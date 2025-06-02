@@ -19,6 +19,29 @@ class ProcessingTask(BaseTask):
             metadata=metadata
         )
 
+    async def update_status(self, status: str, metadata: Dict[str, Any] = None):
+        """Update task status."""
+        if status == "PROCESSING":
+            progress = 0.5  # Default progress for processing
+            if metadata and "stage" in metadata:
+                stage = metadata["stage"]
+                if stage == "audio_transcription":
+                    progress = 0.2
+                elif stage == "text_chunking":
+                    progress = 0.4
+                elif stage == "embedding_generation":
+                    progress = 0.6
+                elif stage == "language_detection":
+                    progress = 0.3
+                elif stage == "segment_transcription":
+                    progress = 0.5
+
+            self.update_progress(progress, f"Status: {status}", **(metadata or {}))
+        elif status == "SUCCESS":
+            self.update_progress(1.0, "Task completed successfully", **(metadata or {}))
+        elif status == "FAILURE":
+            self.update_progress(0.0, "Task failed", **(metadata or {}))
+
     def log_step(self, step: str, **kwargs):
         """Log a processing step."""
         logger.info(
