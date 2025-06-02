@@ -5,27 +5,27 @@ This document provides a comprehensive comparison of MoRAG (Multimodal RAG Inges
 
 ## Comparison Matrix
 
-| Feature | MoRAG | LangChain | LlamaIndex | Haystack | Unstructured.io | Pinecone | Weaviate | Chroma |
-|---------|-------|-----------|------------|----------|-----------------|----------|----------|--------|
-| **Core Focus** | Multimodal RAG Ingestion | LLM Framework | Data Framework | NLP Pipeline | Document Processing | Vector DB | Vector DB | Vector DB |
-| **Document Types** | PDF, DOCX, MD, TXT | Limited | PDF, DOCX, TXT | PDF, DOCX, TXT | 20+ formats | N/A | N/A | N/A |
-| **Audio Processing** | ✅ Whisper STT | ❌ | ❌ | ❌ | ❌ | N/A | N/A | N/A |
-| **Video Processing** | ✅ Full pipeline | ❌ | ❌ | ❌ | ❌ | N/A | N/A | N/A |
-| **Web Scraping** | ✅ Built-in | ✅ Via tools | ✅ Via loaders | ✅ | ❌ | N/A | N/A | N/A |
-| **YouTube Support** | ✅ Native | ✅ Via tools | ✅ Via loaders | ❌ | ❌ | N/A | N/A | N/A |
-| **Semantic Chunking** | ✅ spaCy-based | ✅ Basic | ✅ Advanced | ✅ | ✅ Basic | N/A | N/A | N/A |
-| **Embedding Models** | Gemini, HuggingFace | OpenAI, HuggingFace | OpenAI, HuggingFace | Sentence Transformers | ❌ | OpenAI, Cohere | Multiple | OpenAI, HuggingFace |
-| **Vector Storage** | Qdrant | Multiple | Multiple | Multiple | ❌ | Pinecone | Weaviate | Chroma |
-| **Async Processing** | ✅ Celery | ❌ | ❌ | ✅ | ❌ | N/A | N/A | N/A |
-| **API-First Design** | ✅ FastAPI | ❌ | ❌ | ✅ REST | ✅ | ✅ | ✅ | ✅ |
-| **Webhook Support** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Progress Tracking** | ✅ Real-time | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Orchestration** | ✅ n8n ready | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Docker Support** | ✅ Production-ready | ✅ Basic | ✅ Basic | ✅ | ✅ | ✅ Cloud | ✅ | ✅ |
-| **Monitoring** | ✅ Flower, Logs | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ |
-| **Open Source** | ✅ MIT | ✅ MIT | ✅ MIT | ✅ Apache 2.0 | ✅ Apache 2.0 | ❌ Proprietary | ✅ BSD | ✅ Apache 2.0 |
-| **Cloud Hosting** | Self-hosted | Self-hosted | Self-hosted | Self-hosted | Cloud + Self | Cloud only | Cloud + Self | Self-hosted |
-| **Pricing** | Free | Free | Free | Free | Free + Paid | Paid | Free + Paid | Free |
+| Feature | MoRAG | LangChain | LlamaIndex | Haystack | Unstructured.io | Pinecone | Weaviate | Chroma | Morphik | Milvus |
+|---------|-------|-----------|------------|----------|-----------------|----------|----------|--------|---------|--------|
+| **Core Focus** | Multimodal RAG Ingestion | LLM Framework | Data Framework | NLP Pipeline | Document Processing | Vector DB | Vector DB | Vector DB | Multimodal AI | Vector DB |
+| **Document Types** | PDF, DOCX, MD, TXT | Limited | PDF, DOCX, TXT | PDF, DOCX, TXT | 20+ formats | N/A | N/A | N/A | PDF, Images | N/A |
+| **Audio Processing** | ✅ Whisper STT | ❌ | ❌ | ❌ | ❌ | N/A | N/A | N/A | ✅ | N/A |
+| **Video Processing** | ✅ Full pipeline | ❌ | ❌ | ❌ | ❌ | N/A | N/A | N/A | ✅ | N/A |
+| **Web Scraping** | ✅ Built-in | ✅ Via tools | ✅ Via loaders | ✅ | ❌ | N/A | N/A | N/A | ❌ | N/A |
+| **YouTube Support** | ✅ Native | ✅ Via tools | ✅ Via loaders | ❌ | ❌ | N/A | N/A | N/A | ❌ | N/A |
+| **Semantic Chunking** | ✅ spaCy-based | ✅ Basic | ✅ Advanced | ✅ | ✅ Basic | N/A | N/A | N/A | ✅ | N/A |
+| **Embedding Models** | Gemini, HuggingFace | OpenAI, HuggingFace | OpenAI, HuggingFace | Sentence Transformers | ❌ | OpenAI, Cohere | Multiple | OpenAI, HuggingFace | Proprietary | Multiple |
+| **Vector Storage** | Qdrant | Multiple | Multiple | Multiple | ❌ | Pinecone | Weaviate | Chroma | Built-in | Milvus |
+| **Async Processing** | ✅ Celery | ❌ | ❌ | ✅ | ❌ | N/A | N/A | N/A | ✅ | N/A |
+| **API-First Design** | ✅ FastAPI | ❌ | ❌ | ✅ REST | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Webhook Support** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Progress Tracking** | ✅ Real-time | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| **Orchestration** | ✅ n8n ready | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Docker Support** | ✅ Production-ready | ✅ Basic | ✅ Basic | ✅ | ✅ | ✅ Cloud | ✅ | ✅ | ✅ | ✅ |
+| **Monitoring** | ✅ Flower, Logs | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Open Source** | ✅ MIT | ✅ MIT | ✅ MIT | ✅ Apache 2.0 | ✅ Apache 2.0 | ❌ Proprietary | ✅ BSD | ✅ Apache 2.0 | ❌ Proprietary | ✅ Apache 2.0 |
+| **Cloud Hosting** | Self-hosted | Self-hosted | Self-hosted | Self-hosted | Cloud + Self | Cloud only | Cloud + Self | Self-hosted | Cloud only | Cloud + Self |
+| **Pricing** | Free | Free | Free | Free | Free + Paid | Paid | Free + Paid | Free | Paid | Free + Paid |
 
 ## Detailed Comparison
 
@@ -104,6 +104,43 @@ This document provides a comprehensive comparison of MoRAG (Multimodal RAG Inges
 
 **vs MoRAG:** Vector databases are storage solutions that MoRAG integrates with, but MoRAG provides the complete ingestion pipeline that feeds into these databases.
 
+### 6. Morphik
+**Strengths:**
+- Multimodal AI platform with document, audio, and video processing
+- Cloud-based solution with managed infrastructure
+- Built-in progress tracking and monitoring
+- API-first architecture
+- Enterprise-focused with security features
+
+**Weaknesses:**
+- Proprietary/closed-source solution
+- Cloud-only deployment (no self-hosting)
+- Limited customization options
+- Expensive pricing for small teams
+- No web scraping or YouTube support
+- Vendor lock-in concerns
+
+**vs MoRAG:** Morphik is the closest competitor in terms of multimodal capabilities, but MoRAG offers open-source flexibility, self-hosting options, broader content source support (web/YouTube), and workflow orchestration capabilities.
+
+### 7. Milvus
+**Strengths:**
+- High-performance vector database
+- Excellent scalability and distributed architecture
+- Multiple deployment options (cloud and self-hosted)
+- Strong community and enterprise support
+- Advanced indexing algorithms
+- Good monitoring and observability
+
+**Weaknesses:**
+- Vector storage only (no processing pipeline)
+- No content ingestion or preprocessing
+- Requires separate embedding generation
+- Complex setup for simple use cases
+- No multimodal processing capabilities
+- Focused on storage, not end-to-end workflow
+
+**vs MoRAG:** Milvus is a vector database that MoRAG could integrate with, but MoRAG provides the complete multimodal ingestion pipeline that generates the vectors Milvus stores.
+
 ## Unique Value Propositions of MoRAG
 
 ### 1. **True Multimodal Support**
@@ -155,7 +192,7 @@ This document provides a comprehensive comparison of MoRAG (Multimodal RAG Inges
 |-----------|--------------|--------------|-----------|
 | **Web Framework** | FastAPI | Flask, Django | Async support, automatic docs, type hints |
 | **Task Queue** | Celery + Redis | RQ, Dramatiq | Mature, scalable, monitoring tools |
-| **Vector DB** | Qdrant | Pinecone, Weaviate | Open source, self-hosted, performance |
+| **Vector DB** | Qdrant | Pinecone, Weaviate, Milvus | Open source, self-hosted, performance |
 | **Document Parsing** | Unstructured.io + Docling | PyPDF2, pdfplumber | Comprehensive format support |
 | **NLP** | spaCy | NLTK, transformers | Production-ready, efficient |
 | **Embeddings** | Gemini API | OpenAI, HuggingFace | Cost-effective, high quality |
