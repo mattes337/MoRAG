@@ -21,7 +21,7 @@
 
 ### Web Content
 - [x] **12-web-scraping.md** - Website content extraction ✅
-- [ ] **13-content-conversion.md** - HTML to Markdown conversion
+- [x] **13-content-conversion.md** - HTML to Markdown conversion ✅
 
 ### Embedding & Storage
 - [ ] **14-gemini-integration.md** - Gemini API integration for embeddings
@@ -51,6 +51,7 @@
 ✅ Task 10: Image Processing with Vision Models - COMPLETED
 ✅ Task 11: YouTube Integration with yt-dlp - COMPLETED
 ✅ Task 12: Web Scraping Implementation - COMPLETED
+✅ Task 13: HTML to Markdown Content Conversion - COMPLETED
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)

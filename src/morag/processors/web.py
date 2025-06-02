@@ -15,6 +15,7 @@ from markdownify import markdownify
 
 from ..core.exceptions import ProcessingError, ValidationError
 from ..services.chunking import ChunkingService
+from ..services.content_converter import ContentConverter, ConversionConfig, ConversionOptions
 from .document import DocumentChunk
 
 logger = structlog.get_logger(__name__)
@@ -69,9 +70,14 @@ class WebScrapingResult:
 class WebProcessor:
     """Web content processor for scraping and extracting content."""
     
-    def __init__(self, chunking_service: Optional[ChunkingService] = None):
+    def __init__(
+        self,
+        chunking_service: Optional[ChunkingService] = None,
+        content_converter: Optional[ContentConverter] = None
+    ):
         """Initialize web processor."""
         self.chunking_service = chunking_service or ChunkingService()
+        self.content_converter = content_converter or ContentConverter()
         self._last_request_time = 0.0
         
     def _validate_url(self, url: str) -> str:
@@ -293,23 +299,33 @@ class WebProcessor:
         # Fallback to body
         return soup.find('body') or soup
 
-    def _convert_to_markdown(self, html_content: str, config: WebScrapingConfig) -> str:
-        """Convert HTML content to Markdown."""
-        # Configure markdownify options
-        options = {
-            'heading_style': 'ATX',  # Use # for headings
-            'bullets': '-',  # Use - for bullet points
-            'strip': ['script', 'style', 'nav', 'footer'],  # Remove unwanted elements
-        }
+    async def _convert_to_markdown(self, html_content: str, config: WebScrapingConfig) -> str:
+        """Convert HTML content to Markdown using ContentConverter."""
+        # Configure conversion options
+        conversion_options = ConversionOptions(
+            heading_style='ATX',
+            bullet_style='-',
+            link_style='inline',
+            clean_whitespace=config.clean_content
+        )
 
-        # Convert to markdown
-        markdown = markdownify(html_content, **options)
+        # Use ContentConverter for advanced conversion
+        result = await self.content_converter.html_to_markdown(html_content, conversion_options)
 
-        # Clean up the markdown
-        if config.clean_content:
-            markdown = self._clean_markdown(markdown)
-
-        return markdown
+        if result.success:
+            return result.content
+        else:
+            # Fallback to basic markdownify if ContentConverter fails
+            logger.warning("ContentConverter failed, falling back to markdownify", error=result.error_message)
+            options = {
+                'heading_style': 'ATX',
+                'bullets': '-',
+                'strip': ['script', 'style', 'nav', 'footer'],
+            }
+            markdown = markdownify(html_content, **options)
+            if config.clean_content:
+                markdown = self._clean_markdown(markdown)
+            return markdown
 
     def _clean_markdown(self, markdown: str) -> str:
         """Clean up markdown content."""
@@ -366,7 +382,7 @@ class WebProcessor:
             # Convert to markdown if requested
             markdown_content = ""
             if config.convert_to_markdown:
-                markdown_content = self._convert_to_markdown(str(main_content), config)
+                markdown_content = await self._convert_to_markdown(str(main_content), config)
 
             # Extract links and images
             links = []
