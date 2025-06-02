@@ -49,4 +49,12 @@ class Settings(BaseSettings):
         case_sensitive=False
     )
 
+    def validate_gemini_config(self) -> None:
+        """Validate Gemini API configuration."""
+        if not self.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is required")
+
+        if not self.gemini_api_key.startswith("AI"):
+            raise ValueError("Invalid Gemini API key format - should start with 'AI'")
+
 settings = Settings()

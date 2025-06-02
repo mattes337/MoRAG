@@ -8,6 +8,7 @@ import redis
 from morag.core.config import settings
 from morag.services.storage import qdrant_service
 from morag.services.task_manager import task_manager
+from morag.services.embedding import gemini_service
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -60,10 +61,10 @@ async def readiness_check():
         logger.error("Qdrant health check failed", error=str(e))
         services["qdrant"] = "unhealthy"
     
-    # Check Gemini API (will be implemented in task 14)
+    # Check Gemini API
     try:
-        # Placeholder for Gemini check
-        services["gemini"] = "healthy"
+        gemini_health = await gemini_service.health_check()
+        services["gemini"] = gemini_health["status"]
     except Exception as e:
         logger.error("Gemini health check failed", error=str(e))
         services["gemini"] = "unhealthy"

@@ -6,19 +6,38 @@ import structlog
 
 logger = structlog.get_logger()
 
-def prepare_text_for_summary(text: str) -> str:
-    """Prepare text for summarization by cleaning and normalizing."""
+def prepare_text_for_embedding(text: str) -> str:
+    """Prepare text for embedding generation."""
     # Remove excessive whitespace
     text = re.sub(r'\s+', ' ', text)
-    
-    # Remove special characters that might interfere with processing
-    text = re.sub(r'[^\w\s\.\,\!\?\;\:\-\(\)\[\]\{\}\"\'\/]', '', text)
-    
-    # Normalize quotes
-    text = re.sub(r'["""]', '"', text)
-    text = re.sub(r"[''']", "'", text)
-    
-    return text.strip()
+
+    # Remove special characters that might interfere
+    text = re.sub(r'[^\w\s\-.,!?;:()\[\]{}"\']', ' ', text)
+
+    # Trim and ensure reasonable length
+    text = text.strip()
+
+    # Truncate if too long (Gemini has token limits)
+    max_chars = 30000  # Conservative limit
+    if len(text) > max_chars:
+        text = text[:max_chars] + "..."
+
+    return text
+
+def prepare_text_for_summary(text: str) -> str:
+    """Prepare text for summarization."""
+    # Similar cleaning but preserve more structure
+    text = re.sub(r'\n\s*\n', '\n\n', text)  # Normalize paragraph breaks
+    text = re.sub(r'[ \t]+', ' ', text)      # Normalize spaces
+
+    text = text.strip()
+
+    # Truncate if too long
+    max_chars = 25000  # Leave room for prompt
+    if len(text) > max_chars:
+        text = text[:max_chars] + "..."
+
+    return text
 
 def combine_text_and_summary(text: str, summary: str) -> str:
     """Combine original text and summary for embedding generation."""

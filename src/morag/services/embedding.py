@@ -181,9 +181,9 @@ class GeminiService:
             "bullet": "Create a bullet-point summary of key information",
             "abstract": "Create an abstract-style summary suitable for academic content"
         }
-        
+
         instruction = style_instructions.get(style, style_instructions["concise"])
-        
+
         return f"""
 {instruction} of the following text in approximately {max_length} words or less.
 Focus on the main ideas, key facts, and important details.
@@ -193,6 +193,36 @@ Text to summarize:
 
 Summary:
 """
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Check if Gemini API is accessible."""
+        try:
+            if not self.client:
+                return {
+                    "status": "unhealthy",
+                    "error": "Gemini client not initialized",
+                    "embedding_model": self.embedding_model,
+                    "generation_model": self.generation_model
+                }
+
+            # Test with a simple embedding request
+            test_result = await self.generate_embedding("Health check test")
+
+            return {
+                "status": "healthy",
+                "embedding_model": self.embedding_model,
+                "generation_model": self.generation_model,
+                "embedding_dimension": len(test_result.embedding)
+            }
+
+        except Exception as e:
+            logger.error("Gemini health check failed", error=str(e))
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "embedding_model": self.embedding_model,
+                "generation_model": self.generation_model
+            }
 
 # Global instance
 gemini_service = GeminiService()
