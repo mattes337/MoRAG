@@ -15,9 +15,9 @@
 
 ### Media Processing
 - [x] **08-audio-processing.md** - Speech-to-text with Whisper ✅
-- [ ] **09-video-processing.md** - Video extraction and processing
-- [ ] **10-image-processing.md** - Image captioning and OCR
-- [ ] **11-youtube-integration.md** - YouTube video download and processing
+- [x] **09-video-processing.md** - Video extraction and processing ✅
+- [x] **10-image-processing.md** - Image captioning and OCR ✅
+- [x] **11-youtube-integration.md** - YouTube video download and processing ✅
 
 ### Web Content
 - [ ] **12-web-scraping.md** - Website content extraction
@@ -47,6 +47,9 @@
 ✅ Task 06: Semantic Chunking with spaCy - COMPLETED
 ✅ Task 07: Summary Generation with Gemini - COMPLETED
 ✅ Task 08: Audio Processing with Whisper - COMPLETED
+✅ Task 09: Video Processing with FFmpeg - COMPLETED
+✅ Task 10: Image Processing with Vision Models - COMPLETED
+✅ Task 11: YouTube Integration with yt-dlp - COMPLETED
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)
