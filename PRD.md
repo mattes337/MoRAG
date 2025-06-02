@@ -96,10 +96,11 @@ The core of the ingestion process will be handled by a Python-based microservice
 #### **5.1. Data Ingestion Module (Python Service)**
 
 * **FR1.1 Document Ingestion:**  
-  * Accept PDF, DOCX, MD files.  
-  * Utilize unstructured.io for parsing, converting to Markdown, and extracting elements (text, tables, image references).  
-  * Handle images within documents by extracting them and queueing for image processing.  
-  * Handle tables by converting them to a Markdown representation or a structured textual description.  
+  * Accept PDF, DOCX, MD files.
+  * Utilize unstructured.io as the primary library for parsing, converting to Markdown, and extracting elements (text, tables, image references).
+  * Consider docling as an alternative for complex PDF layouts or performance optimization.
+  * Handle images within documents by extracting them and queueing for image processing.
+  * Handle tables by converting them to a Markdown representation or a structured textual description.
 * **FR1.2 Voice Ingestion:**  
   * Accept audio files (MP3, WAV, M4A).  
   * Utilize OpenAI Whisper for Speech-to-Text (STT).  
@@ -123,10 +124,10 @@ The core of the ingestion process will be handled by a Python-based microservice
 * **FR1.6 Content Chunking:**  
   * Implement semantic chunking using spaCy for sentence/paragraph boundary detection and NLP-based grouping.  
   * Chunk size should be configurable but aim for meaningful semantic units.  
-* **FR1.7 Summary Generation (CRAG-inspired):**  
-  * For each text chunk, generate a concise summary.  
-  * Prepend this summary to the chunk content before embedding (e.g., "Summary: \[Generated Summary\]. Original Content: \[Chunk Content\]").  
-  * This can be done using an LLM.  
+* **FR1.7 Summary Generation (CRAG-inspired):**
+  * For each text chunk, generate a concise summary.
+  * Prepend this summary to the chunk content before embedding (e.g., "Summary: \[Generated Summary\]. Original Content: \[Chunk Content\]").
+  * This will be done using Google Gemini API for consistent, high-quality summarization.
 * **FR1.8 Metadata Association:**  
   * Extract/generate and associate relevant metadata with each chunk:  
     * Original source (filename, URL).  
@@ -136,9 +137,9 @@ The core of the ingestion process will be handled by a Python-based microservice
     * Page number/section ID (for documents/websites).  
     * Image reference/URL (for image-derived text).  
     * Generated topics.  
-* **FR1.9 Embedding Generation:**  
-  * Utilize a pre-trained sentence transformer model (e.g., from Hugging Face) or an API like OpenAI Embeddings to generate vector embeddings for each (summary \+ chunk) combination.  
-  * The choice of embedding model should be configurable.  
+* **FR1.9 Embedding Generation:**
+  * Utilize Google Gemini API with text-embedding-004 model to generate vector embeddings for each (summary \+ chunk) combination.
+  * Fallback to sentence transformer models (e.g., from Hugging Face) should be configurable for offline scenarios or cost optimization.
 * **FR1.10 Vector Storage (Qdrant):**  
   * Store the generated embeddings along with their corresponding text chunks and metadata in a Qdrant collection.  
   * Ensure Qdrant is configured with appropriate indexing for efficient similarity search.
@@ -200,9 +201,10 @@ The core of the ingestion process will be handled by a Python-based microservice
 * **7.2. Python Processing Service:**  
   * **Framework:** FastAPI or Flask (FastAPI preferred for async support and performance).  
   * **Task Queue (Optional but Recommended for heavy tasks):** Celery with Redis or RabbitMQ. For simpler async, FastAPI's background tasks or asyncio might suffice initially.  
-  * **Document Parsing:**  
-    * **Library:** unstructured.io  
-    * **Reasoning:** unstructured.io provides comprehensive support for various file formats (PDF, DOCX, MD, HTML, etc.), robust parsing and cleaning capabilities, and options for different parsing strategies. It's well-suited for converting diverse documents into a clean textual format, including handling elements like tables and images (by referencing them). It's more broadly applicable and community-supported for general RAG preprocessing than docling for this specific use case.  
+  * **Document Parsing:**
+    * **Primary Library:** unstructured.io
+    * **Alternative Library:** docling
+    * **Reasoning:** unstructured.io provides comprehensive support for various file formats (PDF, DOCX, MD, HTML, etc.), robust parsing and cleaning capabilities, and options for different parsing strategies. It's well-suited for converting diverse documents into a clean textual format, including handling elements like tables and images (by referencing them). Docling is considered as an alternative that may offer better performance for certain document types, particularly PDFs with complex layouts. The implementation should allow for easy switching between these libraries based on document type or performance requirements.
   * **NLP / Semantic Chunking:**  
     * **Library:** spaCy  
     * **Reasoning:** spaCy is efficient for NLP tasks like sentence segmentation, tokenization, and can be used to inform semantic chunking logic. Its pre-trained models are robust.  
@@ -215,10 +217,10 @@ The core of the ingestion process will be handled by a Python-based microservice
     * Consider multimodal LLMs if available and suitable.  
   * **Web Scraping:**  
     * **Library:** Firecrawl.io (as suggested, if it meets requirements for scraping and Markdown conversion) or BeautifulSoup \+ requests \+ markdownify for a custom solution.  
-  * **Embedding Models:**  
-    * Sentence Transformers (e.g., all-MiniLM-L6-v2, multi-qa-mpnet-base-dot-v1) via Hugging Face.  
-    * OpenAI Embeddings API (e.g., text-embedding-ada-002 or newer).  
-    * Choice depends on cost, performance, and desired embedding quality.  
+  * **Embedding Models:**
+    * **Primary:** Google Gemini API with text-embedding-004 model.
+    * **Alternative:** Sentence Transformers (e.g., all-MiniLM-L6-v2, multi-qa-mpnet-base-dot-v1) via Hugging Face.
+    * **Reasoning:** Gemini's text-embedding-004 provides state-of-the-art embedding quality with competitive pricing. Sentence Transformers offer a self-hosted alternative for cost optimization or offline scenarios.
   * **YouTube Download:**  
     * **Library:** yt-dlp (a maintained fork of youtube-dl).  
 * **7.3. Vector Database:**  
