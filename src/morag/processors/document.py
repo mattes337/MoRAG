@@ -1,0 +1,388 @@
+from typing import Dict, Any, List, Optional, Union, Tuple
+from pathlib import Path
+import tempfile
+import structlog
+from dataclasses import dataclass
+from enum import Enum
+
+from morag.core.config import settings
+from morag.core.exceptions import ProcessingError, ValidationError
+from morag.utils.text_processing import prepare_text_for_summary
+
+logger = structlog.get_logger()
+
+# Import unstructured only when available
+try:
+    from unstructured.partition.auto import partition
+    from unstructured.partition.pdf import partition_pdf
+    from unstructured.partition.docx import partition_docx
+    from unstructured.partition.md import partition_md
+    from unstructured.documents.elements import Element, Text, Title, NarrativeText, Table, Image
+    UNSTRUCTURED_AVAILABLE = True
+except ImportError:
+    UNSTRUCTURED_AVAILABLE = False
+    logger.warning("Unstructured.io not available - using basic text processing")
+
+class DocumentType(Enum):
+    """Supported document types."""
+    PDF = "pdf"
+    DOCX = "docx"
+    MARKDOWN = "md"
+    TXT = "txt"
+
+@dataclass
+class DocumentChunk:
+    """Represents a processed document chunk."""
+    text: str
+    chunk_type: str  # text, table, image_caption
+    page_number: Optional[int] = None
+    element_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+@dataclass
+class DocumentParseResult:
+    """Result of document parsing."""
+    chunks: List[DocumentChunk]
+    metadata: Dict[str, Any]
+    images: List[Dict[str, Any]]  # Extracted images for processing
+    total_pages: Optional[int] = None
+    word_count: int = 0
+
+class DocumentProcessor:
+    """Handles document parsing and processing."""
+    
+    def __init__(self):
+        self.supported_types = {
+            ".pdf": DocumentType.PDF,
+            ".docx": DocumentType.DOCX,
+            ".doc": DocumentType.DOCX,
+            ".md": DocumentType.MARKDOWN,
+            ".markdown": DocumentType.MARKDOWN,
+            ".txt": DocumentType.TXT,
+        }
+    
+    def detect_document_type(self, file_path: Union[str, Path]) -> DocumentType:
+        """Detect document type from file extension."""
+        path = Path(file_path)
+        extension = path.suffix.lower()
+        
+        if extension not in self.supported_types:
+            raise ValidationError(f"Unsupported file type: {extension}")
+        
+        return self.supported_types[extension]
+    
+    async def parse_document(
+        self,
+        file_path: Union[str, Path],
+        use_docling: bool = False
+    ) -> DocumentParseResult:
+        """Parse document and extract structured content."""
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            raise ValidationError(f"File not found: {file_path}")
+        
+        doc_type = self.detect_document_type(file_path)
+        
+        logger.info(
+            "Starting document parsing",
+            file_path=str(file_path),
+            doc_type=doc_type.value,
+            use_docling=use_docling
+        )
+        
+        try:
+            if use_docling and doc_type == DocumentType.PDF:
+                return await self._parse_with_docling(file_path)
+            else:
+                return await self._parse_with_unstructured(file_path, doc_type)
+                
+        except Exception as e:
+            logger.error("Document parsing failed", error=str(e), file_path=str(file_path))
+            raise ProcessingError(f"Failed to parse document: {str(e)}")
+    
+    async def _parse_with_unstructured(
+        self,
+        file_path: Path,
+        doc_type: DocumentType
+    ) -> DocumentParseResult:
+        """Parse document using unstructured.io."""
+
+        if not UNSTRUCTURED_AVAILABLE:
+            return await self._parse_with_basic_text(file_path, doc_type)
+
+        # Choose appropriate partition function
+        partition_func = {
+            DocumentType.PDF: partition_pdf,
+            DocumentType.DOCX: partition_docx,
+            DocumentType.MARKDOWN: partition_md,
+            DocumentType.TXT: partition,
+        }.get(doc_type, partition)
+
+        # Parse document
+        elements = partition_func(
+            filename=str(file_path),
+            strategy="hi_res" if doc_type == DocumentType.PDF else "fast",
+            include_page_breaks=True,
+            infer_table_structure=True,
+            extract_images_in_pdf=True if doc_type == DocumentType.PDF else False,
+        )
+
+        return await self._process_elements(elements, file_path)
+
+    async def _parse_with_basic_text(
+        self,
+        file_path: Path,
+        doc_type: DocumentType
+    ) -> DocumentParseResult:
+        """Basic text parsing fallback when unstructured is not available."""
+
+        # Read file content
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            # Try with different encoding
+            with open(file_path, 'r', encoding='latin-1') as f:
+                content = f.read()
+
+        # Simple text processing
+        chunks = []
+
+        if doc_type == DocumentType.MARKDOWN:
+            # Basic markdown processing
+            lines = content.split('\n')
+            current_chunk = ""
+
+            for line in lines:
+                if line.strip().startswith('#'):
+                    # Header - create new chunk
+                    if current_chunk.strip():
+                        chunks.append(DocumentChunk(
+                            text=current_chunk.strip(),
+                            chunk_type="text",
+                            page_number=1,
+                            element_id=f"chunk_{len(chunks)}",
+                            metadata={"basic_parser": True}
+                        ))
+                        current_chunk = ""
+
+                    chunks.append(DocumentChunk(
+                        text=line.strip(),
+                        chunk_type="title",
+                        page_number=1,
+                        element_id=f"title_{len(chunks)}",
+                        metadata={"basic_parser": True, "header_level": line.count('#')}
+                    ))
+                else:
+                    current_chunk += line + "\n"
+
+            # Add remaining content
+            if current_chunk.strip():
+                chunks.append(DocumentChunk(
+                    text=current_chunk.strip(),
+                    chunk_type="text",
+                    page_number=1,
+                    element_id=f"chunk_{len(chunks)}",
+                    metadata={"basic_parser": True}
+                ))
+
+        else:
+            # Simple paragraph-based chunking for other formats
+            paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+
+            for i, paragraph in enumerate(paragraphs):
+                chunks.append(DocumentChunk(
+                    text=paragraph,
+                    chunk_type="text",
+                    page_number=1,
+                    element_id=f"paragraph_{i}",
+                    metadata={"basic_parser": True}
+                ))
+
+        # Calculate metadata
+        metadata = {
+            "parser": "basic_text",
+            "file_name": file_path.name,
+            "file_size": file_path.stat().st_size,
+            "total_chunks": len(chunks),
+            "total_images": 0
+        }
+
+        return DocumentParseResult(
+            chunks=chunks,
+            metadata=metadata,
+            images=[],
+            total_pages=1,
+            word_count=len(content.split())
+        )
+    
+    async def _parse_with_docling(self, file_path: Path) -> DocumentParseResult:
+        """Parse document using docling (alternative for PDFs)."""
+        try:
+            # Import docling only when needed
+            from docling.document_converter import DocumentConverter
+            
+            converter = DocumentConverter()
+            result = converter.convert(str(file_path))
+            
+            # Convert docling result to our format
+            chunks = []
+            images = []
+            
+            # Process docling document structure
+            for element in result.document.body:
+                if hasattr(element, 'text') and element.text.strip():
+                    chunk = DocumentChunk(
+                        text=element.text.strip(),
+                        chunk_type="text",
+                        page_number=getattr(element, 'page', None),
+                        metadata={
+                            "element_type": type(element).__name__,
+                            "docling_source": True
+                        }
+                    )
+                    chunks.append(chunk)
+            
+            metadata = {
+                "parser": "docling",
+                "file_name": file_path.name,
+                "file_size": file_path.stat().st_size,
+                "total_elements": len(chunks)
+            }
+            
+            return DocumentParseResult(
+                chunks=chunks,
+                metadata=metadata,
+                images=images,
+                word_count=sum(len(chunk.text.split()) for chunk in chunks)
+            )
+            
+        except ImportError:
+            logger.warning("Docling not available, falling back to unstructured.io")
+            return await self._parse_with_unstructured(file_path, DocumentType.PDF)
+        except Exception as e:
+            logger.error("Docling parsing failed", error=str(e))
+            # Fallback to unstructured.io
+            return await self._parse_with_unstructured(file_path, DocumentType.PDF)
+    
+    async def _process_elements(
+        self,
+        elements,  # List[Element] when unstructured is available
+        file_path: Path
+    ) -> DocumentParseResult:
+        """Process unstructured elements into chunks."""
+        if not UNSTRUCTURED_AVAILABLE:
+            raise ProcessingError("Cannot process elements without unstructured.io")
+
+        chunks = []
+        images = []
+        current_page = 1
+
+        for i, element in enumerate(elements):
+            # Update page number if available
+            if hasattr(element, 'metadata') and element.metadata.page_number:
+                current_page = element.metadata.page_number
+
+            # Process different element types
+            if isinstance(element, (Text, NarrativeText, Title)):
+                if element.text.strip():
+                    chunk = DocumentChunk(
+                        text=element.text.strip(),
+                        chunk_type="text",
+                        page_number=current_page,
+                        element_id=f"element_{i}",
+                        metadata={
+                            "element_type": type(element).__name__,
+                            "category": getattr(element, 'category', 'text')
+                        }
+                    )
+                    chunks.append(chunk)
+
+            elif isinstance(element, Table):
+                # Convert table to markdown format
+                table_text = self._table_to_markdown(element)
+                if table_text:
+                    chunk = DocumentChunk(
+                        text=table_text,
+                        chunk_type="table",
+                        page_number=current_page,
+                        element_id=f"table_{i}",
+                        metadata={
+                            "element_type": "Table",
+                            "table_html": getattr(element, 'metadata', {}).get('text_as_html', '')
+                        }
+                    )
+                    chunks.append(chunk)
+
+            elif isinstance(element, Image):
+                # Queue image for processing
+                image_info = {
+                    "element_id": f"image_{i}",
+                    "page_number": current_page,
+                    "metadata": element.metadata.__dict__ if hasattr(element, 'metadata') else {}
+                }
+                images.append(image_info)
+
+        # Calculate metadata
+        metadata = {
+            "parser": "unstructured",
+            "file_name": file_path.name,
+            "file_size": file_path.stat().st_size,
+            "total_elements": len(elements),
+            "total_chunks": len(chunks),
+            "total_images": len(images)
+        }
+
+        # Estimate total pages
+        total_pages = max((chunk.page_number for chunk in chunks if chunk.page_number), default=1)
+
+        return DocumentParseResult(
+            chunks=chunks,
+            metadata=metadata,
+            images=images,
+            total_pages=total_pages,
+            word_count=sum(len(chunk.text.split()) for chunk in chunks)
+        )
+    
+    def _table_to_markdown(self, table_element) -> str:
+        """Convert table element to markdown format."""
+        if not UNSTRUCTURED_AVAILABLE:
+            return "**Table:** (content not available without unstructured.io)"
+
+        try:
+            # Try to get HTML table and convert to markdown
+            if hasattr(table_element, 'metadata') and hasattr(table_element.metadata, 'text_as_html'):
+                html_table = table_element.metadata.text_as_html
+                # Simple HTML to markdown conversion for tables
+                # This is a basic implementation - could be enhanced
+                return f"**Table:**\n{table_element.text}\n"
+            else:
+                return f"**Table:**\n{table_element.text}\n"
+        except Exception as e:
+            logger.warning("Failed to convert table to markdown", error=str(e))
+            return f"**Table:**\n{table_element.text}\n"
+    
+    def validate_file(self, file_path: Union[str, Path], max_size_mb: int = 100) -> bool:
+        """Validate file before processing."""
+        path = Path(file_path)
+        
+        # Check if file exists
+        if not path.exists():
+            raise ValidationError(f"File not found: {path}")
+        
+        # Check file size
+        size_mb = path.stat().st_size / (1024 * 1024)
+        if size_mb > max_size_mb:
+            raise ValidationError(f"File too large: {size_mb:.1f}MB (max: {max_size_mb}MB)")
+        
+        # Check file type
+        try:
+            self.detect_document_type(path)
+        except ValidationError:
+            raise
+        
+        return True
+
+# Global instance
+document_processor = DocumentProcessor()

@@ -8,9 +8,9 @@
 - [x] **03-database-setup.md** - Qdrant vector database configuration ✅
 - [x] **04-task-queue.md** - Async task processing with Celery/Redis ✅
 
-### Document Processing  
-- [ ] **05-document-parser.md** - Document parsing with unstructured.io/docling
-- [ ] **06-semantic-chunking.md** - Intelligent text chunking with spaCy
+### Document Processing
+- [x] **05-document-parser.md** - Document parsing with unstructured.io/docling ✅
+- [x] **06-semantic-chunking.md** - Intelligent text chunking with spaCy ✅
 - [ ] **07-summary-generation.md** - CRAG-inspired summarization with Gemini
 
 ### Media Processing
@@ -43,7 +43,9 @@
 ✅ Task 02: FastAPI Service Setup with Async Support - COMPLETED
 ✅ Task 03: Qdrant Vector Database Configuration - COMPLETED
 ✅ Task 04: Async Task Processing with Celery/Redis - COMPLETED
-🔄 Task 05: Document Parser with unstructured.io/docling - READY TO START
+✅ Task 05: Document Parser with unstructured.io/docling - COMPLETED
+✅ Task 06: Semantic Chunking with spaCy - COMPLETED
+🔄 Task 07: Summary Generation with Gemini - READY TO START
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)
