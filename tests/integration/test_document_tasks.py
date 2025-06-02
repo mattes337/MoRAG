@@ -2,7 +2,7 @@ import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
-from morag.tasks.document_tasks import process_document_task
+from morag.tasks.document_tasks import process_document_task, _process_document_impl
 from morag.services.embedding import EmbeddingResult, SummaryResult
 
 @pytest.fixture
@@ -17,20 +17,20 @@ def mock_gemini_service():
         )
         
         # Mock batch embedding generation
-        mock.generate_embeddings_batch.return_value = [
+        mock.generate_embeddings_batch = AsyncMock(return_value=[
             EmbeddingResult(
                 embedding=[0.1] * 768,
                 token_count=10,
                 model="text-embedding-004"
             )
-        ]
+        ])
         
         # Mock summary generation
-        mock.generate_summary.return_value = SummaryResult(
+        mock.generate_summary = AsyncMock(return_value=SummaryResult(
             summary="Test summary",
             token_count=5,
             model="gemini-2.0-flash-001"
-        )
+        ))
         
         yield mock
 
@@ -38,7 +38,7 @@ def mock_gemini_service():
 def mock_qdrant_service():
     """Mock Qdrant service for testing."""
     with patch('morag.tasks.document_tasks.qdrant_service') as mock:
-        mock.store_chunks.return_value = ["point_1", "point_2"]
+        mock.store_chunks = AsyncMock(return_value=["point_1", "point_2"])
         yield mock
 
 @pytest.mark.asyncio
@@ -67,12 +67,12 @@ Some content in section 2 with additional information.
         mock_task.log_step = MagicMock()
         mock_task.update_progress = MagicMock()
         
-        # Process document
-        result = await process_document_task(
+        # Process document - call the implementation function directly
+        result = await _process_document_impl(
             mock_task,
-            file_path=temp_path,
-            source_type="document",
-            metadata={"test": True, "source": "test"}
+            temp_path,
+            "document",
+            {"test": True, "source": "test"}
         )
         
         # Verify result
@@ -109,12 +109,12 @@ async def test_document_processing_with_docling(mock_gemini_service, mock_qdrant
         mock_task.update_progress = MagicMock()
         
         # Process document with docling option
-        result = await process_document_task(
+        result = await _process_document_impl(
             mock_task,
-            file_path=temp_path,
-            source_type="document",
-            metadata={"test": True},
-            use_docling=True
+            temp_path,
+            "document",
+            {"test": True},
+            True
         )
         
         assert result["status"] == "success"
@@ -130,11 +130,11 @@ async def test_document_processing_file_not_found():
     mock_task.update_progress = MagicMock()
     
     with pytest.raises(Exception):
-        await process_document_task(
+        await _process_document_impl(
             mock_task,
-            file_path="non_existent_file.pdf",
-            source_type="document",
-            metadata={"test": True}
+            "non_existent_file.pdf",
+            "document",
+            {"test": True}
         )
 
 @pytest.mark.asyncio
@@ -152,24 +152,24 @@ async def test_document_processing_summary_failure(mock_qdrant_service):
             mock_gemini.generate_summary.side_effect = Exception("Summary generation failed")
             
             # Embedding generation succeeds
-            mock_gemini.generate_embeddings_batch.return_value = [
+            mock_gemini.generate_embeddings_batch = AsyncMock(return_value=[
                 EmbeddingResult(
                     embedding=[0.1] * 768,
                     token_count=10,
                     model="text-embedding-004"
                 )
-            ]
+            ])
             
             mock_task = MagicMock()
             mock_task.log_step = MagicMock()
             mock_task.update_progress = MagicMock()
             
             # Should still succeed with fallback summary
-            result = await process_document_task(
+            result = await _process_document_impl(
                 mock_task,
-                file_path=temp_path,
-                source_type="document",
-                metadata={"test": True}
+                temp_path,
+                "document",
+                {"test": True}
             )
             
             assert result["status"] == "success"
@@ -190,11 +190,11 @@ async def test_document_processing_empty_file(mock_gemini_service, mock_qdrant_s
         mock_task.log_step = MagicMock()
         mock_task.update_progress = MagicMock()
         
-        result = await process_document_task(
+        result = await _process_document_impl(
             mock_task,
-            file_path=temp_path,
-            source_type="document",
-            metadata={"test": True}
+            temp_path,
+            "document",
+            {"test": True}
         )
         
         # Should handle empty file gracefully
@@ -216,21 +216,21 @@ async def test_document_processing_metadata_preservation():
         with patch('morag.tasks.document_tasks.gemini_service') as mock_gemini, \
              patch('morag.tasks.document_tasks.qdrant_service') as mock_qdrant:
             
-            mock_gemini.generate_summary.return_value = SummaryResult(
+            mock_gemini.generate_summary = AsyncMock(return_value=SummaryResult(
                 summary="Test summary",
                 token_count=5,
                 model="gemini-2.0-flash-001"
-            )
-            
-            mock_gemini.generate_embeddings_batch.return_value = [
+            ))
+
+            mock_gemini.generate_embeddings_batch = AsyncMock(return_value=[
                 EmbeddingResult(
                     embedding=[0.1] * 768,
                     token_count=10,
                     model="text-embedding-004"
                 )
-            ]
-            
-            mock_qdrant.store_chunks.return_value = ["point_1"]
+            ])
+
+            mock_qdrant.store_chunks = AsyncMock(return_value=["point_1"])
             
             mock_task = MagicMock()
             mock_task.log_step = MagicMock()
@@ -242,11 +242,11 @@ async def test_document_processing_metadata_preservation():
                 "created_at": "2024-01-01"
             }
             
-            result = await process_document_task(
+            result = await _process_document_impl(
                 mock_task,
-                file_path=temp_path,
-                source_type="document",
-                metadata=original_metadata
+                temp_path,
+                "document",
+                original_metadata
             )
             
             # Check that chunks were stored with enhanced metadata
@@ -275,31 +275,31 @@ async def test_document_processing_progress_tracking():
         with patch('morag.tasks.document_tasks.gemini_service') as mock_gemini, \
              patch('morag.tasks.document_tasks.qdrant_service') as mock_qdrant:
             
-            mock_gemini.generate_summary.return_value = SummaryResult(
+            mock_gemini.generate_summary = AsyncMock(return_value=SummaryResult(
                 summary="Test summary",
                 token_count=5,
                 model="gemini-2.0-flash-001"
-            )
-            
-            mock_gemini.generate_embeddings_batch.return_value = [
+            ))
+
+            mock_gemini.generate_embeddings_batch = AsyncMock(return_value=[
                 EmbeddingResult(
                     embedding=[0.1] * 768,
                     token_count=10,
                     model="text-embedding-004"
                 )
-            ]
-            
-            mock_qdrant.store_chunks.return_value = ["point_1"]
+            ])
+
+            mock_qdrant.store_chunks = AsyncMock(return_value=["point_1"])
             
             mock_task = MagicMock()
             mock_task.log_step = MagicMock()
             mock_task.update_progress = MagicMock()
             
-            await process_document_task(
+            await _process_document_impl(
                 mock_task,
-                file_path=temp_path,
-                source_type="document",
-                metadata={"test": True}
+                temp_path,
+                "document",
+                {"test": True}
             )
             
             # Verify progress updates were called with expected values

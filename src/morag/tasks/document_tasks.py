@@ -8,28 +8,29 @@ from morag.processors.document import document_processor
 from morag.services.embedding import gemini_service
 from morag.services.chunking import chunking_service
 from morag.services.storage import qdrant_service
+from morag.services.summarization import enhanced_summarization_service, SummaryConfig, SummaryStrategy
 from morag.utils.text_processing import combine_text_and_summary
 
 logger = structlog.get_logger()
 
-@celery_app.task(bind=True, base=ProcessingTask)
-async def process_document_task(
-    self,
+async def _process_document_impl(
+    task_instance,
     file_path: str,
     source_type: str,
     metadata: Dict[str, Any],
-    use_docling: bool = False
+    use_docling: bool = False,
+    use_enhanced_summary: bool = False
 ) -> Dict[str, Any]:
-    """Process a document file through the complete pipeline."""
+    """Implementation of document processing - separated for testing."""
 
     try:
-        self.log_step("Starting document processing", file_path=file_path)
-        self.update_progress(0.1, "Validating file")
+        task_instance.log_step("Starting document processing", file_path=file_path)
+        task_instance.update_progress(0.1, "Validating file")
 
         # Validate file
         document_processor.validate_file(file_path)
 
-        self.update_progress(0.2, "Parsing document")
+        task_instance.update_progress(0.2, "Parsing document")
 
         # Parse document
         parse_result = await document_processor.parse_document(
@@ -37,35 +38,61 @@ async def process_document_task(
             use_docling=use_docling
         )
 
-        self.log_step(
+        task_instance.log_step(
             "Document parsed",
             chunks_count=len(parse_result.chunks),
             images_count=len(parse_result.images),
             word_count=parse_result.word_count
         )
 
-        self.update_progress(0.4, "Processing chunks")
+        task_instance.update_progress(0.4, "Processing chunks")
 
         # Process chunks for embedding
         processed_chunks = []
 
         for i, chunk in enumerate(parse_result.chunks):
             # Generate summary for chunk
-            self.update_progress(
+            task_instance.update_progress(
                 0.4 + (0.3 * i / len(parse_result.chunks)),
                 f"Generating summary for chunk {i+1}/{len(parse_result.chunks)}"
             )
 
             try:
-                summary_result = await gemini_service.generate_summary(
-                    chunk.text,
-                    max_length=100,
-                    style="concise"
-                )
-                summary = summary_result.summary
+                if use_enhanced_summary:
+                    # Use enhanced summarization with adaptive configuration
+                    enhanced_result = await enhanced_summarization_service.generate_summary(
+                        chunk.text,
+                        config=SummaryConfig(
+                            strategy=SummaryStrategy.ABSTRACTIVE,
+                            max_length=100,
+                            style="concise",
+                            enable_refinement=True
+                        )
+                    )
+                    summary = enhanced_result.summary
+
+                    # Add enhanced summary metadata
+                    chunk_metadata = {
+                        "enhanced_summary": True,
+                        "summary_strategy": enhanced_result.strategy.value,
+                        "summary_quality": enhanced_result.quality.overall,
+                        "processing_time": enhanced_result.processing_time,
+                        "refinement_iterations": enhanced_result.refinement_iterations
+                    }
+                else:
+                    # Use basic summarization
+                    summary_result = await gemini_service.generate_summary(
+                        chunk.text,
+                        max_length=100,
+                        style="concise"
+                    )
+                    summary = summary_result.summary
+                    chunk_metadata = {"enhanced_summary": False}
+
             except Exception as e:
                 logger.warning("Failed to generate summary for chunk", error=str(e))
                 summary = chunk.text[:100] + "..." if len(chunk.text) > 100 else chunk.text
+                chunk_metadata = {"enhanced_summary": False, "summary_fallback": True}
 
             # Combine text and summary for embedding
             combined_text = combine_text_and_summary(chunk.text, summary)
@@ -83,12 +110,13 @@ async def process_document_task(
                     **parse_result.metadata,
                     "page_number": chunk.page_number,
                     "element_id": chunk.element_id,
-                    "chunk_metadata": chunk.metadata or {}
+                    "chunk_metadata": chunk.metadata or {},
+                    **chunk_metadata  # Include summary metadata
                 }
             }
             processed_chunks.append(processed_chunk)
 
-        self.update_progress(0.7, "Generating embeddings")
+        task_instance.update_progress(0.7, "Generating embeddings")
 
         # Generate embeddings
         texts_for_embedding = [chunk["combined_text"] for chunk in processed_chunks]
@@ -100,12 +128,12 @@ async def process_document_task(
 
         embeddings = [result.embedding for result in embedding_results]
 
-        self.update_progress(0.9, "Storing in vector database")
+        task_instance.update_progress(0.9, "Storing in vector database")
 
         # Store in vector database
         point_ids = await qdrant_service.store_chunks(processed_chunks, embeddings)
 
-        self.update_progress(1.0, "Document processing completed")
+        task_instance.update_progress(1.0, "Document processing completed")
 
         result = {
             "status": "success",
@@ -118,11 +146,24 @@ async def process_document_task(
             "metadata": parse_result.metadata
         }
 
-        self.log_step("Document processing completed", **result)
+        task_instance.log_step("Document processing completed", **result)
         return result
 
     except Exception as e:
         error_msg = f"Document processing failed: {str(e)}"
         logger.error("Document processing task failed", error=str(e), file_path=file_path)
-        self.update_progress(0.0, error_msg)
+        task_instance.update_progress(0.0, error_msg)
         raise
+
+
+@celery_app.task(bind=True, base=ProcessingTask)
+async def process_document_task(
+    self,
+    file_path: str,
+    source_type: str,
+    metadata: Dict[str, Any],
+    use_docling: bool = False,
+    use_enhanced_summary: bool = False
+) -> Dict[str, Any]:
+    """Process a document file through the complete pipeline."""
+    return await _process_document_impl(self, file_path, source_type, metadata, use_docling, use_enhanced_summary)
