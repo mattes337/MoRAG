@@ -26,10 +26,10 @@
 ### Embedding & Storage
 - [x] **14-gemini-integration.md** - Gemini API integration for embeddings ✅
 - [x] **15-vector-storage.md** - Qdrant storage implementation ✅
-- [ ] **16-metadata-management.md** - Metadata extraction and association
+- [x] **16-metadata-management.md** - Metadata extraction and association ✅
 
 ### API & Orchestration
-- [ ] **17-ingestion-api.md** - RESTful ingestion endpoints
+- [x] **17-ingestion-api.md** - RESTful ingestion endpoints ✅
 - [ ] **18-status-tracking.md** - Progress tracking and webhooks
 - [ ] **19-n8n-workflows.md** - Orchestration workflow setup
 
@@ -54,6 +54,8 @@
 ✅ Task 13: HTML to Markdown Content Conversion - COMPLETED
 ✅ Task 14: Gemini API Integration for Embeddings - COMPLETED
 ✅ Task 15: Qdrant Vector Storage Implementation - COMPLETED
+✅ Task 16: Metadata Management Implementation - COMPLETED
+✅ Task 17: RESTful Ingestion API Implementation - COMPLETED
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)

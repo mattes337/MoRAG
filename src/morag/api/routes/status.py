@@ -1,21 +1,70 @@
-from fastapi import APIRouter, Path
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from fastapi import APIRouter, Path, HTTPException, Depends
+from typing import List
+import structlog
 
+from morag.api.models import TaskStatusResponse
+from morag.services.task_manager import task_manager, TaskStatus
+from morag.api.routes.ingestion import verify_api_key
+
+logger = structlog.get_logger()
 router = APIRouter()
 
-class StatusResponse(BaseModel):
-    task_id: str
-    status: str
-    progress: Optional[float] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+@router.get("/{task_id}", response_model=TaskStatusResponse)
+async def get_task_status(
+    task_id: str = Path(..., description="Task ID to check"),
+    api_key: str = Depends(verify_api_key)
+):
+    """Get the status of an ingestion task."""
 
-@router.get("/{task_id}", response_model=StatusResponse)
-async def get_task_status(task_id: str = Path(..., description="Task ID to check")):
-    """Get the status of an ingestion task. (Placeholder - will be implemented in task 18)"""
-    return StatusResponse(
-        task_id=task_id,
-        status="pending",
-        error="Status endpoint not yet implemented"
-    )
+    try:
+        task_info = task_manager.get_task_status(task_id)
+
+        # Calculate estimated time remaining
+        estimated_remaining = None
+        if task_info.progress and task_info.progress > 0:
+            # Simple estimation based on progress
+            if task_info.status == TaskStatus.PROGRESS:
+                estimated_remaining = int((1 - task_info.progress) * 300)  # Rough estimate
+
+        return TaskStatusResponse(
+            task_id=task_info.task_id,
+            status=task_info.status.value,
+            progress=task_info.progress,
+            result=task_info.result,
+            error=task_info.error,
+            created_at=task_info.created_at.isoformat() if task_info.created_at else None,
+            started_at=task_info.started_at.isoformat() if task_info.started_at else None,
+            completed_at=task_info.completed_at.isoformat() if task_info.completed_at else None,
+            estimated_time_remaining=estimated_remaining
+        )
+
+    except Exception as e:
+        logger.error("Failed to get task status", task_id=task_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get task status: {str(e)}")
+
+@router.get("/")
+async def list_active_tasks(api_key: str = Depends(verify_api_key)):
+    """List all active tasks."""
+
+    try:
+        active_tasks = task_manager.get_active_tasks()
+        return {
+            "active_tasks": active_tasks,
+            "count": len(active_tasks)
+        }
+
+    except Exception as e:
+        logger.error("Failed to list active tasks", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to list tasks: {str(e)}")
+
+@router.get("/stats/queues")
+async def get_queue_stats(api_key: str = Depends(verify_api_key)):
+    """Get queue statistics."""
+
+    try:
+        stats = task_manager.get_queue_stats()
+        return stats
+
+    except Exception as e:
+        logger.error("Failed to get queue stats", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get queue stats: {str(e)}")
