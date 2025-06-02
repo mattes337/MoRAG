@@ -75,7 +75,10 @@ def process_video_task(self, file_path: str, metadata: Dict[str, Any]):
 
 @celery_app.task(bind=True)
 def process_web_task(self, url: str, metadata: Dict[str, Any]):
-    """Process web content. (Placeholder)"""
+    """Process web content. (Redirects to web_tasks module)"""
     logger.info("Starting web processing", url=url)
-    # Implementation will be added in task 12
-    return {"status": "placeholder", "message": "Web processing not implemented"}
+    # Import here to avoid circular imports
+    from .web_tasks import process_web_url
+
+    # Delegate to the actual implementation
+    return process_web_url.delay(url, metadata, task_id=self.request.id)
