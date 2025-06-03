@@ -17,7 +17,8 @@ class TestConfigValidation:
     def test_default_values(self):
         """Test that default configuration values are set correctly."""
         with patch.dict(os.environ, {}, clear=True):
-            settings = Settings()
+            # Create settings without loading .env file
+            settings = Settings(_env_file=None)
 
             assert settings.api_host == "0.0.0.0"
             assert settings.api_port == 8000
@@ -30,7 +31,7 @@ class TestConfigValidation:
     def test_optional_env_vars(self):
         """Test that optional environment variables work correctly."""
         with patch.dict(os.environ, {}, clear=True):
-            settings = Settings()
+            settings = Settings(_env_file=None)
             # gemini_api_key is optional and should be None by default
             assert settings.gemini_api_key is None
 
@@ -81,7 +82,7 @@ class TestConfigValidation:
     def test_optional_fields(self):
         """Test that optional fields work correctly."""
         with patch.dict(os.environ, {}, clear=True):
-            settings = Settings()
+            settings = Settings(_env_file=None)
 
             # qdrant_api_key is optional
             assert settings.qdrant_api_key is None
