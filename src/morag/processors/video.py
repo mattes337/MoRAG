@@ -10,6 +10,9 @@ import structlog
 import time
 
 import ffmpeg
+from ffmpeg._probe import probe as ffmpeg_probe
+from ffmpeg._run import input as ffmpeg_input, output as ffmpeg_output, run as ffmpeg_run
+from ffmpeg._filters import filter as ffmpeg_filter
 from PIL import Image
 import cv2
 
@@ -141,8 +144,8 @@ class VideoProcessor:
     async def _extract_metadata(self, file_path: Path) -> VideoMetadata:
         """Extract comprehensive video metadata."""
         try:
-            # Use ffmpeg.probe to get metadata
-            probe = await asyncio.to_thread(ffmpeg.probe, str(file_path))
+            # Use ffmpeg_probe to get metadata
+            probe = await asyncio.to_thread(ffmpeg_probe, str(file_path))
             
             # Find video stream
             video_stream = next(
@@ -203,12 +206,14 @@ class VideoProcessor:
             
             # Extract audio using ffmpeg
             await asyncio.to_thread(
-                lambda: (
-                    ffmpeg
-                    .input(str(file_path))
-                    .output(str(audio_path), acodec='pcm_s16le' if audio_format == 'wav' else 'mp3')
-                    .overwrite_output()
-                    .run(quiet=True)
+                lambda: ffmpeg_run(
+                    ffmpeg_output(
+                        ffmpeg_input(str(file_path)),
+                        str(audio_path),
+                        acodec='pcm_s16le' if audio_format == 'wav' else 'mp3'
+                    ),
+                    overwrite_output=True,
+                    quiet=True
                 )
             )
             
@@ -239,7 +244,7 @@ class VideoProcessor:
             thumbnails = []
             
             # Get video duration for timestamp calculation
-            probe = await asyncio.to_thread(ffmpeg.probe, str(file_path))
+            probe = await asyncio.to_thread(ffmpeg_probe, str(file_path))
             duration = float(probe['format']['duration'])
             
             # Calculate timestamps for thumbnails
@@ -253,13 +258,14 @@ class VideoProcessor:
                 
                 # Generate thumbnail using ffmpeg
                 await asyncio.to_thread(
-                    lambda ts=timestamp, path=thumbnail_path: (
-                        ffmpeg
-                        .input(str(file_path), ss=ts)
-                        .filter('scale', size[0], size[1])
-                        .output(str(path), vframes=1)
-                        .overwrite_output()
-                        .run(quiet=True)
+                    lambda ts=timestamp, path=thumbnail_path: ffmpeg_run(
+                        ffmpeg_output(
+                            ffmpeg_filter(ffmpeg_input(str(file_path), ss=ts), 'scale', size[0], size[1]),
+                            str(path),
+                            vframes=1
+                        ),
+                        overwrite_output=True,
+                        quiet=True
                     )
                 )
                 
@@ -351,13 +357,14 @@ class VideoProcessor:
                 keyframe_path = self.temp_dir / f"keyframe_{int(time.time())}_{i}.{format}"
 
                 await asyncio.to_thread(
-                    lambda ts=timestamp, path=keyframe_path: (
-                        ffmpeg
-                        .input(str(file_path), ss=ts)
-                        .filter('scale', size[0], size[1])
-                        .output(str(path), vframes=1)
-                        .overwrite_output()
-                        .run(quiet=True)
+                    lambda ts=timestamp, path=keyframe_path: ffmpeg_run(
+                        ffmpeg_output(
+                            ffmpeg_filter(ffmpeg_input(str(file_path), ss=ts), 'scale', size[0], size[1]),
+                            str(path),
+                            vframes=1
+                        ),
+                        overwrite_output=True,
+                        quiet=True
                     )
                 )
 
