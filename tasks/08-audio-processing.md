@@ -71,7 +71,7 @@ class AudioProcessingResult:
     language: str
     confidence: float
     duration: float
-    segments: List[AudioSegment]
+    segments: List[AudioTranscriptSegment]
     metadata: Dict[str, Any]
     processing_time: float
     model_used: str

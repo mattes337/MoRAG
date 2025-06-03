@@ -10,7 +10,7 @@ import structlog
 import time
 
 from faster_whisper import WhisperModel
-from pydub import AudioSegment
+from pydub import AudioSegment as PydubAudioSegment
 import librosa
 import mutagen
 from mutagen.id3 import ID3NoHeaderError
@@ -37,7 +37,7 @@ class AudioConfig:
     compute_type: str = "int8"  # int8, int16, float16, float32
 
 @dataclass
-class AudioSegment:
+class AudioTranscriptSegment:
     """Represents a segment of processed audio."""
     text: str
     start_time: float
@@ -53,7 +53,7 @@ class AudioProcessingResult:
     language: str
     confidence: float
     duration: float
-    segments: List[AudioSegment]
+    segments: List[AudioTranscriptSegment]
     metadata: Dict[str, Any]
     processing_time: float
     model_used: str
@@ -66,10 +66,34 @@ class AudioProcessor:
         self.config = config or AudioConfig()
         self._model: Optional[WhisperModel] = None
         self._model_loaded = False
-        
-        logger.info("Initialized AudioProcessor", 
+        self._ffmpeg_available = None  # Lazy check on first use
+
+        logger.info("Initialized AudioProcessor",
                    model_size=self.config.model_size,
                    device=self.config.device)
+
+    def _check_ffmpeg_availability(self) -> bool:
+        """Check if FFmpeg is available on the system."""
+        try:
+            import subprocess
+            import shutil
+
+            # First try to find ffmpeg in PATH using shutil.which (faster)
+            if shutil.which('ffmpeg') is None:
+                return False
+
+            # If found in PATH, try to run ffmpeg -version with a short timeout
+            result = subprocess.run(['ffmpeg', '-version'],
+                                  capture_output=True,
+                                  text=True,
+                                  timeout=2,
+                                  creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError, OSError):
+            return False
+        except Exception:
+            # Catch any other unexpected errors and default to False
+            return False
     
     def _load_model(self) -> WhisperModel:
         """Load Whisper model lazily."""
@@ -213,31 +237,96 @@ class AudioProcessor:
         """Convert audio file to WAV format if needed."""
         if file_path.suffix.lower() == '.wav':
             return file_path
-        
+
         try:
             logger.debug("Converting audio to WAV", file_path=str(file_path))
-            
-            # Use pydub for conversion
-            audio = AudioSegment.from_file(str(file_path))
-            
-            # Create temporary WAV file
-            temp_dir = Path(tempfile.gettempdir())
-            wav_path = temp_dir / f"morag_audio_{int(time.time())}_{file_path.stem}.wav"
-            
-            # Export as WAV
-            audio.export(str(wav_path), format="wav")
-            
-            logger.debug("Audio converted to WAV", 
-                        original=str(file_path),
-                        converted=str(wav_path))
-            
-            return wav_path
-            
+
+            # Try pydub first (requires FFmpeg for most formats)
+            try:
+                audio = PydubAudioSegment.from_file(str(file_path))
+
+                # Create temporary WAV file
+                temp_dir = Path(tempfile.gettempdir())
+                wav_path = temp_dir / f"morag_audio_{int(time.time())}_{file_path.stem}.wav"
+
+                # Export as WAV
+                audio.export(str(wav_path), format="wav")
+
+                logger.debug("Audio converted to WAV using pydub",
+                            original=str(file_path),
+                            converted=str(wav_path))
+
+                return wav_path
+
+            except Exception as pydub_error:
+                # Check FFmpeg availability lazily if not already checked
+                if self._ffmpeg_available is None:
+                    self._ffmpeg_available = self._check_ffmpeg_availability()
+
+                # Check if this is an FFmpeg-related error
+                error_str = str(pydub_error).lower()
+                if any(keyword in error_str for keyword in ['ffmpeg', 'ffprobe', 'avconv', 'avprobe', 'file specified']):
+                    if not self._ffmpeg_available:
+                        logger.warning("FFmpeg not available, trying librosa fallback",
+                                     file_path=str(file_path),
+                                     pydub_error=str(pydub_error))
+                    else:
+                        logger.warning("FFmpeg error occurred, trying librosa fallback",
+                                     file_path=str(file_path),
+                                     pydub_error=str(pydub_error))
+                else:
+                    logger.warning("Pydub conversion failed, trying librosa fallback",
+                                 file_path=str(file_path),
+                                 pydub_error=str(pydub_error))
+
+                # Fallback to librosa for audio loading
+                return await self._convert_to_wav_with_librosa(file_path)
+
         except Exception as e:
-            logger.error("Audio conversion failed", 
+            logger.error("Audio conversion failed",
                         file_path=str(file_path),
                         error=str(e))
             raise ProcessingError(f"Audio conversion failed: {str(e)}")
+
+    async def _convert_to_wav_with_librosa(self, file_path: Path) -> Path:
+        """Convert audio file to WAV using librosa as fallback."""
+        try:
+            import soundfile as sf
+
+            logger.debug("Converting audio to WAV using librosa fallback", file_path=str(file_path))
+
+            # Load audio with librosa
+            y, sr = await asyncio.to_thread(librosa.load, str(file_path), sr=None)
+
+            # Create temporary WAV file
+            temp_dir = Path(tempfile.gettempdir())
+            wav_path = temp_dir / f"morag_audio_{int(time.time())}_{file_path.stem}.wav"
+
+            # Save as WAV using soundfile
+            await asyncio.to_thread(sf.write, str(wav_path), y, sr)
+
+            logger.debug("Audio converted to WAV using librosa",
+                        original=str(file_path),
+                        converted=str(wav_path))
+
+            return wav_path
+
+        except ImportError:
+            logger.error("soundfile not available for librosa fallback")
+            error_msg = (
+                "Audio conversion failed: FFmpeg not available and soundfile not installed. "
+                "Please install FFmpeg or run 'pip install soundfile' to enable audio conversion."
+            )
+            raise ProcessingError(error_msg)
+        except Exception as e:
+            logger.error("Librosa audio conversion failed",
+                        file_path=str(file_path),
+                        error=str(e))
+            error_msg = (
+                f"Audio conversion failed with librosa: {str(e)}. "
+                "Consider installing FFmpeg for better audio format support."
+            )
+            raise ProcessingError(error_msg)
     
     async def _transcribe_audio(
         self,
@@ -262,9 +351,9 @@ class AudioProcessor:
             # Convert segments to our format
             audio_segments = []
             full_text_parts = []
-            
+
             for segment in segments:
-                audio_segment = AudioSegment(
+                audio_segment = AudioTranscriptSegment(
                     text=segment.text.strip(),
                     start_time=segment.start,
                     end_time=segment.end,

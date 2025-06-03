@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
 import numpy as np
 
-from morag.processors.audio import AudioProcessor, AudioConfig, AudioProcessingResult, AudioSegment
+from morag.processors.audio import AudioProcessor, AudioConfig, AudioProcessingResult, AudioTranscriptSegment
 from morag.core.exceptions import ProcessingError, ExternalServiceError
 
 class TestAudioProcessor:
@@ -140,24 +140,24 @@ class TestAudioProcessor:
         assert result_path == mock_audio_file
     
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.AudioSegment')
+    @patch('morag.processors.audio.PydubAudioSegment')
     async def test_convert_to_wav_conversion(self, mock_audio_segment, audio_processor):
         """Test audio format conversion."""
         # Create mock MP3 file
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(b"mock mp3 data")
             mp3_path = Path(f.name)
-        
-        # Mock AudioSegment
+
+        # Mock PydubAudioSegment
         mock_audio = Mock()
         mock_audio_segment.from_file.return_value = mock_audio
-        
+
         try:
             result_path = await audio_processor._convert_to_wav(mp3_path)
-            
-            # Should have called AudioSegment.from_file
+
+            # Should have called PydubAudioSegment.from_file
             mock_audio_segment.from_file.assert_called_once_with(str(mp3_path))
-            
+
             # Should have called export
             mock_audio.export.assert_called_once()
             
@@ -171,14 +171,14 @@ class TestAudioProcessor:
                 result_path.unlink()
     
     @pytest.mark.asyncio
-    @patch('morag.processors.audio.AudioSegment')
+    @patch('morag.processors.audio.PydubAudioSegment')
     async def test_convert_to_wav_failure(self, mock_audio_segment, audio_processor):
         """Test audio conversion failure."""
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(b"mock mp3 data")
             mp3_path = Path(f.name)
-        
-        # Mock AudioSegment to raise exception
+
+        # Mock PydubAudioSegment to raise exception
         mock_audio_segment.from_file.side_effect = Exception("Conversion failed")
         
         try:
@@ -258,7 +258,7 @@ class TestAudioProcessor:
             language="en",
             confidence=0.9,
             duration=2.0,
-            segments=[AudioSegment("Hello world", 0.0, 2.0, 0.9, language="en")],
+            segments=[AudioTranscriptSegment("Hello world", 0.0, 2.0, 0.9, language="en")],
             metadata={},
             processing_time=1.0,
             model_used="tiny"
@@ -288,8 +288,10 @@ class TestAudioProcessor:
             await audio_processor.process_audio_file(non_existent_file)
     
     def test_audio_segment_creation(self):
-        """Test AudioSegment creation."""
-        segment = AudioSegment(
+        """Test AudioTranscriptSegment creation."""
+        from morag.processors.audio import AudioTranscriptSegment
+
+        segment = AudioTranscriptSegment(
             text="Hello world",
             start_time=0.0,
             end_time=2.0,
@@ -297,7 +299,7 @@ class TestAudioProcessor:
             speaker_id="speaker_1",
             language="en"
         )
-        
+
         assert segment.text == "Hello world"
         assert segment.start_time == 0.0
         assert segment.end_time == 2.0
@@ -307,7 +309,7 @@ class TestAudioProcessor:
     
     def test_audio_processing_result_creation(self):
         """Test AudioProcessingResult creation."""
-        segments = [AudioSegment("Hello", 0.0, 1.0, 0.9)]
+        segments = [AudioTranscriptSegment("Hello", 0.0, 1.0, 0.9)]
         metadata = {"file_name": "test.wav"}
         
         result = AudioProcessingResult(

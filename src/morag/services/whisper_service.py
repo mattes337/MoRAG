@@ -9,7 +9,7 @@ import time
 from faster_whisper import WhisperModel
 from morag.core.config import settings
 from morag.core.exceptions import ExternalServiceError, ProcessingError
-from morag.processors.audio import AudioConfig, AudioProcessingResult, AudioSegment
+from morag.processors.audio import AudioConfig, AudioProcessingResult, AudioTranscriptSegment
 
 logger = structlog.get_logger()
 
@@ -88,8 +88,8 @@ class WhisperService:
             for segment in segments:
                 # Convert log probability to confidence (0-1 scale)
                 confidence = max(0.0, min(1.0, (segment.avg_logprob + 1.0) / 2.0))
-                
-                audio_segment = AudioSegment(
+
+                audio_segment = AudioTranscriptSegment(
                     text=segment.text.strip(),
                     start_time=segment.start,
                     end_time=segment.end,

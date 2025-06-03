@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, AsyncMock
 
 # Import the actual task functions, not the Celery tasks
 from morag.tasks import audio_tasks
-from morag.processors.audio import AudioConfig, AudioProcessingResult, AudioSegment
+from morag.processors.audio import AudioConfig, AudioProcessingResult, AudioTranscriptSegment
 from morag.services.chunking import ChunkInfo
 
 class TestAudioTasks:
@@ -29,9 +29,9 @@ class TestAudioTasks:
             confidence=0.9,
             duration=5.0,
             segments=[
-                AudioSegment("Hello world,", 0.0, 2.0, 0.95, language="en"),
-                AudioSegment("this is a test", 2.0, 4.0, 0.88, language="en"),
-                AudioSegment("audio transcription.", 4.0, 5.0, 0.87, language="en")
+                AudioTranscriptSegment("Hello world,", 0.0, 2.0, 0.95, language="en"),
+                AudioTranscriptSegment("this is a test", 2.0, 4.0, 0.88, language="en"),
+                AudioTranscriptSegment("audio transcription.", 4.0, 5.0, 0.87, language="en")
             ],
             metadata={"file_name": "test.wav", "sample_rate": 44100},
             processing_time=2.5,

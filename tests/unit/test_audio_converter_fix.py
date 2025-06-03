@@ -6,7 +6,7 @@ from pathlib import Path
 
 from morag.converters.audio import AudioConverter
 from morag.converters.base import ConversionOptions, ChunkingStrategy
-from morag.processors.audio import AudioProcessingResult, AudioSegment
+from morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
 
 
 class TestAudioConverterFix:
@@ -42,14 +42,14 @@ class TestAudioConverterFix:
             confidence=0.95,
             duration=120.0,
             segments=[
-                AudioSegment(
+                AudioTranscriptSegment(
                     text="This is a test transcription",
                     start_time=0.0,
                     end_time=2.5,
                     confidence=0.95,
                     language="en"
                 ),
-                AudioSegment(
+                AudioTranscriptSegment(
                     text="from the audio file.",
                     start_time=2.5,
                     end_time=5.0,

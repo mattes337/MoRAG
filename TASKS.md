@@ -78,6 +78,8 @@
 ✅ **UNIVERSAL-DOCUMENT-CONVERSION** - Implemented universal document conversion framework with pluggable converters - COMPLETED
 ✅ **AUDIO-CONVERTER-METHOD-FIX** - Fixed AudioProcessor method call from process_audio to process_audio_file in audio converter - COMPLETED
 ✅ **PDF-ENCODING-FIX** - Fixed PDF text encoding issues with soft hyphens, ligatures, and special characters - COMPLETED
+✅ **AUDIO-SEGMENT-NAMING-FIX** - Fixed AudioSegment naming conflict causing 'AudioSegment' object has no attribute 'from_file' error - COMPLETED
+✅ **AUDIO-FFMPEG-FALLBACK** - Added robust FFmpeg fallback mechanism using librosa and soundfile for audio conversion - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -98,6 +100,32 @@
   - `src/morag/converters/pdf.py` (integrated encoding fixes)
   - `src/morag/processors/document.py` (integrated encoding fixes)
   - `tests/unit/test_pdf_encoding_fix.py` (new test file)
+
+### Audio Segment Naming Conflict Fix
+- **Issue**: `type object 'AudioSegment' has no attribute 'from_file'` error during audio conversion
+- **Root Cause**: Custom `AudioSegment` dataclass was shadowing the pydub `AudioSegment` class import
+- **Solution**: Renamed custom dataclass to `AudioTranscriptSegment` and imported pydub as `PydubAudioSegment`
+- **Files Modified**:
+  - `src/morag/processors/audio.py` (renamed dataclass and fixed import)
+  - `src/morag/services/whisper_service.py` (updated import and usage)
+  - `tests/unit/test_audio_processor.py` (updated test references)
+  - `tests/unit/test_audio_tasks.py` (updated test references)
+  - `tests/unit/test_audio_converter_fix.py` (updated test references)
+  - `tasks/08-audio-processing.md` (updated documentation)
+
+### Audio FFmpeg Fallback Mechanism
+- **Issue**: `[WinError 2] The system cannot find the file specified` error when FFmpeg is not installed
+- **Root Cause**: pydub requires FFmpeg for most audio format conversions, but FFmpeg is not always available
+- **Solution**: Implemented robust fallback mechanism using librosa and soundfile for audio conversion
+- **Files Modified**:
+  - `src/morag/processors/audio.py` (added FFmpeg detection and librosa fallback)
+  - `pyproject.toml` (added soundfile dependency)
+- **Features Added**:
+  - FFmpeg availability detection on initialization
+  - Automatic fallback to librosa + soundfile when pydub fails
+  - Enhanced error messages with installation instructions
+  - Support for audio conversion without FFmpeg dependency
+  - Comprehensive logging for troubleshooting
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns
