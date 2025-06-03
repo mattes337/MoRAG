@@ -3,6 +3,7 @@ import structlog
 from pathlib import Path
 
 from morag.core.celery_app import celery_app
+from morag.core.config import settings
 from morag.tasks.base import ProcessingTask
 from morag.processors.document import document_processor
 from morag.services.embedding import gemini_service
