@@ -100,8 +100,8 @@ class TaskManager:
     ) -> None:
         """Update task progress."""
         try:
-            result = AsyncResult(task_id, app=self.celery_app)
-
+            # For now, just log the progress update
+            # The actual state update should be done from within the task itself
             progress_info = {
                 'progress': progress,
                 'message': message,
@@ -109,9 +109,11 @@ class TaskManager:
                 'updated_at': datetime.utcnow().isoformat()
             }
 
-            result.update_state(
-                state='PROGRESS',
-                meta=progress_info
+            logger.debug(
+                "Task progress updated",
+                task_id=task_id,
+                progress=progress,
+                message=message
             )
 
             # Add to status history

@@ -24,12 +24,17 @@ class ProcessingTask(BaseTask):
         metadata = self._get_metadata(args, kwargs)
         self.webhook_url = metadata.get('webhook_url')
 
-        # Send webhook notification
+        # Send webhook notification (run async code synchronously)
         if self.webhook_url:
-            asyncio.create_task(task_manager.handle_task_started(
-                task_id=task_id,
-                metadata=metadata
-            ))
+            try:
+                # Try to run the async function synchronously
+                asyncio.run(task_manager.handle_task_started(
+                    task_id=task_id,
+                    metadata=metadata
+                ))
+            except RuntimeError:
+                # If there's already an event loop running, skip webhook for now
+                logger.warning("Could not send webhook notification - event loop already running", task_id=task_id)
 
         task_manager.update_task_progress(
             task_id,
@@ -42,31 +47,37 @@ class ProcessingTask(BaseTask):
         """Handle task success."""
         super().on_success(retval, task_id, args, kwargs)
 
-        # Send webhook notification
+        # Send webhook notification (run async code synchronously)
         if self.webhook_url:
             metadata = self._get_metadata(args, kwargs)
-            asyncio.create_task(task_manager.handle_task_completion(
-                task_id=task_id,
-                result=retval,
-                metadata=metadata
-            ))
+            try:
+                asyncio.run(task_manager.handle_task_completion(
+                    task_id=task_id,
+                    result=retval,
+                    metadata=metadata
+                ))
+            except RuntimeError:
+                logger.warning("Could not send webhook notification - event loop already running", task_id=task_id)
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Handle task failure."""
         super().on_failure(exc, task_id, args, kwargs, einfo)
 
-        # Send webhook notification
+        # Send webhook notification (run async code synchronously)
         if self.webhook_url:
             metadata = self._get_metadata(args, kwargs)
             result = {
                 'status': 'failure',
                 'error': str(exc)
             }
-            asyncio.create_task(task_manager.handle_task_completion(
-                task_id=task_id,
-                result=result,
-                metadata=metadata
-            ))
+            try:
+                asyncio.run(task_manager.handle_task_completion(
+                    task_id=task_id,
+                    result=result,
+                    metadata=metadata
+                ))
+            except RuntimeError:
+                logger.warning("Could not send webhook notification - event loop already running", task_id=task_id)
 
     def update_progress(self, progress: float, message: str = None, **metadata):
         """Update task progress with webhook support."""
@@ -77,14 +88,17 @@ class ProcessingTask(BaseTask):
             metadata=metadata
         )
 
-        # Send webhook for significant milestones
+        # Send webhook for significant milestones (run async code synchronously)
         if self.webhook_url and progress in [0.25, 0.5, 0.75]:
-            asyncio.create_task(task_manager.handle_task_progress(
-                task_id=self.request.id,
-                progress=progress,
-                message=message or f"Progress: {progress*100:.0f}%",
-                metadata=metadata
-            ))
+            try:
+                asyncio.run(task_manager.handle_task_progress(
+                    task_id=self.request.id,
+                    progress=progress,
+                    message=message or f"Progress: {progress*100:.0f}%",
+                    metadata=metadata
+                ))
+            except RuntimeError:
+                logger.warning("Could not send webhook notification - event loop already running", task_id=self.request.id)
 
     def _get_metadata(self, args, kwargs) -> Dict[str, Any]:
         """Extract metadata from task arguments."""
@@ -97,7 +111,7 @@ class ProcessingTask(BaseTask):
             return args[3]
         return {}
 
-    async def update_status(self, status: str, metadata: Dict[str, Any] = None):
+    def update_status(self, status: str, metadata: Dict[str, Any] = None):
         """Update task status."""
         if status == "PROCESSING":
             progress = 0.5  # Default progress for processing
@@ -114,11 +128,15 @@ class ProcessingTask(BaseTask):
                 elif stage == "segment_transcription":
                     progress = 0.5
 
-            self.update_progress(progress, f"Status: {status}", **(metadata or {}))
+            # Create a copy of metadata without 'message' key to avoid conflicts
+            safe_metadata = {k: v for k, v in (metadata or {}).items() if k != 'message'}
+            self.update_progress(progress, f"Status: {status}", **safe_metadata)
         elif status == "SUCCESS":
-            self.update_progress(1.0, "Task completed successfully", **(metadata or {}))
+            safe_metadata = {k: v for k, v in (metadata or {}).items() if k != 'message'}
+            self.update_progress(1.0, "Task completed successfully", **safe_metadata)
         elif status == "FAILURE":
-            self.update_progress(0.0, "Task failed", **(metadata or {}))
+            safe_metadata = {k: v for k, v in (metadata or {}).items() if k != 'message'}
+            self.update_progress(0.0, "Task failed", **safe_metadata)
 
     def log_step(self, step: str, **kwargs):
         """Log a processing step."""
@@ -128,6 +146,26 @@ class ProcessingTask(BaseTask):
             task_name=self.name,
             **kwargs
         )
+
+# Test task to verify Celery is working
+@celery_app.task(bind=True, base=ProcessingTask)
+def test_task(self, message: str = "Hello from Celery!"):
+    """Simple test task to verify Celery is working."""
+    logger.info("Test task started", message=message)
+
+    self.update_status("PROCESSING", {"stage": "testing"})
+    self.update_progress(0.5, "Processing test task")
+
+    result = {
+        "status": "success",
+        "message": message,
+        "task_id": self.request.id
+    }
+
+    self.update_status("SUCCESS", result)
+    logger.info("Test task completed", result=result)
+
+    return result
 
 # Placeholder task implementations (will be implemented in later tasks)
 @celery_app.task(bind=True)

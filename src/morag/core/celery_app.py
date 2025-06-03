@@ -1,6 +1,7 @@
 from celery import Celery
 from kombu import Queue
 import structlog
+import sys
 
 from morag.core.config import settings
 
@@ -17,8 +18,18 @@ celery_app = Celery(
         "morag.tasks.audio_tasks",
         "morag.tasks.video_tasks",
         "morag.tasks.web_tasks",
+        "morag.tasks.image_tasks",
+        "morag.tasks.youtube_tasks",
     ]
 )
+
+# Windows-specific configuration
+if sys.platform == "win32":
+    # Use threads instead of processes on Windows to avoid permission issues
+    celery_app.conf.update(
+        worker_pool="threads",
+        worker_concurrency=4,
+    )
 
 # Celery configuration
 celery_app.conf.update(
@@ -32,6 +43,11 @@ celery_app.conf.update(
     # Result settings
     result_expires=3600,  # 1 hour
     result_persistent=True,
+
+    # Worker settings
+    worker_prefetch_multiplier=1,
+    task_acks_late=True,
+    worker_disable_rate_limits=True,
 )
 
 # Task base class with common functionality

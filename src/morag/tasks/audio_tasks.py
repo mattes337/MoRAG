@@ -2,6 +2,7 @@
 
 from typing import Dict, Any, List, Optional
 import structlog
+import asyncio
 from pathlib import Path
 
 from morag.core.celery_app import celery_app
@@ -15,15 +16,14 @@ from morag.services.summarization import enhanced_summarization_service, Summary
 
 logger = structlog.get_logger()
 
-@celery_app.task(bind=True, base=ProcessingTask)
-async def process_audio_file(
+async def _process_audio_file_impl(
     self,
     file_path: str,
     task_id: str,
     config: Optional[Dict[str, Any]] = None,
     use_enhanced_summary: bool = True
 ) -> Dict[str, Any]:
-    """Process audio file with speech-to-text and embedding generation."""
+    """Async implementation of audio file processing."""
 
     logger.info("Starting audio processing task",
                task_id=task_id,
@@ -31,7 +31,7 @@ async def process_audio_file(
 
     try:
         # Update task status
-        await self.update_status("PROCESSING", {"stage": "audio_transcription"})
+        self.update_status("PROCESSING", {"stage": "audio_transcription"})
 
         # Parse config
         audio_config = AudioConfig(**config) if config else AudioConfig()
@@ -49,7 +49,7 @@ async def process_audio_file(
                    confidence=audio_result.confidence)
 
         # Update task status
-        await self.update_status("PROCESSING", {
+        self.update_status("PROCESSING", {
             "stage": "text_chunking",
             "transcription_complete": True,
             "language": audio_result.language,
@@ -67,7 +67,7 @@ async def process_audio_file(
                    chunk_count=len(chunks))
 
         # Update task status
-        await self.update_status("PROCESSING", {
+        self.update_status("PROCESSING", {
             "stage": "embedding_generation",
             "chunk_count": len(chunks)
         })
@@ -164,7 +164,7 @@ async def process_audio_file(
 
                 # Update progress
                 progress = (i + 1) / len(chunks) * 100
-                await self.update_status("PROCESSING", {
+                self.update_status("PROCESSING", {
                     "stage": "embedding_generation",
                     "progress": progress,
                     "chunks_processed": i + 1,
@@ -202,7 +202,7 @@ async def process_audio_file(
             }
         }
 
-        await self.update_status("SUCCESS", result)
+        self.update_status("SUCCESS", result)
 
         logger.info("Audio processing task completed",
                    task_id=task_id,
@@ -217,11 +217,22 @@ async def process_audio_file(
                     task_id=task_id,
                     error=str(e))
 
-        await self.update_status("FAILURE", {"error": error_msg})
+        self.update_status("FAILURE", {"error": error_msg})
         raise
 
+
 @celery_app.task(bind=True, base=ProcessingTask)
-async def detect_audio_language(
+def process_audio_file(
+    self,
+    file_path: str,
+    task_id: str,
+    config: Optional[Dict[str, Any]] = None,
+    use_enhanced_summary: bool = True
+) -> Dict[str, Any]:
+    """Process audio file with speech-to-text and embedding generation."""
+    return asyncio.run(_process_audio_file_impl(self, file_path, task_id, config, use_enhanced_summary))
+
+async def _detect_audio_language_impl(
     self,
     file_path: str,
     task_id: str,
@@ -235,7 +246,7 @@ async def detect_audio_language(
                model_size=model_size)
 
     try:
-        await self.update_status("PROCESSING", {"stage": "language_detection"})
+        self.update_status("PROCESSING", {"stage": "language_detection"})
 
         # Detect language
         result = await whisper_service.detect_language(
@@ -252,7 +263,7 @@ async def detect_audio_language(
             "all_language_probs": result["all_language_probs"]
         }
 
-        await self.update_status("SUCCESS", final_result)
+        self.update_status("SUCCESS", final_result)
 
         logger.info("Audio language detection completed",
                    task_id=task_id,
@@ -267,11 +278,21 @@ async def detect_audio_language(
                     task_id=task_id,
                     error=str(e))
 
-        await self.update_status("FAILURE", {"error": error_msg})
+        self.update_status("FAILURE", {"error": error_msg})
         raise
 
+
 @celery_app.task(bind=True, base=ProcessingTask)
-async def transcribe_audio_segments(
+def detect_audio_language(
+    self,
+    file_path: str,
+    task_id: str,
+    model_size: str = "base"
+) -> Dict[str, Any]:
+    """Detect language of audio file."""
+    return asyncio.run(_detect_audio_language_impl(self, file_path, task_id, model_size))
+
+async def _transcribe_audio_segments_impl(
     self,
     file_path: str,
     task_id: str,
@@ -286,7 +307,7 @@ async def transcribe_audio_segments(
                segment_count=len(segments))
 
     try:
-        await self.update_status("PROCESSING", {"stage": "segment_transcription"})
+        self.update_status("PROCESSING", {"stage": "segment_transcription"})
 
         # Parse config
         audio_config = AudioConfig(**config) if config else AudioConfig()
@@ -327,7 +348,7 @@ async def transcribe_audio_segments(
 
                 # Update progress
                 progress = (i + 1) / len(segments) * 100
-                await self.update_status("PROCESSING", {
+                self.update_status("PROCESSING", {
                     "stage": "segment_transcription",
                     "progress": progress,
                     "segments_processed": i + 1,
@@ -355,7 +376,7 @@ async def transcribe_audio_segments(
             "segment_results": segment_results
         }
 
-        await self.update_status("SUCCESS", result)
+        self.update_status("SUCCESS", result)
 
         logger.info("Audio segment transcription completed",
                    task_id=task_id,
@@ -369,5 +390,17 @@ async def transcribe_audio_segments(
                     task_id=task_id,
                     error=str(e))
 
-        await self.update_status("FAILURE", {"error": error_msg})
+        self.update_status("FAILURE", {"error": error_msg})
         raise
+
+
+@celery_app.task(bind=True, base=ProcessingTask)
+def transcribe_audio_segments(
+    self,
+    file_path: str,
+    task_id: str,
+    segments: List[Dict[str, float]],  # [{"start": 0.0, "end": 30.0}, ...]
+    config: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Transcribe specific segments of audio file."""
+    return asyncio.run(_transcribe_audio_segments_impl(self, file_path, task_id, segments, config))

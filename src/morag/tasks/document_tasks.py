@@ -157,7 +157,7 @@ async def _process_document_impl(
 
 
 @celery_app.task(bind=True, base=ProcessingTask)
-async def process_document_task(
+def process_document_task(
     self,
     file_path: str,
     source_type: str,
@@ -166,4 +166,5 @@ async def process_document_task(
     use_enhanced_summary: bool = False
 ) -> Dict[str, Any]:
     """Process a document file through the complete pipeline."""
-    return await _process_document_impl(self, file_path, source_type, metadata, use_docling, use_enhanced_summary)
+    import asyncio
+    return asyncio.run(_process_document_impl(self, file_path, source_type, metadata, use_docling, use_enhanced_summary))
