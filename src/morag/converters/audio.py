@@ -358,6 +358,58 @@ class AudioConverter(BaseConverter):
 
             sections.append("")
 
+        # Transcript section
+        sections.append("## Transcript")
+        sections.append("")
+
+        if hasattr(enhanced_result, 'segments') and enhanced_result.segments:
+            # Detailed transcript with timestamps
+            for segment in enhanced_result.segments:
+                if options.format_options.get('include_timestamps', True):
+                    start_time = self._format_timestamp(segment.start_time)
+                    end_time = self._format_timestamp(segment.end_time)
+                    sections.append(f"**[{start_time} - {end_time}]**")
+
+                text = segment.text.strip()
+                if text:
+                    sections.append(text)
+                    sections.append("")
+        else:
+            # Simple transcript
+            if hasattr(enhanced_result, 'transcript') and enhanced_result.transcript:
+                sections.append(enhanced_result.transcript)
+            elif hasattr(enhanced_result, 'text') and enhanced_result.text:
+                sections.append(enhanced_result.text)
+            else:
+                sections.append("*No transcript available*")
+            sections.append("")
+
+        # Topics section
+        if enhanced_result.topics and options.format_options.get('include_topic_info', True):
+            sections.append("## Topics")
+            sections.append("")
+
+            for i, topic in enumerate(enhanced_result.topics, 1):
+                sections.append(f"### {topic.get('topic', f'Topic {i}')}")
+                sections.append("")
+
+                for sentence in topic.get('sentences', []):
+                    sections.append(f"- {sentence}")
+
+                sections.append("")
+
+        # Processing details
+        sections.append("## Processing Details")
+        sections.append("")
+        sections.append(f"**Transcription Engine**: {enhanced_result.metadata.get('model_used', 'Whisper')}")
+
+        if 'confidence' in enhanced_result.metadata:
+            confidence = enhanced_result.metadata['confidence']
+            sections.append(f"**Average Confidence**: {confidence:.2f}")
+
+        if 'word_count' in enhanced_result.metadata:
+            sections.append(f"**Word Count**: {enhanced_result.metadata['word_count']}")
+
         return "\n".join(sections)
 
     async def _create_structured_markdown(self, audio_result, options: ConversionOptions) -> str:
@@ -401,7 +453,7 @@ class AudioConverter(BaseConverter):
             sections.append("")
         
         # Summary section (if available)
-        if audio_result.summary:
+        if hasattr(audio_result, 'summary') and audio_result.summary:
             sections.append("## Summary")
             sections.append("")
             sections.append(audio_result.summary)
@@ -415,11 +467,11 @@ class AudioConverter(BaseConverter):
             # Detailed transcript with timestamps
             for segment in audio_result.segments:
                 if options.format_options.get('include_timestamps', True):
-                    start_time = self._format_timestamp(segment.get('start', 0))
-                    end_time = self._format_timestamp(segment.get('end', 0))
+                    start_time = self._format_timestamp(segment.start_time)
+                    end_time = self._format_timestamp(segment.end_time)
                     sections.append(f"**[{start_time} - {end_time}]**")
-                
-                text = segment.get('text', '').strip()
+
+                text = segment.text.strip()
                 if text:
                     sections.append(text)
                     sections.append("")

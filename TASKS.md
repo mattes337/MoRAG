@@ -81,6 +81,7 @@
 ✅ **AUDIO-SEGMENT-NAMING-FIX** - Fixed AudioSegment naming conflict causing 'AudioSegment' object has no attribute 'from_file' error - COMPLETED
 ✅ **AUDIO-FFMPEG-FALLBACK** - Added robust FFmpeg fallback mechanism using librosa and soundfile for audio conversion - COMPLETED
 ✅ **DOCKER-SYSTEM-DEPENDENCIES** - Enhanced Docker images with comprehensive system dependencies for all features - COMPLETED
+✅ **AUDIO-TRANSCRIPT-MISSING-FIX** - Fixed missing transcript section in enhanced audio markdown conversion causing empty output - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -143,6 +144,19 @@
   - `git` - Git support for packages that install from repositories
   - Browser dependencies for Playwright: `libnss3`, `libnspr4`, `libatk1.0-0`, `libatk-bridge2.0-0`, `libcups2`, `libdrm2`, `libxss1`, `libgtk-3-0`, `libxrandr2`, `libasound2`, `libpangocairo-1.0-0`, `libcairo-gobject2`, `libgdk-pixbuf2.0-0`
   - Playwright Chromium browser installation for dynamic web content extraction
+
+### Audio Transcript Missing in Enhanced Markdown Fix
+- **Issue**: Audio conversion returning nearly empty markdown files with only headers, missing actual transcript content
+- **Root Cause**: Enhanced audio markdown creation method (`_create_enhanced_structured_markdown`) was missing the transcript section entirely
+- **Solution**: Added missing transcript section with proper AudioTranscriptSegment attribute access (not dictionary access)
+- **Files Modified**:
+  - `src/morag/converters/audio.py` (added transcript section to enhanced markdown creation and fixed segment attribute access)
+- **Features Added**:
+  - Complete transcript section in enhanced audio markdown output
+  - Proper timestamp formatting for audio segments
+  - Topics section for enhanced processing
+  - Processing details section with transcription engine info
+  - Fixed attribute access for AudioTranscriptSegment objects (using `.start_time` instead of `.get('start_time')`)
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns
