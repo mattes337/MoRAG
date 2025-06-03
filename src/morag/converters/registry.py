@@ -85,6 +85,17 @@ class DocumentConverter:
             logger.warning("Web converter not available", error=str(e))
         except Exception as e:
             logger.error("Failed to register Web converter", error=str(e))
+
+        try:
+            from .text import TextConverter
+            text_converter = TextConverter()
+            for format_type in ['text', 'txt', 'md', 'markdown']:
+                self.register_converter(format_type, text_converter)
+            logger.info("Registered Text converter")
+        except ImportError as e:
+            logger.warning("Text converter not available", error=str(e))
+        except Exception as e:
+            logger.error("Failed to register Text converter", error=str(e))
     
     def detect_format(self, file_path: Union[str, Path]) -> str:
         """Detect document format using multiple methods.

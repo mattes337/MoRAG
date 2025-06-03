@@ -416,7 +416,7 @@ class PDFConverter(BaseConverter):
                 
                 sections.append(f"### Page {current_page}")
                 sections.append("")
-                sections.append(chunk.content.strip())
+                sections.append(chunk.text.strip())
                 sections.append("")
                 current_page += 1
         else:
@@ -424,7 +424,7 @@ class PDFConverter(BaseConverter):
             for i, chunk in enumerate(parse_result.chunks, 1):
                 sections.append(f"### Section {i}")
                 sections.append("")
-                sections.append(chunk.content.strip())
+                sections.append(chunk.text.strip())
                 sections.append("")
         
         # Images section
