@@ -1,7 +1,10 @@
 # Task 29: Enhanced Web Content to Markdown Conversion
 
+## Status: FRAMEWORK READY ✅
+**Note**: The universal document conversion framework (Task 24) has been implemented with basic web conversion. This task focuses on adding advanced features like JavaScript rendering and intelligent content detection.
+
 ## Objective
-Implement advanced web content extraction and conversion to markdown, handling dynamic content, JavaScript-rendered pages, complex layouts, and preserving semantic structure while filtering noise.
+Enhance the existing web converter in the universal document conversion framework with advanced content extraction, JavaScript rendering, multi-page crawling, and intelligent content detection capabilities.
 
 ## Research Phase
 

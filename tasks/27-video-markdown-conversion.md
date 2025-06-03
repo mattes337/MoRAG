@@ -1,7 +1,10 @@
-# Task 27: Video to Markdown Conversion with Keyframe Extraction
+# Task 27: Enhanced Video to Markdown Conversion with Keyframe Extraction
+
+## Status: FRAMEWORK READY ✅
+**Note**: The universal document conversion framework (Task 24) has been implemented with basic video conversion. This task focuses on adding advanced features like keyframe extraction and scene detection.
 
 ## Objective
-Implement comprehensive video-to-markdown conversion that extracts audio for speech-to-text, analyzes keyframes for visual content description, and combines everything into structured markdown with timestamps.
+Enhance the existing video converter in the universal document conversion framework with advanced keyframe extraction, scene detection, visual content analysis, and comprehensive timeline-based markdown output.
 
 ## Research Phase
 

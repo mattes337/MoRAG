@@ -4,8 +4,10 @@ A comprehensive, production-ready multimodal RAG (Retrieval Augmented Generation
 
 ## Features
 
+- **Universal Document Conversion**: Unified framework for converting any document format to structured markdown
 - **Multimodal Processing**: Support for documents (PDF, DOCX, MD), audio, video, images, web content, and YouTube videos
 - **Intelligent Chunking**: Page-based chunking for documents with configurable strategies (page, semantic, sentence, paragraph)
+- **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
 - **Vector Storage**: Qdrant vector database integration for efficient similarity search
 - **Async Processing**: Celery-based task queue for scalable background processing
 - **API-First**: FastAPI-based REST API with comprehensive documentation
@@ -78,6 +80,7 @@ The MoRAG pipeline consists of several key components:
 ## Documentation
 
 - [API Documentation](http://localhost:8000/docs) (when running locally)
+- [Universal Document Conversion](docs/UNIVERSAL_DOCUMENT_CONVERSION.md) - Complete guide to the conversion framework
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
 - [Task Implementation Guide](tasks/README.md)
 - [Deployment Guide](docs/deployment.md)

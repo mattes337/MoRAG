@@ -1,7 +1,10 @@
-# Task 25: PDF to Markdown Conversion with Docling Integration
+# Task 25: Enhanced PDF to Markdown Conversion with Docling Integration
+
+## Status: FRAMEWORK READY ✅
+**Note**: The universal document conversion framework (Task 24) has been implemented. This task now focuses on enhancing the existing PDF converter with advanced docling features.
 
 ## Objective
-Implement high-quality PDF to markdown conversion using docling library (user's preferred PDF parser) to produce optimal AI-readable output with page-level chunking, table preservation, and OCR capabilities.
+Enhance the existing PDF converter in the universal document conversion framework with advanced docling features, improved table extraction, OCR capabilities, and enhanced quality assessment.
 
 ## Research Phase
 
@@ -17,15 +20,21 @@ Implement high-quality PDF to markdown conversion using docling library (user's 
 3. **Unstructured.io**: Current implementation (backup option)
 4. **PDFMiner**: Low-level PDF parsing for complex documents
 
-## Implementation Strategy
+## Current Implementation Status
 
-### Phase 1: Docling Integration
+### ✅ Completed (Task 24)
+- Basic PDF converter integrated with universal framework
+- Docling integration with fallback to unstructured.io
+- Page-level chunking support
+- Quality assessment framework
+- Structured markdown output
+
+### 🔄 Enhancement Strategy
+
+### Phase 1: Advanced Docling Features
 ```python
-from docling import DocumentConverter
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions
-
-class DoclingPDFConverter(BaseConverter):
+# Enhance existing src/morag/converters/pdf.py
+class EnhancedPDFConverter(BaseConverter):
     def __init__(self):
         self.converter = DocumentConverter(
             format_options={
