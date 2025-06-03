@@ -71,6 +71,13 @@ class UniversalConverterService:
             # Apply config defaults
             for key, value in self.config.default_options.items():
                 if hasattr(options, key):
+                    # Handle chunking_strategy conversion from string to enum
+                    if key == 'chunking_strategy' and isinstance(value, str):
+                        try:
+                            value = ChunkingStrategy(value)
+                        except ValueError:
+                            logger.warning(f"Invalid chunking strategy '{value}', using default")
+                            value = ChunkingStrategy.PAGE
                     setattr(options, key, value)
             
             # Apply format-specific config
@@ -82,7 +89,7 @@ class UniversalConverterService:
             file_path=str(file_path),
             file_size=file_size,
             format_type=self.document_converter.detect_format(file_path),
-            chunking_strategy=options.chunking_strategy.value
+            chunking_strategy=options.chunking_strategy.value if hasattr(options.chunking_strategy, 'value') else str(options.chunking_strategy)
         )
         
         try:
@@ -172,12 +179,13 @@ class UniversalConverterService:
             List of chunk objects
         """
         try:
+            strategy_value = options.chunking_strategy.value if hasattr(options.chunking_strategy, 'value') else str(options.chunking_strategy)
             chunks = await self.chunking_service.chunk_with_metadata(
                 content,
-                strategy=options.chunking_strategy.value
+                strategy=strategy_value
             )
             
-            logger.info(f"Generated {len(chunks)} chunks using {options.chunking_strategy.value} strategy")
+            logger.info(f"Generated {len(chunks)} chunks using {strategy_value} strategy")
             return chunks
             
         except Exception as e:

@@ -9,9 +9,9 @@ import asyncio
 import structlog
 import time
 
-import ffmpeg
+# Import ffmpeg-python components
 from ffmpeg._probe import probe as ffmpeg_probe
-from ffmpeg._run import input as ffmpeg_input, output as ffmpeg_output, run as ffmpeg_run
+from ffmpeg._run import input as ffmpeg_input, output as ffmpeg_output, run as ffmpeg_run, Error as FFmpegError
 from ffmpeg._filters import filter as ffmpeg_filter
 from PIL import Image
 import cv2
@@ -331,43 +331,137 @@ class VideoProcessor:
         """Generate thumbnails at evenly spaced intervals."""
         try:
             thumbnails = []
-            
+
+            logger.debug("Starting thumbnail generation",
+                        file_path=str(file_path),
+                        count=count,
+                        size=size,
+                        format=format)
+
             # Get video duration for timestamp calculation
-            probe = await asyncio.to_thread(ffmpeg_probe, str(file_path))
-            duration = float(probe['format']['duration'])
-            
+            try:
+                probe = await asyncio.to_thread(ffmpeg_probe, str(file_path))
+                duration = float(probe['format']['duration'])
+                logger.debug("Video duration extracted", duration=duration)
+            except Exception as e:
+                logger.error("Failed to probe video for duration",
+                           file_path=str(file_path),
+                           error=str(e))
+                raise ProcessingError(f"Failed to probe video: {str(e)}")
+
+            # Validate duration
+            if duration <= 0:
+                raise ProcessingError(f"Invalid video duration: {duration}")
+
             # Calculate timestamps for thumbnails
             if count == 1:
                 timestamps = [duration / 2]  # Middle of video
             else:
-                timestamps = [i * duration / (count - 1) for i in range(count)]
-            
+                # Ensure we don't go beyond video duration
+                timestamps = [min(i * duration / (count - 1), duration - 1) for i in range(count)]
+
+            logger.debug("Calculated timestamps", timestamps=timestamps)
+
             for i, timestamp in enumerate(timestamps):
                 thumbnail_path = self.temp_dir / f"thumb_{int(time.time())}_{i}.{format}"
-                
-                # Generate thumbnail using ffmpeg
-                await asyncio.to_thread(
-                    lambda ts=timestamp, path=thumbnail_path: ffmpeg_run(
-                        ffmpeg_output(
-                            ffmpeg_filter(ffmpeg_input(str(file_path), ss=ts), 'scale', size[0], size[1]),
-                            str(path),
-                            vframes=1
-                        ),
-                        overwrite_output=True,
-                        quiet=True
-                    )
-                )
-                
-                if thumbnail_path.exists():
-                    thumbnails.append(thumbnail_path)
-                    logger.debug("Thumbnail generated",
-                                thumbnail_path=str(thumbnail_path),
-                                timestamp=timestamp)
-            
-            logger.info("Thumbnails generated",
+
+                logger.debug("Generating thumbnail",
+                           index=i,
+                           timestamp=timestamp,
+                           output_path=str(thumbnail_path))
+
+                try:
+                    # Generate thumbnail using ffmpeg with better error handling
+                    def generate_thumbnail():
+                        try:
+                            # Build ffmpeg command using internal functions
+                            input_stream = ffmpeg_input(str(file_path), ss=timestamp)
+                            scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
+                            output_stream = ffmpeg_output(scaled_stream, str(thumbnail_path), vframes=1)
+
+                            # Run with error capture
+                            ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
+
+                        except FFmpegError as e:
+                            # Capture stderr for detailed error information
+                            stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
+                            raise ProcessingError(f"FFmpeg error: {stderr_output}")
+                        except Exception as e:
+                            raise ProcessingError(f"Thumbnail generation error: {str(e)}")
+
+                    await asyncio.to_thread(generate_thumbnail)
+
+                    # Verify thumbnail was created
+                    if thumbnail_path.exists() and thumbnail_path.stat().st_size > 0:
+                        thumbnails.append(thumbnail_path)
+                        logger.debug("Thumbnail generated successfully",
+                                   thumbnail_path=str(thumbnail_path),
+                                   timestamp=timestamp,
+                                   file_size=thumbnail_path.stat().st_size)
+                    else:
+                        logger.warning("Thumbnail file not created or empty",
+                                     thumbnail_path=str(thumbnail_path),
+                                     timestamp=timestamp)
+
+                        # Try alternative approaches
+                        # 1. Try with different timestamp
+                        if timestamp > 1:
+                            alt_timestamp = max(0, timestamp - 1)
+                            logger.debug("Retrying with alternative timestamp",
+                                       original_timestamp=timestamp,
+                                       alt_timestamp=alt_timestamp)
+
+                            alt_thumbnail_path = self.temp_dir / f"thumb_{int(time.time())}_{i}_alt.{format}"
+
+                            def generate_alt_thumbnail():
+                                try:
+                                    input_stream = ffmpeg_input(str(file_path), ss=alt_timestamp)
+                                    scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
+                                    output_stream = ffmpeg_output(scaled_stream, str(alt_thumbnail_path), vframes=1)
+                                    ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
+                                except Exception as e:
+                                    logger.warning("Alternative timestamp thumbnail generation failed", error=str(e))
+
+                            await asyncio.to_thread(generate_alt_thumbnail)
+
+                            if alt_thumbnail_path.exists() and alt_thumbnail_path.stat().st_size > 0:
+                                thumbnails.append(alt_thumbnail_path)
+                                logger.debug("Alternative timestamp thumbnail generated successfully",
+                                           thumbnail_path=str(alt_thumbnail_path))
+                                continue
+
+                        # 2. Try without scaling (original size)
+                        logger.debug("Retrying without scaling", timestamp=timestamp)
+                        no_scale_path = self.temp_dir / f"thumb_{int(time.time())}_{i}_noscale.{format}"
+
+                        def generate_no_scale_thumbnail():
+                            try:
+                                input_stream = ffmpeg_input(str(file_path), ss=timestamp)
+                                output_stream = ffmpeg_output(input_stream, str(no_scale_path), vframes=1)
+                                ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
+                            except Exception as e:
+                                logger.warning("No-scale thumbnail generation failed", error=str(e))
+
+                        await asyncio.to_thread(generate_no_scale_thumbnail)
+
+                        if no_scale_path.exists() and no_scale_path.stat().st_size > 0:
+                            thumbnails.append(no_scale_path)
+                            logger.debug("No-scale thumbnail generated successfully",
+                                       thumbnail_path=str(no_scale_path))
+
+                except Exception as e:
+                    logger.warning("Failed to generate thumbnail",
+                                 index=i,
+                                 timestamp=timestamp,
+                                 error=str(e))
+                    # Continue with next thumbnail instead of failing completely
+                    continue
+
+            logger.info("Thumbnail generation completed",
                        count=len(thumbnails),
-                       requested=count)
-            
+                       requested=count,
+                       success_rate=f"{len(thumbnails)}/{count}")
+
             return thumbnails
 
         except Exception as e:
@@ -445,20 +539,42 @@ class VideoProcessor:
             for i, timestamp in enumerate(keyframe_timestamps):
                 keyframe_path = self.temp_dir / f"keyframe_{int(time.time())}_{i}.{format}"
 
-                await asyncio.to_thread(
-                    lambda ts=timestamp, path=keyframe_path: ffmpeg_run(
-                        ffmpeg_output(
-                            ffmpeg_filter(ffmpeg_input(str(file_path), ss=ts), 'scale', size[0], size[1]),
-                            str(path),
-                            vframes=1
-                        ),
-                        overwrite_output=True,
-                        quiet=True
-                    )
-                )
+                try:
+                    def generate_keyframe():
+                        try:
+                            # Build ffmpeg command using internal functions
+                            input_stream = ffmpeg_input(str(file_path), ss=timestamp)
+                            scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
+                            output_stream = ffmpeg_output(scaled_stream, str(keyframe_path), vframes=1)
+                            ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
 
-                if keyframe_path.exists():
-                    keyframes.append(keyframe_path)
+                        except FFmpegError as e:
+                            # Capture stderr for detailed error information
+                            stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
+                            raise ProcessingError(f"FFmpeg keyframe error: {stderr_output}")
+                        except Exception as e:
+                            raise ProcessingError(f"Keyframe generation error: {str(e)}")
+
+                    await asyncio.to_thread(generate_keyframe)
+
+                    # Verify keyframe was created
+                    if keyframe_path.exists() and keyframe_path.stat().st_size > 0:
+                        keyframes.append(keyframe_path)
+                        logger.debug("Keyframe generated successfully",
+                                   keyframe_path=str(keyframe_path),
+                                   timestamp=timestamp)
+                    else:
+                        logger.warning("Keyframe file not created or empty",
+                                     keyframe_path=str(keyframe_path),
+                                     timestamp=timestamp)
+
+                except Exception as e:
+                    logger.warning("Failed to generate keyframe",
+                                 index=i,
+                                 timestamp=timestamp,
+                                 error=str(e))
+                    # Continue with next keyframe instead of failing completely
+                    continue
 
             logger.info("Keyframes extracted",
                        count=len(keyframes),
