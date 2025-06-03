@@ -31,9 +31,33 @@ class Settings(BaseSettings):
     temp_dir: str = "./temp"
     max_file_size: str = "100MB"
     
-    # Logging
+    # Enhanced Logging Configuration
     log_level: str = "INFO"
-    log_format: str = "json"
+    log_format: str = "json"  # json or console
+    log_file: str = "./logs/morag.log"
+    log_max_size: str = "100MB"
+    log_backup_count: int = 5
+    log_rotation: str = "daily"  # daily, weekly, size
+
+    # Monitoring Configuration
+    metrics_enabled: bool = True
+    metrics_port: int = 9090
+    metrics_path: str = "/metrics"
+
+    # Performance Monitoring
+    enable_profiling: bool = False
+    slow_query_threshold: float = 1.0  # seconds
+    memory_threshold: int = 80  # percentage
+    cpu_threshold: int = 80  # percentage
+
+    # Alerting Configuration
+    webhook_alerts_enabled: bool = False
+    alert_webhook_url: str = ""
+    alert_email_enabled: bool = False
+    alert_email_smtp_host: str = ""
+    alert_email_smtp_port: int = 587
+    alert_email_from: str = ""
+    alert_email_to: List[str] = []
     
     # Security
     api_key_header: str = "X-API-Key"

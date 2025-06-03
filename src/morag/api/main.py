@@ -4,11 +4,14 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 import structlog
 import time
+import asyncio
 from typing import Dict, Any
 
 from morag.core.config import settings
 from morag.core.exceptions import MoRAGException
 from morag.api.routes import health, ingestion, status
+from morag.middleware.monitoring import PerformanceMonitoringMiddleware, ResourceMonitoringMiddleware
+from morag.services.metrics_service import metrics_collector
 
 # Configure structured logging
 structlog.configure(
@@ -55,32 +58,21 @@ def create_app() -> FastAPI:
         allowed_hosts=["*"]  # Configure appropriately for production
     )
     
-    # Add request logging middleware
-    @app.middleware("http")
-    async def log_requests(request: Request, call_next):
-        start_time = time.time()
-        
-        # Log request
-        logger.info(
-            "Request started",
-            method=request.method,
-            url=str(request.url),
-            client_ip=request.client.host if request.client else None,
-        )
-        
-        response = await call_next(request)
-        
-        # Log response
-        process_time = time.time() - start_time
-        logger.info(
-            "Request completed",
-            method=request.method,
-            url=str(request.url),
-            status_code=response.status_code,
-            process_time=round(process_time, 4),
-        )
-        
-        return response
+    # Add monitoring middleware
+    app.add_middleware(PerformanceMonitoringMiddleware)
+    app.add_middleware(ResourceMonitoringMiddleware)
+
+    # Startup event to start metrics collection
+    @app.on_event("startup")
+    async def startup_event():
+        if settings.metrics_enabled:
+            logger.info("Starting metrics collection")
+            asyncio.create_task(metrics_collector.start_collection())
+
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        logger.info("Stopping metrics collection")
+        metrics_collector.stop_collection()
     
     # Add exception handlers
     @app.exception_handler(MoRAGException)

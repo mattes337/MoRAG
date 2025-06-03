@@ -1,0 +1,44 @@
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+
+# Copy requirements and install dependencies
+COPY pyproject.toml ./
+RUN pip install --upgrade pip && \
+    pip install -e .
+
+# Download spaCy model (optional, will fallback if not available)
+RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
+
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Create app directory
+WORKDIR /app
+
+# Copy application code
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+
+# Create necessary directories
+RUN mkdir -p uploads temp logs && \
+    chown -R appuser:appuser /app
+
+# Switch to app user
+USER appuser
+
+# Default command for worker
+CMD ["celery", "-A", "src.morag.core.celery_app", "worker", "--loglevel=info", "--concurrency=2"]

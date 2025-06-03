@@ -9,6 +9,7 @@ from morag.core.config import settings
 from morag.services.storage import qdrant_service
 from morag.services.task_manager import task_manager
 from morag.services.embedding import gemini_service
+from morag.services.metrics_service import metrics_collector
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -76,3 +77,28 @@ async def readiness_check():
         version="0.1.0",
         services=services
     )
+
+@router.get("/metrics")
+async def get_metrics():
+    """Get current system and application metrics."""
+    if not settings.metrics_enabled:
+        return {"error": "Metrics collection is disabled"}
+
+    current_metrics = metrics_collector.get_current_metrics()
+    if not current_metrics:
+        # Collect metrics if none available
+        current_metrics = await metrics_collector.collect_metrics()
+
+    return current_metrics
+
+@router.get("/metrics/history")
+async def get_metrics_history(hours: int = 1):
+    """Get metrics history for the specified number of hours."""
+    if not settings.metrics_enabled:
+        return {"error": "Metrics collection is disabled"}
+
+    return {
+        "metrics": metrics_collector.get_recent_metrics(hours),
+        "hours": hours,
+        "count": len(metrics_collector.get_recent_metrics(hours))
+    }
