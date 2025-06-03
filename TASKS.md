@@ -41,11 +41,11 @@
 ### Advanced Features & Improvements
 - [ ] **23-llm-provider-abstraction.md** - Abstract LLM and embedding provider APIs
 - [x] **24-universal-document-conversion.md** - Universal document format conversion to markdown ✅
-- [ ] **25-pdf-markdown-conversion.md** - PDF to markdown with docling integration
-- [ ] **26-audio-markdown-conversion.md** - Audio/voice to markdown with speaker diarization
-- [ ] **27-video-markdown-conversion.md** - Video to markdown with keyframe extraction
-- [ ] **28-office-markdown-conversion.md** - Office documents to markdown conversion
-- [ ] **29-web-markdown-conversion.md** - Enhanced web content to markdown conversion
+- [x] **25-pdf-markdown-conversion.md** - PDF to markdown with docling integration ✅
+- [x] **26-audio-markdown-conversion.md** - Audio/voice to markdown with speaker diarization ✅
+- [x] **27-video-markdown-conversion.md** - Video to markdown with keyframe extraction ✅
+- [x] **28-office-markdown-conversion.md** - Office documents to markdown conversion ✅
+- [x] **29-web-markdown-conversion.md** - Enhanced web content to markdown conversion ✅
 - [ ] **30-ai-error-handling.md** - Robust AI/LLM error handling and resilience
 
 ## Current Focus

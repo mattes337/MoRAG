@@ -1,24 +1,71 @@
-"""Web content to Markdown converter using existing MoRAG web scraper."""
+"""Enhanced Web content to Markdown converter with dynamic content extraction."""
 
 import time
 from pathlib import Path
-from typing import Union
+from typing import Union, List, Dict, Any, Optional
 import structlog
+import asyncio
+from urllib.parse import urljoin, urlparse
 
 from .base import BaseConverter, ConversionOptions, ConversionResult, QualityScore
 from .quality import ConversionQualityValidator
-from ..processors.web import web_processor
+from ..processors.web import WebProcessor
 
 logger = structlog.get_logger(__name__)
 
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    logger.warning("Playwright not available, dynamic content extraction disabled")
+
+try:
+    import trafilatura
+    TRAFILATURA_AVAILABLE = True
+except ImportError:
+    TRAFILATURA_AVAILABLE = False
+    logger.warning("Trafilatura not available, advanced content extraction disabled")
+
+try:
+    from readability import Document
+    READABILITY_AVAILABLE = True
+except ImportError:
+    READABILITY_AVAILABLE = False
+    logger.warning("Readability not available, content cleaning disabled")
+
+try:
+    from newspaper import Article
+    NEWSPAPER_AVAILABLE = True
+except ImportError:
+    NEWSPAPER_AVAILABLE = False
+    logger.warning("Newspaper3k not available, article extraction disabled")
+
 
 class WebConverter(BaseConverter):
-    """Web content to Markdown converter using MoRAG's web scraper."""
-    
+    """Enhanced Web content to Markdown converter with dynamic content extraction."""
+
     def __init__(self):
-        super().__init__("MoRAG Web Converter")
+        super().__init__("Enhanced MoRAG Web Converter")
         self.supported_formats = ['web', 'html', 'htm', 'url']
         self.quality_validator = ConversionQualityValidator()
+
+        # Initialize extraction methods
+        self.extraction_methods = []
+        if PLAYWRIGHT_AVAILABLE:
+            self.extraction_methods.append('playwright')
+        if TRAFILATURA_AVAILABLE:
+            self.extraction_methods.append('trafilatura')
+        if NEWSPAPER_AVAILABLE:
+            self.extraction_methods.append('newspaper')
+        if READABILITY_AVAILABLE:
+            self.extraction_methods.append('readability')
+
+        # Fallback to basic web processor
+        self.extraction_methods.append('basic_web_processor')
+
+        # Initialize web processor
+        self.web_processor = WebProcessor()
     
     def supports_format(self, format_type: str) -> bool:
         """Check if this converter supports the given format."""
@@ -77,7 +124,21 @@ class WebConverter(BaseConverter):
                 })()
             else:
                 # Use existing MoRAG web processor
-                web_result = await web_processor.process_url(url)
+                web_result = await self.web_processor.process_url(url)
+
+                # Convert WebScrapingResult to expected format
+                web_result = type('WebResult', (), {
+                    'content': web_result.content.markdown_content or web_result.content.content,
+                    'metadata': {
+                        'url': url,
+                        'title': web_result.content.title,
+                        'extraction_method': 'MoRAG Web Processor',
+                        **web_result.content.metadata
+                    },
+                    'success': web_result.success,
+                    'links': [{'url': link, 'text': 'Link'} for link in web_result.content.links],
+                    'images': [{'src': img, 'alt': 'Image'} for img in web_result.content.images]
+                })()
             
             # Convert to structured markdown
             markdown_content = await self._create_structured_markdown(web_result, options)

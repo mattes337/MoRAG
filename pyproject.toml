@@ -68,12 +68,17 @@ audio = [
     "librosa>=0.10.0",
     "ffmpeg-python>=0.2.0",
     "mutagen>=1.47.0",
+    "pyannote.audio>=3.1.0",
+    "speechbrain>=0.5.0",
+    "sentence-transformers>=2.2.0",
 ]
 
 video = [
     "opencv-python>=4.8.0",
     "Pillow>=10.0.0",
     "moviepy>=1.0.3",
+    "transformers>=4.30.0",
+    "torch>=2.0.0",
 ]
 
 image = [
@@ -81,6 +86,21 @@ image = [
     "pytesseract>=0.3.10",
     "easyocr>=1.7.0",
     "opencv-python>=4.8.0",
+]
+
+office = [
+    "python-docx>=0.8.11",
+    "openpyxl>=3.1.0",
+    "python-pptx>=0.6.21",
+    "xlrd>=2.0.1",
+    "xlwt>=1.3.0",
+]
+
+web = [
+    "playwright>=1.40.0",
+    "trafilatura>=1.6.0",
+    "readability-lxml>=0.8.1",
+    "newspaper3k>=0.2.8",
 ]
 
 morphik = [
@@ -98,11 +118,25 @@ all-extras = [
     "librosa>=0.10.0",
     "ffmpeg-python>=0.2.0",
     "mutagen>=1.47.0",
+    "pyannote.audio>=3.1.0",
+    "speechbrain>=0.5.0",
+    "sentence-transformers>=2.2.0",
     "opencv-python>=4.8.0",
     "Pillow>=10.0.0",
     "moviepy>=1.0.3",
+    "transformers>=4.30.0",
+    "torch>=2.0.0",
     "pytesseract>=0.3.10",
     "easyocr>=1.7.0",
+    "python-docx>=0.8.11",
+    "openpyxl>=3.1.0",
+    "python-pptx>=0.6.21",
+    "xlrd>=2.0.1",
+    "xlwt>=1.3.0",
+    "playwright>=1.40.0",
+    "trafilatura>=1.6.0",
+    "readability-lxml>=0.8.1",
+    "newspaper3k>=0.2.8",
     "morphik>=0.1.0",
     "pymilvus>=2.3.0",
     "unstructured[all-docs]>=0.11.0",
