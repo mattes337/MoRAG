@@ -33,6 +33,11 @@ class VideoConfig:
     thumbnail_size: Tuple[int, int] = (320, 240)
     thumbnail_format: str = "jpg"
     keyframe_threshold: float = 0.3  # Scene change threshold
+    # Enhanced audio processing options
+    enable_enhanced_audio: bool = True
+    enable_speaker_diarization: bool = True
+    enable_topic_segmentation: bool = True
+    audio_model_size: str = "base"
 
 @dataclass
 class VideoMetadata:
@@ -58,14 +63,25 @@ class VideoProcessingResult:
     metadata: VideoMetadata
     processing_time: float
     temp_files: List[Path] = field(default_factory=list)
+    # Enhanced audio processing results
+    audio_processing_result: Optional[Any] = None  # AudioProcessingResult from audio processor
 
 class VideoProcessor:
     """Video processing service using FFmpeg."""
-    
+
     def __init__(self):
         self.temp_dir = Path(tempfile.gettempdir()) / "morag_video"
         self.temp_dir.mkdir(exist_ok=True)
-        
+        # Import audio processor here to avoid circular imports
+        self._audio_processor = None
+
+    def _get_audio_processor(self):
+        """Get audio processor instance, importing only when needed."""
+        if self._audio_processor is None:
+            from morag.processors.audio import AudioProcessor
+            self._audio_processor = AudioProcessor()
+        return self._audio_processor
+
     async def process_video(
         self,
         file_path: Path,
@@ -99,6 +115,48 @@ class VideoProcessor:
                 audio_path = await self._extract_audio(file_path, config.audio_format)
                 result.audio_path = audio_path
                 result.temp_files.append(audio_path)
+
+                # Process extracted audio with enhanced features if enabled
+                if config.enable_enhanced_audio and audio_path:
+                    try:
+                        logger.info("Starting enhanced audio processing for video",
+                                   audio_path=str(audio_path),
+                                   enable_diarization=config.enable_speaker_diarization,
+                                   enable_topic_segmentation=config.enable_topic_segmentation)
+
+                        audio_processor = self._get_audio_processor()
+
+                        # Import AudioConfig here to avoid circular imports
+                        from morag.processors.audio import AudioConfig
+
+                        audio_config = AudioConfig(
+                            model_size=config.audio_model_size,
+                            language=None,  # Auto-detect
+                            device="cpu"  # Use CPU for video processing to avoid GPU conflicts
+                        )
+
+                        # Process audio with enhanced features
+                        audio_result = await audio_processor.process_audio_file(
+                            audio_path,
+                            config=audio_config,
+                            enable_diarization=config.enable_speaker_diarization,
+                            enable_topic_segmentation=config.enable_topic_segmentation
+                        )
+
+                        result.audio_processing_result = audio_result
+
+                        logger.info("Enhanced audio processing completed for video",
+                                   transcription_length=len(audio_result.text),
+                                   language=audio_result.language,
+                                   speakers_detected=audio_result.speaker_diarization.total_speakers if audio_result.speaker_diarization else 0,
+                                   topics_detected=audio_result.topic_segmentation.total_topics if audio_result.topic_segmentation else 0)
+
+                    except Exception as e:
+                        logger.warning("Enhanced audio processing failed for video",
+                                     audio_path=str(audio_path),
+                                     error=str(e))
+                        # Continue without enhanced audio processing
+                        result.audio_processing_result = None
             
             # Generate thumbnails if requested
             if config.generate_thumbnails:

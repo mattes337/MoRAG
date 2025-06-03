@@ -31,8 +31,13 @@ async def _process_video_file_impl(
     try:
         self.update_status("PROCESSING", {"stage": "video_analysis"})
 
-        # Parse configuration
-        video_config = VideoConfig()
+        # Parse configuration with enhanced audio processing defaults
+        video_config = VideoConfig(
+            enable_enhanced_audio=True,
+            enable_speaker_diarization=True,
+            enable_topic_segmentation=True,
+            audio_model_size="base"
+        )
         if config:
             for key, value in config.items():
                 if hasattr(video_config, key):
@@ -58,27 +63,37 @@ async def _process_video_file_impl(
             "thumbnails": [str(path) for path in video_result.thumbnails],
             "keyframes": [str(path) for path in video_result.keyframes],
             "processing_time": video_result.processing_time,
+            "audio_path": str(video_result.audio_path) if video_result.audio_path else None,
             "audio_processing_result": None
         }
 
-        # Process extracted audio if available and requested
-        if process_audio and video_result.audio_path and video_result.metadata.has_audio:
-            self.update_status("PROCESSING", {"stage": "audio_processing"})
+        # Include enhanced audio processing results if available
+        if video_result.audio_processing_result:
+            audio_result = video_result.audio_processing_result
+            result["audio_processing_result"] = {
+                "text": audio_result.text,
+                "language": audio_result.language,
+                "confidence": audio_result.confidence,
+                "duration": audio_result.duration,
+                "processing_time": audio_result.processing_time,
+                "model_used": audio_result.model_used,
+                "segments_count": len(audio_result.segments),
+                "speaker_diarization": {
+                    "total_speakers": audio_result.speaker_diarization.total_speakers,
+                    "total_duration": audio_result.speaker_diarization.total_duration,
+                    "processing_time": audio_result.speaker_diarization.processing_time,
+                    "model_used": audio_result.speaker_diarization.model_used
+                } if audio_result.speaker_diarization else None,
+                "topic_segmentation": {
+                    "total_topics": audio_result.topic_segmentation.total_topics,
+                    "processing_time": audio_result.topic_segmentation.processing_time,
+                    "model_used": audio_result.topic_segmentation.model_used,
+                    "similarity_threshold": audio_result.topic_segmentation.similarity_threshold
+                } if audio_result.topic_segmentation else None
+            }
 
-            logger.info("Processing extracted audio",
-                       task_id=task_id,
-                       audio_path=str(video_result.audio_path))
-
-            # Process audio using existing audio pipeline
-            # Note: process_audio_file is now synchronous, so we call it directly
-            audio_result = process_audio_file(
-                str(video_result.audio_path),
-                f"{task_id}_audio",
-                config={"model_size": "base"},
-                use_enhanced_summary=True
-            )
-
-            result["audio_processing_result"] = audio_result
+        # Audio processing is now handled automatically by the video processor
+        # if enhanced audio processing is enabled in the video config
 
         self.update_status("SUCCESS", result)
 

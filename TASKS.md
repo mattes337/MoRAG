@@ -84,6 +84,7 @@
 ✅ **AUDIO-TRANSCRIPT-MISSING-FIX** - Fixed missing transcript section in enhanced audio markdown conversion causing empty output - COMPLETED
 ✅ **ENHANCED-AUDIO-PROCESSING** - Implemented comprehensive topic segmentation and speaker diarization for audio and video processing - COMPLETED
 ✅ **CONVERSATIONAL-FORMAT** - Implemented conversational format for audio transcription with topic-based speaker dialogue - COMPLETED
+✅ **VIDEO-AUDIO-INTEGRATION** - Implemented automatic audio processing pipeline integration for video files with enhanced features - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -204,6 +205,29 @@
   - Fallback mechanisms for when speaker mapping fails
   - Comprehensive test coverage for dialogue creation
   - Demo script showing conversational format output
+
+### Video-Audio Integration Implementation
+- **Issue**: Need automatic audio processing pipeline integration for video files with enhanced features
+- **Root Cause**: Video processing pipeline extracted audio but didn't automatically process it with enhanced features
+- **Solution**: Implemented comprehensive video-audio integration with automatic enhanced audio processing
+- **Files Modified**:
+  - `src/morag/processors/video.py` (added enhanced audio processing integration)
+  - `src/morag/tasks/video_tasks.py` (updated to use enhanced audio processing results)
+  - `src/morag/converters/video.py` (added conversational format markdown creation)
+  - `tests/integration/test_video_audio_integration.py` (comprehensive integration tests)
+  - `scripts/demo_video_audio_integration.py` (demonstration script)
+- **Features Added**:
+  - Automatic enhanced audio processing in VideoProcessor
+  - VideoConfig with enhanced audio processing options
+  - VideoProcessingResult with audio_processing_result field
+  - Automatic speaker diarization and topic segmentation for video audio
+  - Conversational format markdown with topic headers and speaker dialogue
+  - Topic headers with timestamps (e.g., "# Introduction [00:00 - 00:45]")
+  - Speaker dialogue format (e.g., "**SPEAKER_00**: Hello, welcome...")
+  - Intelligent speaker-to-text mapping based on timing
+  - Comprehensive error handling and fallback mechanisms
+  - Integration tests validating the complete pipeline
+  - Demo script showing all integration features
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns

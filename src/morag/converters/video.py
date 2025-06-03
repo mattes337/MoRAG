@@ -2,7 +2,7 @@
 
 import time
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 import structlog
 
 from .base import BaseConverter, ConversionOptions, ConversionResult, QualityScore
@@ -57,7 +57,12 @@ class VideoConverter(BaseConverter):
                 audio_format=options.format_options.get('audio_format', 'wav'),
                 thumbnail_size=tuple(options.format_options.get('thumbnail_size', [320, 240])),
                 thumbnail_format=options.format_options.get('thumbnail_format', 'jpg'),
-                keyframe_threshold=options.format_options.get('keyframe_threshold', 0.3)
+                keyframe_threshold=options.format_options.get('keyframe_threshold', 0.3),
+                # Enhanced audio processing options
+                enable_enhanced_audio=options.format_options.get('enable_enhanced_audio', True),
+                enable_speaker_diarization=options.format_options.get('enable_speaker_diarization', True),
+                enable_topic_segmentation=options.format_options.get('enable_topic_segmentation', True),
+                audio_model_size=options.format_options.get('audio_model_size', 'base')
             )
 
             # Use existing MoRAG video processor
@@ -173,23 +178,21 @@ class VideoConverter(BaseConverter):
             sections.append(video_result.summary)
             sections.append("")
         
-        # Audio transcript section - format as topic with timestamps
-        # Note: Audio transcription integration needs to be implemented
-        # The video processor extracts audio but doesn't transcribe it yet
+        # Audio transcript section with enhanced processing results
         if video_result.audio_path and video_result.metadata.has_audio:
-            # Calculate total duration for timestamp
-            duration = video_result.metadata.duration
-            duration_str = self._format_timestamp(duration)
-
-            sections.append(f"# Audio Content [00:00 - {duration_str}]")
-            sections.append("")
-            sections.append("*Audio track extracted but transcription not yet integrated.*")
-            sections.append(f"*Audio file: {video_result.audio_path.name}*")
-            sections.append("")
-
-            # TODO: Integrate audio transcription
-            # This would require calling the audio processor on the extracted audio
-            # and formatting the result according to user preferences
+            if video_result.audio_processing_result:
+                # Use enhanced audio processing results
+                audio_result = video_result.audio_processing_result
+                sections.extend(self._create_enhanced_audio_markdown(audio_result, video_result.metadata.duration))
+            else:
+                # Fallback for basic audio extraction
+                duration = video_result.metadata.duration
+                duration_str = self._format_timestamp(duration)
+                sections.append(f"# Audio Content [00:00 - {duration_str}]")
+                sections.append("")
+                sections.append("*Audio track extracted but enhanced processing not available.*")
+                sections.append(f"*Audio file: {video_result.audio_path.name}*")
+                sections.append("")
         elif not video_result.metadata.has_audio:
             sections.append("# Audio Content")
             sections.append("")
@@ -239,7 +242,122 @@ class VideoConverter(BaseConverter):
                 sections.append("")
 
         return "\n".join(sections)
-    
+
+    def _create_enhanced_audio_markdown(self, audio_result, video_duration: float) -> List[str]:
+        """Create enhanced audio markdown with topic segmentation and speaker diarization.
+
+        Args:
+            audio_result: AudioProcessingResult from enhanced audio processing
+            video_duration: Total video duration in seconds
+
+        Returns:
+            List of markdown lines for audio content
+        """
+        sections = []
+
+        # Check if we have topic segmentation results
+        if audio_result.topic_segmentation and audio_result.topic_segmentation.topics:
+            # Create conversational format with topic headers and speaker dialogue
+            for topic in audio_result.topic_segmentation.topics:
+                # Format topic header with timestamps
+                start_time = self._format_timestamp(topic.start_time) if topic.start_time else "00:00"
+                end_time = self._format_timestamp(topic.end_time) if topic.end_time else self._format_timestamp(video_duration)
+
+                # Use topic title or generate one
+                topic_title = topic.title if topic.title and topic.title != f"Topic {topic.topic_id.split('_')[-1]}" else f"Discussion Topic {topic.topic_id.split('_')[-1]}"
+
+                sections.append(f"# {topic_title} [{start_time} - {end_time}]")
+                sections.append("")
+
+                # Add topic summary if available
+                if topic.summary and topic.summary.strip():
+                    sections.append(f"*{topic.summary}*")
+                    sections.append("")
+
+                # Create speaker dialogue for this topic
+                topic_dialogue = self._create_topic_dialogue(topic, audio_result)
+                sections.extend(topic_dialogue)
+                sections.append("")
+        else:
+            # Fallback to simple transcript format
+            duration_str = self._format_timestamp(video_duration)
+            sections.append(f"# Audio Transcript [00:00 - {duration_str}]")
+            sections.append("")
+
+            if audio_result.text:
+                sections.append(audio_result.text)
+            else:
+                sections.append("*No transcript available.*")
+            sections.append("")
+
+            # Add speaker information if available
+            if audio_result.speaker_diarization:
+                sections.append("## Speaker Information")
+                sections.append("")
+                sections.append(f"**Total Speakers Detected**: {audio_result.speaker_diarization.total_speakers}")
+                sections.append(f"**Total Duration**: {self._format_timestamp(audio_result.speaker_diarization.total_duration)}")
+                sections.append("")
+
+        return sections
+
+    def _create_topic_dialogue(self, topic, audio_result) -> List[str]:
+        """Create speaker dialogue for a topic segment.
+
+        Args:
+            topic: TopicSegment with timing and content information
+            audio_result: AudioProcessingResult with speaker and transcript data
+
+        Returns:
+            List of markdown lines for topic dialogue
+        """
+        dialogue_lines = []
+
+        if not topic.sentences:
+            return ["*No dialogue available for this topic.*"]
+
+        # Try to map sentences to speakers using timing information
+        if (audio_result.speaker_diarization and
+            audio_result.speaker_diarization.segments and
+            topic.start_time is not None and
+            topic.end_time is not None):
+
+            # Create speaker mapping for this topic timeframe
+            speaker_segments = [
+                seg for seg in audio_result.speaker_diarization.segments
+                if (seg.start_time < topic.end_time and seg.end_time > topic.start_time)
+            ]
+
+            if speaker_segments:
+                # Map sentences to speakers based on timing
+                for sentence in topic.sentences:
+                    # Find the most likely speaker for this sentence
+                    # This is a simplified mapping - in practice, you'd want more sophisticated alignment
+                    speaker_id = speaker_segments[0].speaker_id  # Default to first speaker in timeframe
+
+                    # Try to find better speaker match if we have transcript segments with timing
+                    if hasattr(audio_result, 'segments') and audio_result.segments:
+                        for transcript_seg in audio_result.segments:
+                            if (hasattr(transcript_seg, 'text') and
+                                sentence.lower() in transcript_seg.text.lower()):
+                                # Find speaker at this time
+                                for speaker_seg in speaker_segments:
+                                    if (speaker_seg.start_time <= transcript_seg.start_time <= speaker_seg.end_time):
+                                        speaker_id = speaker_seg.speaker_id
+                                        break
+                                break
+
+                    dialogue_lines.append(f"**{speaker_id}**: {sentence}")
+            else:
+                # No speaker segments in this timeframe, use generic format
+                for sentence in topic.sentences:
+                    dialogue_lines.append(f"**SPEAKER**: {sentence}")
+        else:
+            # No speaker diarization available, use simple format
+            for sentence in topic.sentences:
+                dialogue_lines.append(f"**SPEAKER**: {sentence}")
+
+        return dialogue_lines
+
     def _format_timestamp(self, seconds: float) -> str:
         """Format timestamp in MM:SS format.
         
