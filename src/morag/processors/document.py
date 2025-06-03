@@ -118,6 +118,8 @@ class DocumentProcessor:
         """Parse document using unstructured.io."""
 
         if not UNSTRUCTURED_AVAILABLE:
+            logger.warning("Unstructured.io not available, using basic text parsing",
+                          file_path=str(file_path))
             return await self._parse_with_basic_text(file_path, doc_type)
 
         # Choose appropriate partition function
@@ -128,16 +130,41 @@ class DocumentProcessor:
             DocumentType.TXT: partition,
         }.get(doc_type, partition)
 
-        # Parse document
-        elements = partition_func(
-            filename=str(file_path),
-            strategy="hi_res" if doc_type == DocumentType.PDF else "fast",
-            include_page_breaks=True,
-            infer_table_structure=True,
-            extract_images_in_pdf=True if doc_type == DocumentType.PDF else False,
-        )
+        logger.info("Starting unstructured.io parsing",
+                   file_path=str(file_path),
+                   doc_type=doc_type.value,
+                   partition_function=partition_func.__name__)
 
-        return await self._process_elements(elements, file_path)
+        try:
+            # Parse document
+            elements = partition_func(
+                filename=str(file_path),
+                strategy="hi_res" if doc_type == DocumentType.PDF else "fast",
+                include_page_breaks=True,
+                infer_table_structure=True,
+                extract_images_in_pdf=True if doc_type == DocumentType.PDF else False,
+            )
+
+            logger.info("Unstructured.io parsing completed",
+                       elements_count=len(elements),
+                       file_path=str(file_path))
+
+            # Log first few elements for debugging
+            for i, element in enumerate(elements[:3]):
+                logger.info(f"Element {i}",
+                           element_type=type(element).__name__,
+                           text_preview=element.text[:100] + "..." if len(element.text) > 100 else element.text,
+                           text_length=len(element.text))
+
+            return await self._process_elements(elements, file_path)
+
+        except Exception as e:
+            logger.error("Unstructured.io parsing failed",
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        file_path=str(file_path))
+            # Fallback to basic text parsing
+            return await self._parse_with_basic_text(file_path, doc_type)
 
     async def _parse_with_basic_text(
         self,
@@ -373,10 +400,16 @@ class DocumentProcessor:
             )
 
         except ImportError as e:
-            logger.warning("Docling not available, falling back to unstructured.io", error=str(e))
+            logger.warning("Docling not available, falling back to unstructured.io",
+                          error=str(e),
+                          error_type=type(e).__name__,
+                          file_path=str(file_path))
             return await self._parse_with_unstructured(file_path, DocumentType.PDF)
         except Exception as e:
-            logger.error("Docling parsing failed", error=str(e), file_path=str(file_path))
+            logger.error("Docling parsing failed, falling back to unstructured.io",
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        file_path=str(file_path))
             # Fallback to unstructured.io
             return await self._parse_with_unstructured(file_path, DocumentType.PDF)
     
