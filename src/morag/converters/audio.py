@@ -102,11 +102,18 @@ class AudioConverter(BaseConverter):
         )
         
         try:
-            # Use existing MoRAG audio processor for basic transcription
-            audio_result = await audio_processor.process_audio_file(str(file_path))
+            # Use enhanced MoRAG audio processor with integrated features
+            enable_diarization = options.format_options.get('enable_diarization', True)
+            enable_topic_segmentation = options.format_options.get('enable_topic_segmentation', True)
 
-            # Enhanced processing with speaker diarization and topic segmentation
-            enhanced_result = await self._enhance_audio_processing(file_path, audio_result, options)
+            audio_result = await audio_processor.process_audio_file(
+                str(file_path),
+                enable_diarization=enable_diarization,
+                enable_topic_segmentation=enable_topic_segmentation
+            )
+
+            # Create enhanced result structure for compatibility
+            enhanced_result = await self._create_enhanced_result_structure(audio_result, options)
 
             # Convert to structured markdown
             markdown_content = await self._create_enhanced_structured_markdown(enhanced_result, options)
@@ -162,53 +169,69 @@ class AudioConverter(BaseConverter):
                 converter_used=self.name
             )
 
-    async def _enhance_audio_processing(self, file_path: Path, audio_result, options: ConversionOptions):
-        """Enhance audio processing with speaker diarization and topic segmentation.
+    async def _create_enhanced_result_structure(self, audio_result, options: ConversionOptions):
+        """Create enhanced result structure from audio processing result.
 
         Args:
-            file_path: Path to audio file
-            audio_result: Basic audio processing result
+            audio_result: Audio processing result from enhanced processor
             options: Conversion options
 
         Returns:
             Enhanced audio result with speaker and topic information
         """
         enhanced_result = type('EnhancedAudioResult', (), {
-            'transcript': audio_result.transcript if hasattr(audio_result, 'transcript') else audio_result.text,
+            'transcript': audio_result.text,
             'metadata': audio_result.metadata.copy(),
             'summary': getattr(audio_result, 'summary', ''),
-            'segments': getattr(audio_result, 'segments', []),
+            'segments': audio_result.segments,
             'speakers': [],
             'topics': [],
             'speaker_segments': []
         })()
 
-        # Speaker diarization
-        if (self.diarization_pipeline and
-            options.format_options.get('enable_diarization', True)):
-            try:
-                speakers_info = await self._perform_speaker_diarization(file_path)
-                enhanced_result.speakers = speakers_info['speakers']
-                enhanced_result.speaker_segments = speakers_info['segments']
-                enhanced_result.metadata['num_speakers'] = len(speakers_info['speakers'])
-                enhanced_result.metadata['diarization_used'] = True
-                logger.info(f"Speaker diarization completed: {len(speakers_info['speakers'])} speakers detected")
-            except Exception as e:
-                logger.warning(f"Speaker diarization failed: {e}")
-                enhanced_result.metadata['diarization_used'] = False
+        # Extract speaker information if available
+        if audio_result.speaker_diarization:
+            diarization = audio_result.speaker_diarization
+            enhanced_result.speakers = [
+                {
+                    'id': speaker.speaker_id,
+                    'total_speaking_time': speaker.total_speaking_time,
+                    'segments_count': speaker.segment_count
+                }
+                for speaker in diarization.speakers
+            ]
+            enhanced_result.speaker_segments = [
+                {
+                    'speaker': segment.speaker_id,
+                    'start_time': segment.start_time,
+                    'end_time': segment.end_time,
+                    'duration': segment.duration
+                }
+                for segment in diarization.segments
+            ]
+            enhanced_result.metadata['num_speakers'] = diarization.total_speakers
+            enhanced_result.metadata['diarization_used'] = True
+        else:
+            enhanced_result.metadata['diarization_used'] = False
 
-        # Topic segmentation
-        if (self.topic_segmenter and
-            options.format_options.get('enable_topic_segmentation', True)):
-            try:
-                topics_info = await self._perform_topic_segmentation(enhanced_result.transcript)
-                enhanced_result.topics = topics_info
-                enhanced_result.metadata['num_topics'] = len(topics_info)
-                enhanced_result.metadata['topic_segmentation_used'] = True
-                logger.info(f"Topic segmentation completed: {len(topics_info)} topics detected")
-            except Exception as e:
-                logger.warning(f"Topic segmentation failed: {e}")
-                enhanced_result.metadata['topic_segmentation_used'] = False
+        # Extract topic information if available
+        if audio_result.topic_segmentation:
+            segmentation = audio_result.topic_segmentation
+            enhanced_result.topics = [
+                {
+                    'topic': topic.title,
+                    'sentences': topic.sentences,
+                    'start_sentence': 0,  # Simplified
+                    'sentence_count': len(topic.sentences),
+                    'summary': topic.summary,
+                    'keywords': topic.keywords or []
+                }
+                for topic in segmentation.topics
+            ]
+            enhanced_result.metadata['num_topics'] = segmentation.total_topics
+            enhanced_result.metadata['topic_segmentation_used'] = True
+        else:
+            enhanced_result.metadata['topic_segmentation_used'] = False
 
         return enhanced_result
 

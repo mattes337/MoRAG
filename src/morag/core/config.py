@@ -72,6 +72,28 @@ class Settings(BaseSettings):
     enable_page_based_chunking: bool = True
     max_page_chunk_size: int = 8000  # Larger size for page-based chunks
 
+    # Audio Processing Configuration
+    # Speaker Diarization
+    enable_speaker_diarization: bool = True
+    speaker_diarization_model: str = "pyannote/speaker-diarization-3.1"
+    min_speakers: int = 1
+    max_speakers: int = 10
+    speaker_embedding_model: str = "pyannote/embedding"
+    huggingface_token: Optional[str] = None
+
+    # Topic Segmentation
+    enable_topic_segmentation: bool = True
+    topic_similarity_threshold: float = 0.7
+    min_topic_sentences: int = 3
+    max_topics: int = 10
+    topic_embedding_model: str = "all-MiniLM-L6-v2"
+    use_llm_topic_summarization: bool = True
+
+    # Audio Quality and Processing
+    audio_quality_threshold: float = 0.6
+    enable_audio_enhancement: bool = False
+    audio_chunk_overlap: float = 0.1  # 10% overlap between chunks
+
     # Webhook Configuration
     webhook_timeout: int = 30
     webhook_max_retries: int = 3

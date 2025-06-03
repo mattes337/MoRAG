@@ -17,6 +17,8 @@ from mutagen.id3 import ID3NoHeaderError
 
 from morag.core.config import settings
 from morag.core.exceptions import ProcessingError, ExternalServiceError
+from morag.services.speaker_diarization import speaker_diarization_service, DiarizationResult
+from morag.services.topic_segmentation import topic_segmentation_service, TopicSegmentationResult
 
 logger = structlog.get_logger()
 
@@ -57,6 +59,9 @@ class AudioProcessingResult:
     metadata: Dict[str, Any]
     processing_time: float
     model_used: str
+    # Enhanced features
+    speaker_diarization: Optional[DiarizationResult] = None
+    topic_segmentation: Optional[TopicSegmentationResult] = None
 
 class AudioProcessor:
     """Audio processor using Faster Whisper for speech-to-text."""
@@ -121,36 +126,72 @@ class AudioProcessor:
     async def process_audio_file(
         self,
         file_path: Union[str, Path],
-        config: Optional[AudioConfig] = None
+        config: Optional[AudioConfig] = None,
+        enable_diarization: Optional[bool] = None,
+        enable_topic_segmentation: Optional[bool] = None
     ) -> AudioProcessingResult:
-        """Process audio file and extract text."""
+        """Process audio file and extract text with optional enhanced features."""
         start_time = time.time()
         file_path = Path(file_path)
         config = config or self.config
-        
+
+        # Use settings defaults if not provided
+        enable_diarization = enable_diarization if enable_diarization is not None else settings.enable_speaker_diarization
+        enable_topic_segmentation = enable_topic_segmentation if enable_topic_segmentation is not None else settings.enable_topic_segmentation
+
         try:
             # Validate file first
             self._validate_audio_file(file_path, config)
 
             logger.info("Processing audio file",
                        file_path=str(file_path),
-                       file_size=file_path.stat().st_size)
-            
+                       file_size=file_path.stat().st_size,
+                       enable_diarization=enable_diarization,
+                       enable_topic_segmentation=enable_topic_segmentation)
+
             # Extract metadata
             metadata = await self._extract_metadata(file_path)
-            
+
             # Convert to WAV if needed
             wav_path = await self._convert_to_wav(file_path)
-            
+
             try:
                 # Process with Whisper
                 result = await self._transcribe_audio(wav_path, config)
-                
+
                 # Calculate overall confidence
                 overall_confidence = sum(seg.confidence for seg in result.segments) / len(result.segments) if result.segments else 0.0
-                
+
+                # Enhanced processing
+                speaker_diarization_result = None
+                topic_segmentation_result = None
+
+                # Perform speaker diarization if enabled
+                if enable_diarization:
+                    try:
+                        speaker_diarization_result = await speaker_diarization_service.diarize_audio(wav_path)
+                        logger.info("Speaker diarization completed",
+                                   speakers_detected=speaker_diarization_result.total_speakers)
+                    except Exception as e:
+                        logger.warning("Speaker diarization failed", error=str(e))
+
+                # Perform topic segmentation if enabled
+                if enable_topic_segmentation and result.text:
+                    try:
+                        # Pass speaker segments for better topic boundaries
+                        speaker_segments = speaker_diarization_result.segments if speaker_diarization_result else None
+                        topic_segmentation_result = await topic_segmentation_service.segment_topics(
+                            result.text,
+                            speaker_segments=speaker_segments,
+                            transcript_segments=result.segments
+                        )
+                        logger.info("Topic segmentation completed",
+                                   topics_detected=topic_segmentation_result.total_topics)
+                    except Exception as e:
+                        logger.warning("Topic segmentation failed", error=str(e))
+
                 processing_time = time.time() - start_time
-                
+
                 return AudioProcessingResult(
                     text=result.text,
                     language=result.language,
@@ -159,7 +200,9 @@ class AudioProcessor:
                     segments=result.segments,
                     metadata=metadata,
                     processing_time=processing_time,
-                    model_used=config.model_size
+                    model_used=config.model_size,
+                    speaker_diarization=speaker_diarization_result,
+                    topic_segmentation=topic_segmentation_result
                 )
                 
             finally:
