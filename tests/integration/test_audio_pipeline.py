@@ -21,7 +21,7 @@ class TestAudioPipeline:
             model_size="tiny",  # Use smallest model for faster tests
             device="cpu",
             compute_type="int8",
-            max_file_size=10 * 1024 * 1024  # 10MB
+            max_file_size=10 * 1024 * 1024  # 10MB for testing
         )
     
     @pytest.fixture

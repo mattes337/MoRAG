@@ -69,7 +69,7 @@ class ConversionConfig:
     
     # Performance settings
     performance_settings: Dict[str, Any] = field(default_factory=lambda: {
-        'max_file_size': 100 * 1024 * 1024,  # 100MB
+        'max_file_size': 100 * 1024 * 1024,  # 100MB - default, overridden by type-specific limits
         'timeout_seconds': 300,  # 5 minutes
         'max_concurrent_conversions': 5,
         'enable_caching': True,
@@ -259,7 +259,7 @@ quality_settings:
   enable_quality_validation: true
 
 performance_settings:
-  max_file_size: 104857600  # 100MB
+  max_file_size: 104857600  # 100MB - default, overridden by type-specific limits
   timeout_seconds: 300  # 5 minutes
   max_concurrent_conversions: 5
   enable_caching: true

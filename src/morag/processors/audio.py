@@ -31,12 +31,17 @@ class AudioConfig:
     chunk_duration: int = 300  # 5 minutes in seconds
     overlap_duration: int = 30  # 30 seconds overlap
     quality_threshold: float = 0.7
-    max_file_size: int = 500 * 1024 * 1024  # 500MB
+    max_file_size: Optional[int] = None  # Will use settings.max_audio_size if None
     supported_formats: List[str] = field(default_factory=lambda: [
         "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma"
     ])
     device: str = "cpu"  # cpu or cuda
     compute_type: str = "int8"  # int8, int16, float16, float32
+
+    def __post_init__(self):
+        """Set default max_file_size from settings if not provided."""
+        if self.max_file_size is None:
+            self.max_file_size = settings.max_audio_size
 
 @dataclass
 class AudioTranscriptSegment:

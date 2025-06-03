@@ -133,13 +133,15 @@ class FileHandler:
     
     def _get_max_size_for_type(self, source_type: str) -> int:
         """Get maximum file size for source type."""
+        from ..core.config import settings
+
         max_sizes = {
-            'document': 100 * 1024 * 1024,  # 100MB
-            'audio': 500 * 1024 * 1024,     # 500MB
-            'video': 2 * 1024 * 1024 * 1024, # 2GB
-            'image': 50 * 1024 * 1024,      # 50MB
+            'document': settings.max_document_size,
+            'audio': settings.max_audio_size,
+            'video': settings.max_video_size,
+            'image': settings.max_image_size,
         }
-        return max_sizes.get(source_type, 100 * 1024 * 1024)
+        return max_sizes.get(source_type, settings.max_document_size)
     
     def _is_valid_for_source_type(self, file_extension: str, source_type: str) -> bool:
         """Check if file extension is valid for source type."""

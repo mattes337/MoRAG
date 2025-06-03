@@ -164,7 +164,7 @@ async def test_audio_config():
             chunk_duration=600,
             overlap_duration=60,
             quality_threshold=0.8,
-            max_file_size=100 * 1024 * 1024  # 100MB
+            max_file_size=100 * 1024 * 1024  # 100MB for testing
         )
         logger.info("✓ Custom config created", config=custom_config.__dict__)
         

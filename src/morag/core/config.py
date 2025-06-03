@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     temp_dir: str = "./temp"
     max_file_size: str = "100MB"
+
+    # File Size Limits (in bytes)
+    max_document_size: int = 100 * 1024 * 1024  # 100MB
+    max_audio_size: int = 2 * 1024 * 1024 * 1024  # 2GB - increased for large audio files
+    max_video_size: int = 5 * 1024 * 1024 * 1024  # 5GB
+    max_image_size: int = 50 * 1024 * 1024  # 50MB
     
     # Enhanced Logging Configuration
     log_level: str = "INFO"

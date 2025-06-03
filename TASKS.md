@@ -85,6 +85,7 @@
 ✅ **ENHANCED-AUDIO-PROCESSING** - Implemented comprehensive topic segmentation and speaker diarization for audio and video processing - COMPLETED
 ✅ **CONVERSATIONAL-FORMAT** - Implemented conversational format for audio transcription with topic-based speaker dialogue - COMPLETED
 ✅ **VIDEO-AUDIO-INTEGRATION** - Implemented automatic audio processing pipeline integration for video files with enhanced features - COMPLETED
+✅ **AUDIO-FILE-SIZE-LIMIT-FIX** - Increased audio file size limits from 500MB to 2GB to handle large audio files - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -228,6 +229,27 @@
   - Comprehensive error handling and fallback mechanisms
   - Integration tests validating the complete pipeline
   - Demo script showing all integration features
+
+### Audio File Size Limit Fix
+- **Issue**: Audio files larger than 500MB were being rejected with "Audio file too large" error
+- **Root Cause**: Hardcoded 500MB limit in AudioConfig and FileHandler was too restrictive for large audio files
+- **Solution**: Increased audio file size limits to 2GB and made them configurable via settings
+- **Files Modified**:
+  - `src/morag/core/config.py` (added configurable file size limits for all types)
+  - `src/morag/processors/audio.py` (updated AudioConfig to use settings)
+  - `src/morag/utils/file_handling.py` (updated FileHandler to use settings)
+  - `src/morag/converters/config.py` (updated converter config comments)
+  - `docs/api_usage.md` (updated documentation with new limits)
+  - `tests/integration/test_audio_pipeline.py` (updated test comments)
+  - `scripts/test_audio_processing.py` (updated test comments)
+- **Features Added**:
+  - Configurable file size limits via settings: `max_audio_size`, `max_video_size`, `max_document_size`, `max_image_size`
+  - Audio file size limit increased from 500MB to 2GB
+  - Video file size limit increased from 2GB to 5GB
+  - All file size limits now configurable and consistent across components
+  - AudioConfig automatically uses settings.max_audio_size if not explicitly set
+  - FileHandler uses settings for all file type size limits
+  - Updated documentation to reflect new configurable limits
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns

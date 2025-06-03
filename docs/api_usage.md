@@ -251,10 +251,10 @@ DELETE /api/v1/ingest/{task_id}
 
 ## File Size Limits
 
-- Documents: 100MB
-- Audio: 500MB
-- Video: 2GB
-- Images: 50MB
+- Documents: 100MB (configurable via settings)
+- Audio: 2GB (configurable via settings)
+- Video: 5GB (configurable via settings)
+- Images: 50MB (configurable via settings)
 
 ## Metadata Schema
 
