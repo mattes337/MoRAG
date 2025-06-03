@@ -80,6 +80,7 @@
 ✅ **PDF-ENCODING-FIX** - Fixed PDF text encoding issues with soft hyphens, ligatures, and special characters - COMPLETED
 ✅ **AUDIO-SEGMENT-NAMING-FIX** - Fixed AudioSegment naming conflict causing 'AudioSegment' object has no attribute 'from_file' error - COMPLETED
 ✅ **AUDIO-FFMPEG-FALLBACK** - Added robust FFmpeg fallback mechanism using librosa and soundfile for audio conversion - COMPLETED
+✅ **DOCKER-SYSTEM-DEPENDENCIES** - Enhanced Docker images with comprehensive system dependencies for all features - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -126,6 +127,22 @@
   - Enhanced error messages with installation instructions
   - Support for audio conversion without FFmpeg dependency
   - Comprehensive logging for troubleshooting
+
+### Docker System Dependencies Enhancement
+- **Issue**: Missing system-level dependencies for OCR, image processing, and audio processing features
+- **Root Cause**: Docker images only included basic dependencies, missing libraries required for optional features
+- **Solution**: Enhanced both main and worker Dockerfiles with comprehensive system dependencies
+- **Files Modified**:
+  - `Dockerfile` (added system dependencies for production image)
+  - `Dockerfile.worker` (added system dependencies for worker image)
+- **Dependencies Added**:
+  - `tesseract-ocr` + `tesseract-ocr-eng` - OCR functionality for image text extraction
+  - `libgl1-mesa-glx`, `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender-dev` - OpenCV support
+  - `libgomp1` - OpenMP support for parallel processing
+  - `libsndfile1` - Audio file format support for librosa/soundfile
+  - `git` - Git support for packages that install from repositories
+  - Browser dependencies for Playwright: `libnss3`, `libnspr4`, `libatk1.0-0`, `libatk-bridge2.0-0`, `libcups2`, `libdrm2`, `libxss1`, `libgtk-3-0`, `libxrandr2`, `libasound2`, `libpangocairo-1.0-0`, `libcairo-gobject2`, `libgdk-pixbuf2.0-0`
+  - Playwright Chromium browser installation for dynamic web content extraction
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns

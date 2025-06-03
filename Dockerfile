@@ -25,6 +25,8 @@ RUN pip install --upgrade pip && \
 # Download spaCy model (optional, will fallback if not available)
 RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
 
+
+
 # Production stage
 FROM python:3.11-slim as production
 
@@ -37,10 +39,38 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y \
     curl \
     ffmpeg \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libsndfile1 \
+    git \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxss1 \
+    libgtk-3-0 \
+    libxrandr2 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libatk1.0-0 \
+    libcairo-gobject2 \
+    libgtk-3-0 \
+    libgdk-pixbuf2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
+
+# Install Playwright browsers (optional, for web scraping with dynamic content)
+RUN python -m playwright install chromium || echo "Playwright browser installation failed, will use fallback"
 
 # Create app user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
