@@ -32,10 +32,13 @@ async def _process_document_impl(
 
         task_instance.update_progress(0.2, "Parsing document")
 
-        # Parse document
+        # Parse document - default to docling for PDFs as it creates better AI-readable formats
+        file_extension = Path(file_path).suffix.lower()
+        should_use_docling = use_docling or (file_extension == '.pdf')
+
         parse_result = await document_processor.parse_document(
             file_path,
-            use_docling=use_docling
+            use_docling=should_use_docling
         )
 
         task_instance.log_step(

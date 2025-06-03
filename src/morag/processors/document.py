@@ -221,48 +221,153 @@ class DocumentProcessor:
         """Parse document using docling (alternative for PDFs)."""
         try:
             # Import docling only when needed
-            from docling.document_converter import DocumentConverter
-            
-            converter = DocumentConverter()
+            from docling.document_converter import DocumentConverter, PdfFormatOption
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+            # Configure pipeline options for better text extraction
+            pipeline_options = PdfPipelineOptions(
+                do_ocr=True,  # Enable OCR for scanned documents
+                do_table_structure=True,  # Extract table structure
+                generate_page_images=False,  # Don't generate page images to save memory
+                generate_picture_images=False,  # Don't generate picture images to save memory
+            )
+
+            # Create converter with optimized settings
+            converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
+
+            logger.info("Starting docling conversion", file_path=str(file_path))
             result = converter.convert(str(file_path))
-            
+
+            if result.status.name != "SUCCESS":
+                raise ProcessingError(f"Docling conversion failed with status: {result.status}")
+
             # Convert docling result to our format
             chunks = []
             images = []
-            
-            # Process docling document structure
-            for element in result.document.body:
-                if hasattr(element, 'text') and element.text.strip():
+            total_pages = 0
+
+            # Process docling document structure using the new v2 API
+            for item, level in result.document.iterate_items():
+                # Handle different item types
+                if hasattr(item, 'text') and item.text.strip():
+                    # Get page number from provenance if available
+                    page_number = 1
+                    if hasattr(item, 'prov') and item.prov:
+                        for prov in item.prov:
+                            if hasattr(prov, 'page_no'):
+                                page_number = prov.page_no
+                                total_pages = max(total_pages, page_number)
+                                break
+
+                    # Determine chunk type based on item type
+                    chunk_type = "text"
+                    if hasattr(item, 'label'):
+                        if item.label in ['title', 'section_header']:
+                            chunk_type = "title"
+                        elif item.label == 'table':
+                            chunk_type = "table"
+                        elif item.label in ['list_item', 'list']:
+                            chunk_type = "list"
+
                     chunk = DocumentChunk(
-                        text=element.text.strip(),
-                        chunk_type="text",
-                        page_number=getattr(element, 'page', None),
+                        text=item.text.strip(),
+                        chunk_type=chunk_type,
+                        page_number=page_number,
+                        element_id=getattr(item, 'self_ref', f"item_{len(chunks)}"),
                         metadata={
-                            "element_type": type(element).__name__,
-                            "docling_source": True
+                            "element_type": type(item).__name__,
+                            "docling_source": True,
+                            "label": getattr(item, 'label', 'unknown'),
+                            "hierarchy_level": level
                         }
                     )
                     chunks.append(chunk)
-            
+
+                # Handle table items specifically
+                elif hasattr(item, 'export_to_dataframe'):
+                    try:
+                        # Export table to DataFrame and convert to markdown
+                        df = item.export_to_dataframe()
+                        table_markdown = df.to_markdown(index=False)
+
+                        # Get page number from provenance
+                        page_number = 1
+                        if hasattr(item, 'prov') and item.prov:
+                            for prov in item.prov:
+                                if hasattr(prov, 'page_no'):
+                                    page_number = prov.page_no
+                                    total_pages = max(total_pages, page_number)
+                                    break
+
+                        chunk = DocumentChunk(
+                            text=f"**Table:**\n{table_markdown}",
+                            chunk_type="table",
+                            page_number=page_number,
+                            element_id=getattr(item, 'self_ref', f"table_{len(chunks)}"),
+                            metadata={
+                                "element_type": "TableItem",
+                                "docling_source": True,
+                                "label": "table",
+                                "hierarchy_level": level,
+                                "table_shape": df.shape
+                            }
+                        )
+                        chunks.append(chunk)
+                    except Exception as e:
+                        logger.warning("Failed to process table item", error=str(e))
+
+            # If no chunks were extracted, try to get the raw markdown
+            if not chunks:
+                logger.warning("No chunks extracted from docling, trying markdown export")
+                markdown_text = result.document.export_to_markdown()
+                if markdown_text.strip():
+                    chunk = DocumentChunk(
+                        text=markdown_text.strip(),
+                        chunk_type="text",
+                        page_number=1,
+                        element_id="markdown_export",
+                        metadata={
+                            "element_type": "MarkdownExport",
+                            "docling_source": True,
+                            "label": "full_document"
+                        }
+                    )
+                    chunks.append(chunk)
+
             metadata = {
                 "parser": "docling",
                 "file_name": file_path.name,
                 "file_size": file_path.stat().st_size,
-                "total_elements": len(chunks)
+                "total_elements": len(chunks),
+                "conversion_status": result.status.name,
+                "docling_version": "v2"
             }
-            
+
+            logger.info(
+                "Docling conversion completed",
+                chunks_extracted=len(chunks),
+                total_pages=total_pages,
+                status=result.status.name
+            )
+
             return DocumentParseResult(
                 chunks=chunks,
                 metadata=metadata,
                 images=images,
+                total_pages=max(total_pages, 1),
                 word_count=sum(len(chunk.text.split()) for chunk in chunks)
             )
-            
-        except ImportError:
-            logger.warning("Docling not available, falling back to unstructured.io")
+
+        except ImportError as e:
+            logger.warning("Docling not available, falling back to unstructured.io", error=str(e))
             return await self._parse_with_unstructured(file_path, DocumentType.PDF)
         except Exception as e:
-            logger.error("Docling parsing failed", error=str(e))
+            logger.error("Docling parsing failed", error=str(e), file_path=str(file_path))
             # Fallback to unstructured.io
             return await self._parse_with_unstructured(file_path, DocumentType.PDF)
     
