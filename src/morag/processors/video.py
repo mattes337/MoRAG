@@ -29,7 +29,7 @@ class VideoConfig:
     thumbnail_count: int = 5
     extract_keyframes: bool = False
     max_keyframes: int = 10
-    audio_format: str = "wav"
+    audio_format: str = "mp3"
     thumbnail_size: Tuple[int, int] = (320, 240)
     thumbnail_format: str = "jpg"
     keyframe_threshold: float = 0.3  # Scene change threshold
@@ -251,30 +251,61 @@ class VideoProcessor:
                         error=str(e))
             raise ExternalServiceError(f"Metadata extraction failed: {str(e)}", "ffmpeg")
     
-    async def _extract_audio(self, file_path: Path, audio_format: str = "wav") -> Path:
-        """Extract audio track from video file."""
+    async def _extract_audio(self, file_path: Path, audio_format: str = "mp3") -> Path:
+        """Extract audio track from video file with minimal processing overhead."""
         try:
             # Create output path
             audio_path = self.temp_dir / f"audio_{int(time.time())}_{file_path.stem}.{audio_format}"
-            
+
             logger.debug("Extracting audio from video",
                         video_path=str(file_path),
                         audio_path=str(audio_path),
                         format=audio_format)
-            
-            # Extract audio using ffmpeg
+
+            # Get video metadata to determine best extraction strategy
+            metadata = await self._extract_metadata(file_path)
+
+            # Determine codec strategy for minimal processing time
+            if audio_format == "mp3":
+                # Try to copy stream if source is already MP3, otherwise use fast encoding
+                if metadata.audio_codec and "mp3" in metadata.audio_codec.lower():
+                    codec = "copy"  # Stream copy - fastest, no re-encoding
+                    logger.debug("Using stream copy for MP3 extraction (minimal overhead)")
+                else:
+                    codec = "libmp3lame"  # Fast MP3 encoding
+                    logger.debug("Using MP3 encoding for audio extraction")
+            elif audio_format == "wav":
+                codec = "pcm_s16le"  # Uncompressed WAV
+                logger.warning("Using uncompressed WAV format - will result in large files")
+            elif audio_format == "aac":
+                # Try to copy stream if source is already AAC
+                if metadata.audio_codec and "aac" in metadata.audio_codec.lower():
+                    codec = "copy"  # Stream copy - fastest
+                    logger.debug("Using stream copy for AAC extraction (minimal overhead)")
+                else:
+                    codec = "aac"  # Fast AAC encoding
+                    logger.debug("Using AAC encoding for audio extraction")
+            else:
+                codec = "libmp3lame"  # Default to MP3 for unknown formats
+                logger.debug(f"Unknown format {audio_format}, defaulting to MP3 encoding")
+
+            # Extract audio using ffmpeg with optimized settings
             await asyncio.to_thread(
                 lambda: ffmpeg_run(
                     ffmpeg_output(
                         ffmpeg_input(str(file_path)),
                         str(audio_path),
-                        acodec='pcm_s16le' if audio_format == 'wav' else 'mp3'
+                        acodec=codec,
+                        # Add quality settings for non-copy modes
+                        **({} if codec == "copy" else {
+                            "audio_bitrate": "128k" if audio_format == "mp3" else None
+                        })
                     ),
                     overwrite_output=True,
                     quiet=True
                 )
             )
-            
+
             if not audio_path.exists():
                 raise ProcessingError("Audio extraction failed - output file not created")
             

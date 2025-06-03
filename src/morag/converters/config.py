@@ -43,7 +43,9 @@ class ConversionConfig:
             'extract_keyframes': True,
             'keyframe_interval': 30,
             'include_audio': True,
-            'extract_scenes': True
+            'extract_scenes': True,
+            'audio_format': 'mp3',
+            'optimize_for_speed': True
         },
         'office': {
             'preserve_comments': False,
@@ -239,6 +241,8 @@ format_specific:
     keyframe_interval: 30  # seconds
     include_audio: true
     extract_scenes: true
+    audio_format: "mp3"  # Use compressed format for smaller files
+    optimize_for_speed: true  # Enable stream copying when possible
     
   office:
     preserve_comments: false

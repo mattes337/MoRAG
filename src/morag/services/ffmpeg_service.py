@@ -21,11 +21,12 @@ class FFmpegService:
         self.temp_dir.mkdir(exist_ok=True)
     
     async def extract_audio(
-        self, 
-        video_path: Path, 
-        output_format: str = "wav",
+        self,
+        video_path: Path,
+        output_format: str = "mp3",
         sample_rate: int = 16000,
-        channels: int = 1
+        channels: int = 1,
+        optimize_for_speed: bool = True
     ) -> Path:
         """Extract audio from video file."""
         try:
@@ -34,33 +35,97 @@ class FFmpegService:
             logger.debug("Extracting audio with FFmpeg",
                         video_path=str(video_path),
                         output_path=str(output_path),
-                        format=output_format)
-            
-            # Configure audio codec based on format
-            if output_format.lower() == "wav":
-                codec = "pcm_s16le"
-            elif output_format.lower() == "mp3":
-                codec = "mp3"
-            elif output_format.lower() == "flac":
-                codec = "flac"
+                        format=output_format,
+                        optimize_for_speed=optimize_for_speed)
+
+            # Configure audio codec based on format with speed optimization
+            if optimize_for_speed:
+                try:
+                    # Get metadata to check source audio codec
+                    metadata = await self.extract_metadata(video_path)
+                    source_codec = metadata.get('audio_codec', '').lower()
+
+                    # Use stream copy if source and target are compatible
+                    if output_format.lower() == "mp3" and "mp3" in source_codec:
+                        codec = "copy"
+                        use_copy = True
+                        logger.debug("Using stream copy for MP3 extraction (minimal overhead)")
+                    elif output_format.lower() == "aac" and "aac" in source_codec:
+                        codec = "copy"
+                        use_copy = True
+                        logger.debug("Using stream copy for AAC extraction (minimal overhead)")
+                    else:
+                        use_copy = False
+                        if output_format.lower() == "wav":
+                            codec = "pcm_s16le"
+                            logger.warning("Using uncompressed WAV format - will result in large files")
+                        elif output_format.lower() == "mp3":
+                            codec = "libmp3lame"
+                        elif output_format.lower() == "aac":
+                            codec = "aac"
+                        elif output_format.lower() == "flac":
+                            codec = "flac"
+                        else:
+                            codec = "libmp3lame"  # Default to MP3
+                        logger.debug(f"Using {codec} encoding for audio extraction")
+                except Exception as e:
+                    logger.warning(f"Could not optimize audio extraction: {e}, using standard method")
+                    use_copy = False
+                    if output_format.lower() == "wav":
+                        codec = "pcm_s16le"
+                    elif output_format.lower() == "mp3":
+                        codec = "libmp3lame"
+                    elif output_format.lower() == "flac":
+                        codec = "flac"
+                    else:
+                        codec = "libmp3lame"  # Default to MP3
             else:
-                codec = "pcm_s16le"  # Default to WAV
+                # Standard codec selection without optimization
+                use_copy = False
+                if output_format.lower() == "wav":
+                    codec = "pcm_s16le"
+                elif output_format.lower() == "mp3":
+                    codec = "libmp3lame"
+                elif output_format.lower() == "flac":
+                    codec = "flac"
+                else:
+                    codec = "libmp3lame"  # Default to MP3
             
-            # Extract audio using ffmpeg
-            await asyncio.to_thread(
-                lambda: (
-                    ffmpeg
-                    .input(str(video_path))
-                    .output(
-                        str(output_path),
-                        acodec=codec,
-                        ac=channels,
-                        ar=sample_rate
+            # Extract audio using ffmpeg with appropriate parameters
+            if use_copy:
+                # When copying stream, don't modify audio parameters
+                await asyncio.to_thread(
+                    lambda: (
+                        ffmpeg
+                        .input(str(video_path))
+                        .output(str(output_path), acodec=codec)
+                        .overwrite_output()
+                        .run(quiet=True, capture_stderr=True)
                     )
-                    .overwrite_output()
-                    .run(quiet=True, capture_stderr=True)
                 )
-            )
+            else:
+                # When encoding, apply audio parameters and quality settings
+                output_params = {
+                    'acodec': codec,
+                    'ac': channels,
+                    'ar': sample_rate
+                }
+
+                # Add quality settings for specific codecs
+                if codec == "libmp3lame":
+                    output_params['audio_bitrate'] = "128k"  # Fast encoding
+                elif codec == "aac":
+                    output_params['audio_bitrate'] = "128k"
+
+                await asyncio.to_thread(
+                    lambda: (
+                        ffmpeg
+                        .input(str(video_path))
+                        .output(str(output_path), **output_params)
+                        .overwrite_output()
+                        .run(quiet=True, capture_stderr=True)
+                    )
+                )
             
             if not output_path.exists():
                 raise ProcessingError("Audio extraction failed - output file not created")
