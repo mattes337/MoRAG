@@ -162,7 +162,7 @@ class TestYouTubeProcessor:
         mock_video_file.write_text("mock video")
         
         with patch('asyncio.to_thread'), \
-             patch.object(youtube_processor.temp_dir, 'glob', return_value=[mock_video_file]):
+             patch('pathlib.Path.glob', return_value=[mock_video_file]):
             
             result = await youtube_processor._download_video("https://youtube.com/watch?v=test", youtube_config)
             
@@ -190,7 +190,7 @@ class TestYouTubeProcessor:
         mock_audio_file.write_text("mock audio")
         
         with patch('asyncio.to_thread'), \
-             patch.object(youtube_processor.temp_dir, 'glob', return_value=[mock_audio_file]):
+             patch('pathlib.Path.glob', return_value=[mock_audio_file]):
             
             result = await youtube_processor._download_audio("https://youtube.com/watch?v=test", youtube_config)
             
@@ -212,7 +212,7 @@ class TestYouTubeProcessor:
             f.write_text("mock subtitles")
         
         with patch('asyncio.to_thread'), \
-             patch.object(youtube_processor.temp_dir, 'glob', side_effect=[mock_sub_files[:1], mock_sub_files[1:]]):
+             patch('pathlib.Path.glob', side_effect=[mock_sub_files[:1], mock_sub_files[1:]]):
             
             result = await youtube_processor._download_subtitles("https://youtube.com/watch?v=test", youtube_config)
             
@@ -235,7 +235,7 @@ class TestYouTubeProcessor:
             f.write_text("mock thumbnail")
         
         with patch('asyncio.to_thread'), \
-             patch.object(youtube_processor.temp_dir, 'glob', side_effect=[mock_thumb_files[:1], [], mock_thumb_files[1:]]):
+             patch('pathlib.Path.glob', side_effect=[mock_thumb_files[:1], [], mock_thumb_files[1:]]):
             
             result = await youtube_processor._download_thumbnails("https://youtube.com/watch?v=test", youtube_config)
             
