@@ -150,16 +150,44 @@ class VideoConverter(BaseConverter):
             sections.append(video_result.summary)
             sections.append("")
         
-        # Audio transcript section
+        # Audio transcript section - format as topic with timestamps
         if hasattr(video_result, 'audio_transcript') and video_result.audio_transcript:
-            sections.append("## Audio Transcript")
+            # Calculate total duration for timestamp
+            duration = video_result.metadata.get('duration', 0)
+            duration_str = self._format_timestamp(duration)
+
+            sections.append(f"# Audio Content [00:00 - {duration_str}]")
             sections.append("")
-            sections.append(video_result.audio_transcript)
+
+            # Format transcript with speaker labels
+            transcript_lines = video_result.audio_transcript.split('\n')
+            for line in transcript_lines:
+                line = line.strip()
+                if line:
+                    # Add speaker label if not already present
+                    if not line.startswith('Speaker_') and not line.startswith('SPEAKER_'):
+                        sections.append(f"Speaker_00: {line}")
+                    else:
+                        sections.append(line)
             sections.append("")
         elif hasattr(video_result, 'transcript') and video_result.transcript:
-            sections.append("## Transcript")
+            # Calculate total duration for timestamp
+            duration = video_result.metadata.get('duration', 0)
+            duration_str = self._format_timestamp(duration)
+
+            sections.append(f"# Audio Content [00:00 - {duration_str}]")
             sections.append("")
-            sections.append(video_result.transcript)
+
+            # Format transcript with speaker labels
+            transcript_lines = video_result.transcript.split('\n')
+            for line in transcript_lines:
+                line = line.strip()
+                if line:
+                    # Add speaker label if not already present
+                    if not line.startswith('Speaker_') and not line.startswith('SPEAKER_'):
+                        sections.append(f"Speaker_00: {line}")
+                    else:
+                        sections.append(line)
             sections.append("")
         
         # Keyframes section
@@ -203,18 +231,7 @@ class VideoConverter(BaseConverter):
                     sections.append(f"**Activity**: {scene['activity']}")
                 
                 sections.append("")
-        
-        # Processing details
-        sections.append("## Processing Details")
-        sections.append("")
-        sections.append(f"**Video Processor**: {video_result.metadata.get('processor_used', 'MoRAG Video Processor')}")
-        
-        if 'keyframes_extracted' in video_result.metadata:
-            sections.append(f"**Keyframes Extracted**: {video_result.metadata['keyframes_extracted']}")
-        
-        if 'audio_extracted' in video_result.metadata:
-            sections.append(f"**Audio Extracted**: {'Yes' if video_result.metadata['audio_extracted'] else 'No'}")
-        
+
         return "\n".join(sections)
     
     def _format_timestamp(self, seconds: float) -> str:

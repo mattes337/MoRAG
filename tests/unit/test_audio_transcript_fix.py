@@ -161,8 +161,8 @@ class TestAudioTranscriptFix:
             conversion_options
         )
 
-        # Verify fallback transcript is used
-        assert "## Transcript" in markdown
+        # Verify fallback transcript is used - now should be in topic format
+        assert "# Topic" in markdown or "# Main Content" in markdown
         assert "Simple transcript text." in markdown
         # Should not have timestamps when no segments
         assert "**[" not in markdown
@@ -227,8 +227,8 @@ class TestAudioTranscriptFix:
             conversion_options
         )
 
-        # Verify transcript section is present
-        assert "## Transcript" in markdown
+        # Verify transcript section is now in topic format
+        assert "# Main Content" in markdown
         assert "Dies ist ein Testtext, bitte transcribieren." in markdown
-        assert "**[00:00 - 00:05]**" in markdown
-        assert "## Processing Details" in markdown
+        # Should have speaker labels now
+        assert "Speaker_00:" in markdown

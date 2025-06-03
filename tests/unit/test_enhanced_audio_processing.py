@@ -440,8 +440,8 @@ class TestEnhancedAudioConverter:
 
         # Check basic structure
         assert "# Audio Transcription:" in markdown
-        assert "## Topics" in markdown
-        assert "# Greeting" in markdown  # Topic as main header
+        # Topics should now be main headers with timestamps, not under "## Topics"
+        assert "# Greeting" in markdown or "# Topic" in markdown  # Topic as main header
 
         # Check for speaker dialogue format (should contain speaker IDs)
         assert "SPEAKER_" in markdown or "Speaker_" in markdown

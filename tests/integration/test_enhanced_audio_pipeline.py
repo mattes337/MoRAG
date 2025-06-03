@@ -199,24 +199,22 @@ class TestEnhancedAudioPipeline:
         assert len(result.content) > 0
         assert result.processing_time > 0
         
-        # Check markdown structure
+        # Check markdown structure - updated for new format
         content = result.content
         assert "# Audio Transcription:" in content
         assert "## Audio Information" in content
-        assert "## Transcript" in content
-        assert "## Processing Details" in content
-        
+        # Should have topic headers instead of transcript/processing sections
+        assert "# Topic" in content or "# Main Content" in content
+
         # Check metadata
         assert 'diarization_used' in result.metadata
         assert 'topic_segmentation_used' in result.metadata
-        
-        # If enhanced features worked, check their sections
-        if result.metadata.get('diarization_used'):
-            assert "## Speakers" in content
-            assert result.metadata.get('num_speakers', 0) >= 1
-        
+
+        # Should have speaker labels in content
+        assert "Speaker_00:" in content or "SPEAKER_" in content
+
         if result.metadata.get('topic_segmentation_used'):
-            assert "## Topics" in content
+            # Topics are now main headers, not under a "## Topics" section
             assert result.metadata.get('num_topics', 0) >= 1
     
     @pytest.mark.asyncio

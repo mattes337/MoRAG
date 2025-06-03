@@ -2,7 +2,7 @@
 
 import time
 from pathlib import Path
-from typing import Union, List, Dict, Any, Optional
+from typing import Union, List, Dict, Any, Optional, Tuple
 import structlog
 import asyncio
 
@@ -471,6 +471,56 @@ class AudioConverter(BaseConverter):
 
         return topic_segments
 
+    def _calculate_topic_timestamps(
+        self,
+        topic: Dict[str, Any],
+        speaker_segments: List[Dict[str, Any]],
+        transcript_segments: List
+    ) -> Tuple[float, float]:
+        """Calculate start and end timestamps for a topic.
+
+        Args:
+            topic: Topic information with sentences
+            speaker_segments: Speaker diarization segments
+            transcript_segments: Transcript segments with timing
+
+        Returns:
+            Tuple of (start_time, end_time) in seconds, or (None, None) if not found
+        """
+        try:
+            topic_sentences = topic.get('sentences', [])
+            if not topic_sentences or not transcript_segments:
+                return None, None
+
+            # Find the earliest and latest timestamps for sentences in this topic
+            topic_times = []
+
+            for sentence in topic_sentences:
+                sentence_clean = sentence.strip()
+
+                # Try to find matching transcript segment
+                for segment in transcript_segments:
+                    if hasattr(segment, 'text') and hasattr(segment, 'start_time') and hasattr(segment, 'end_time'):
+                        segment_text = segment.text.strip()
+
+                        # Check for text similarity
+                        if (sentence_clean in segment_text or
+                            segment_text in sentence_clean or
+                            self._text_similarity(sentence_clean, segment_text) > 0.6):
+                            topic_times.append((segment.start_time, segment.end_time))
+                            break
+
+            if topic_times:
+                start_time = min(t[0] for t in topic_times)
+                end_time = max(t[1] for t in topic_times)
+                return start_time, end_time
+
+            return None, None
+
+        except Exception as e:
+            logger.warning("Failed to calculate topic timestamps", error=str(e))
+            return None, None
+
     async def _create_enhanced_structured_markdown(self, enhanced_result, options: ConversionOptions) -> str:
         """Create enhanced structured markdown with speaker and topic information.
 
@@ -521,52 +571,23 @@ class AudioConverter(BaseConverter):
             sections.append(enhanced_result.summary)
             sections.append("")
 
-        # Speakers section
-        if enhanced_result.speakers and options.format_options.get('include_speaker_info', True):
-            sections.append("## Speakers")
-            sections.append("")
-
-            for i, speaker in enumerate(enhanced_result.speakers, 1):
-                speaking_time = speaker['total_speaking_time']
-                time_str = f"{speaking_time:.1f} seconds" if speaking_time < 60 else f"{speaking_time/60:.1f} minutes"
-                sections.append(f"- **Speaker {i}** ({speaker['id']}): {time_str} speaking time, {speaker['segments_count']} segments")
-
-            sections.append("")
-
-        # Transcript section
-        sections.append("## Transcript")
-        sections.append("")
-
-        if hasattr(enhanced_result, 'segments') and enhanced_result.segments:
-            # Detailed transcript with timestamps
-            for segment in enhanced_result.segments:
-                if options.format_options.get('include_timestamps', True):
-                    start_time = self._format_timestamp(segment.start_time)
-                    end_time = self._format_timestamp(segment.end_time)
-                    sections.append(f"**[{start_time} - {end_time}]**")
-
-                text = segment.text.strip()
-                if text:
-                    sections.append(text)
-                    sections.append("")
-        else:
-            # Simple transcript
-            if hasattr(enhanced_result, 'transcript') and enhanced_result.transcript:
-                sections.append(enhanced_result.transcript)
-            elif hasattr(enhanced_result, 'text') and enhanced_result.text:
-                sections.append(enhanced_result.text)
-            else:
-                sections.append("*No transcript available*")
-            sections.append("")
-
-        # Topics section with conversational format
+        # Topics section with conversational format and timestamps
         if enhanced_result.topics and options.format_options.get('include_topic_info', True):
-            sections.append("## Topics")
-            sections.append("")
-
             for i, topic in enumerate(enhanced_result.topics, 1):
                 topic_title = topic.get('topic', f'Topic {i}')
-                sections.append(f"# {topic_title}")
+
+                # Calculate topic timestamp range
+                topic_start_time, topic_end_time = self._calculate_topic_timestamps(
+                    topic, enhanced_result.speaker_segments, enhanced_result.segments
+                )
+
+                # Add timestamp to topic header
+                if topic_start_time is not None and topic_end_time is not None:
+                    start_str = self._format_timestamp(topic_start_time)
+                    end_str = self._format_timestamp(topic_end_time)
+                    sections.append(f"# {topic_title} [{start_str} - {end_str}]")
+                else:
+                    sections.append(f"# {topic_title}")
                 sections.append("")
 
                 # Create conversational format by mapping sentences to speakers and timing
@@ -586,18 +607,6 @@ class AudioConverter(BaseConverter):
                         sections.append(f"Speaker_00: {sentence}")
 
                 sections.append("")
-
-        # Processing details
-        sections.append("## Processing Details")
-        sections.append("")
-        sections.append(f"**Transcription Engine**: {enhanced_result.metadata.get('model_used', 'Whisper')}")
-
-        if 'confidence' in enhanced_result.metadata:
-            confidence = enhanced_result.metadata['confidence']
-            sections.append(f"**Average Confidence**: {confidence:.2f}")
-
-        if 'word_count' in enhanced_result.metadata:
-            sections.append(f"**Word Count**: {enhanced_result.metadata['word_count']}")
 
         return "\n".join(sections)
 
@@ -647,45 +656,38 @@ class AudioConverter(BaseConverter):
             sections.append("")
             sections.append(audio_result.summary)
             sections.append("")
-        
-        # Transcript section
-        sections.append("## Transcript")
-        sections.append("")
-        
-        if hasattr(audio_result, 'segments') and audio_result.segments:
-            # Detailed transcript with timestamps
-            for segment in audio_result.segments:
-                if options.format_options.get('include_timestamps', True):
-                    start_time = self._format_timestamp(segment.start_time)
-                    end_time = self._format_timestamp(segment.end_time)
-                    sections.append(f"**[{start_time} - {end_time}]**")
 
+        # Simple topic section for basic transcripts (without speaker diarization)
+        if hasattr(audio_result, 'segments') and audio_result.segments:
+            # Create a single topic with all content
+            sections.append("# Main Content [00:00 - ")
+
+            # Calculate total duration
+            total_duration = 0
+            if audio_result.segments:
+                total_duration = max(segment.end_time for segment in audio_result.segments if hasattr(segment, 'end_time'))
+
+            duration_str = self._format_timestamp(total_duration)
+            sections[-1] += f"{duration_str}]"
+            sections.append("")
+
+            # Add all transcript content with speaker labels
+            for segment in audio_result.segments:
                 text = segment.text.strip()
                 if text:
-                    sections.append(text)
-                    sections.append("")
+                    sections.append(f"Speaker_00: {text}")
         else:
-            # Simple transcript
-            if hasattr(audio_result, 'transcript') and audio_result.transcript:
-                sections.append(audio_result.transcript)
-            elif hasattr(audio_result, 'text') and audio_result.text:
-                sections.append(audio_result.text)
-            else:
-                sections.append("*No transcript available*")
+            # Simple transcript fallback
+            sections.append("# Main Content")
             sections.append("")
-        
-        # Processing details
-        sections.append("## Processing Details")
-        sections.append("")
-        sections.append(f"**Transcription Engine**: {audio_result.metadata.get('model_used', 'Whisper')}")
-        
-        if 'confidence' in audio_result.metadata:
-            confidence = audio_result.metadata['confidence']
-            sections.append(f"**Average Confidence**: {confidence:.2f}")
-        
-        if 'word_count' in audio_result.metadata:
-            sections.append(f"**Word Count**: {audio_result.metadata['word_count']}")
-        
+
+            if hasattr(audio_result, 'transcript') and audio_result.transcript:
+                sections.append(f"Speaker_00: {audio_result.transcript}")
+            elif hasattr(audio_result, 'text') and audio_result.text:
+                sections.append(f"Speaker_00: {audio_result.text}")
+            else:
+                sections.append("Speaker_00: *No transcript available*")
+
         return "\n".join(sections)
     
     def _format_timestamp(self, seconds: float) -> str:
