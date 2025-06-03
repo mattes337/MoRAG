@@ -52,11 +52,18 @@ cp .env.example .env
 redis-server
 
 # Start Qdrant
-docker run -p 6333:6333 qdrant/qdrant:latest
+docker run -d -p 6333:6333 --name morag-qdrant qdrant/qdrant:latest
 
-# Start the API
+# Start Celery worker (REQUIRED for task processing)
+python scripts/start_worker.py
+# OR alternatively:
+# celery -A src.morag.core.celery_app worker --loglevel=info --concurrency=4
+
+# Start the API (in a separate terminal)
 uvicorn morag.api.main:app --reload
 ```
+
+**Important**: The Celery worker is required for processing ingestion tasks. Without it, submitted tasks will remain in "pending" status and never complete.
 
 ## Architecture
 
@@ -100,6 +107,53 @@ isort src/ tests/
 flake8 src/ tests/
 mypy src/
 ```
+
+## Troubleshooting
+
+### Tasks Not Processing
+
+If you submit tasks but they remain in "pending" status:
+
+1. **Check if Celery worker is running:**
+   ```bash
+   # Check for running worker processes
+   ps aux | grep celery
+   ```
+
+2. **Start the Celery worker:**
+   ```bash
+   # Using the provided script
+   python scripts/start_worker.py
+
+   # Or directly with celery command
+   celery -A src.morag.core.celery_app worker --loglevel=info --concurrency=4
+   ```
+
+3. **Check Redis connection:**
+   ```bash
+   # Test Redis connectivity
+   redis-cli ping
+   # Should return "PONG"
+   ```
+
+4. **Check Qdrant connection:**
+   ```bash
+   # Test Qdrant connectivity
+   curl http://localhost:6333/health
+   # Should return health status
+   ```
+
+5. **Monitor worker logs:**
+   ```bash
+   # Run worker with debug logging
+   celery -A src.morag.core.celery_app worker --loglevel=debug
+   ```
+
+### Common Issues
+
+- **Windows Users**: The worker script uses "solo" pool for Windows compatibility
+- **Port Conflicts**: Ensure ports 6379 (Redis) and 6333 (Qdrant) are available
+- **Environment Variables**: Check that `.env` file is properly configured with API keys
 
 ## License
 
