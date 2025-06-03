@@ -63,8 +63,16 @@ async def _process_document_impl(
             )
 
             try:
+                # Log chunk details for debugging
+                logger.info("Processing chunk for summary",
+                           chunk_index=i,
+                           chunk_length=len(chunk.text),
+                           chunk_preview=chunk.text[:200] + "..." if len(chunk.text) > 200 else chunk.text,
+                           use_enhanced_summary=use_enhanced_summary)
+
                 if use_enhanced_summary:
                     # Use enhanced summarization with adaptive configuration
+                    logger.info("Using enhanced summarization service")
                     enhanced_result = await enhanced_summarization_service.generate_summary(
                         chunk.text,
                         config=SummaryConfig(
@@ -76,6 +84,13 @@ async def _process_document_impl(
                     )
                     summary = enhanced_result.summary
 
+                    logger.info("Enhanced summary generated",
+                               original_length=len(chunk.text),
+                               summary_length=len(summary),
+                               summary_preview=summary[:100] + "..." if len(summary) > 100 else summary,
+                               strategy=enhanced_result.strategy.value,
+                               quality_score=enhanced_result.quality.overall)
+
                     # Add enhanced summary metadata
                     chunk_metadata = {
                         "enhanced_summary": True,
@@ -86,16 +101,36 @@ async def _process_document_impl(
                     }
                 else:
                     # Use basic summarization
+                    logger.info("Using basic Gemini summarization service")
                     summary_result = await gemini_service.generate_summary(
                         chunk.text,
                         max_length=100,
                         style="concise"
                     )
                     summary = summary_result.summary
+
+                    logger.info("Basic summary generated",
+                               original_length=len(chunk.text),
+                               summary_length=len(summary),
+                               summary_preview=summary[:100] + "..." if len(summary) > 100 else summary,
+                               model=summary_result.model,
+                               token_count=summary_result.token_count)
+
                     chunk_metadata = {"enhanced_summary": False}
 
+                # Check if summary is just truncated text (potential issue indicator)
+                if summary.startswith(chunk.text[:50]):
+                    logger.warning("Summary appears to be truncated original text",
+                                 chunk_index=i,
+                                 original_start=chunk.text[:50],
+                                 summary_start=summary[:50])
+
             except Exception as e:
-                logger.warning("Failed to generate summary for chunk", error=str(e))
+                logger.error("Failed to generate summary for chunk",
+                           error=str(e),
+                           chunk_index=i,
+                           chunk_length=len(chunk.text),
+                           error_type=type(e).__name__)
                 summary = chunk.text[:100] + "..." if len(chunk.text) > 100 else chunk.text
                 chunk_metadata = {"enhanced_summary": False, "summary_fallback": True}
 

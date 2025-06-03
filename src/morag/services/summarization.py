@@ -224,14 +224,22 @@ class EnhancedSummarizationService:
     async def _abstractive_summary(self, text: str, config: SummaryConfig) -> str:
         """Generate abstractive summary using Gemini."""
         prompt = self._build_enhanced_prompt(text, config)
-        
-        result = await self.gemini_service.generate_summary(
-            text=prompt,
-            max_length=config.max_length,
-            style=config.style
-        )
-        
-        return result.summary
+
+        logger.info("Generating abstractive summary",
+                   text_length=len(text),
+                   text_preview=text[:100] + "..." if len(text) > 100 else text,
+                   config_max_length=config.max_length,
+                   config_style=config.style,
+                   prompt_length=len(prompt))
+
+        # Use direct text generation to avoid double-prompting
+        result = await self.gemini_service.generate_text_from_prompt(prompt)
+
+        logger.info("Abstractive summary result",
+                   summary_length=len(result),
+                   summary_preview=result[:100] + "..." if len(result) > 100 else result)
+
+        return result
     
     async def _extractive_summary(self, text: str, config: SummaryConfig) -> str:
         """Generate extractive summary by selecting key sentences."""
@@ -322,17 +330,18 @@ class EnhancedSummarizationService:
         focus_text = ', '.join(config.focus_areas)
         enhanced_prompt = f"""
         Summarize the following text with special focus on: {focus_text}
+        Keep the summary to approximately {config.max_length} words.
+        Style: {config.style}
 
         Text: {text}
+
+        Summary:
         """
 
-        result = await self.gemini_service.generate_summary(
-            text=enhanced_prompt,
-            max_length=config.max_length,
-            style=config.style
-        )
+        # Use direct text generation to avoid double-prompting
+        result = await self.gemini_service.generate_text_from_prompt(enhanced_prompt)
 
-        return result.summary
+        return result
 
     def _split_into_chunks(self, text: str, chunk_size: int) -> List[str]:
         """Split text into chunks of approximately equal size."""
@@ -527,6 +536,8 @@ class EnhancedSummarizationService:
             # Create refinement prompt
             refinement_prompt = f"""
             Please improve the following summary by addressing these issues: {', '.join(issues)}.
+            Keep the improved summary to approximately {config.max_length} words.
+            Style: {config.style}
 
             Original text: {original_text[:1000]}...
 
@@ -536,12 +547,8 @@ class EnhancedSummarizationService:
             """
 
             try:
-                result = await self.gemini_service.generate_summary(
-                    text=refinement_prompt,
-                    max_length=config.max_length,
-                    style=config.style
-                )
-                current_summary = result.summary
+                # Use direct text generation to avoid double-prompting
+                current_summary = await self.gemini_service.generate_text_from_prompt(refinement_prompt)
 
                 # Re-assess quality
                 quality = self._assess_quality(original_text, current_summary, config)

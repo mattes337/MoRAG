@@ -140,29 +140,48 @@ class GeminiService:
         """Generate a summary of the given text."""
         try:
             prompt = self._build_summary_prompt(text, max_length, style)
-            
+
+            logger.info("Generating summary with Gemini API",
+                       text_length=len(text),
+                       text_preview=text[:100] + "..." if len(text) > 100 else text,
+                       max_length=max_length,
+                       style=style,
+                       model=self.generation_model,
+                       prompt_preview=prompt[:200] + "..." if len(prompt) > 200 else prompt)
+
             result = await asyncio.to_thread(
                 self._generate_text_sync,
                 prompt
             )
-            
-            logger.debug("Generated summary", 
-                        original_length=len(text),
-                        summary_length=len(result),
-                        model=self.generation_model)
-            
+
+            logger.info("Gemini API response received",
+                       original_length=len(text),
+                       summary_length=len(result),
+                       summary_preview=result[:100] + "..." if len(result) > 100 else result,
+                       model=self.generation_model)
+
+            # Check if result looks like a proper summary or just truncated text
+            if result.strip().startswith(text[:50].strip()):
+                logger.warning("Gemini API returned text that appears to be truncated original",
+                             original_start=text[:50],
+                             result_start=result[:50])
+
             return SummaryResult(
                 summary=result,
                 token_count=len(result.split()),
                 model=self.generation_model
             )
-            
+
         except Exception as e:
             if "quota" in str(e).lower() or "rate" in str(e).lower():
                 logger.warning("Rate limit hit for summary generation", error=str(e))
                 raise RateLimitError(f"Gemini API rate limit: {str(e)}")
-            
-            logger.error("Failed to generate summary", error=str(e))
+
+            logger.error("Failed to generate summary",
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        text_length=len(text),
+                        text_preview=text[:100] + "..." if len(text) > 100 else text)
             raise ExternalServiceError(f"Summary generation failed: {str(e)}", "gemini")
     
     def _generate_text_sync(self, prompt: str) -> str:
@@ -172,6 +191,37 @@ class GeminiService:
             contents=prompt
         )
         return response.text
+
+    async def generate_text_from_prompt(self, prompt: str) -> str:
+        """Generate text directly from a prompt without additional processing."""
+        try:
+            logger.info("Generating text from direct prompt",
+                       prompt_length=len(prompt),
+                       prompt_preview=prompt[:200] + "..." if len(prompt) > 200 else prompt,
+                       model=self.generation_model)
+
+            result = await asyncio.to_thread(
+                self._generate_text_sync,
+                prompt
+            )
+
+            logger.info("Direct prompt response received",
+                       response_length=len(result),
+                       response_preview=result[:100] + "..." if len(result) > 100 else result,
+                       model=self.generation_model)
+
+            return result
+
+        except Exception as e:
+            if "quota" in str(e).lower() or "rate" in str(e).lower():
+                logger.warning("Rate limit hit for text generation", error=str(e))
+                raise RateLimitError(f"Gemini API rate limit: {str(e)}")
+
+            logger.error("Failed to generate text from prompt",
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        prompt_length=len(prompt))
+            raise ExternalServiceError(f"Text generation failed: {str(e)}", "gemini")
     
     def _build_summary_prompt(self, text: str, max_length: int, style: str) -> str:
         """Build prompt for summary generation."""
