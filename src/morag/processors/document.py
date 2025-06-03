@@ -7,7 +7,7 @@ from enum import Enum
 
 from morag.core.config import settings
 from morag.core.exceptions import ProcessingError, ValidationError
-from morag.utils.text_processing import prepare_text_for_summary
+from morag.utils.text_processing import prepare_text_for_summary, normalize_text_encoding
 
 logger = structlog.get_logger()
 
@@ -310,8 +310,11 @@ class DocumentProcessor:
                         elif item.label in ['list_item', 'list']:
                             chunk_type = "list"
 
+                    # Clean text encoding issues
+                    clean_text = normalize_text_encoding(item.text.strip())
+
                     chunk = DocumentChunk(
-                        text=item.text.strip(),
+                        text=clean_text,
                         chunk_type=chunk_type,
                         page_number=page_number,
                         element_id=getattr(item, 'self_ref', f"item_{len(chunks)}"),
@@ -330,6 +333,8 @@ class DocumentProcessor:
                         # Export table to DataFrame and convert to markdown
                         df = item.export_to_dataframe()
                         table_markdown = df.to_markdown(index=False)
+                        # Clean encoding issues in table content
+                        table_markdown = normalize_text_encoding(table_markdown)
 
                         # Get page number from provenance
                         page_number = 1
@@ -362,8 +367,10 @@ class DocumentProcessor:
                 logger.warning("No chunks extracted from docling, trying markdown export")
                 markdown_text = result.document.export_to_markdown()
                 if markdown_text.strip():
+                    # Clean encoding issues in markdown export
+                    clean_markdown = normalize_text_encoding(markdown_text.strip())
                     chunk = DocumentChunk(
-                        text=markdown_text.strip(),
+                        text=clean_markdown,
                         chunk_type="text",
                         page_number=1,
                         element_id="markdown_export",
@@ -434,8 +441,10 @@ class DocumentProcessor:
             # Process different element types
             if isinstance(element, (Text, NarrativeText, Title)):
                 if element.text.strip():
+                    # Clean text encoding issues
+                    clean_text = normalize_text_encoding(element.text.strip())
                     chunk = DocumentChunk(
-                        text=element.text.strip(),
+                        text=clean_text,
                         chunk_type="text",
                         page_number=current_page,
                         element_id=f"element_{i}",

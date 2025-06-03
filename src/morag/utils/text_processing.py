@@ -1,6 +1,7 @@
 """Text processing utilities for MoRAG."""
 
 import re
+import unicodedata
 from typing import List, Dict, Any, Optional
 import structlog
 
@@ -23,6 +24,124 @@ def prepare_text_for_embedding(text: str) -> str:
         text = text[:max_chars] + "..."
 
     return text
+
+
+def clean_pdf_text_encoding(text: str) -> str:
+    """Clean PDF text encoding issues and artifacts.
+
+    Args:
+        text: Raw text extracted from PDF
+
+    Returns:
+        Cleaned text with encoding issues resolved
+    """
+    if not text:
+        return text
+
+    # Normalize Unicode characters
+    text = unicodedata.normalize('NFKC', text)
+
+    # Common PDF encoding fixes
+    replacements = {
+        # Zero-width characters (but NOT soft hyphen - handled by regex below)
+        '\u200b': '',  # Zero-width space
+        '\u200c': '',  # Zero-width non-joiner
+        '\u200d': '',  # Zero-width joiner
+        '\ufeff': '',  # Byte order mark
+
+        # Common ligature issues
+        'ﬁ': 'fi',
+        'ﬂ': 'fl',
+        'ﬀ': 'ff',
+        'ﬃ': 'ffi',
+        'ﬄ': 'ffl',
+
+        # Quote marks
+        '"': '"',
+        '"': '"',
+        ''': "'",
+        ''': "'",
+
+        # Dashes
+        '–': '-',  # En dash
+        '—': '-',  # Em dash
+
+        # Common encoding artifacts
+        'â€™': "'",
+        'â€œ': '"',
+        'â€': '"',
+        'â€¦': '...',
+        'â€"': '-',
+        'â€"': '-',
+
+        # Note: Soft hyphens are handled by regex patterns below
+    }
+
+    # Apply replacements
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # Fix hyphenated words with soft hyphens BEFORE cleaning whitespace
+    # Handle cases like "ange­ schlagen" -> "angeschlagen"
+    # This needs to handle the case where there might be multiple spaces before the soft hyphen
+    text = re.sub(r'(\w+)\s*\u00ad\s+(\w+)', r'\1\2', text)  # word + optional space + soft hyphen + space(s) + word
+    text = re.sub(r'(\w+)\u00ad\s+(\w+)', r'\1\2', text)     # soft hyphen + space(s) + word
+    text = re.sub(r'(\w+)\u00ad(\w+)', r'\1\2', text)        # soft hyphen + word directly
+
+    # Fix broken words that span lines (common in PDFs)
+    # Pattern: word- newline word -> wordword
+    text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', text)
+
+    # Remove any remaining soft hyphens that weren't caught by the patterns above
+    text = text.replace('\u00ad', '')
+
+    # Clean up multiple spaces (but preserve single newlines)
+    text = re.sub(r'[ \t]+', ' ', text)  # Only collapse spaces and tabs, not newlines
+
+    # Clean up multiple newlines (preserve double newlines for paragraphs)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip()
+
+
+def normalize_text_encoding(text: str) -> str:
+    """Normalize text encoding for consistent processing.
+
+    Args:
+        text: Input text that may have encoding issues
+
+    Returns:
+        Normalized text
+    """
+    if text is None:
+        return ""
+    if isinstance(text, bytes) and not text:
+        return ""
+    if not text:
+        return text
+
+    try:
+        # Try to encode/decode to fix encoding issues
+        if isinstance(text, bytes):
+            # If it's bytes, try to decode with various encodings
+            for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    text = text.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+        # Normalize Unicode
+        text = unicodedata.normalize('NFKC', text)
+
+        # Apply PDF-specific cleaning
+        text = clean_pdf_text_encoding(text)
+
+        return text
+
+    except Exception as e:
+        logger.warning("Text encoding normalization failed", error=str(e))
+        return str(text) if text else ""
 
 def prepare_text_for_summary(text: str) -> str:
     """Prepare text for summarization."""

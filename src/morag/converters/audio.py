@@ -103,7 +103,7 @@ class AudioConverter(BaseConverter):
         
         try:
             # Use existing MoRAG audio processor for basic transcription
-            audio_result = await audio_processor.process_audio(str(file_path))
+            audio_result = await audio_processor.process_audio_file(str(file_path))
 
             # Enhanced processing with speaker diarization and topic segmentation
             enhanced_result = await self._enhance_audio_processing(file_path, audio_result, options)

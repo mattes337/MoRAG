@@ -76,6 +76,36 @@
 ✅ **SETTINGS-IMPORT-FIX** - Fixed missing settings import in document_tasks.py causing NameError - COMPLETED
 ✅ **SUMMARIZATION-FIX** - Fix PDF document summarization returning truncated text instead of proper summaries - COMPLETED
 ✅ **UNIVERSAL-DOCUMENT-CONVERSION** - Implemented universal document conversion framework with pluggable converters - COMPLETED
+✅ **AUDIO-CONVERTER-METHOD-FIX** - Fixed AudioProcessor method call from process_audio to process_audio_file in audio converter - COMPLETED
+✅ **PDF-ENCODING-FIX** - Fixed PDF text encoding issues with soft hyphens, ligatures, and special characters - COMPLETED
+
+## Bug Fixes Completed
+
+### Audio Processing Error Fix
+- **Issue**: `'AudioProcessor' object has no attribute 'process_audio'`
+- **Root Cause**: Audio converter was calling incorrect method name
+- **Solution**: Updated `src/morag/converters/audio.py` line 106 to call `process_audio_file` instead of `process_audio`
+- **Files Modified**:
+  - `src/morag/converters/audio.py`
+  - `tests/unit/test_audio_converter_fix.py` (new test file)
+
+### PDF Text Encoding Fix
+- **Issue**: PDF text showing garbled characters like "extrem  ange­ schlagen" instead of "angeschlagen"
+- **Root Cause**: Soft hyphens and other Unicode encoding artifacts not properly handled
+- **Solution**: Enhanced text processing with comprehensive Unicode normalization and soft hyphen handling
+- **Files Modified**:
+  - `src/morag/utils/text_processing.py` (added `clean_pdf_text_encoding` and `normalize_text_encoding` functions)
+  - `src/morag/converters/pdf.py` (integrated encoding fixes)
+  - `src/morag/processors/document.py` (integrated encoding fixes)
+  - `tests/unit/test_pdf_encoding_fix.py` (new test file)
+
+### Key Features Added
+- Universal soft hyphen handling with regex patterns
+- Ligature normalization (ﬁ → fi, ﬂ → fl, etc.)
+- Smart quote and dash normalization
+- Zero-width character removal
+- Comprehensive Unicode normalization
+- Encoding artifact cleanup for common PDF issues
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)

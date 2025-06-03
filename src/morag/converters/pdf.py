@@ -8,6 +8,7 @@ import structlog
 from .base import BaseConverter, ConversionOptions, ConversionResult, QualityScore
 from .quality import ConversionQualityValidator
 from ..processors.document import document_processor
+from ..utils.text_processing import normalize_text_encoding, clean_pdf_text_encoding
 
 logger = structlog.get_logger(__name__)
 
@@ -301,16 +302,19 @@ class PDFConverter(BaseConverter):
         # Process text elements
         for element in page.elements:
             if hasattr(element, 'text') and element.text:
+                # Clean text encoding issues
+                clean_text = normalize_text_encoding(element.text)
+
                 # Handle different element types
                 if hasattr(element, 'element_type'):
                     if element.element_type == 'title':
-                        elements.append(f"#### {element.text}")
+                        elements.append(f"#### {clean_text}")
                     elif element.element_type == 'heading':
-                        elements.append(f"##### {element.text}")
+                        elements.append(f"##### {clean_text}")
                     else:
-                        elements.append(element.text)
+                        elements.append(clean_text)
                 else:
-                    elements.append(element.text)
+                    elements.append(clean_text)
 
         # Process tables if available
         if hasattr(page, 'tables') and options.format_options.get('extract_tables', True):
@@ -342,13 +346,13 @@ class PDFConverter(BaseConverter):
 
                 # Header row
                 if rows:
-                    headers = [str(cell) for cell in rows[0]]
+                    headers = [normalize_text_encoding(str(cell)) for cell in rows[0]]
                     table_lines.append("| " + " | ".join(headers) + " |")
                     table_lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
 
                     # Data rows
                     for row in rows[1:]:
-                        cells = [str(cell) for cell in row]
+                        cells = [normalize_text_encoding(str(cell)) for cell in row]
                         table_lines.append("| " + " | ".join(cells) + " |")
 
                 return "\n".join(table_lines)
