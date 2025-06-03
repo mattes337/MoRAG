@@ -350,6 +350,102 @@ class TestEnhancedAudioConverter:
             assert result.metadata.get('num_speakers') == 1
             assert result.metadata.get('num_topics') == 2
 
+    def test_topic_dialogue_creation(self, audio_converter):
+        """Test the topic dialogue creation method directly."""
+        # Create test data
+        topic = {
+            'topic': 'Test Topic',
+            'sentences': [
+                'Hello, welcome to our discussion.',
+                'Today we will talk about AI.',
+                'AI is very important.'
+            ]
+        }
+
+        speaker_segments = [
+            {'speaker': 'SPEAKER_00', 'start_time': 0.0, 'end_time': 10.0},
+            {'speaker': 'SPEAKER_01', 'start_time': 10.0, 'end_time': 20.0}
+        ]
+
+        transcript_segments = [
+            Mock(text='Hello, welcome to our discussion.', start_time=0.0, end_time=5.0),
+            Mock(text='Today we will talk about AI.', start_time=5.0, end_time=10.0),
+            Mock(text='AI is very important.', start_time=15.0, end_time=20.0)
+        ]
+
+        # Test dialogue creation
+        dialogue = audio_converter._create_topic_dialogue(
+            topic, speaker_segments, transcript_segments
+        )
+
+        assert len(dialogue) == 3
+        assert all('speaker' in entry and 'text' in entry for entry in dialogue)
+
+        # Check that speakers are assigned
+        speakers_found = set(entry['speaker'] for entry in dialogue)
+        assert len(speakers_found) >= 1  # At least one speaker should be assigned
+
+        # Check text content
+        texts = [entry['text'] for entry in dialogue]
+        assert 'Hello, welcome to our discussion.' in texts
+        assert 'Today we will talk about AI.' in texts
+        assert 'AI is very important.' in texts
+
+    @pytest.mark.asyncio
+    async def test_conversational_markdown_format(self, audio_converter):
+        """Test that the markdown format includes conversational structure."""
+        # Create mock enhanced result
+        enhanced_result = Mock()
+        enhanced_result.transcript = "Hello there. How are you? I'm fine, thanks."
+        enhanced_result.summary = None  # No summary for this test
+        enhanced_result.metadata = {
+            'filename': 'test.wav',
+            'duration': 30.0,
+            'diarization_used': True,
+            'topic_segmentation_used': True,
+            'num_speakers': 2,
+            'num_topics': 1
+        }
+        enhanced_result.segments = [
+            Mock(text='Hello there.', start_time=0.0, end_time=2.0),
+            Mock(text='How are you?', start_time=2.0, end_time=4.0),
+            Mock(text="I'm fine, thanks.", start_time=4.0, end_time=6.0)
+        ]
+        enhanced_result.speakers = [
+            {'id': 'SPEAKER_00', 'total_speaking_time': 15.0, 'segments_count': 2},
+            {'id': 'SPEAKER_01', 'total_speaking_time': 15.0, 'segments_count': 1}
+        ]
+        enhanced_result.speaker_segments = [
+            {'speaker': 'SPEAKER_00', 'start_time': 0.0, 'end_time': 4.0},
+            {'speaker': 'SPEAKER_01', 'start_time': 4.0, 'end_time': 6.0}
+        ]
+        enhanced_result.topics = [
+            {
+                'topic': 'Greeting',
+                'sentences': ['Hello there.', 'How are you?', "I'm fine, thanks."]
+            }
+        ]
+
+        # Mock options
+        options = Mock()
+        options.include_metadata = True
+        options.format_options = {
+            'include_topic_info': True,
+            'include_speaker_info': True,
+            'include_timestamps': True
+        }
+
+        # Test markdown creation
+        markdown = await audio_converter._create_enhanced_structured_markdown(enhanced_result, options)
+
+        # Check basic structure
+        assert "# Audio Transcription:" in markdown
+        assert "## Topics" in markdown
+        assert "# Greeting" in markdown  # Topic as main header
+
+        # Check for speaker dialogue format (should contain speaker IDs)
+        assert "SPEAKER_" in markdown or "Speaker_" in markdown
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

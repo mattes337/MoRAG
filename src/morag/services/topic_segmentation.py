@@ -287,9 +287,9 @@ class EnhancedTopicSegmentation:
             
             # Calculate timing if transcript segments available
             start_time, end_time, duration = self._calculate_topic_timing(
-                start_idx, end_idx, transcript_segments
+                start_idx, end_idx, transcript_segments, topic_sentences
             )
-            
+
             # Calculate speaker distribution if available
             speaker_dist = self._calculate_speaker_distribution(
                 start_time, end_time, speaker_segments
@@ -323,31 +323,83 @@ class EnhancedTopicSegmentation:
         self,
         start_idx: int,
         end_idx: int,
-        transcript_segments: Optional[List]
+        transcript_segments: Optional[List],
+        topic_sentences: List[str]
     ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
         """Calculate timing for topic segment."""
-        if not transcript_segments:
+        if not transcript_segments or not topic_sentences:
             return None, None, None
-        
+
         try:
-            # Map sentence indices to transcript segments
-            # This is a simplified mapping - could be enhanced
+            # Try to match topic sentences with transcript segments for better timing
+            start_time = None
+            end_time = None
+
+            # Find the earliest and latest matching transcript segments
+            for sentence in topic_sentences:
+                sentence_clean = sentence.strip().lower()
+
+                for segment in transcript_segments:
+                    if hasattr(segment, 'text') and hasattr(segment, 'start_time'):
+                        segment_text = segment.text.strip().lower()
+
+                        # Check for text similarity
+                        if (sentence_clean in segment_text or
+                            segment_text in sentence_clean or
+                            self._simple_text_match(sentence_clean, segment_text)):
+
+                            if start_time is None or segment.start_time < start_time:
+                                start_time = segment.start_time
+                            if end_time is None or segment.end_time > end_time:
+                                end_time = segment.end_time
+
+            # If we found matches, return the timing
+            if start_time is not None and end_time is not None:
+                duration = end_time - start_time
+                return start_time, end_time, duration
+
+            # Fallback to proportional mapping
             total_sentences = end_idx
-            segment_ratio_start = start_idx / total_sentences
-            segment_ratio_end = end_idx / total_sentences
-            
+            segment_ratio_start = start_idx / total_sentences if total_sentences > 0 else 0
+            segment_ratio_end = end_idx / total_sentences if total_sentences > 0 else 1
+
             if transcript_segments:
-                total_duration = max(seg.end_time for seg in transcript_segments)
+                total_duration = max(seg.end_time for seg in transcript_segments if hasattr(seg, 'end_time'))
                 start_time = segment_ratio_start * total_duration
                 end_time = segment_ratio_end * total_duration
                 duration = end_time - start_time
-                
+
                 return start_time, end_time, duration
-        
+
         except Exception as e:
             logger.warning("Failed to calculate topic timing", error=str(e))
-        
+
         return None, None, None
+
+    def _simple_text_match(self, text1: str, text2: str) -> bool:
+        """Simple text matching for timing calculation."""
+        try:
+            # Check if they share significant words
+            words1 = set(text1.split())
+            words2 = set(text2.split())
+
+            if len(words1) < 2 or len(words2) < 2:
+                return False
+
+            # Remove very common words
+            common_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were'}
+            words1 = words1 - common_words
+            words2 = words2 - common_words
+
+            if not words1 or not words2:
+                return False
+
+            # Check if they share at least 30% of words
+            intersection = words1.intersection(words2)
+            return len(intersection) / min(len(words1), len(words2)) >= 0.3
+
+        except Exception:
+            return False
     
     def _calculate_speaker_distribution(
         self,

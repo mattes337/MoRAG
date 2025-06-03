@@ -83,6 +83,7 @@
 ✅ **DOCKER-SYSTEM-DEPENDENCIES** - Enhanced Docker images with comprehensive system dependencies for all features - COMPLETED
 ✅ **AUDIO-TRANSCRIPT-MISSING-FIX** - Fixed missing transcript section in enhanced audio markdown conversion causing empty output - COMPLETED
 ✅ **ENHANCED-AUDIO-PROCESSING** - Implemented comprehensive topic segmentation and speaker diarization for audio and video processing - COMPLETED
+✅ **CONVERSATIONAL-FORMAT** - Implemented conversational format for audio transcription with topic-based speaker dialogue - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -185,6 +186,24 @@
   - Robust error handling and fallback mechanisms
   - Performance benchmarking and optimization
   - Complete test coverage for all features
+
+### Conversational Format Implementation
+- **Issue**: Need conversational format for audio transcription showing speaker dialogue organized by topics
+- **Root Cause**: Existing format showed topics as lists rather than natural conversation flow
+- **Solution**: Implemented conversational format with topic-based speaker dialogue structure
+- **Files Modified**:
+  - `src/morag/converters/audio.py` (added conversational format creation methods)
+  - `src/morag/services/topic_segmentation.py` (enhanced timing and speaker mapping)
+  - `tests/unit/test_enhanced_audio_processing.py` (added conversational format tests)
+  - `demo_conversational_format.py` (demonstration script)
+- **Features Added**:
+  - Topic headers as main sections (# Topic Name)
+  - Speaker dialogue format (SPEAKER_00: text, SPEAKER_01: response)
+  - Intelligent text-to-speaker mapping based on timing
+  - Enhanced topic timing calculation with transcript alignment
+  - Fallback mechanisms for when speaker mapping fails
+  - Comprehensive test coverage for dialogue creation
+  - Demo script showing conversational format output
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns

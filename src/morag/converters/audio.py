@@ -235,6 +235,158 @@ class AudioConverter(BaseConverter):
 
         return enhanced_result
 
+    def _create_topic_dialogue(
+        self,
+        topic: Dict[str, Any],
+        speaker_segments: List[Dict[str, Any]],
+        transcript_segments: List
+    ) -> List[Dict[str, str]]:
+        """Create conversational dialogue format for a topic.
+
+        Args:
+            topic: Topic information with sentences
+            speaker_segments: Speaker diarization segments
+            transcript_segments: Transcript segments with timing
+
+        Returns:
+            List of dialogue entries with speaker and text
+        """
+        try:
+            dialogue = []
+            topic_sentences = topic.get('sentences', [])
+
+            if not topic_sentences:
+                return dialogue
+
+            # If we have speaker segments and transcript segments, try to map them
+            if speaker_segments and transcript_segments:
+                # Create a mapping of text to speaker based on timing
+                text_to_speaker = self._map_text_to_speakers(
+                    topic_sentences, speaker_segments, transcript_segments
+                )
+
+                for sentence in topic_sentences:
+                    speaker_id = text_to_speaker.get(sentence, 'Speaker_00')
+                    dialogue.append({
+                        'speaker': speaker_id,
+                        'text': sentence.strip()
+                    })
+            else:
+                # Fallback: assign all to Speaker_00
+                for sentence in topic_sentences:
+                    dialogue.append({
+                        'speaker': 'Speaker_00',
+                        'text': sentence.strip()
+                    })
+
+            return dialogue
+
+        except Exception as e:
+            logger.warning("Failed to create topic dialogue", error=str(e))
+            # Fallback to simple format
+            return [{'speaker': 'Speaker_00', 'text': sentence}
+                   for sentence in topic.get('sentences', [])]
+
+    def _map_text_to_speakers(
+        self,
+        sentences: List[str],
+        speaker_segments: List[Dict[str, Any]],
+        transcript_segments: List
+    ) -> Dict[str, str]:
+        """Map sentences to speakers based on timing information.
+
+        Args:
+            sentences: List of sentences to map
+            speaker_segments: Speaker diarization segments
+            transcript_segments: Transcript segments with timing
+
+        Returns:
+            Dictionary mapping sentence text to speaker ID
+        """
+        text_to_speaker = {}
+
+        try:
+            # Create a mapping of transcript text to timing
+            transcript_timing = {}
+            for segment in transcript_segments:
+                if hasattr(segment, 'text') and hasattr(segment, 'start_time'):
+                    transcript_timing[segment.text.strip()] = segment.start_time
+
+            # For each sentence, find the best matching transcript segment
+            for sentence in sentences:
+                sentence_clean = sentence.strip()
+                best_match_time = None
+
+                # Try to find exact or partial match in transcript
+                for transcript_text, start_time in transcript_timing.items():
+                    if (sentence_clean in transcript_text or
+                        transcript_text in sentence_clean or
+                        self._text_similarity(sentence_clean, transcript_text) > 0.8):
+                        best_match_time = start_time
+                        break
+
+                # If we found a timing, map to speaker
+                if best_match_time is not None:
+                    speaker_id = self._find_speaker_at_time(best_match_time, speaker_segments)
+                    text_to_speaker[sentence] = speaker_id
+                else:
+                    # Default to first speaker
+                    text_to_speaker[sentence] = 'Speaker_00'
+
+        except Exception as e:
+            logger.warning("Failed to map text to speakers", error=str(e))
+            # Fallback: assign all to Speaker_00
+            for sentence in sentences:
+                text_to_speaker[sentence] = 'Speaker_00'
+
+        return text_to_speaker
+
+    def _find_speaker_at_time(self, time: float, speaker_segments: List[Dict[str, Any]]) -> str:
+        """Find which speaker is active at a given time.
+
+        Args:
+            time: Time in seconds
+            speaker_segments: Speaker diarization segments
+
+        Returns:
+            Speaker ID
+        """
+        for segment in speaker_segments:
+            start_time = segment.get('start_time', 0)
+            end_time = segment.get('end_time', 0)
+
+            if start_time <= time <= end_time:
+                return segment.get('speaker', 'Speaker_00')
+
+        # Default to first speaker if no match found
+        return 'Speaker_00'
+
+    def _text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate simple text similarity between two strings.
+
+        Args:
+            text1: First text
+            text2: Second text
+
+        Returns:
+            Similarity score between 0 and 1
+        """
+        try:
+            # Simple word-based similarity
+            words1 = set(text1.lower().split())
+            words2 = set(text2.lower().split())
+
+            if not words1 or not words2:
+                return 0.0
+
+            intersection = words1.intersection(words2)
+            union = words1.union(words2)
+
+            return len(intersection) / len(union) if union else 0.0
+
+        except Exception:
+            return 0.0
+
     async def _perform_speaker_diarization(self, file_path: Path) -> Dict[str, Any]:
         """Perform speaker diarization on audio file.
 
@@ -407,17 +559,31 @@ class AudioConverter(BaseConverter):
                 sections.append("*No transcript available*")
             sections.append("")
 
-        # Topics section
+        # Topics section with conversational format
         if enhanced_result.topics and options.format_options.get('include_topic_info', True):
             sections.append("## Topics")
             sections.append("")
 
             for i, topic in enumerate(enhanced_result.topics, 1):
-                sections.append(f"### {topic.get('topic', f'Topic {i}')}")
+                topic_title = topic.get('topic', f'Topic {i}')
+                sections.append(f"# {topic_title}")
                 sections.append("")
 
-                for sentence in topic.get('sentences', []):
-                    sections.append(f"- {sentence}")
+                # Create conversational format by mapping sentences to speakers and timing
+                topic_dialogue = self._create_topic_dialogue(
+                    topic, enhanced_result.speaker_segments, enhanced_result.segments
+                )
+
+                if topic_dialogue:
+                    for dialogue_entry in topic_dialogue:
+                        speaker_id = dialogue_entry.get('speaker', 'Speaker_00')
+                        text = dialogue_entry.get('text', '')
+                        if text.strip():
+                            sections.append(f"{speaker_id}: {text}")
+                else:
+                    # Fallback to sentence list if dialogue creation fails
+                    for sentence in topic.get('sentences', []):
+                        sections.append(f"Speaker_00: {sentence}")
 
                 sections.append("")
 
