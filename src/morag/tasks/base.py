@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
 import structlog
+import asyncio
 from datetime import datetime
 
 from morag.core.celery_app import celery_app, BaseTask
@@ -10,14 +11,91 @@ logger = structlog.get_logger()
 class ProcessingTask(BaseTask):
     """Base class for content processing tasks."""
 
+    def __init__(self):
+        super().__init__()
+        self.start_time = None
+        self.webhook_url = None
+
+    def on_start(self, task_id, args, kwargs):
+        """Called when task starts."""
+        self.start_time = datetime.utcnow()
+
+        # Extract webhook URL from metadata
+        metadata = self._get_metadata(args, kwargs)
+        self.webhook_url = metadata.get('webhook_url')
+
+        # Send webhook notification
+        if self.webhook_url:
+            asyncio.create_task(task_manager.handle_task_started(
+                task_id=task_id,
+                metadata=metadata
+            ))
+
+        task_manager.update_task_progress(
+            task_id,
+            progress=0.0,
+            message="Task started",
+            metadata={'started_at': self.start_time.isoformat()}
+        )
+
+    def on_success(self, retval, task_id, args, kwargs):
+        """Handle task success."""
+        super().on_success(retval, task_id, args, kwargs)
+
+        # Send webhook notification
+        if self.webhook_url:
+            metadata = self._get_metadata(args, kwargs)
+            asyncio.create_task(task_manager.handle_task_completion(
+                task_id=task_id,
+                result=retval,
+                metadata=metadata
+            ))
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        """Handle task failure."""
+        super().on_failure(exc, task_id, args, kwargs, einfo)
+
+        # Send webhook notification
+        if self.webhook_url:
+            metadata = self._get_metadata(args, kwargs)
+            result = {
+                'status': 'failure',
+                'error': str(exc)
+            }
+            asyncio.create_task(task_manager.handle_task_completion(
+                task_id=task_id,
+                result=result,
+                metadata=metadata
+            ))
+
     def update_progress(self, progress: float, message: str = None, **metadata):
-        """Update task progress."""
+        """Update task progress with webhook support."""
         task_manager.update_task_progress(
             self.request.id,
             progress=progress,
             message=message,
             metadata=metadata
         )
+
+        # Send webhook for significant milestones
+        if self.webhook_url and progress in [0.25, 0.5, 0.75]:
+            asyncio.create_task(task_manager.handle_task_progress(
+                task_id=self.request.id,
+                progress=progress,
+                message=message or f"Progress: {progress*100:.0f}%",
+                metadata=metadata
+            ))
+
+    def _get_metadata(self, args, kwargs) -> Dict[str, Any]:
+        """Extract metadata from task arguments."""
+        # Check for metadata in various positions
+        if len(args) > 2 and isinstance(args[2], dict):
+            return args[2]
+        elif 'metadata' in kwargs and isinstance(kwargs['metadata'], dict):
+            return kwargs['metadata']
+        elif len(args) > 3 and isinstance(args[3], dict):
+            return args[3]
+        return {}
 
     async def update_status(self, status: str, metadata: Dict[str, Any] = None):
         """Update task status."""

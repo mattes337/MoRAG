@@ -42,7 +42,11 @@ class Settings(BaseSettings):
     # Processing Limits
     max_chunk_size: int = 1000
     max_concurrent_tasks: int = 10
+
+    # Webhook Configuration
     webhook_timeout: int = 30
+    webhook_max_retries: int = 3
+    webhook_retry_delay: int = 5
     
     model_config = SettingsConfigDict(
         env_file=".env",

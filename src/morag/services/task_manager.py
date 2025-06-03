@@ -101,26 +101,36 @@ class TaskManager:
         """Update task progress."""
         try:
             result = AsyncResult(task_id, app=self.celery_app)
-            
+
             progress_info = {
                 'progress': progress,
                 'message': message,
                 'metadata': metadata or {},
                 'updated_at': datetime.utcnow().isoformat()
             }
-            
+
             result.update_state(
                 state='PROGRESS',
                 meta=progress_info
             )
-            
+
+            # Add to status history
+            from morag.services.status_history import status_history
+            status_history.add_status_event(
+                task_id=task_id,
+                status='progress',
+                progress=progress,
+                message=message,
+                metadata=metadata
+            )
+
             logger.debug(
                 "Task progress updated",
                 task_id=task_id,
                 progress=progress,
                 message=message
             )
-            
+
         except Exception as e:
             logger.error(
                 "Failed to update task progress",
@@ -189,6 +199,81 @@ class TaskManager:
         except Exception as e:
             logger.error("Failed to get queue stats", error=str(e))
             return {'error': str(e)}
+
+    async def handle_task_completion(self, task_id: str, result: Dict[str, Any], metadata: Dict[str, Any]):
+        """Handle task completion and send webhooks."""
+        webhook_url = metadata.get('webhook_url')
+
+        # Add to status history
+        from morag.services.status_history import status_history
+        status_history.add_status_event(
+            task_id=task_id,
+            status='completed' if result.get('status') != 'failure' else 'failed',
+            progress=1.0 if result.get('status') != 'failure' else None,
+            message="Task completed successfully" if result.get('status') != 'failure' else f"Task failed: {result.get('error', 'Unknown error')}",
+            metadata=metadata
+        )
+
+        if webhook_url:
+            from morag.services.webhook import webhook_service
+            if result.get('status') != 'failure':
+                await webhook_service.send_task_completed(
+                    task_id=task_id,
+                    webhook_url=webhook_url,
+                    result=result,
+                    metadata=metadata
+                )
+            else:
+                error = result.get('error', 'Unknown error')
+                await webhook_service.send_task_failed(
+                    task_id=task_id,
+                    webhook_url=webhook_url,
+                    error=error,
+                    metadata=metadata
+                )
+
+    async def handle_task_started(self, task_id: str, metadata: Dict[str, Any]):
+        """Handle task start and send webhooks."""
+        webhook_url = metadata.get('webhook_url')
+
+        # Add to status history
+        from morag.services.status_history import status_history
+        status_history.add_status_event(
+            task_id=task_id,
+            status='started',
+            progress=0.0,
+            message="Task started",
+            metadata=metadata
+        )
+
+        if webhook_url:
+            from morag.services.webhook import webhook_service
+            await webhook_service.send_task_started(
+                task_id=task_id,
+                webhook_url=webhook_url,
+                metadata=metadata
+            )
+
+    async def handle_task_progress(
+        self,
+        task_id: str,
+        progress: float,
+        message: str,
+        metadata: Dict[str, Any]
+    ):
+        """Handle task progress and send webhooks if significant."""
+        webhook_url = metadata.get('webhook_url')
+
+        # Only send webhook for significant progress milestones
+        if webhook_url and progress in [0.25, 0.5, 0.75]:
+            from morag.services.webhook import webhook_service
+            await webhook_service.send_task_progress(
+                task_id=task_id,
+                webhook_url=webhook_url,
+                progress=progress,
+                message=message,
+                metadata=metadata
+            )
 
 # Global instance
 task_manager = TaskManager()

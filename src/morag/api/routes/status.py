@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Path, HTTPException, Depends
+from fastapi import APIRouter, Path, HTTPException, Depends, Query
 from typing import List
 import structlog
 
 from morag.api.models import TaskStatusResponse
 from morag.services.task_manager import task_manager, TaskStatus
+from morag.services.status_history import status_history
 from morag.api.routes.ingestion import verify_api_key
 
 logger = structlog.get_logger()
@@ -68,3 +69,52 @@ async def get_queue_stats(api_key: str = Depends(verify_api_key)):
     except Exception as e:
         logger.error("Failed to get queue stats", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to get queue stats: {str(e)}")
+
+@router.get("/{task_id}/history")
+async def get_task_history(
+    task_id: str = Path(..., description="Task ID to get history for"),
+    api_key: str = Depends(verify_api_key)
+):
+    """Get complete status history for a task."""
+
+    try:
+        history = status_history.get_task_history(task_id)
+
+        return {
+            "task_id": task_id,
+            "history": [
+                {
+                    "timestamp": event.timestamp.isoformat(),
+                    "status": event.status,
+                    "progress": event.progress,
+                    "message": event.message,
+                    "metadata": event.metadata
+                }
+                for event in history
+            ],
+            "event_count": len(history)
+        }
+
+    except Exception as e:
+        logger.error("Failed to get task history", task_id=task_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get task history: {str(e)}")
+
+@router.get("/events/recent")
+async def get_recent_events(
+    hours: int = Query(24, description="Number of hours to look back"),
+    api_key: str = Depends(verify_api_key)
+):
+    """Get recent status events across all tasks."""
+
+    try:
+        events = status_history.get_recent_events(hours)
+
+        return {
+            "events": events,
+            "count": len(events),
+            "hours": hours
+        }
+
+    except Exception as e:
+        logger.error("Failed to get recent events", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get recent events: {str(e)}")
