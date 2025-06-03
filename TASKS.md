@@ -38,6 +38,16 @@
 - [x] **21-monitoring-logging.md** - Logging and basic monitoring ✅
 - [x] **22-deployment-config.md** - Docker and deployment configuration ✅
 
+### Advanced Features & Improvements
+- [ ] **23-llm-provider-abstraction.md** - Abstract LLM and embedding provider APIs
+- [ ] **24-universal-document-conversion.md** - Universal document format conversion to markdown
+- [ ] **25-pdf-markdown-conversion.md** - PDF to markdown with docling integration
+- [ ] **26-audio-markdown-conversion.md** - Audio/voice to markdown with speaker diarization
+- [ ] **27-video-markdown-conversion.md** - Video to markdown with keyframe extraction
+- [ ] **28-office-markdown-conversion.md** - Office documents to markdown conversion
+- [ ] **29-web-markdown-conversion.md** - Enhanced web content to markdown conversion
+- [ ] **30-ai-error-handling.md** - Robust AI/LLM error handling and resilience
+
 ## Current Focus
 ✅ Task 01: Project Setup and Configuration - COMPLETED
 ✅ Task 02: FastAPI Service Setup with Async Support - COMPLETED
