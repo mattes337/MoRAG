@@ -74,29 +74,38 @@ class DocumentProcessor:
     async def parse_document(
         self,
         file_path: Union[str, Path],
-        use_docling: bool = False
+        use_docling: bool = False,
+        chunking_strategy: Optional[str] = None
     ) -> DocumentParseResult:
         """Parse document and extract structured content."""
         file_path = Path(file_path)
-        
+
         if not file_path.exists():
             raise ValidationError(f"File not found: {file_path}")
-        
+
         doc_type = self.detect_document_type(file_path)
-        
+        chunking_strategy = chunking_strategy or settings.default_chunking_strategy
+
         logger.info(
             "Starting document parsing",
             file_path=str(file_path),
             doc_type=doc_type.value,
-            use_docling=use_docling
+            use_docling=use_docling,
+            chunking_strategy=chunking_strategy
         )
-        
+
         try:
             if use_docling and doc_type == DocumentType.PDF:
-                return await self._parse_with_docling(file_path)
+                result = await self._parse_with_docling(file_path)
             else:
-                return await self._parse_with_unstructured(file_path, doc_type)
-                
+                result = await self._parse_with_unstructured(file_path, doc_type)
+
+            # Apply page-based chunking if enabled
+            if chunking_strategy == "page" and settings.enable_page_based_chunking:
+                result = await self._apply_page_based_chunking(result)
+
+            return result
+
         except Exception as e:
             logger.error("Document parsing failed", error=str(e), file_path=str(file_path))
             raise ProcessingError(f"Failed to parse document: {str(e)}")
@@ -488,6 +497,154 @@ class DocumentProcessor:
             raise
         
         return True
+
+    async def _apply_page_based_chunking(self, parse_result: DocumentParseResult) -> DocumentParseResult:
+        """Group chunks by page to create page-based chunks."""
+        if not parse_result.chunks:
+            return parse_result
+
+        # Group chunks by page number
+        page_groups = {}
+        for chunk in parse_result.chunks:
+            page_num = chunk.page_number or 1
+            if page_num not in page_groups:
+                page_groups[page_num] = []
+            page_groups[page_num].append(chunk)
+
+        # Create new page-based chunks
+        new_chunks = []
+        max_chunk_size = settings.max_page_chunk_size
+
+        for page_num in sorted(page_groups.keys()):
+            page_chunks = page_groups[page_num]
+
+            # Combine all text from the page
+            page_text_parts = []
+            chunk_types = set()
+            all_metadata = {}
+
+            for chunk in page_chunks:
+                page_text_parts.append(chunk.text)
+                chunk_types.add(chunk.chunk_type)
+                if chunk.metadata:
+                    all_metadata.update(chunk.metadata)
+
+            # Join text with appropriate separators
+            page_text = "\n\n".join(page_text_parts).strip()
+
+            # Check if the combined text is too large
+            if len(page_text) > max_chunk_size:
+                logger.warning(
+                    f"Page {page_num} text too large ({len(page_text)} chars), "
+                    f"splitting into smaller chunks"
+                )
+
+                # Split large pages into smaller chunks while preserving page context
+                text_parts = []
+
+                # If we have multiple parts, try to combine them intelligently
+                if len(page_text_parts) > 1:
+                    text_parts = page_text_parts
+                else:
+                    # Single large chunk - split by sentences or paragraphs
+                    single_text = page_text_parts[0]
+                    # Try to split by double newlines (paragraphs) first
+                    paragraphs = [p.strip() for p in single_text.split('\n\n') if p.strip()]
+                    if len(paragraphs) > 1:
+                        text_parts = paragraphs
+                    else:
+                        # Split by sentences as fallback
+                        import re
+                        sentences = [s.strip() + '.' for s in re.split(r'[.!?]+', single_text) if s.strip()]
+                        text_parts = sentences
+
+                current_chunk_text = ""
+                chunk_index = 0
+
+                for part in text_parts:
+                    # Check if adding this part would exceed the limit
+                    if len(current_chunk_text) + len(part) + 2 <= max_chunk_size:
+                        if current_chunk_text:
+                            current_chunk_text += "\n\n" + part
+                        else:
+                            current_chunk_text = part
+                    else:
+                        # Create chunk from current text if it's not empty
+                        if current_chunk_text:
+                            new_chunk = DocumentChunk(
+                                text=current_chunk_text,
+                                chunk_type="page",
+                                page_number=page_num,
+                                element_id=f"page_{page_num}_chunk_{chunk_index}",
+                                metadata={
+                                    **all_metadata,
+                                    "original_chunk_types": list(chunk_types),
+                                    "page_based_chunking": True,
+                                    "chunk_index_on_page": chunk_index,
+                                    "is_partial_page": True
+                                }
+                            )
+                            new_chunks.append(new_chunk)
+                            chunk_index += 1
+
+                        # Start new chunk with current part
+                        current_chunk_text = part
+
+                # Add final chunk
+                if current_chunk_text:
+                    new_chunk = DocumentChunk(
+                        text=current_chunk_text,
+                        chunk_type="page",
+                        page_number=page_num,
+                        element_id=f"page_{page_num}_chunk_{chunk_index}",
+                        metadata={
+                            **all_metadata,
+                            "original_chunk_types": list(chunk_types),
+                            "page_based_chunking": True,
+                            "chunk_index_on_page": chunk_index,
+                            "is_partial_page": True
+                        }
+                    )
+                    new_chunks.append(new_chunk)
+            else:
+                # Create single chunk for the entire page
+                new_chunk = DocumentChunk(
+                    text=page_text,
+                    chunk_type="page",
+                    page_number=page_num,
+                    element_id=f"page_{page_num}",
+                    metadata={
+                        **all_metadata,
+                        "original_chunk_types": list(chunk_types),
+                        "page_based_chunking": True,
+                        "original_chunks_count": len(page_chunks)
+                    }
+                )
+                new_chunks.append(new_chunk)
+
+        # Update metadata
+        updated_metadata = {
+            **parse_result.metadata,
+            "chunking_strategy": "page",
+            "original_chunks_count": len(parse_result.chunks),
+            "page_based_chunks_count": len(new_chunks),
+            "page_based_chunking_applied": True
+        }
+
+        logger.info(
+            "Applied page-based chunking",
+            original_chunks=len(parse_result.chunks),
+            new_chunks=len(new_chunks),
+            total_pages=parse_result.total_pages
+        )
+
+        return DocumentParseResult(
+            chunks=new_chunks,
+            metadata=updated_metadata,
+            images=parse_result.images,
+            total_pages=parse_result.total_pages,
+            word_count=parse_result.word_count
+        )
 
 # Global instance
 document_processor = DocumentProcessor()

@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     max_chunk_size: int = 1000
     max_concurrent_tasks: int = 10
 
+    # Document Processing Configuration
+    default_chunking_strategy: str = "page"  # page, semantic, sentence, paragraph, simple
+    enable_page_based_chunking: bool = True
+    max_page_chunk_size: int = 8000  # Larger size for page-based chunks
+
     # Webhook Configuration
     webhook_timeout: int = 30
     webhook_max_retries: int = 3

@@ -38,7 +38,8 @@ async def _process_document_impl(
 
         parse_result = await document_processor.parse_document(
             file_path,
-            use_docling=should_use_docling
+            use_docling=should_use_docling,
+            chunking_strategy=settings.default_chunking_strategy
         )
 
         task_instance.log_step(

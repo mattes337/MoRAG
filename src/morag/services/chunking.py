@@ -69,6 +69,8 @@ class SemanticChunker:
             return await self._sentence_chunking(text, chunk_size)
         elif strategy == "paragraph":
             return await self._paragraph_chunking(text, chunk_size)
+        elif strategy == "page":
+            return await self._page_chunking(text, chunk_size)
         else:
             logger.warning(f"Unknown chunking strategy: {strategy}, using semantic")
             return await self._semantic_chunking(text, chunk_size)
@@ -469,6 +471,34 @@ class SemanticChunker:
             chunks.append(chunk_info)
 
         return chunks
+
+    async def _page_chunking(self, text: str, chunk_size: int) -> List[ChunkInfo]:
+        """Chunk text treating the entire text as a single page-based chunk.
+
+        This method is designed for use with pre-parsed document chunks that
+        should be grouped by page rather than further subdivided.
+        """
+
+        # For page-based chunking, we treat the entire text as one chunk
+        # unless it exceeds the maximum size
+        if len(text) <= chunk_size:
+            # Single chunk for the entire text
+            chunk_info = ChunkInfo(
+                text=text.strip(),
+                start_char=0,
+                end_char=len(text),
+                sentence_count=len([s for s in re.split(r'[.!?]+', text) if s.strip()]),
+                word_count=len(text.split()),
+                entities=[],
+                topics=[],
+                chunk_type="page"
+            )
+            return [chunk_info]
+        else:
+            # If text is too large, fall back to paragraph-based chunking
+            # but with larger chunks to maintain page-like grouping
+            logger.info(f"Text too large for single page chunk ({len(text)} chars), using paragraph chunking")
+            return await self._paragraph_chunking(text, chunk_size)
 
 
 class ChunkingService:

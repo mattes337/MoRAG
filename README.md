@@ -5,7 +5,7 @@ A comprehensive, production-ready multimodal RAG (Retrieval Augmented Generation
 ## Features
 
 - **Multimodal Processing**: Support for documents (PDF, DOCX, MD), audio, video, images, web content, and YouTube videos
-- **Intelligent Chunking**: Semantic text chunking with spaCy for optimal retrieval
+- **Intelligent Chunking**: Page-based chunking for documents with configurable strategies (page, semantic, sentence, paragraph)
 - **Vector Storage**: Qdrant vector database integration for efficient similarity search
 - **Async Processing**: Celery-based task queue for scalable background processing
 - **API-First**: FastAPI-based REST API with comprehensive documentation
@@ -78,6 +78,7 @@ The MoRAG pipeline consists of several key components:
 ## Documentation
 
 - [API Documentation](http://localhost:8000/docs) (when running locally)
+- [Page-Based Chunking Guide](docs/page-based-chunking.md)
 - [Task Implementation Guide](tasks/README.md)
 - [Deployment Guide](docs/deployment.md)
 
