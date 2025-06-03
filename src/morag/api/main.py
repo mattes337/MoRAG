@@ -62,15 +62,33 @@ def create_app() -> FastAPI:
     app.add_middleware(PerformanceMonitoringMiddleware)
     app.add_middleware(ResourceMonitoringMiddleware)
 
-    # Startup event to start metrics collection
+    # Startup event to start metrics collection and initialize services
     @app.on_event("startup")
     async def startup_event():
+        # Initialize Qdrant connection
+        try:
+            from morag.services.storage import qdrant_service
+            await qdrant_service.connect()
+            logger.info("Qdrant service initialized successfully")
+        except Exception as e:
+            logger.error("Failed to initialize Qdrant service", error=str(e))
+
+        # Start metrics collection
         if settings.metrics_enabled:
             logger.info("Starting metrics collection")
             asyncio.create_task(metrics_collector.start_collection())
 
     @app.on_event("shutdown")
     async def shutdown_event():
+        # Disconnect from Qdrant
+        try:
+            from morag.services.storage import qdrant_service
+            await qdrant_service.disconnect()
+            logger.info("Qdrant service disconnected")
+        except Exception as e:
+            logger.error("Failed to disconnect Qdrant service", error=str(e))
+
+        # Stop metrics collection
         logger.info("Stopping metrics collection")
         metrics_collector.stop_collection()
     

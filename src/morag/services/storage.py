@@ -24,19 +24,52 @@ class QdrantService:
     async def connect(self) -> None:
         """Initialize connection to Qdrant."""
         try:
-            self.client = QdrantClient(
-                host=settings.qdrant_host,
-                port=settings.qdrant_port,
-                api_key=settings.qdrant_api_key,
-                timeout=30
-            )
-            
+            # Check if host is a URL (starts with http:// or https://)
+            if settings.qdrant_host.startswith(('http://', 'https://')):
+                from urllib.parse import urlparse
+                parsed = urlparse(settings.qdrant_host)
+                hostname = parsed.hostname
+                port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
+                use_https = parsed.scheme == 'https'
+
+                # Use host/port connection which works better with HTTPS
+                self.client = QdrantClient(
+                    host=hostname,
+                    port=port,
+                    https=use_https,
+                    api_key=settings.qdrant_api_key,
+                    timeout=30
+                )
+
+                logger.info("Connecting to Qdrant via URL",
+                           url=settings.qdrant_host,
+                           hostname=hostname,
+                           port=port,
+                           https=use_https)
+            else:
+                # Use host/port connection for local instances
+                self.client = QdrantClient(
+                    host=settings.qdrant_host,
+                    port=settings.qdrant_port,
+                    api_key=settings.qdrant_api_key,
+                    timeout=30
+                )
+
+                logger.info("Connecting to Qdrant via host/port",
+                           host=settings.qdrant_host,
+                           port=settings.qdrant_port)
+
             # Test connection
             collections = await asyncio.to_thread(self.client.get_collections)
-            logger.info("Connected to Qdrant", collections_count=len(collections.collections))
-            
+            logger.info("Connected to Qdrant successfully",
+                       collections_count=len(collections.collections),
+                       collections=[col.name for col in collections.collections])
+
         except Exception as e:
-            logger.error("Failed to connect to Qdrant", error=str(e))
+            logger.error("Failed to connect to Qdrant",
+                        host=settings.qdrant_host,
+                        port=settings.qdrant_port,
+                        error=str(e))
             raise StorageError(f"Failed to connect to Qdrant: {str(e)}")
     
     async def disconnect(self) -> None:
@@ -323,13 +356,25 @@ class QdrantService:
                 collection_name=self.collection_name
             )
 
+            # Handle optimizer status safely (different versions may have different structures)
+            optimizer_status = "unknown"
+            try:
+                if hasattr(info.optimizer_status, 'status'):
+                    optimizer_status = info.optimizer_status.status.value
+                elif hasattr(info.optimizer_status, 'value'):
+                    optimizer_status = info.optimizer_status.value
+                else:
+                    optimizer_status = str(info.optimizer_status)
+            except Exception:
+                optimizer_status = "unknown"
+
             return {
                 "name": self.collection_name,
                 "vectors_count": info.vectors_count,
                 "indexed_vectors_count": info.indexed_vectors_count,
                 "points_count": info.points_count,
                 "status": info.status.value,
-                "optimizer_status": info.optimizer_status.status.value,
+                "optimizer_status": optimizer_status,
                 "config": {
                     "vector_size": info.config.params.vectors.size,
                     "distance": info.config.params.vectors.distance.value
