@@ -242,7 +242,116 @@ class VideoConverter(BaseConverter):
 
                 sections.append("")
 
-        return "\n".join(sections)
+        # CRITICAL: Final deduplication check before returning content
+        final_content = "\n".join(sections)
+
+        # Check for excessive duplication in final content
+        lines = final_content.split('\n')
+        line_counts = {}
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):  # Skip headers
+                line_counts[stripped] = line_counts.get(stripped, 0) + 1
+
+        # Find lines that appear more than 10 times (likely duplicates)
+        excessive_duplicates = {line: count for line, count in line_counts.items() if count > 10}
+
+        if excessive_duplicates:
+            logger.error("CRITICAL: Excessive duplication detected in final content",
+                        duplicate_lines_count=len(excessive_duplicates),
+                        total_lines=len(lines))
+
+            # Log the most duplicated line for debugging
+            most_duplicated = max(excessive_duplicates.items(), key=lambda x: x[1])
+            logger.error("Most duplicated line",
+                        line=most_duplicated[0][:100],
+                        count=most_duplicated[1])
+
+            # Apply aggressive deduplication to final content
+            seen_lines = set()
+            deduplicated_lines = []
+
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    deduplicated_lines.append(line)  # Keep empty lines
+                elif stripped.startswith('#'):
+                    deduplicated_lines.append(line)  # Keep headers
+                elif stripped not in seen_lines:
+                    deduplicated_lines.append(line)
+                    seen_lines.add(stripped)
+                # Skip duplicate lines
+
+            final_content = "\n".join(deduplicated_lines)
+            logger.warning("Applied aggressive deduplication to final content",
+                          original_lines=len(lines),
+                          deduplicated_lines=len(deduplicated_lines))
+
+        # Apply additional pattern removal
+        final_content = self._remove_repetitive_patterns(final_content)
+
+        return final_content
+
+    def _remove_repetitive_patterns(self, content: str) -> str:
+        """Remove repetitive patterns from the final content.
+
+        Args:
+            content: The content to clean
+
+        Returns:
+            Cleaned content without repetitive patterns
+        """
+        try:
+            lines = content.split('\n')
+            cleaned_lines = []
+
+            # Track consecutive identical lines
+            last_line = None
+            consecutive_count = 0
+
+            for line in lines:
+                line_clean = line.strip()
+
+                if line_clean == last_line and line_clean:
+                    consecutive_count += 1
+                    # Allow up to 1 consecutive duplicate, but log excessive repetition
+                    if consecutive_count <= 1:
+                        cleaned_lines.append(line)
+                    else:
+                        logger.warning("Removing repetitive line in video content",
+                                     line=line_clean[:50],
+                                     consecutive_count=consecutive_count)
+                else:
+                    consecutive_count = 0
+                    cleaned_lines.append(line)
+                    last_line = line_clean
+
+            # Check for patterns at the end (common issue with video transcripts)
+            if len(cleaned_lines) > 20:
+                last_20_lines = cleaned_lines[-20:]
+                unique_last_lines = []
+                seen_lines = set()
+
+                for line in last_20_lines:
+                    line_clean = line.strip()
+                    if line_clean not in seen_lines or not line_clean:
+                        unique_last_lines.append(line)
+                        if line_clean:
+                            seen_lines.add(line_clean)
+
+                # Replace last 20 lines with deduplicated version
+                cleaned_lines = cleaned_lines[:-20] + unique_last_lines
+
+                if len(unique_last_lines) < len(last_20_lines):
+                    logger.info("Removed duplicate lines from end of video content",
+                               original_lines=len(last_20_lines),
+                               unique_lines=len(unique_last_lines))
+
+            return '\n'.join(cleaned_lines)
+
+        except Exception as e:
+            logger.warning("Failed to remove repetitive patterns from video content", error=str(e))
+            return content
 
     def _create_enhanced_audio_markdown(self, audio_result, video_duration: float) -> List[str]:
         """Create enhanced audio markdown with topic segmentation and speaker diarization.
@@ -255,12 +364,23 @@ class VideoConverter(BaseConverter):
             List of markdown lines for audio content
         """
         sections = []
+        logger.info("Creating enhanced audio markdown",
+                   has_topic_segmentation=bool(audio_result.topic_segmentation),
+                   video_duration=video_duration)
 
         # Check if we have topic segmentation results
         if audio_result.topic_segmentation and audio_result.topic_segmentation.topics:
+            logger.info("Processing topic segmentation",
+                       topics_count=len(audio_result.topic_segmentation.topics))
+
             # Create conversational format with topic headers and speaker dialogue
             topic_counter = 1
             for topic in audio_result.topic_segmentation.topics:
+                logger.info("Processing topic",
+                           topic_counter=topic_counter,
+                           topic_id=topic.topic_id,
+                           sentences_count=len(topic.sentences) if topic.sentences else 0)
+
                 # Calculate proper timestamp - use topic index if start_time is invalid
                 start_seconds = 0
                 if topic.start_time is not None and topic.start_time >= 0:
@@ -287,13 +407,19 @@ class VideoConverter(BaseConverter):
                 sections.append("")
 
                 # Create speaker dialogue for this topic with improved deduplication
+                logger.info("Creating topic dialogue", topic_id=topic.topic_id)
                 topic_dialogue = self._create_topic_dialogue(topic, audio_result)
+                logger.info("Topic dialogue created",
+                           topic_id=topic.topic_id,
+                           dialogue_lines_count=len(topic_dialogue))
 
                 # Enhanced deduplication - track both full text and normalized text
                 added_texts = set()
                 added_normalized = set()
+                lines_added = 0
+                lines_skipped = 0
 
-                for dialogue_line in topic_dialogue:
+                for i, dialogue_line in enumerate(topic_dialogue):
                     dialogue_clean = dialogue_line.strip()
                     if not dialogue_clean:
                         continue
@@ -313,10 +439,19 @@ class VideoConverter(BaseConverter):
                         sections.append(dialogue_line)
                         added_texts.add(dialogue_clean)
                         added_normalized.add(normalized_text)
+                        lines_added += 1
                     else:
+                        lines_skipped += 1
                         logger.debug("Skipping duplicate dialogue line",
+                                   line_index=i,
                                    line=dialogue_clean[:50],
                                    reason="duplicate_text")
+
+                logger.info("Topic dialogue processing complete",
+                           topic_id=topic.topic_id,
+                           lines_added=lines_added,
+                           lines_skipped=lines_skipped,
+                           total_sections=len(sections))
 
                 sections.append("")
                 topic_counter += 1
@@ -353,27 +488,51 @@ class VideoConverter(BaseConverter):
             List of markdown lines for topic dialogue
         """
         dialogue_lines = []
+        logger.info("Creating topic dialogue",
+                   topic_id=topic.topic_id,
+                   sentences_count=len(topic.sentences) if topic.sentences else 0)
 
         if not topic.sentences:
+            logger.warning("No sentences in topic", topic_id=topic.topic_id)
             return ["*No dialogue available for this topic.*"]
 
         # Clean and deduplicate sentences first
         unique_sentences = []
         seen_sentences = set()
+        original_count = len(topic.sentences)
 
-        for sentence in topic.sentences:
+        for i, sentence in enumerate(topic.sentences):
             clean_sentence = sentence.strip()
             if clean_sentence and clean_sentence not in seen_sentences:
                 unique_sentences.append(clean_sentence)
                 seen_sentences.add(clean_sentence)
+            else:
+                logger.debug("Duplicate sentence found during initial cleanup",
+                           sentence_index=i,
+                           sentence=clean_sentence[:50])
+
+        logger.info("Sentence deduplication complete",
+                   topic_id=topic.topic_id,
+                   original_count=original_count,
+                   unique_count=len(unique_sentences),
+                   duplicates_removed=original_count - len(unique_sentences))
 
         if not unique_sentences:
+            logger.warning("No unique sentences after deduplication", topic_id=topic.topic_id)
             return ["*No dialogue available for this topic.*"]
 
         # Try to map sentences to speakers using timing and transcript information
+        logger.info("Starting speaker mapping",
+                   has_speaker_diarization=bool(audio_result.speaker_diarization),
+                   has_transcript_segments=bool(hasattr(audio_result, 'segments') and audio_result.segments))
+
         if (audio_result.speaker_diarization and
             audio_result.speaker_diarization.segments and
             hasattr(audio_result, 'segments') and audio_result.segments):
+
+            logger.info("Using advanced speaker mapping with timing",
+                       speaker_segments=len(audio_result.speaker_diarization.segments),
+                       transcript_segments=len(audio_result.segments))
 
             # Create a mapping of text to speaker based on transcript segments
             text_to_speaker = {}
@@ -390,8 +549,10 @@ class VideoConverter(BaseConverter):
                             text_to_speaker[transcript_seg.text.strip().lower()] = speaker_seg.speaker_id
                             break
 
+            logger.info("Text-to-speaker mapping created", mappings_count=len(text_to_speaker))
+
             # Now map sentences to speakers
-            for sentence in unique_sentences:
+            for i, sentence in enumerate(unique_sentences):
                 speaker_id = "SPEAKER_00"  # Default fallback
 
                 # Try to find exact or partial match in transcript
@@ -415,25 +576,52 @@ class VideoConverter(BaseConverter):
                 if best_match_speaker and best_match_score > 1:
                     speaker_id = best_match_speaker
 
-                dialogue_lines.append(f"{speaker_id}: {sentence}")
+                dialogue_line = f"{speaker_id}: {sentence}"
+                dialogue_lines.append(dialogue_line)
+
+                if i < 5:  # Log first few for debugging
+                    logger.debug("Sentence mapped to speaker",
+                               sentence_index=i,
+                               speaker_id=speaker_id,
+                               sentence=sentence[:50])
 
         elif (audio_result.speaker_diarization and
               audio_result.speaker_diarization.segments):
 
+            logger.info("Using fallback speaker alternation")
             # Fallback: alternate between available speakers
             all_speakers = list(set(seg.speaker_id for seg in audio_result.speaker_diarization.segments))
+            logger.info("Available speakers", speakers=all_speakers)
+
             if all_speakers:
                 for i, sentence in enumerate(unique_sentences):
                     speaker_id = all_speakers[i % len(all_speakers)]
                     dialogue_lines.append(f"{speaker_id}: {sentence}")
             else:
                 # No speakers found, use default
+                logger.warning("No speakers found in diarization segments")
                 for sentence in unique_sentences:
                     dialogue_lines.append(f"SPEAKER_00: {sentence}")
         else:
             # No speaker diarization available, use simple format
+            logger.info("No speaker diarization available, using default speaker")
             for sentence in unique_sentences:
                 dialogue_lines.append(f"SPEAKER_00: {sentence}")
+
+        logger.info("Topic dialogue creation complete",
+                   topic_id=topic.topic_id,
+                   dialogue_lines_count=len(dialogue_lines),
+                   unique_sentences_count=len(unique_sentences))
+
+        # CRITICAL: Check for potential infinite loops or excessive duplication
+        if len(dialogue_lines) > len(unique_sentences) * 2:
+            logger.error("POTENTIAL BUG: Dialogue lines count exceeds expected",
+                        dialogue_lines_count=len(dialogue_lines),
+                        unique_sentences_count=len(unique_sentences),
+                        topic_id=topic.topic_id)
+            # Truncate to prevent runaway duplication
+            dialogue_lines = dialogue_lines[:len(unique_sentences)]
+            logger.warning("Truncated dialogue lines to prevent duplication bug")
 
         return dialogue_lines
 

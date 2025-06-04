@@ -208,23 +208,61 @@ class EnhancedTopicSegmentation:
     
     async def _extract_sentences(self, text: str) -> List[str]:
         """Extract sentences from text using best available method."""
+        logger.info("Starting sentence extraction", text_length=len(text))
+
         try:
             if self.nlp:
                 # Use spaCy for better sentence segmentation
+                logger.debug("Using spaCy for sentence extraction")
                 doc = self.nlp(text)
                 sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
             else:
                 # Fallback to NLTK
+                logger.debug("Using NLTK for sentence extraction")
                 sentences = sent_tokenize(text)
                 sentences = [s.strip() for s in sentences if s.strip()]
-            
-            logger.debug("Extracted sentences", count=len(sentences))
+
+            logger.info("Sentence extraction complete",
+                       sentences_count=len(sentences),
+                       method="spacy" if self.nlp else "nltk")
+
+            # CRITICAL: Check for duplicates in extracted sentences
+            unique_sentences = list(dict.fromkeys(sentences))  # Preserve order while removing duplicates
+            if len(unique_sentences) != len(sentences):
+                logger.warning("Duplicate sentences detected during extraction",
+                             original_count=len(sentences),
+                             unique_count=len(unique_sentences),
+                             duplicates_removed=len(sentences) - len(unique_sentences))
+
+                # Log some examples of duplicates for debugging
+                seen = set()
+                duplicates_found = []
+                for i, sentence in enumerate(sentences):
+                    if sentence in seen and len(duplicates_found) < 3:
+                        duplicates_found.append((i, sentence[:100]))
+                    seen.add(sentence)
+
+                if duplicates_found:
+                    logger.warning("Sample duplicate sentences", duplicates=duplicates_found)
+
+                sentences = unique_sentences
+
             return sentences
-            
+
         except Exception as e:
             logger.warning("Sentence extraction failed, using simple split", error=str(e))
             # Ultimate fallback
             sentences = [s.strip() for s in text.split('.') if s.strip()]
+
+            # Apply deduplication to fallback as well
+            unique_sentences = list(dict.fromkeys(sentences))
+            if len(unique_sentences) != len(sentences):
+                logger.warning("Duplicate sentences in fallback extraction",
+                             original_count=len(sentences),
+                             unique_count=len(unique_sentences))
+                sentences = unique_sentences
+
+            logger.info("Fallback sentence extraction complete", sentences_count=len(sentences))
             return sentences
     
     async def _generate_embeddings(self, sentences: List[str]) -> np.ndarray:
@@ -288,17 +326,41 @@ class EnhancedTopicSegmentation:
     ) -> List[TopicSegment]:
         """Create topic segments from boundaries."""
         topics = []
-        
+
+        logger.info("Creating topic segments",
+                   sentences_count=len(sentences),
+                   boundaries_count=len(boundaries),
+                   max_topics=max_topics)
+
         for i in range(len(boundaries) - 1):
             start_idx = boundaries[i]
             end_idx = boundaries[i + 1]
-            
+
             topic_sentences = sentences[start_idx:end_idx]
-            
+
+            logger.debug("Processing topic segment",
+                        topic_index=i,
+                        start_idx=start_idx,
+                        end_idx=end_idx,
+                        topic_sentences_count=len(topic_sentences))
+
             # Skip if too few sentences
             if len(topic_sentences) < settings.min_topic_sentences:
+                logger.debug("Skipping topic with too few sentences",
+                           topic_index=i,
+                           sentences_count=len(topic_sentences),
+                           min_required=settings.min_topic_sentences)
                 continue
-            
+
+            # CRITICAL: Check for potential sentence duplication
+            unique_topic_sentences = list(dict.fromkeys(topic_sentences))  # Preserve order while removing duplicates
+            if len(unique_topic_sentences) != len(topic_sentences):
+                logger.warning("Duplicate sentences detected in topic",
+                             topic_index=i,
+                             original_count=len(topic_sentences),
+                             unique_count=len(unique_topic_sentences))
+                topic_sentences = unique_topic_sentences
+
             # Calculate timing if transcript segments available
             start_time, end_time, duration = self._calculate_topic_timing(
                 start_idx, end_idx, transcript_segments, topic_sentences
@@ -308,10 +370,10 @@ class EnhancedTopicSegmentation:
             speaker_dist = self._calculate_speaker_distribution(
                 start_time, end_time, speaker_segments
             )
-            
+
             # Extract keywords
             keywords = await self._extract_keywords(topic_sentences)
-            
+
             topic = TopicSegment(
                 topic_id=f"topic_{i+1}",
                 title=f"Topic {i+1}",
@@ -324,13 +386,21 @@ class EnhancedTopicSegmentation:
                 keywords=keywords,
                 speaker_distribution=speaker_dist
             )
-            
+
+            logger.info("Topic segment created",
+                       topic_id=topic.topic_id,
+                       sentences_count=len(topic.sentences),
+                       start_time=start_time,
+                       end_time=end_time)
+
             topics.append(topic)
-            
+
             # Limit number of topics
             if len(topics) >= max_topics:
+                logger.info("Reached maximum topics limit", max_topics=max_topics)
                 break
-        
+
+        logger.info("Topic segments creation complete", topics_count=len(topics))
         return topics
     
     def _calculate_topic_timing(
@@ -621,26 +691,55 @@ class EnhancedTopicSegmentation:
     
     async def _fallback_segmentation(self, text: str) -> TopicSegmentationResult:
         """Fallback segmentation when models are not available."""
-        logger.info("Using fallback topic segmentation")
-        
+        logger.info("Using fallback topic segmentation", text_length=len(text))
+
         try:
             # Simple sentence-based segmentation
             sentences = [s.strip() for s in text.split('.') if s.strip()]
-            
+            logger.info("Fallback segmentation extracted sentences", sentences_count=len(sentences))
+
+            # CRITICAL: Remove duplicates in fallback segmentation
+            unique_sentences = list(dict.fromkeys(sentences))  # Preserve order while removing duplicates
+            if len(unique_sentences) != len(sentences):
+                logger.warning("Duplicate sentences detected in fallback segmentation",
+                             original_count=len(sentences),
+                             unique_count=len(unique_sentences))
+                sentences = unique_sentences
+
             if len(sentences) <= settings.min_topic_sentences:
+                logger.info("Too few sentences for segmentation, creating single topic")
                 return await self._create_single_topic_result(sentences, text, 0.1)
-            
+
             # Split into 2-3 topics based on length
             num_topics = min(3, len(sentences) // settings.min_topic_sentences)
             sentences_per_topic = len(sentences) // num_topics
-            
+
+            logger.info("Fallback segmentation plan",
+                       num_topics=num_topics,
+                       sentences_per_topic=sentences_per_topic)
+
             topics = []
             for i in range(num_topics):
                 start_idx = i * sentences_per_topic
                 end_idx = start_idx + sentences_per_topic if i < num_topics - 1 else len(sentences)
-                
+
                 topic_sentences = sentences[start_idx:end_idx]
-                
+
+                # Additional safety check for duplicates within topic
+                unique_topic_sentences = list(dict.fromkeys(topic_sentences))
+                if len(unique_topic_sentences) != len(topic_sentences):
+                    logger.warning("Duplicate sentences in fallback topic",
+                                 topic_index=i,
+                                 original_count=len(topic_sentences),
+                                 unique_count=len(unique_topic_sentences))
+                    topic_sentences = unique_topic_sentences
+
+                logger.debug("Creating fallback topic",
+                           topic_index=i,
+                           start_idx=start_idx,
+                           end_idx=end_idx,
+                           topic_sentences_count=len(topic_sentences))
+
                 topic = TopicSegment(
                     topic_id=f"topic_{i+1}",
                     title=f"Topic {i+1}",
@@ -650,7 +749,9 @@ class EnhancedTopicSegmentation:
                     keywords=[]
                 )
                 topics.append(topic)
-            
+
+            logger.info("Fallback segmentation complete", topics_count=len(topics))
+
             return TopicSegmentationResult(
                 topics=topics,
                 total_topics=len(topics),
@@ -659,7 +760,7 @@ class EnhancedTopicSegmentation:
                 similarity_threshold=0.5,
                 segmentation_method="simple_split"
             )
-            
+
         except Exception as e:
             logger.error("Fallback segmentation failed", error=str(e))
             return await self._create_single_topic_result([text], text, 0.1)
