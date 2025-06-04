@@ -105,12 +105,12 @@ We will reorganize the project into the following packages:
 
 ### Phase 3: Processor Packages Implementation
 
-- [ ] **3.1 Implement morag-audio package**
-  - [ ] Create package structure with pyproject.toml
-  - [ ] Move audio processor code
-  - [ ] Define dependencies (Whisper, etc.)
-  - [ ] Implement interface adapters to core
-  - [ ] Write unit tests
+- [x] **3.1 Implement morag-audio package**
+  - [x] Create package structure with pyproject.toml
+  - [x] Move audio processor code
+  - [x] Define dependencies (Whisper, etc.)
+  - [x] Implement interface adapters to core
+  - [x] Write unit tests
 
 - [x] **3.2 Implement morag-video package**
   - [x] Create package structure with pyproject.toml
@@ -370,7 +370,7 @@ We will reorganize the project into the following packages:
 ### Further Tasks
 
 - [ ] **Complete remaining processor packages**
-  - [ ] Implement morag-audio package
+  - [x] Implement morag-audio package
   - [x] Implement morag-video package
   - [ ] Implement morag-image package
   - [ ] Implement morag-web package
