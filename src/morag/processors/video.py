@@ -289,22 +289,38 @@ class VideoProcessor:
                 codec = "libmp3lame"  # Default to MP3 for unknown formats
                 logger.debug(f"Unknown format {audio_format}, defaulting to MP3 encoding")
 
-            # Extract audio using ffmpeg with optimized settings
-            await asyncio.to_thread(
-                lambda: ffmpeg_run(
-                    ffmpeg_output(
-                        ffmpeg_input(str(file_path)),
-                        str(audio_path),
-                        acodec=codec,
-                        # Add quality settings for non-copy modes
-                        **({} if codec == "copy" else {
-                            "audio_bitrate": "128k" if audio_format == "mp3" else None
-                        })
-                    ),
-                    overwrite_output=True,
-                    quiet=True
-                )
-            )
+            # Extract audio using ffmpeg with optimized settings and error capture
+            def run_ffmpeg_extraction():
+                try:
+                    # Build output parameters, excluding None values
+                    output_params = {"acodec": codec}
+
+                    # Add quality settings for non-copy modes
+                    if codec != "copy":
+                        if audio_format == "mp3":
+                            output_params["audio_bitrate"] = "128k"
+                        elif audio_format == "aac":
+                            output_params["audio_bitrate"] = "128k"
+                        # For WAV (pcm_s16le), don't set bitrate as it's uncompressed
+
+                    ffmpeg_run(
+                        ffmpeg_output(
+                            ffmpeg_input(str(file_path)),
+                            str(audio_path),
+                            **output_params
+                        ),
+                        overwrite_output=True,
+                        quiet=False,  # Enable stderr capture
+                        capture_stderr=True
+                    )
+                except FFmpegError as e:
+                    # Capture stderr for detailed error information
+                    stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
+                    raise ProcessingError(f"FFmpeg audio extraction error: {stderr_output}")
+                except Exception as e:
+                    raise ProcessingError(f"Audio extraction error: {str(e)}")
+
+            await asyncio.to_thread(run_ffmpeg_extraction)
 
             if not audio_path.exists():
                 raise ProcessingError("Audio extraction failed - output file not created")

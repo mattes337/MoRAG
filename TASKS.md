@@ -87,6 +87,7 @@
 ✅ **VIDEO-AUDIO-INTEGRATION** - Implemented automatic audio processing pipeline integration for video files with enhanced features - COMPLETED
 ✅ **AUDIO-FILE-SIZE-LIMIT-FIX** - Increased audio file size limits from 500MB to 2GB to handle large audio files - COMPLETED
 ✅ **VIDEO-AUDIO-EXTRACTION-OPTIMIZATION** - Optimized video audio extraction to minimize file size and processing time overhead - COMPLETED
+✅ **VIDEO-FFMPEG-ERROR-HANDLING** - Fixed video audio extraction ffmpeg error handling to capture stderr output and resolve None bitrate parameter issues - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -277,6 +278,24 @@
   - Any -> WAV: Uncompressed extraction (minutes, 5-20x larger files)
   - Processing time reduced by 80-95% for compatible formats
   - File sizes reduced by 80-95% compared to WAV extraction
+
+### Video FFmpeg Error Handling Fix
+- **Issue**: Video audio extraction failing with "ffmpeg error (see stderr output for detail)" but no actual stderr output visible
+- **Root Cause**: FFmpeg calls were using `quiet=True` which suppressed stderr output, and None bitrate parameters were being passed to ffmpeg
+- **Solution**: Enhanced error handling to capture stderr output and fixed parameter handling to exclude None values
+- **Files Modified**:
+  - `src/morag/processors/video.py` (improved error handling and parameter filtering)
+- **Features Added**:
+  - Proper stderr capture in ffmpeg error handling with `quiet=False` and `capture_stderr=True`
+  - Parameter filtering to exclude None values from being passed to ffmpeg
+  - Detailed error messages showing actual ffmpeg stderr output for debugging
+  - Separate parameter building logic to handle different audio formats correctly
+  - Enhanced FFmpegError exception handling with decoded stderr output
+- **Error Resolution**:
+  - Fixed "Unable to parse option value 'None'" error by excluding None bitrate parameters
+  - Fixed "Error setting option b to value None" by proper parameter filtering
+  - Video audio extraction now works correctly for WAV, MP3, and AAC formats
+  - Detailed error messages help diagnose ffmpeg issues when they occur
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns
