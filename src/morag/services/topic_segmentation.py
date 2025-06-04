@@ -167,9 +167,9 @@ class EnhancedTopicSegmentation:
                 max_topics
             )
             
-            # Generate topic summaries if LLM is enabled
-            if settings.use_llm_topic_summarization:
-                topics = await self._generate_topic_summaries(topics)
+            # Skip topic summarization - user doesn't want summaries
+            # if settings.use_llm_topic_summarization:
+            #     topics = await self._generate_topic_summaries(topics)
             
             processing_time = time.time() - start_time
             

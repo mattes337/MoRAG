@@ -25,7 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class AudioConfig:
     """Configuration for audio processing."""
-    model_size: str = "base"  # tiny, base, small, medium, large
+    model_size: str = "large-v3"  # Use large-v3 for best quality, especially for German
     language: Optional[str] = None  # Auto-detect if None
     enable_diarization: bool = False
     chunk_duration: int = 300  # 5 minutes in seconds

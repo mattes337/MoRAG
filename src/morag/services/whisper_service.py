@@ -145,18 +145,19 @@ class WhisperService:
         audio_path: str,
         config: AudioConfig
     ):
-        """Synchronous transcription method."""
+        """Synchronous transcription method with enhanced settings for better quality."""
         return model.transcribe(
             audio_path,
             language=config.language,
-            beam_size=5,
-            best_of=5,
-            temperature=0.0,
+            beam_size=settings.whisper_beam_size,
+            best_of=settings.whisper_best_of,
+            temperature=settings.whisper_temperature,
             condition_on_previous_text=True,
-            compression_ratio_threshold=2.4,
-            log_prob_threshold=-1.0,
-            no_speech_threshold=0.6,
-            initial_prompt=None
+            compression_ratio_threshold=settings.whisper_compression_ratio_threshold,
+            log_prob_threshold=settings.whisper_log_prob_threshold,
+            no_speech_threshold=settings.whisper_no_speech_threshold,
+            initial_prompt=None,
+            word_timestamps=True  # Enable word-level timestamps for better speaker alignment
         )
     
     async def transcribe_with_chunking(

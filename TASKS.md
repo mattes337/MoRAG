@@ -88,6 +88,7 @@
 ✅ **AUDIO-FILE-SIZE-LIMIT-FIX** - Increased audio file size limits from 500MB to 2GB to handle large audio files - COMPLETED
 ✅ **VIDEO-AUDIO-EXTRACTION-OPTIMIZATION** - Optimized video audio extraction to minimize file size and processing time overhead - COMPLETED
 ✅ **VIDEO-FFMPEG-ERROR-HANDLING** - Fixed video audio extraction ffmpeg error handling to capture stderr output and resolve None bitrate parameter issues - COMPLETED
+✅ **AUDIO-VIDEO-TRANSCRIPTION-QUALITY-FIX** - Fixed audio/video transcription issues: topic timestamps, speaker diarization, summaries, and STT quality - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -296,6 +297,35 @@
   - Fixed "Error setting option b to value None" by proper parameter filtering
   - Video audio extraction now works correctly for WAV, MP3, and AAC formats
   - Detailed error messages help diagnose ffmpeg issues when they occur
+
+### Audio/Video Transcription Quality Fix
+- **Issue**: Multiple transcription quality and format issues affecting user experience
+- **Root Cause**: Topic timestamps showed full ranges, speaker diarization always showed "SPEAKER", summaries were unwanted, and STT quality was poor for German
+- **Solution**: Comprehensive fixes to improve transcription output format and quality
+- **Files Modified**:
+  - `src/morag/converters/video.py` (fixed topic timestamp format and speaker mapping)
+  - `src/morag/converters/audio.py` (fixed topic timestamp format and speaker mapping)
+  - `src/morag/services/topic_segmentation.py` (disabled topic summarization)
+  - `src/morag/core/config.py` (enhanced Whisper configuration for better quality)
+  - `src/morag/services/whisper_service.py` (improved transcription settings)
+  - `src/morag/processors/audio.py` (updated default model to large-v3)
+  - `src/morag/converters/config.py` (enabled speaker diarization by default)
+  - `scripts/test_audio_transcription_fixes.py` (comprehensive test suite)
+- **Features Fixed**:
+  - Topic timestamps now show single start seconds: `# Discussion Topic 2 [123]` instead of `[00:02 - 00:05]`
+  - Speaker diarization correctly identifies speakers as `SPEAKER_00:`, `SPEAKER_01:` instead of generic `**SPEAKER**:`
+  - Topic summaries completely removed from output as requested
+  - Improved speech-to-text quality with large-v3 model for better German language support
+  - Enhanced Whisper settings: increased beam size, multiple candidates, word-level timestamps
+  - Better speaker-to-text mapping with improved fallback mechanisms
+  - Speaker diarization enabled by default for better multi-speaker handling
+- **Quality Improvements**:
+  - Default Whisper model upgraded from "base" to "large-v3" for significantly better accuracy
+  - Enhanced beam search (beam_size=5) and candidate selection (best_of=5) for better results
+  - Word-level timestamps enabled for more precise speaker-text alignment
+  - Improved German language transcription quality through better model and settings
+  - More robust speaker identification with proper fallback to numbered speakers
+  - Cleaner output format focused on actual content without unwanted summaries
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns

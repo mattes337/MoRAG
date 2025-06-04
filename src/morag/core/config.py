@@ -100,6 +100,15 @@ class Settings(BaseSettings):
     enable_audio_enhancement: bool = False
     audio_chunk_overlap: float = 0.1  # 10% overlap between chunks
 
+    # Whisper Configuration for Better Quality
+    whisper_model_size: str = "large-v3"  # Use large-v3 for best quality
+    whisper_beam_size: int = 5  # Increased beam size for better accuracy
+    whisper_best_of: int = 5  # Multiple candidates for better results
+    whisper_temperature: float = 0.0  # Deterministic output
+    whisper_compression_ratio_threshold: float = 2.4
+    whisper_log_prob_threshold: float = -1.0
+    whisper_no_speech_threshold: float = 0.6
+
     # Webhook Configuration
     webhook_timeout: int = 30
     webhook_max_retries: int = 3

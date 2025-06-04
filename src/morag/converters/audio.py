@@ -581,13 +581,12 @@ class AudioConverter(BaseConverter):
                     topic, enhanced_result.speaker_segments, enhanced_result.segments
                 )
 
-                # Add timestamp to topic header
-                if topic_start_time is not None and topic_end_time is not None:
-                    start_str = self._format_timestamp(topic_start_time)
-                    end_str = self._format_timestamp(topic_end_time)
-                    sections.append(f"# {topic_title} [{start_str} - {end_str}]")
+                # Add timestamp to topic header with single start seconds
+                if topic_start_time is not None:
+                    start_seconds = int(topic_start_time)
+                    sections.append(f"# {topic_title} [{start_seconds}]")
                 else:
-                    sections.append(f"# {topic_title}")
+                    sections.append(f"# {topic_title} [0]")
                 sections.append("")
 
                 # Create conversational format by mapping sentences to speakers and timing
@@ -659,16 +658,8 @@ class AudioConverter(BaseConverter):
 
         # Simple topic section for basic transcripts (without speaker diarization)
         if hasattr(audio_result, 'segments') and audio_result.segments:
-            # Create a single topic with all content
-            sections.append("# Main Content [00:00 - ")
-
-            # Calculate total duration
-            total_duration = 0
-            if audio_result.segments:
-                total_duration = max(segment.end_time for segment in audio_result.segments if hasattr(segment, 'end_time'))
-
-            duration_str = self._format_timestamp(total_duration)
-            sections[-1] += f"{duration_str}]"
+            # Create a single topic with all content using start seconds format
+            sections.append("# Main Content [0]")
             sections.append("")
 
             # Add all transcript content with speaker labels

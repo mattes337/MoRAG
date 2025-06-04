@@ -259,20 +259,16 @@ class VideoConverter(BaseConverter):
         if audio_result.topic_segmentation and audio_result.topic_segmentation.topics:
             # Create conversational format with topic headers and speaker dialogue
             for topic in audio_result.topic_segmentation.topics:
-                # Format topic header with timestamps
-                start_time = self._format_timestamp(topic.start_time) if topic.start_time else "00:00"
-                end_time = self._format_timestamp(topic.end_time) if topic.end_time else self._format_timestamp(video_duration)
+                # Format topic header with single start timestamp in seconds
+                start_seconds = int(topic.start_time) if topic.start_time else 0
 
                 # Use topic title or generate one
                 topic_title = topic.title if topic.title and topic.title != f"Topic {topic.topic_id.split('_')[-1]}" else f"Discussion Topic {topic.topic_id.split('_')[-1]}"
 
-                sections.append(f"# {topic_title} [{start_time} - {end_time}]")
+                sections.append(f"# {topic_title} [{start_seconds}]")
                 sections.append("")
 
-                # Add topic summary if available
-                if topic.summary and topic.summary.strip():
-                    sections.append(f"*{topic.summary}*")
-                    sections.append("")
+                # Skip topic summary - user doesn't want summaries
 
                 # Create speaker dialogue for this topic
                 topic_dialogue = self._create_topic_dialogue(topic, audio_result)
@@ -317,22 +313,23 @@ class VideoConverter(BaseConverter):
 
         # Try to map sentences to speakers using timing information
         if (audio_result.speaker_diarization and
-            audio_result.speaker_diarization.segments and
-            topic.start_time is not None and
-            topic.end_time is not None):
+            audio_result.speaker_diarization.segments):
 
             # Create speaker mapping for this topic timeframe
-            speaker_segments = [
-                seg for seg in audio_result.speaker_diarization.segments
-                if (seg.start_time < topic.end_time and seg.end_time > topic.start_time)
-            ]
+            speaker_segments = audio_result.speaker_diarization.segments
+
+            # If we have timing information, filter by topic timeframe
+            if topic.start_time is not None and topic.end_time is not None:
+                speaker_segments = [
+                    seg for seg in speaker_segments
+                    if (seg.start_time < topic.end_time and seg.end_time > topic.start_time)
+                ]
 
             if speaker_segments:
                 # Map sentences to speakers based on timing
                 for sentence in topic.sentences:
                     # Find the most likely speaker for this sentence
-                    # This is a simplified mapping - in practice, you'd want more sophisticated alignment
-                    speaker_id = speaker_segments[0].speaker_id  # Default to first speaker in timeframe
+                    speaker_id = speaker_segments[0].speaker_id  # Default to first speaker
 
                     # Try to find better speaker match if we have transcript segments with timing
                     if hasattr(audio_result, 'segments') and audio_result.segments:
@@ -346,15 +343,23 @@ class VideoConverter(BaseConverter):
                                         break
                                 break
 
-                    dialogue_lines.append(f"**{speaker_id}**: {sentence}")
+                    dialogue_lines.append(f"{speaker_id}: {sentence}")
             else:
-                # No speaker segments in this timeframe, use generic format
-                for sentence in topic.sentences:
-                    dialogue_lines.append(f"**SPEAKER**: {sentence}")
+                # Use all available speakers if no timeframe match
+                all_speakers = list(set(seg.speaker_id for seg in audio_result.speaker_diarization.segments))
+                if all_speakers:
+                    # Alternate between speakers for sentences
+                    for i, sentence in enumerate(topic.sentences):
+                        speaker_id = all_speakers[i % len(all_speakers)]
+                        dialogue_lines.append(f"{speaker_id}: {sentence}")
+                else:
+                    # Fallback to generic format
+                    for sentence in topic.sentences:
+                        dialogue_lines.append(f"Speaker_00: {sentence}")
         else:
             # No speaker diarization available, use simple format
             for sentence in topic.sentences:
-                dialogue_lines.append(f"**SPEAKER**: {sentence}")
+                dialogue_lines.append(f"Speaker_00: {sentence}")
 
         return dialogue_lines
 

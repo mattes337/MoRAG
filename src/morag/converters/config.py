@@ -34,10 +34,10 @@ class ConversionConfig:
             'preserve_layout': False
         },
         'audio': {
-            'enable_diarization': False,
+            'enable_diarization': True,  # Enable speaker diarization by default
             'include_timestamps': True,
             'confidence_threshold': 0.8,
-            'model': 'whisper-large-v3'
+            'model': 'large-v3'  # Use large-v3 for best quality
         },
         'video': {
             'extract_keyframes': True,
