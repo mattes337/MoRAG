@@ -1,6 +1,16 @@
-# MoRAG Debug Scripts
+# MoRAG Essential Scripts
 
-This directory contains scripts to help with debugging and development of the MoRAG project.
+This directory contains essential scripts for development, debugging, deployment, and maintenance of the MoRAG project.
+
+## Script Categories
+
+- **Development & Debugging**: Scripts for setting up development environments
+- **Database Management**: Scripts for initializing and managing the database
+- **Worker Management**: Scripts for managing Celery workers
+- **Production Deployment**: Scripts for production deployment and monitoring
+- **System Maintenance**: Scripts for backup and monitoring
+
+**Note**: Test scripts have been moved to `tests/manual/` and demo scripts to `examples/`.
 
 ## Debug Session Scripts
 
@@ -70,17 +80,46 @@ Initializes the database and creates necessary collections.
 
 Starts a Celery worker for background task processing.
 
-### Test Scripts
+### Production Scripts
 
-Various test scripts for different components:
-- `test_audio_processing.py`
-- `test_content_conversion.py`
-- `test_document_processing.py`
-- `test_gemini.py`
-- `test_image_processing.py`
-- `test_semantic_chunking.py`
-- `test_video_processing.py`
-- `test_youtube_processing.py`
+Essential scripts for production deployment and management:
+
+#### `backup.sh`
+Creates timestamped backups of all system data including:
+- Qdrant vector database
+- Redis data
+- Uploaded files
+- Configuration files
+
+**Usage:**
+```bash
+./scripts/backup.sh
+```
+
+#### `deploy.sh`
+Production deployment script that:
+- Creates necessary directories
+- Builds and starts Docker services
+- Initializes the database
+- Performs health checks
+
+**Usage:**
+```bash
+./scripts/deploy.sh
+```
+
+#### `monitor.sh`
+System monitoring script that displays:
+- Service status
+- Resource usage
+- Queue statistics
+- Health status
+- Recent logs
+
+**Usage:**
+```bash
+./scripts/monitor.sh
+```
 
 ## Environment Setup
 

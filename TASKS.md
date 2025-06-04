@@ -89,6 +89,7 @@
 ✅ **VIDEO-AUDIO-EXTRACTION-OPTIMIZATION** - Optimized video audio extraction to minimize file size and processing time overhead - COMPLETED
 ✅ **VIDEO-FFMPEG-ERROR-HANDLING** - Fixed video audio extraction ffmpeg error handling to capture stderr output and resolve None bitrate parameter issues - COMPLETED
 ✅ **AUDIO-VIDEO-TRANSCRIPTION-QUALITY-FIX** - Fixed audio/video transcription issues: topic timestamps, speaker diarization, summaries, and STT quality - COMPLETED
+✅ **REPOSITORY-CLEANUP-AND-DOCUMENTATION** - Comprehensive repository cleanup with aggressive script removal, test consolidation, and enhanced documentation - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -326,6 +327,36 @@
   - Improved German language transcription quality through better model and settings
   - More robust speaker identification with proper fallback to numbered speakers
   - Cleaner output format focused on actual content without unwanted summaries
+
+### Repository Cleanup and Documentation Enhancement
+- **Issue**: Repository had accumulated many temporary debugging scripts, duplicate test files, and lacked comprehensive documentation
+- **Root Cause**: Aggressive development approach led to script proliferation without cleanup, and documentation was scattered
+- **Solution**: Comprehensive repository cleanup with aggressive script removal, test consolidation, and enhanced documentation structure
+- **Files Modified**:
+  - `examples/README.md` (comprehensive documentation for all examples)
+  - `tests/README.md` (new comprehensive test suite documentation)
+  - `tests/manual/README.md` (new manual testing documentation)
+  - `scripts/README.md` (updated to reflect cleaned structure)
+  - Removed 9 duplicate/temporary scripts from scripts/
+  - Moved 4 demo scripts from scripts/ to examples/
+  - Moved 11 unique test scripts from scripts/ to tests/manual/
+  - Removed outdated README_universal_conversion.md
+- **Cleanup Actions**:
+  - **Removed duplicate scripts**: test_audio_processing.py, test_gemini.py, test_document_processing.py, test_image_processing.py, test_video_processing.py, test_youtube_processing.py, test_semantic_chunking.py, test_content_conversion.py, debug_summarization.py
+  - **Moved demo scripts to examples/**: demo_enhanced_audio_processing.py → enhanced_audio_processing_demo.py, demo_transcription_fixes.py → transcription_fixes_demo_alt.py, demo_universal_conversion.py → universal_conversion_demo_alt.py, demo_video_audio_integration.py → video_audio_integration_demo.py
+  - **Moved test scripts to tests/manual/**: test_qdrant_connection.py, test_qdrant_auth.py, test_qdrant_network.py, test_audio_transcription_fixes.py, test_audio_format_fix.py, test_audio_extraction_optimization.py, test_video_format_fix.py, test_summarization_fix.py, test_universal_conversion.py, test_pdf_parsing.py, test_webhook_demo.py
+  - **Cleaned scripts/ folder**: Now contains only essential scripts (debug-session, init_db, start_worker, deploy, backup, monitor)
+- **Documentation Enhancements**:
+  - **examples/README.md**: Comprehensive documentation for 8 examples with usage instructions, prerequisites, and expected outputs
+  - **tests/README.md**: Complete test suite documentation with structure explanation, running instructions, and coverage requirements
+  - **tests/manual/README.md**: Detailed manual testing documentation with categorized scripts and usage guidelines
+  - **scripts/README.md**: Updated to reflect cleaned structure with categorized essential scripts
+- **Repository Structure Improvements**:
+  - Clear separation between examples (demos), tests (automated), and manual tests (debugging/validation)
+  - Unified test structure following Python testing best practices
+  - Significantly reduced script count while maintaining all essential functionality
+  - Enhanced discoverability through comprehensive documentation
+  - Improved maintainability with clear categorization and purpose documentation
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns
