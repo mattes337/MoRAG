@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "morag-audio"
+version = "0.1.0"
+description = "Audio processing service for MoRAG (Modular Retrieval Augmented Generation)"
+authors = [
+    {name = "MoRAG Team"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "morag-core>=0.1.0",
+    "morag-embedding>=0.1.0",
+    "faster-whisper>=0.6.0",
+    "pydub>=0.25.1",
+    "librosa>=0.9.2",
+    "mutagen>=1.45.1",
+    "ffmpeg-python>=0.2.0",
+    "numpy>=1.20.0",
+    "structlog>=23.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+diarization = [
+    "pyannote.audio>=2.1.1",
+    "torch>=1.10.0",
+]
+topic = [
+    "sentence-transformers>=2.2.2",
+    "scikit-learn>=1.0.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/morag"
+Documentation = "https://github.com/yourusername/morag#readme"
+Repository = "https://github.com/yourusername/morag.git"
+Issues = "https://github.com/yourusername/morag/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
