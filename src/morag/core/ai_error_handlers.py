@@ -118,7 +118,10 @@ class WhisperErrorHandler(AIServiceResilience):
             return ErrorType.UNKNOWN  # Don't retry corrupted files
         elif "memory" in error_message or "out of memory" in error_message:
             return ErrorType.SERVICE_UNAVAILABLE
-        elif "cuda" in error_message or "gpu" in error_message:
+        elif any(gpu_keyword in error_message for gpu_keyword in [
+            "cuda", "gpu", "device", "nvidia", "cudnn", "cublas", "curand",
+            "device-side assert", "kernel launch", "gpu memory"
+        ]):
             return ErrorType.SERVICE_UNAVAILABLE
         
         return super()._classify_error(exception)
@@ -170,6 +173,13 @@ class VisionErrorHandler(AIServiceResilience):
         elif "image corrupted" in error_message or "cannot decode" in error_message:
             return ErrorType.UNKNOWN  # Don't retry corrupted images
         elif "vision model" in error_message and "unavailable" in error_message:
+            return ErrorType.SERVICE_UNAVAILABLE
+        elif any(gpu_keyword in error_message for gpu_keyword in [
+            "cuda", "gpu", "device", "nvidia", "cudnn", "cublas", "curand",
+            "device-side assert", "kernel launch", "gpu memory"
+        ]):
+            return ErrorType.SERVICE_UNAVAILABLE
+        elif "memory" in error_message or "out of memory" in error_message:
             return ErrorType.SERVICE_UNAVAILABLE
         
         return super()._classify_error(exception)

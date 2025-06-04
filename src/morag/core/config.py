@@ -1,6 +1,48 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
 import os
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+def detect_device() -> str:
+    """Detect the best available device (CPU/GPU) with fallback to CPU."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device = "cuda"
+            logger.info("GPU (CUDA) detected and available", device=device)
+            return device
+    except ImportError:
+        logger.debug("PyTorch not available, using CPU")
+    except Exception as e:
+        logger.warning("GPU detection failed, falling back to CPU", error=str(e))
+
+    logger.info("Using CPU device", device="cpu")
+    return "cpu"
+
+def get_safe_device(preferred_device: Optional[str] = None) -> str:
+    """Get a safe device with automatic fallback to CPU if GPU is not available."""
+    if preferred_device == "cpu":
+        return "cpu"
+
+    if preferred_device == "cuda" or preferred_device == "gpu":
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return "cuda"
+            else:
+                logger.warning("CUDA requested but not available, falling back to CPU")
+                return "cpu"
+        except ImportError:
+            logger.warning("PyTorch not available for CUDA, falling back to CPU")
+            return "cpu"
+        except Exception as e:
+            logger.warning("GPU check failed, falling back to CPU", error=str(e))
+            return "cpu"
+
+    # Auto-detect if no preference specified
+    return detect_device()
 
 class Settings(BaseSettings):
     # API Configuration
@@ -78,6 +120,11 @@ class Settings(BaseSettings):
     enable_page_based_chunking: bool = True
     max_page_chunk_size: int = 8000  # Larger size for page-based chunks
 
+    # Device Configuration
+    # Automatically detect best available device (cpu/cuda) with CPU fallback
+    preferred_device: str = "auto"  # auto, cpu, cuda
+    force_cpu: bool = False  # Force CPU usage even if GPU is available
+
     # Audio Processing Configuration
     # Speaker Diarization
     enable_speaker_diarization: bool = True
@@ -139,6 +186,16 @@ class Settings(BaseSettings):
         env_file=".env",
         case_sensitive=False
     )
+
+    def get_device(self) -> str:
+        """Get the configured device with automatic fallback to CPU."""
+        if self.force_cpu:
+            return "cpu"
+
+        if self.preferred_device == "auto":
+            return detect_device()
+        else:
+            return get_safe_device(self.preferred_device)
 
     def validate_gemini_config(self) -> None:
         """Validate Gemini API configuration."""

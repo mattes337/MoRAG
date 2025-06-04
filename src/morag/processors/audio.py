@@ -15,7 +15,7 @@ import librosa
 import mutagen
 from mutagen.id3 import ID3NoHeaderError
 
-from morag.core.config import settings
+from morag.core.config import settings, get_safe_device
 from morag.core.exceptions import ProcessingError, ExternalServiceError
 from morag.services.speaker_diarization import speaker_diarization_service, DiarizationResult
 from morag.services.topic_segmentation import topic_segmentation_service, TopicSegmentationResult
@@ -39,9 +39,12 @@ class AudioConfig:
     compute_type: str = "int8"  # int8, int16, float16, float32
 
     def __post_init__(self):
-        """Set default max_file_size from settings if not provided."""
+        """Set default max_file_size from settings if not provided and ensure safe device."""
         if self.max_file_size is None:
             self.max_file_size = settings.max_audio_size
+
+        # Ensure device is safe and available
+        self.device = get_safe_device(self.device)
 
 @dataclass
 class AudioTranscriptSegment:

@@ -7,7 +7,7 @@ import structlog
 import time
 
 from faster_whisper import WhisperModel
-from morag.core.config import settings
+from morag.core.config import settings, get_safe_device
 from morag.core.exceptions import ExternalServiceError, ProcessingError
 from morag.processors.audio import AudioConfig, AudioProcessingResult, AudioTranscriptSegment
 from morag.core.ai_error_handlers import execute_with_ai_resilience, get_ai_service_health
@@ -25,31 +25,58 @@ class WhisperService:
         logger.info("Initialized WhisperService")
     
     def _get_model(self, model_size: str, device: str = "cpu", compute_type: str = "int8") -> WhisperModel:
-        """Get or create Whisper model."""
-        model_key = f"{model_size}_{device}_{compute_type}"
-        
+        """Get or create Whisper model with safe device fallback."""
+        # Ensure device is safe and available
+        safe_device = get_safe_device(device)
+        model_key = f"{model_size}_{safe_device}_{compute_type}"
+
         if model_key not in self._models:
             try:
-                logger.info("Loading Whisper model", 
+                logger.info("Loading Whisper model",
                            model_size=model_size,
-                           device=device,
-                           compute_type=compute_type)
-                
+                           device=safe_device,
+                           compute_type=compute_type,
+                           requested_device=device)
+
                 model = WhisperModel(
                     model_size,
-                    device=device,
+                    device=safe_device,
                     compute_type=compute_type
                 )
-                
+
                 self._models[model_key] = model
-                logger.info("Whisper model loaded successfully", model_key=model_key)
-                
+                logger.info("Whisper model loaded successfully",
+                           model_key=model_key,
+                           actual_device=safe_device)
+
             except Exception as e:
-                logger.error("Failed to load Whisper model", 
-                           model_size=model_size,
-                           error=str(e))
-                raise ExternalServiceError(f"Failed to load Whisper model: {str(e)}", "whisper")
-        
+                # If GPU fails, try CPU fallback
+                if safe_device != "cpu":
+                    logger.warning("GPU model loading failed, trying CPU fallback",
+                                 model_size=model_size,
+                                 failed_device=safe_device,
+                                 error=str(e))
+                    try:
+                        cpu_model_key = f"{model_size}_cpu_{compute_type}"
+                        if cpu_model_key not in self._models:
+                            model = WhisperModel(
+                                model_size,
+                                device="cpu",
+                                compute_type=compute_type
+                            )
+                            self._models[cpu_model_key] = model
+                            logger.info("Whisper model loaded on CPU fallback", model_key=cpu_model_key)
+                        return self._models[cpu_model_key]
+                    except Exception as cpu_error:
+                        logger.error("CPU fallback also failed", error=str(cpu_error))
+                        raise ExternalServiceError(f"Failed to load Whisper model on both GPU and CPU: {str(cpu_error)}", "whisper")
+                else:
+                    logger.error("Failed to load Whisper model",
+                               model_size=model_size,
+                               device=safe_device,
+                               error=str(e))
+                    raise ExternalServiceError(f"Failed to load Whisper model: {str(e)}", "whisper")
+
         return self._models[model_key]
     
     async def transcribe_audio(

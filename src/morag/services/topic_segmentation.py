@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import structlog
 import numpy as np
 
-from morag.core.config import settings
+from morag.core.config import settings, get_safe_device
 from morag.core.exceptions import ProcessingError, ExternalServiceError
 
 logger = structlog.get_logger(__name__)
@@ -80,8 +80,22 @@ class EnhancedTopicSegmentation:
             logger.info("Initializing topic segmentation models",
                        embedding_model=settings.topic_embedding_model)
             
-            # Initialize sentence transformer
-            self.embedding_model = SentenceTransformer(settings.topic_embedding_model)
+            # Initialize sentence transformer with safe device
+            safe_device = get_safe_device(settings.preferred_device)
+            logger.info("Initializing SentenceTransformer",
+                       model=settings.topic_embedding_model,
+                       device=safe_device)
+
+            try:
+                self.embedding_model = SentenceTransformer(settings.topic_embedding_model, device=safe_device)
+                logger.info("SentenceTransformer initialized successfully", device=safe_device)
+            except Exception as e:
+                if safe_device != "cpu":
+                    logger.warning("SentenceTransformer GPU initialization failed, trying CPU", error=str(e))
+                    self.embedding_model = SentenceTransformer(settings.topic_embedding_model, device="cpu")
+                    logger.info("SentenceTransformer initialized on CPU fallback")
+                else:
+                    raise
             
             # Initialize spaCy if available
             if SPACY_AVAILABLE:

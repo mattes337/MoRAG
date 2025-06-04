@@ -12,7 +12,7 @@ import time
 from PIL import Image, ExifTags
 import google.generativeai as genai
 
-from morag.core.config import settings
+from morag.core.config import settings, get_safe_device
 from morag.core.exceptions import ProcessingError, ExternalServiceError
 
 logger = structlog.get_logger()
@@ -347,14 +347,27 @@ class ImageProcessor:
             return "", 0.0
     
     async def _extract_text_easyocr(self, image_path: Path) -> Tuple[str, float]:
-        """Extract text using EasyOCR."""
+        """Extract text using EasyOCR with CPU fallback."""
         try:
             import easyocr
-            
-            # Initialize EasyOCR reader (cached)
+
+            # Initialize EasyOCR reader (cached) with safe device
             if not hasattr(self, '_easyocr_reader'):
-                self._easyocr_reader = easyocr.Reader(['en'])
-            
+                # Try GPU first, fallback to CPU
+                try:
+                    safe_device = get_safe_device("cuda")
+                    gpu_available = safe_device == "cuda"
+
+                    logger.info("Initializing EasyOCR reader",
+                               gpu_available=gpu_available,
+                               device=safe_device)
+
+                    self._easyocr_reader = easyocr.Reader(['en'], gpu=gpu_available)
+
+                except Exception as e:
+                    logger.warning("EasyOCR GPU initialization failed, using CPU", error=str(e))
+                    self._easyocr_reader = easyocr.Reader(['en'], gpu=False)
+
             # Extract text
             results = await asyncio.to_thread(
                 self._easyocr_reader.readtext,

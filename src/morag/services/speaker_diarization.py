@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import structlog
 import numpy as np
 
-from morag.core.config import settings
+from morag.core.config import settings, get_safe_device
 from morag.core.exceptions import ProcessingError, ExternalServiceError
 
 logger = structlog.get_logger(__name__)
@@ -82,26 +82,62 @@ class EnhancedSpeakerDiarization:
             self._initialize_pipeline()
     
     def _initialize_pipeline(self):
-        """Initialize the pyannote pipeline."""
+        """Initialize the pyannote pipeline with safe device configuration."""
         try:
+            safe_device = get_safe_device(settings.preferred_device)
             logger.info("Initializing speaker diarization pipeline",
-                       model=settings.speaker_diarization_model)
-            
+                       model=settings.speaker_diarization_model,
+                       device=safe_device)
+
             # Initialize with authentication token if available
-            if settings.huggingface_token:
-                self.pipeline = Pipeline.from_pretrained(
-                    settings.speaker_diarization_model,
-                    use_auth_token=settings.huggingface_token
-                )
-            else:
-                # Try without token (for public models)
-                self.pipeline = Pipeline.from_pretrained(
-                    settings.speaker_diarization_model
-                )
-            
-            self.model_loaded = True
-            logger.info("Speaker diarization pipeline initialized successfully")
-            
+            try:
+                if settings.huggingface_token:
+                    self.pipeline = Pipeline.from_pretrained(
+                        settings.speaker_diarization_model,
+                        use_auth_token=settings.huggingface_token
+                    )
+                else:
+                    # Try without token (for public models)
+                    self.pipeline = Pipeline.from_pretrained(
+                        settings.speaker_diarization_model
+                    )
+
+                # Move pipeline to safe device
+                if hasattr(self.pipeline, 'to') and safe_device != "cpu":
+                    try:
+                        self.pipeline.to(safe_device)
+                        logger.info("Speaker diarization pipeline moved to device", device=safe_device)
+                    except Exception as device_error:
+                        logger.warning("Failed to move pipeline to GPU, using CPU",
+                                     error=str(device_error))
+                        if hasattr(self.pipeline, 'to'):
+                            self.pipeline.to("cpu")
+
+                self.model_loaded = True
+                logger.info("Speaker diarization pipeline initialized successfully", device=safe_device)
+
+            except Exception as init_error:
+                if safe_device != "cpu":
+                    logger.warning("GPU pipeline initialization failed, trying CPU", error=str(init_error))
+                    # Force CPU initialization
+                    if settings.huggingface_token:
+                        self.pipeline = Pipeline.from_pretrained(
+                            settings.speaker_diarization_model,
+                            use_auth_token=settings.huggingface_token
+                        )
+                    else:
+                        self.pipeline = Pipeline.from_pretrained(
+                            settings.speaker_diarization_model
+                        )
+
+                    if hasattr(self.pipeline, 'to'):
+                        self.pipeline.to("cpu")
+
+                    self.model_loaded = True
+                    logger.info("Speaker diarization pipeline initialized on CPU fallback")
+                else:
+                    raise
+
         except Exception as e:
             logger.warning("Failed to initialize speaker diarization pipeline",
                           error=str(e))

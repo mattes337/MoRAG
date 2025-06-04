@@ -9,6 +9,7 @@ import asyncio
 from .base import BaseConverter, ConversionOptions, ConversionResult, QualityScore
 from .quality import ConversionQualityValidator
 from ..processors.audio import audio_processor
+from ..core.config import get_safe_device
 
 logger = structlog.get_logger(__name__)
 
@@ -67,10 +68,21 @@ class AudioConverter(BaseConverter):
             self.diarization_pipeline = None
 
     def _initialize_topic_segmenter(self):
-        """Initialize the topic segmentation model."""
+        """Initialize the topic segmentation model with safe device."""
         try:
-            self.topic_segmenter = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Topic segmentation model initialized successfully")
+            safe_device = get_safe_device("auto")
+            logger.info("Initializing topic segmentation model", device=safe_device)
+
+            try:
+                self.topic_segmenter = SentenceTransformer('all-MiniLM-L6-v2', device=safe_device)
+                logger.info("Topic segmentation model initialized successfully", device=safe_device)
+            except Exception as device_error:
+                if safe_device != "cpu":
+                    logger.warning("GPU initialization failed, trying CPU", error=str(device_error))
+                    self.topic_segmenter = SentenceTransformer('all-MiniLM-L6-v2', device="cpu")
+                    logger.info("Topic segmentation model initialized on CPU fallback")
+                else:
+                    raise
         except Exception as e:
             logger.warning(f"Failed to initialize topic segmentation: {e}")
             self.topic_segmenter = None

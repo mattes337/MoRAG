@@ -95,6 +95,7 @@
 ✅ **VIDEO-TRANSCRIPTION-FORMAT-FIX** - Fix video transcription format issues: proper timestamps, speaker labeling, and text deduplication - COMPLETED
 ✅ **DOCLING-PDF-BACKEND-FIX** - Fixed docling PDF converter 'PdfPipelineOptions' object has no attribute 'backend' error - COMPLETED
 ✅ **DOCLING-PDF-ELEMENTS-FIX** - Fixed docling PDF converter 'int' object has no attribute 'elements' error by updating to docling v2 API - COMPLETED
+✅ **GPU-CPU-FALLBACK-SYSTEM** - Implemented comprehensive GPU/CPU fallback system with automatic device detection and safe CPU fallbacks for all AI/ML components - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -517,6 +518,43 @@
 - Zero-width character removal
 - Comprehensive Unicode normalization
 - Encoding artifact cleanup for common PDF issues
+
+### GPU/CPU Fallback System Implementation
+- **Issue**: GPU support was not absolutely optional and could cause failures when GPU hardware was not available
+- **Root Cause**: AI/ML components lacked comprehensive device detection and CPU fallback mechanisms
+- **Solution**: Implemented comprehensive GPU/CPU fallback system with automatic device detection and safe CPU fallbacks for all components
+- **Files Modified**:
+  - `src/morag/core/config.py` (added device detection functions and configuration settings)
+  - `src/morag/processors/audio.py` (enhanced AudioConfig with safe device fallback)
+  - `src/morag/services/whisper_service.py` (added GPU/CPU fallback for Whisper models)
+  - `src/morag/processors/image.py` (added EasyOCR GPU/CPU fallback)
+  - `src/morag/services/topic_segmentation.py` (added SentenceTransformer device fallback)
+  - `src/morag/services/speaker_diarization.py` (added PyAnnote device fallback)
+  - `src/morag/converters/audio.py` (enhanced topic segmenter device handling)
+  - `src/morag/core/ai_error_handlers.py` (improved GPU error detection and handling)
+  - `.env.example` (added device configuration options)
+  - `tests/test_device_fallback.py` (comprehensive test suite)
+  - `docs/gpu-cpu-fallback.md` (detailed documentation)
+- **Features Implemented**:
+  - **Automatic Device Detection**: Detects best available device (GPU/CPU) with safe fallback to CPU
+  - **Configuration Options**: `PREFERRED_DEVICE` (auto/cpu/cuda) and `FORCE_CPU` environment variables
+  - **Safe Device Functions**: `detect_device()` and `get_safe_device()` with comprehensive error handling
+  - **Component-Specific Fallbacks**: All AI/ML components automatically fall back to CPU when GPU fails
+  - **Enhanced Error Handling**: GPU-related errors trigger automatic CPU fallback with detailed logging
+  - **Health Monitoring**: Device usage and fallback frequency tracking
+  - **Universal Coverage**: Audio (Whisper), Image (EasyOCR), Speaker Diarization (PyAnnote), Topic Segmentation (SentenceTransformer)
+- **Device Detection Logic**:
+  - **Force CPU Check**: Respects `force_cpu=True` setting to always use CPU
+  - **GPU Availability**: Checks PyTorch CUDA availability with proper exception handling
+  - **Automatic Fallback**: Falls back to CPU on any GPU-related error (CUDA out of memory, driver issues, etc.)
+  - **Import Safety**: Handles missing PyTorch gracefully with CPU fallback
+- **Quality Improvements**:
+  - GPU support is now absolutely optional - system works perfectly without any GPU hardware
+  - Automatic fallback prevents crashes when GPU memory is exhausted
+  - Consistent device handling across all AI/ML components
+  - Comprehensive logging for device selection and fallback events
+  - Performance optimization: uses GPU when available, CPU when needed
+  - Zero configuration required - works out of the box on any hardware
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)
