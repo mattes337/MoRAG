@@ -1,0 +1,89 @@
+"""Configuration management for MoRAG."""
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List, Optional
+import os
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+def detect_device() -> str:
+    """Detect the best available device (CPU/GPU) with fallback to CPU."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device = "cuda"
+            logger.info("GPU (CUDA) detected and available", device=device)
+            return device
+    except ImportError:
+        logger.debug("PyTorch not available, using CPU")
+    except Exception as e:
+        logger.warning("GPU detection failed, falling back to CPU", error=str(e))
+
+    logger.info("Using CPU device", device="cpu")
+    return "cpu"
+
+def get_safe_device(preferred_device: Optional[str] = None) -> str:
+    """Get a safe device with automatic fallback to CPU if GPU is not available."""
+    if preferred_device == "cpu":
+        return "cpu"
+
+    if preferred_device == "cuda" or preferred_device == "gpu":
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return "cuda"
+            else:
+                logger.warning("CUDA requested but not available, falling back to CPU")
+                return "cpu"
+        except ImportError:
+            logger.warning("PyTorch not available for CUDA, falling back to CPU")
+            return "cpu"
+        except Exception as e:
+            logger.warning("GPU check failed, falling back to CPU", error=str(e))
+            return "cpu"
+
+    # Auto-detect if no preference specified
+    return detect_device()
+
+class Settings(BaseSettings):
+    """Core settings for MoRAG."""
+    # API Configuration
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    api_workers: int = 4
+    allowed_origins: List[str] = ["*"]
+
+    # File Storage
+    upload_dir: str = "./uploads"
+    temp_dir: str = "./temp"
+    max_file_size: str = "100MB"
+
+    # File Size Limits (in bytes)
+    max_document_size: int = 100 * 1024 * 1024  # 100MB
+    max_audio_size: int = 2 * 1024 * 1024 * 1024  # 2GB
+    max_video_size: int = 5 * 1024 * 1024 * 1024  # 5GB
+    max_image_size: int = 50 * 1024 * 1024  # 50MB
+    
+    # Enhanced Logging Configuration
+    log_level: str = "INFO"
+    log_format: str = "json"  # json or console
+    log_file: str = "./logs/morag.log"
+    log_max_size: str = "100MB"
+    log_backup_count: int = 5
+    log_rotation: str = "daily"  # daily, weekly, size
+
+    # Environment settings
+    environment: str = "development"  # development, testing, production
+    debug: bool = True
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="MORAG_",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+# Global settings instance
+settings = Settings()
