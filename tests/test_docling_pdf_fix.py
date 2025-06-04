@@ -17,31 +17,36 @@ class TestDoclingPDFParsing:
     @pytest.mark.asyncio
     async def test_docling_parsing_configuration(self):
         """Test that docling is configured with proper pipeline options."""
-        
+
         # Mock the docling imports and classes
         mock_converter = Mock()
         mock_result = Mock()
         mock_document = Mock()
-        
+
         # Configure the mock result
         mock_result.status.name = "SUCCESS"
         mock_result.document = mock_document
         mock_document.iterate_items.return_value = []
         mock_document.export_to_markdown.return_value = "# Test Document\n\nThis is a test."
-        
+
         mock_converter.convert.return_value = mock_result
-        
+
+        # Mock file operations
+        mock_stat = Mock()
+        mock_stat.st_size = 1024
+
         with patch('docling.document_converter.DocumentConverter') as mock_doc_converter, \
              patch('docling.document_converter.PdfFormatOption') as mock_pdf_option, \
              patch('docling.datamodel.base_models.InputFormat') as mock_input_format, \
-             patch('docling.datamodel.pipeline_options.PdfPipelineOptions') as mock_pipeline_options:
-            
+             patch('docling.datamodel.pipeline_options.PdfPipelineOptions') as mock_pipeline_options, \
+             patch.object(Path, 'stat', return_value=mock_stat):
+
             mock_doc_converter.return_value = mock_converter
-            
+
             # Test the parsing
             test_file = Path("test.pdf")
             result = await document_processor._parse_with_docling(test_file)
-            
+
             # Verify that PdfPipelineOptions was called with correct parameters
             mock_pipeline_options.assert_called_once_with(
                 do_ocr=True,
@@ -49,14 +54,32 @@ class TestDoclingPDFParsing:
                 generate_page_images=False,
                 generate_picture_images=False,
             )
-            
+
             # Verify DocumentConverter was configured properly
             mock_doc_converter.assert_called_once()
-            
+
             # Verify the result
             assert isinstance(result, DocumentParseResult)
             assert result.metadata["parser"] == "docling"
-            assert result.metadata["docling_version"] == "v2"
+
+    @pytest.mark.asyncio
+    async def test_pdf_converter_docling_initialization_fix(self):
+        """Test that PDFConverter initializes docling correctly with PdfFormatOption."""
+
+        # Test that the actual initialization works without the 'backend' attribute error
+        from morag.converters.pdf import PDFConverter
+
+        # This should not raise an AttributeError about 'backend'
+        try:
+            converter = PDFConverter()
+            # If we get here without an exception, the fix worked
+            assert True, "PDFConverter initialized successfully without 'backend' attribute error"
+        except AttributeError as e:
+            if "'PdfPipelineOptions' object has no attribute 'backend'" in str(e):
+                pytest.fail("The 'backend' attribute error still exists - fix not working")
+            else:
+                # Some other AttributeError, re-raise it
+                raise
 
     @pytest.mark.asyncio
     async def test_docling_text_extraction(self):

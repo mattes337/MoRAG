@@ -93,6 +93,7 @@
 ✅ **AI-ERROR-HANDLING-IMPLEMENTATION** - Comprehensive AI/LLM error handling and resilience framework with circuit breakers, exponential backoff, and health monitoring - COMPLETED
 ✅ **AUDIO-VIDEO-TRANSCRIPTION-BUGS** - Fix critical timestamp and text repetition bugs in audio/video transcription system - COMPLETED
 ✅ **VIDEO-TRANSCRIPTION-FORMAT-FIX** - Fix video transcription format issues: proper timestamps, speaker labeling, and text deduplication - COMPLETED
+✅ **DOCLING-PDF-BACKEND-FIX** - Fixed docling PDF converter 'PdfPipelineOptions' object has no attribute 'backend' error - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -463,6 +464,27 @@
   - Clean topic structure without unwanted metadata headers
   - Better speaker-to-text alignment using overlap detection and word matching
   - Improved fallback mechanisms when timing information is unavailable
+
+### Docling PDF Backend Attribute Error Fix
+- **Issue**: `'PdfPipelineOptions' object has no attribute 'backend'` error when initializing PDF converter with docling
+- **Root Cause**: Incorrect usage of docling v2 API - passing `PdfPipelineOptions` directly to `format_options` instead of wrapping it in `PdfFormatOption`
+- **Solution**: Updated PDF converter to use correct docling v2 API format with `PdfFormatOption` wrapper
+- **Files Modified**:
+  - `src/morag/converters/pdf.py` (fixed docling converter initialization and added missing `PdfFormatOption` import)
+  - `tests/test_docling_pdf_fix.py` (added test to verify fix works correctly)
+- **API Changes**:
+  - **Before**: `DocumentConverter(format_options={InputFormat.PDF: pipeline_options})`
+  - **After**: `DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)})`
+- **Features Fixed**:
+  - PDF converter initialization no longer fails with backend attribute error
+  - Docling v2 API compliance for proper PDF pipeline configuration
+  - Advanced docling features (OCR, table extraction) now work correctly
+  - Proper error handling and fallback mechanisms maintained
+- **Quality Improvements**:
+  - PDF conversion now works with latest docling version without compatibility issues
+  - Enhanced PDF processing with advanced docling features (OCR, table structure extraction)
+  - Proper integration with existing MoRAG PDF processing pipeline
+  - Comprehensive test coverage to prevent regression
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns

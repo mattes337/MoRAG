@@ -13,7 +13,7 @@ from ..utils.text_processing import normalize_text_encoding, clean_pdf_text_enco
 logger = structlog.get_logger(__name__)
 
 try:
-    from docling.document_converter import DocumentConverter
+    from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions, TableStructureOptions
     DOCLING_AVAILABLE = True
@@ -67,7 +67,7 @@ class PDFConverter(BaseConverter):
 
             self.docling_converter = DocumentConverter(
                 format_options={
-                    InputFormat.PDF: pipeline_options
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
                 }
             )
             logger.info("Advanced docling converter initialized successfully")
