@@ -29,11 +29,20 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if running as root
+# Check if running as root (Alpine allows root execution)
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        log_error "This script should not be run as root. Please run as a regular user with sudo privileges."
-        exit 1
+        log_warning "Running as root. This is acceptable on Alpine Linux."
+        USE_SUDO=""
+    else
+        log_info "Running as regular user. Will use sudo for system operations."
+        USE_SUDO="sudo"
+        # Check if sudo exists (not default on Alpine)
+        if ! command -v sudo &> /dev/null; then
+            log_error "sudo not found. Please run as root or install sudo package."
+            log_info "To install sudo: apk add sudo"
+            exit 1
+        fi
     fi
 }
 
@@ -51,15 +60,23 @@ check_alpine_version() {
 # Update system packages
 update_system() {
     log_info "Updating system packages..."
-    sudo apk update
-    sudo apk upgrade
-    log_success "System packages updated"
+    $USE_SUDO apk update
+    $USE_SUDO apk upgrade
+
+    # Enable community repository for additional packages (like FFmpeg)
+    log_info "Enabling community repository..."
+    if ! grep -q "community" /etc/apk/repositories; then
+        echo "http://dl-cdn.alpinelinux.org/alpine/v$(cat /etc/alpine-release | cut -d'.' -f1-2)/community" | $USE_SUDO tee -a /etc/apk/repositories
+        $USE_SUDO apk update
+    fi
+
+    log_success "System packages updated and community repository enabled"
 }
 
 # Install essential build tools
 install_build_tools() {
     log_info "Installing essential build tools..."
-    sudo apk add --no-cache \
+    $USE_SUDO apk add --no-cache \
         build-base \
         linux-headers \
         musl-dev \
@@ -78,7 +95,7 @@ install_build_tools() {
 # Install system dependencies
 install_system_dependencies() {
     log_info "Installing core system libraries..."
-    sudo apk add --no-cache \
+    $USE_SUDO apk add --no-cache \
         glib-dev \
         cairo-dev \
         pango-dev \
@@ -96,26 +113,39 @@ install_system_dependencies() {
 # Install media processing dependencies
 install_media_dependencies() {
     log_info "Installing media processing dependencies..."
-    sudo apk add --no-cache \
-        ffmpeg \
-        ffmpeg-dev \
+
+    # Try to install FFmpeg, fall back to alternatives if not available
+    if $USE_SUDO apk add --no-cache ffmpeg ffmpeg-dev 2>/dev/null; then
+        log_info "FFmpeg installed from community repository"
+    else
+        log_warning "FFmpeg not available, installing alternative media libraries"
+        # Install basic media libraries that are usually available
+        $USE_SUDO apk add --no-cache \
+            libavcodec \
+            libavformat \
+            libavutil \
+            libswscale \
+            libswresample 2>/dev/null || true
+    fi
+
+    # Install audio processing libraries
+    $USE_SUDO apk add --no-cache \
         libsndfile \
         libsndfile-dev \
         portaudio \
         portaudio-dev \
         alsa-lib \
         alsa-lib-dev
+
     log_success "Media processing dependencies installed"
 }
 
 # Install OCR and image processing
 install_ocr_dependencies() {
     log_info "Installing OCR and image processing dependencies..."
-    sudo apk add --no-cache \
-        tesseract-ocr \
-        tesseract-ocr-data-eng \
-        tesseract-ocr-data-deu \
-        tesseract-ocr-dev \
+
+    # Install image processing libraries first (these are usually available)
+    $USE_SUDO apk add --no-cache \
         jpeg-dev \
         tiff-dev \
         freetype-dev \
@@ -123,88 +153,169 @@ install_ocr_dependencies() {
         openjpeg-dev \
         libwebp-dev \
         zlib-dev
+
+    # Try to install Tesseract with new package names (Alpine 3.21+)
+    if $USE_SUDO apk add --no-cache tesseract tesseract-data-eng tesseract-data-deu tesseract-dev 2>/dev/null; then
+        log_info "Tesseract OCR installed with new package names"
+    elif $USE_SUDO apk add --no-cache tesseract-ocr tesseract-ocr-data-eng tesseract-ocr-data-deu tesseract-ocr-dev 2>/dev/null; then
+        log_info "Tesseract OCR installed with legacy package names"
+    else
+        log_warning "Tesseract OCR not available, OCR functionality will be limited"
+        log_info "You can install Tesseract manually later if needed"
+    fi
+
     log_success "OCR and image processing dependencies installed"
 }
 
 # Install web scraping dependencies
 install_web_dependencies() {
     log_info "Installing web scraping dependencies..."
-    sudo apk add --no-cache \
+
+    # Install core web scraping libraries
+    $USE_SUDO apk add --no-cache \
         libxml2-dev \
-        libxslt-dev \
-        chromium \
-        chromium-chromedriver
+        libxslt-dev
+
+    # Try to install Chromium (may not be available in all Alpine versions)
+    if $USE_SUDO apk add --no-cache chromium chromium-chromedriver 2>/dev/null; then
+        log_info "Chromium installed successfully"
+    else
+        log_warning "Chromium not available, web scraping will use static methods only"
+    fi
+
     log_success "Web scraping dependencies installed"
 }
 
 # Install Python and development tools
 install_python() {
     log_info "Installing Python and development tools..."
-    sudo apk add --no-cache \
+
+    # Install core Python packages (these should be available)
+    $USE_SUDO apk add --no-cache \
         python3 \
-        python3-dev \
-        py3-pip \
-        py3-virtualenv \
-        py3-wheel \
-        py3-setuptools \
+        python3-dev
+
+    # Try to install pip with new package names (Alpine 3.21+)
+    if $USE_SUDO apk add --no-cache python3-pip 2>/dev/null; then
+        log_info "Python pip installed with new package name"
+    elif $USE_SUDO apk add --no-cache py3-pip 2>/dev/null; then
+        log_info "Python pip installed with legacy package name"
+    else
+        log_warning "pip package not available, will install via ensurepip"
+        python3 -m ensurepip --upgrade 2>/dev/null || true
+    fi
+
+    # Try to install virtualenv
+    if $USE_SUDO apk add --no-cache python3-venv 2>/dev/null; then
+        log_info "Python venv installed with new package name"
+    elif $USE_SUDO apk add --no-cache py3-virtualenv 2>/dev/null; then
+        log_info "Python virtualenv installed with legacy package name"
+    else
+        log_warning "virtualenv package not available, will install via pip later"
+    fi
+
+    # Try to install wheel and setuptools
+    $USE_SUDO apk add --no-cache python3-wheel python3-setuptools 2>/dev/null || \
+    $USE_SUDO apk add --no-cache py3-wheel py3-setuptools 2>/dev/null || \
+    log_warning "wheel/setuptools packages not available, will install via pip"
+
+    # Try to install common Python packages (optional)
+    log_info "Attempting to install optional Python packages..."
+    $USE_SUDO apk add --no-cache \
+        python3-numpy \
+        python3-scipy \
+        python3-pillow \
+        python3-lxml \
+        python3-cryptography \
+        python3-cffi 2>/dev/null || \
+    $USE_SUDO apk add --no-cache \
         py3-numpy \
         py3-scipy \
         py3-pillow \
         py3-lxml \
         py3-cryptography \
-        py3-cffi
-    
+        py3-cffi 2>/dev/null || \
+    log_warning "Some Python packages not available, will install via pip in virtual environment"
+
     # Verify Python version
     local python_version=$(python3 --version)
     log_info "Python version: $python_version"
     log_success "Python and development tools installed"
 }
 
-# Install and configure Redis
+# Install and configure Redis/Valkey
 install_redis() {
-    log_info "Installing and configuring Redis..."
-    sudo apk add --no-cache redis
-    
-    # Enable Redis service
-    sudo rc-update add redis default
-    
-    # Start Redis
-    sudo service redis start
-    
-    # Test Redis connection
-    if redis-cli ping > /dev/null 2>&1; then
-        log_success "Redis installed and running"
+    log_info "Installing and configuring Redis/Valkey..."
+
+    # Alpine 3.21+ replaced Redis with Valkey due to licensing
+    if $USE_SUDO apk add --no-cache valkey 2>/dev/null; then
+        log_info "Valkey installed (Redis replacement in Alpine 3.21+)"
+        SERVICE_NAME="valkey"
+        CLI_COMMAND="valkey-cli"
+    elif $USE_SUDO apk add --no-cache redis6 2>/dev/null; then
+        log_info "Redis6 installed"
+        SERVICE_NAME="redis"
+        CLI_COMMAND="redis-cli"
+    elif $USE_SUDO apk add --no-cache redis 2>/dev/null; then
+        log_info "Redis installed"
+        SERVICE_NAME="redis"
+        CLI_COMMAND="redis-cli"
     else
-        log_warning "Redis installed but not responding to ping"
+        log_error "Neither Valkey nor Redis could be installed"
+        return 1
+    fi
+
+    # Enable service
+    $USE_SUDO rc-update add $SERVICE_NAME default
+
+    # Start service
+    $USE_SUDO service $SERVICE_NAME start
+
+    # Test connection
+    if $CLI_COMMAND ping > /dev/null 2>&1; then
+        log_success "$SERVICE_NAME installed and running"
+    else
+        log_warning "$SERVICE_NAME installed but not responding to ping"
     fi
 }
 
 # Install additional build dependencies for Python packages
 install_python_build_deps() {
     log_info "Installing additional Python build dependencies..."
-    sudo apk add --no-cache \
+    $USE_SUDO apk add --no-cache \
         rust \
         cargo \
         libffi-dev \
         openssl-dev
-    
+
     # Set environment variable for Rust packages
     export CARGO_NET_GIT_FETCH_WITH_CLI=true
     log_success "Python build dependencies installed"
 }
 
-# Clone MoRAG repository
-clone_repository() {
-    log_info "Cloning MoRAG repository..."
-    
-    if [ -d "morag" ]; then
-        log_warning "MoRAG directory already exists. Skipping clone."
+# Check if we're already in MoRAG repository
+check_repository() {
+    log_info "Checking if we're in MoRAG repository..."
+
+    # Check if we're already in the MoRAG repository by looking for key files
+    if [ -f "pyproject.toml" ] && [ -f ".env.example" ] && [ -d "src/morag" ]; then
+        log_success "Already in MoRAG repository directory"
+        return 0
+    elif [ -d "morag" ]; then
+        log_info "Found morag subdirectory, entering it..."
         cd morag
+        if [ -f "pyproject.toml" ] && [ -f ".env.example" ] && [ -d "src/morag" ]; then
+            log_success "Entered MoRAG repository directory"
+            return 0
+        else
+            log_error "morag directory exists but doesn't contain MoRAG files"
+            return 1
+        fi
     else
-        # Note: Update this URL to the actual repository
-        git clone https://github.com/yourusername/morag.git
-        cd morag
-        log_success "Repository cloned"
+        log_error "Not in MoRAG repository and no morag subdirectory found"
+        log_error "Please run this script from within the cloned MoRAG repository"
+        log_info "To clone the repository: git clone https://github.com/yourusername/morag.git"
+        return 1
     fi
 }
 
@@ -375,7 +486,7 @@ main() {
     install_python
     install_redis
     install_python_build_deps
-    clone_repository
+    check_repository
     create_virtualenv
     install_morag_dependencies
     handle_alpine_issues
@@ -390,7 +501,7 @@ main() {
     echo "   - Update QDRANT_HOST with your Qdrant server IP/hostname"
     echo "   - Update QDRANT_API_KEY if your Qdrant server requires authentication"
     echo "2. Verify services are running:"
-    echo "   - Redis: redis-cli ping"
+    echo "   - Redis/Valkey: redis-cli ping (or valkey-cli ping)"
     echo "   - External Qdrant: curl http://your_qdrant_server:6333/health"
     echo "3. Initialize the database: source venv/bin/activate && python scripts/init_db.py"
     echo "4. Start the Celery worker: source venv/bin/activate && python scripts/start_worker.py"
@@ -398,7 +509,7 @@ main() {
     echo "6. Test the installation: curl http://localhost:8000/health/"
     echo
     log_info "Services installed locally:"
-    echo "- Redis (task queue): localhost:6379"
+    echo "- Redis/Valkey (task queue): localhost:6379"
     echo "- MoRAG API (when started): localhost:8000"
     echo
     log_info "External services (configure in .env):"

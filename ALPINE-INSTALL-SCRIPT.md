@@ -52,7 +52,7 @@ The script `alpine-install.sh` provides a complete automated installation of MoR
 2. **Minimum 4GB RAM** (recommended: 8GB+)
 3. **10GB+ free disk space**
 4. **Internet connection**
-5. **User with sudo privileges** (do NOT run as root)
+5. **Root access** (can be run as root or with sudo)
 
 ### Running the Script
 
@@ -70,6 +70,10 @@ The script `alpine-install.sh` provides a complete automated installation of MoR
 
 3. **Run the script**:
    ```bash
+   # As root (recommended for Alpine)
+   ./alpine-install.sh
+
+   # Or as regular user (requires sudo to be installed)
    ./alpine-install.sh
    ```
 
@@ -79,8 +83,9 @@ The script performs these steps in order:
 
 1. **System Checks**
    - Verifies Alpine Linux
-   - Checks user privileges
+   - Detects root/sudo usage
    - Updates system packages
+   - Enables community repository for additional packages
 
 2. **Dependency Installation**
    - Installs build tools and system libraries
@@ -118,8 +123,10 @@ nano .env
 
 Check that services are running:
 ```bash
-# Test Redis (local)
+# Test Redis/Valkey (local)
 redis-cli ping  # Should return "PONG"
+# or if Valkey is installed:
+valkey-cli ping  # Should return "PONG"
 
 # Test external Qdrant server
 curl http://your_qdrant_server:6333/health
@@ -194,7 +201,7 @@ WHISPER_MODEL_SIZE=base
 
 ### Service Ports
 
-- **Redis**: localhost:6379
+- **Redis/Valkey**: localhost:6379
 - **External Qdrant**: your_qdrant_server:6333
 - **MoRAG API**: localhost:8000 (when started)
 
@@ -203,20 +210,45 @@ WHISPER_MODEL_SIZE=base
 ### Common Issues
 
 1. **Permission Errors**
-   - Ensure you're not running as root
-   - Check sudo privileges
+   - Run as root for simplest installation
+   - If running as user, ensure sudo is installed: `apk add sudo`
 
 2. **Package Build Failures**
    - The script includes Alpine-specific fixes
    - Some packages are rebuilt from source for musl compatibility
+   - FFmpeg and Chromium may not be available in all Alpine versions
 
-3. **Memory Issues**
+3. **Missing FFmpeg**
+   - Script automatically enables community repository
+   - Falls back to alternative media libraries if FFmpeg unavailable
+   - Audio processing will still work with fallback libraries
+
+4. **Missing Tesseract OCR**
+   - Package names changed in Alpine 3.21+ (tesseract vs tesseract-ocr)
+   - Script tries both new and legacy package names
+   - OCR functionality will be limited if Tesseract unavailable
+   - Can be installed manually later if needed
+
+5. **Python Package Changes**
+   - Alpine 3.21+ changed Python package names (python3-pip vs py3-pip)
+   - Script tries both new and legacy package names
+   - Falls back to ensurepip if pip package unavailable
+   - Missing packages will be installed via pip in virtual environment
+
+6. **Redis Replaced with Valkey**
+   - Alpine 3.21+ replaced Redis with Valkey due to licensing changes
+   - Script tries Valkey first, then Redis6, then Redis
+   - Both use same Redis protocol and commands
+   - Existing Redis configurations will work with Valkey
+
+7. **Memory Issues**
    - Ensure sufficient RAM (4GB minimum)
    - Consider adding swap space if needed
 
-4. **Service Startup Issues**
-   - Check service logs: `sudo tail -f /var/log/messages`
-   - Restart services: `sudo service redis restart`, `sudo service milvus restart`
+8. **Service Startup Issues**
+   - Check service logs: `tail -f /var/log/messages` (as root) or `sudo tail -f /var/log/messages`
+   - Check specific service status: `service redis status` or `service valkey status` (as root) or with sudo
+   - Restart services: `service redis restart` or `service valkey restart` (as root) or with sudo
 
 ### Getting Help
 
@@ -251,7 +283,7 @@ This Alpine installation differs from the standard Docker/Ubuntu installation:
 
 - Services run under dedicated users (redis)
 - File permissions are properly set
-- No root execution required for normal operation
+- Script can be run as root (standard for Alpine) or with sudo
 - API keys should be kept secure in `.env` file
 - External Qdrant server should be properly secured and accessible
 
