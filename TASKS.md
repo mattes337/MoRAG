@@ -92,6 +92,7 @@
 ✅ **REPOSITORY-CLEANUP-AND-DOCUMENTATION** - Comprehensive repository cleanup with aggressive script removal, test consolidation, and enhanced documentation - COMPLETED
 ✅ **AI-ERROR-HANDLING-IMPLEMENTATION** - Comprehensive AI/LLM error handling and resilience framework with circuit breakers, exponential backoff, and health monitoring - COMPLETED
 ✅ **AUDIO-VIDEO-TRANSCRIPTION-BUGS** - Fix critical timestamp and text repetition bugs in audio/video transcription system - COMPLETED
+✅ **VIDEO-TRANSCRIPTION-FORMAT-FIX** - Fix video transcription format issues: proper timestamps, speaker labeling, and text deduplication - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -433,6 +434,35 @@
   - Error distribution tracking by error type for debugging and analysis
   - Circuit breaker state monitoring with failure counts and recovery timers
   - Comprehensive health reports accessible via API endpoints
+
+### Video Transcription Format Fix
+- **Issue**: Video transcription output had multiple format problems affecting user experience
+- **Root Cause**: Video converter was not properly handling topic timestamps, speaker labeling, and text deduplication
+- **Solution**: Comprehensive fixes to video transcription format to match user requirements
+- **Files Modified**:
+  - `src/morag/converters/video.py` (enhanced `_create_enhanced_audio_markdown` and `_create_topic_dialogue` methods)
+  - `src/morag/converters/audio.py` (fixed speaker labeling consistency to use SPEAKER_XX format)
+  - `tests/unit/test_video_transcript_fix.py` (comprehensive test suite)
+  - `examples/video_transcript_fix_demo.py` (demonstration script)
+- **Issues Fixed**:
+  - **Topic Timestamps**: Fixed timestamps showing [0] for all topics instead of actual start times in seconds format [123]
+  - **Speaker Labeling**: Fixed inconsistent speaker IDs, now properly shows SPEAKER_00, SPEAKER_01 instead of generic labels
+  - **Text Repetition**: Eliminated repetitive text at the end of transcriptions through enhanced deduplication
+  - **Topic Structure**: Removed unwanted headers like "## Speakers", "## transcript", "## processing details"
+  - **Dialogue Format**: Ensured proper speaker-labeled dialogue format (SPEAKER_XX: text)
+- **Features Added**:
+  - **Enhanced Timestamp Calculation**: Improved fallback mechanism using topic position when start_time is invalid
+  - **Better Speaker Mapping**: Enhanced text-to-speaker mapping using timing information and transcript segments
+  - **Comprehensive Deduplication**: Multiple layers of text deduplication using both exact and normalized text matching
+  - **Meaningful Topic Titles**: Uses actual topic titles when available instead of generic "Discussion Topic X"
+  - **Consistent Speaker Format**: Standardized SPEAKER_XX format across both audio and video converters
+- **Quality Improvements**:
+  - Topic timestamps now correctly show actual start times: `# Topic Name [45]` instead of `[0]`
+  - Speaker labels are consistent: `SPEAKER_00:`, `SPEAKER_01:` instead of mixed formats
+  - No text repetition through enhanced deduplication safeguards
+  - Clean topic structure without unwanted metadata headers
+  - Better speaker-to-text alignment using overlap detection and word matching
+  - Improved fallback mechanisms when timing information is unavailable
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns

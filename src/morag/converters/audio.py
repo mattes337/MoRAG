@@ -598,7 +598,7 @@ class AudioConverter(BaseConverter):
                     # Add safeguard against text repetition
                     added_texts = set()
                     for dialogue_entry in topic_dialogue:
-                        speaker_id = dialogue_entry.get('speaker', 'Speaker_00')
+                        speaker_id = dialogue_entry.get('speaker', 'SPEAKER_00')
                         text = dialogue_entry.get('text', '').strip()
 
                         # Prevent duplicate text entries
@@ -613,7 +613,7 @@ class AudioConverter(BaseConverter):
                     for sentence in topic.get('sentences', []):
                         sentence_clean = sentence.strip()
                         if sentence_clean and sentence_clean not in added_sentences:
-                            sections.append(f"Speaker_00: {sentence_clean}")
+                            sections.append(f"SPEAKER_00: {sentence_clean}")
                             added_sentences.add(sentence_clean)
 
                 sections.append("")
@@ -680,18 +680,18 @@ class AudioConverter(BaseConverter):
             for segment in audio_result.segments:
                 text = segment.text.strip()
                 if text:
-                    sections.append(f"Speaker_00: {text}")
+                    sections.append(f"SPEAKER_00: {text}")
         else:
             # Simple transcript fallback
             sections.append("# Main Content")
             sections.append("")
 
             if hasattr(audio_result, 'transcript') and audio_result.transcript:
-                sections.append(f"Speaker_00: {audio_result.transcript}")
+                sections.append(f"SPEAKER_00: {audio_result.transcript}")
             elif hasattr(audio_result, 'text') and audio_result.text:
-                sections.append(f"Speaker_00: {audio_result.text}")
+                sections.append(f"SPEAKER_00: {audio_result.text}")
             else:
-                sections.append("Speaker_00: *No transcript available*")
+                sections.append("SPEAKER_00: *No transcript available*")
 
         return "\n".join(sections)
 

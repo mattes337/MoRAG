@@ -258,43 +258,67 @@ class VideoConverter(BaseConverter):
         # Check if we have topic segmentation results
         if audio_result.topic_segmentation and audio_result.topic_segmentation.topics:
             # Create conversational format with topic headers and speaker dialogue
+            topic_counter = 1
             for topic in audio_result.topic_segmentation.topics:
-                # Format topic header with single start timestamp in seconds
-                # Improved timestamp calculation with better fallback
+                # Calculate proper timestamp - use topic index if start_time is invalid
                 start_seconds = 0
-                if topic.start_time is not None and topic.start_time > 0:
+                if topic.start_time is not None and topic.start_time >= 0:
                     start_seconds = int(topic.start_time)
                     logger.debug("Using topic start time",
                                topic_id=topic.topic_id,
                                start_time=topic.start_time,
                                start_seconds=start_seconds)
                 else:
-                    logger.debug("Topic start time is None or 0, using fallback",
+                    # Fallback: estimate based on topic position and video duration
+                    estimated_start = (topic_counter - 1) * (video_duration / len(audio_result.topic_segmentation.topics))
+                    start_seconds = int(estimated_start)
+                    logger.debug("Using estimated start time",
                                topic_id=topic.topic_id,
-                               start_time=topic.start_time)
+                               estimated_start=estimated_start,
+                               start_seconds=start_seconds)
 
-                # Use topic title or generate one
-                topic_title = topic.title if topic.title and topic.title != f"Topic {topic.topic_id.split('_')[-1]}" else f"Discussion Topic {topic.topic_id.split('_')[-1]}"
+                # Generate proper topic title
+                topic_title = f"Discussion Topic {topic_counter}"
+                if topic.title and topic.title != f"Topic {topic.topic_id.split('_')[-1]}":
+                    topic_title = topic.title
 
                 sections.append(f"# {topic_title} [{start_seconds}]")
                 sections.append("")
 
-                # Skip topic summary - user doesn't want summaries
-
-                # Create speaker dialogue for this topic with deduplication
+                # Create speaker dialogue for this topic with improved deduplication
                 topic_dialogue = self._create_topic_dialogue(topic, audio_result)
 
-                # Add safeguard against text repetition
+                # Enhanced deduplication - track both full text and normalized text
                 added_texts = set()
+                added_normalized = set()
+
                 for dialogue_line in topic_dialogue:
                     dialogue_clean = dialogue_line.strip()
-                    if dialogue_clean and dialogue_clean not in added_texts:
+                    if not dialogue_clean:
+                        continue
+
+                    # Extract just the text part (after speaker label)
+                    if ": " in dialogue_clean:
+                        text_part = dialogue_clean.split(": ", 1)[1]
+                        normalized_text = text_part.lower().strip()
+                    else:
+                        normalized_text = dialogue_clean.lower().strip()
+
+                    # Check for duplicates using both exact and normalized matching
+                    if (dialogue_clean not in added_texts and
+                        normalized_text not in added_normalized and
+                        len(normalized_text) > 3):  # Skip very short texts
+
                         sections.append(dialogue_line)
                         added_texts.add(dialogue_clean)
-                    elif dialogue_clean in added_texts:
-                        logger.debug("Skipping duplicate dialogue line", line=dialogue_clean[:50])
+                        added_normalized.add(normalized_text)
+                    else:
+                        logger.debug("Skipping duplicate dialogue line",
+                                   line=dialogue_clean[:50],
+                                   reason="duplicate_text")
 
                 sections.append("")
+                topic_counter += 1
         else:
             # Fallback to simple transcript format
             duration_str = self._format_timestamp(video_duration)
@@ -332,55 +356,83 @@ class VideoConverter(BaseConverter):
         if not topic.sentences:
             return ["*No dialogue available for this topic.*"]
 
-        # Try to map sentences to speakers using timing information
+        # Clean and deduplicate sentences first
+        unique_sentences = []
+        seen_sentences = set()
+
+        for sentence in topic.sentences:
+            clean_sentence = sentence.strip()
+            if clean_sentence and clean_sentence not in seen_sentences:
+                unique_sentences.append(clean_sentence)
+                seen_sentences.add(clean_sentence)
+
+        if not unique_sentences:
+            return ["*No dialogue available for this topic.*"]
+
+        # Try to map sentences to speakers using timing and transcript information
         if (audio_result.speaker_diarization and
-            audio_result.speaker_diarization.segments):
+            audio_result.speaker_diarization.segments and
+            hasattr(audio_result, 'segments') and audio_result.segments):
 
-            # Create speaker mapping for this topic timeframe
-            speaker_segments = audio_result.speaker_diarization.segments
+            # Create a mapping of text to speaker based on transcript segments
+            text_to_speaker = {}
 
-            # If we have timing information, filter by topic timeframe
-            if topic.start_time is not None and topic.end_time is not None:
-                speaker_segments = [
-                    seg for seg in speaker_segments
-                    if (seg.start_time < topic.end_time and seg.end_time > topic.start_time)
-                ]
+            for transcript_seg in audio_result.segments:
+                if hasattr(transcript_seg, 'text') and hasattr(transcript_seg, 'start_time'):
+                    # Find the speaker who was talking during this transcript segment
+                    for speaker_seg in audio_result.speaker_diarization.segments:
+                        # Check if transcript segment overlaps with speaker segment
+                        if (speaker_seg.start_time <= transcript_seg.start_time <= speaker_seg.end_time or
+                            speaker_seg.start_time <= transcript_seg.end_time <= speaker_seg.end_time):
 
-            if speaker_segments:
-                # Map sentences to speakers based on timing
-                for sentence in topic.sentences:
-                    # Find the most likely speaker for this sentence
-                    speaker_id = speaker_segments[0].speaker_id  # Default to first speaker
+                            # Map this text to the speaker
+                            text_to_speaker[transcript_seg.text.strip().lower()] = speaker_seg.speaker_id
+                            break
 
-                    # Try to find better speaker match if we have transcript segments with timing
-                    if hasattr(audio_result, 'segments') and audio_result.segments:
-                        for transcript_seg in audio_result.segments:
-                            if (hasattr(transcript_seg, 'text') and
-                                sentence.lower() in transcript_seg.text.lower()):
-                                # Find speaker at this time
-                                for speaker_seg in speaker_segments:
-                                    if (speaker_seg.start_time <= transcript_seg.start_time <= speaker_seg.end_time):
-                                        speaker_id = speaker_seg.speaker_id
-                                        break
-                                break
+            # Now map sentences to speakers
+            for sentence in unique_sentences:
+                speaker_id = "SPEAKER_00"  # Default fallback
 
+                # Try to find exact or partial match in transcript
+                sentence_lower = sentence.lower()
+                best_match_speaker = None
+                best_match_score = 0
+
+                for transcript_text, mapped_speaker in text_to_speaker.items():
+                    # Check for exact match or high overlap
+                    if sentence_lower == transcript_text:
+                        speaker_id = mapped_speaker
+                        break
+                    elif sentence_lower in transcript_text or transcript_text in sentence_lower:
+                        # Calculate overlap score
+                        overlap = len(set(sentence_lower.split()) & set(transcript_text.split()))
+                        if overlap > best_match_score:
+                            best_match_score = overlap
+                            best_match_speaker = mapped_speaker
+
+                # Use best match if found
+                if best_match_speaker and best_match_score > 1:
+                    speaker_id = best_match_speaker
+
+                dialogue_lines.append(f"{speaker_id}: {sentence}")
+
+        elif (audio_result.speaker_diarization and
+              audio_result.speaker_diarization.segments):
+
+            # Fallback: alternate between available speakers
+            all_speakers = list(set(seg.speaker_id for seg in audio_result.speaker_diarization.segments))
+            if all_speakers:
+                for i, sentence in enumerate(unique_sentences):
+                    speaker_id = all_speakers[i % len(all_speakers)]
                     dialogue_lines.append(f"{speaker_id}: {sentence}")
             else:
-                # Use all available speakers if no timeframe match
-                all_speakers = list(set(seg.speaker_id for seg in audio_result.speaker_diarization.segments))
-                if all_speakers:
-                    # Alternate between speakers for sentences
-                    for i, sentence in enumerate(topic.sentences):
-                        speaker_id = all_speakers[i % len(all_speakers)]
-                        dialogue_lines.append(f"{speaker_id}: {sentence}")
-                else:
-                    # Fallback to generic format
-                    for sentence in topic.sentences:
-                        dialogue_lines.append(f"Speaker_00: {sentence}")
+                # No speakers found, use default
+                for sentence in unique_sentences:
+                    dialogue_lines.append(f"SPEAKER_00: {sentence}")
         else:
             # No speaker diarization available, use simple format
-            for sentence in topic.sentences:
-                dialogue_lines.append(f"Speaker_00: {sentence}")
+            for sentence in unique_sentences:
+                dialogue_lines.append(f"SPEAKER_00: {sentence}")
 
         return dialogue_lines
 
