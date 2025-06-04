@@ -219,12 +219,21 @@ class PDFConverter(BaseConverter):
             converter_used=f"{self.name} (Advanced Docling)"
         )
 
+        # Get page count for logging
+        page_count = 0
+        if docling_result.document:
+            for item, level in docling_result.document.iterate_items():
+                if hasattr(item, 'prov') and item.prov:
+                    for prov in item.prov:
+                        if hasattr(prov, 'page_no'):
+                            page_count = max(page_count, prov.page_no)
+
         logger.info(
             "Advanced docling conversion completed",
             processing_time=processing_time,
             quality_score=quality_score.overall_score,
             word_count=result.word_count,
-            pages=len(docling_result.document.pages) if docling_result.document else 0
+            pages=page_count
         )
 
         return result
@@ -251,9 +260,17 @@ class PDFConverter(BaseConverter):
             sections.append("## Document Information")
             sections.append("")
 
+            # Get page count from document structure
+            page_count = 0
+            for item, level in docling_result.document.iterate_items():
+                if hasattr(item, 'prov') and item.prov:
+                    for prov in item.prov:
+                        if hasattr(prov, 'page_no'):
+                            page_count = max(page_count, prov.page_no)
+
             metadata_items = [
                 ("**Source**", docling_result.input.file.name),
-                ("**Pages**", str(len(docling_result.document.pages))),
+                ("**Pages**", str(page_count)),
                 ("**Processing Method**", "Advanced Docling"),
                 ("**OCR Used**", "Yes" if options.format_options.get('use_ocr', True) else "No"),
                 ("**Table Extraction**", "Yes" if options.format_options.get('extract_tables', True) else "No")
@@ -268,30 +285,47 @@ class PDFConverter(BaseConverter):
         if options.include_toc and options.chunking_strategy.value == 'page':
             sections.append("## Table of Contents")
             sections.append("")
-            for i, page in enumerate(docling_result.document.pages, 1):
+            for i in range(1, page_count + 1):
                 sections.append(f"- [Page {i}](#page-{i})")
             sections.append("")
 
-        # Process content by pages
+        # Process content using docling v2 API
         sections.append("## Content")
         sections.append("")
 
-        for page_num, page in enumerate(docling_result.document.pages, 1):
+        # Group items by page
+        page_items = {}
+        for item, level in docling_result.document.iterate_items():
+            if hasattr(item, 'text') and item.text.strip():
+                # Get page number from provenance
+                page_number = 1
+                if hasattr(item, 'prov') and item.prov:
+                    for prov in item.prov:
+                        if hasattr(prov, 'page_no'):
+                            page_number = prov.page_no
+                            break
+
+                if page_number not in page_items:
+                    page_items[page_number] = []
+
+                page_items[page_number].append((item, level))
+
+        # Process each page
+        for page_num in sorted(page_items.keys()):
             sections.append(f"### Page {page_num}")
             sections.append("")
 
-            # Process page elements in order
-            page_content = await self._process_page_elements(page, options)
+            page_content = await self._process_page_items(page_items[page_num], options)
             sections.append(page_content)
             sections.append("")
 
         return "\n".join(sections)
 
-    async def _process_page_elements(self, page, options: ConversionOptions) -> str:
-        """Process elements within a page.
+    async def _process_page_items(self, page_items, options: ConversionOptions) -> str:
+        """Process items within a page using docling v2 API.
 
         Args:
-            page: Docling page object
+            page_items: List of (item, level) tuples for the page
             options: Conversion options
 
         Returns:
@@ -299,34 +333,61 @@ class PDFConverter(BaseConverter):
         """
         elements = []
 
-        # Process text elements
-        for element in page.elements:
-            if hasattr(element, 'text') and element.text:
+        # Process text items
+        for item, level in page_items:
+            if hasattr(item, 'text') and item.text.strip():
                 # Clean text encoding issues
-                clean_text = normalize_text_encoding(element.text)
+                clean_text = normalize_text_encoding(item.text.strip())
 
-                # Handle different element types
-                if hasattr(element, 'element_type'):
-                    if element.element_type == 'title':
+                # Handle different item types based on label
+                if hasattr(item, 'label'):
+                    if item.label in ['title', 'section_header']:
                         elements.append(f"#### {clean_text}")
-                    elif element.element_type == 'heading':
+                    elif item.label in ['heading', 'subtitle']:
                         elements.append(f"##### {clean_text}")
+                    elif item.label == 'table':
+                        # For table items, try to export as markdown
+                        table_md = await self._convert_docling_item_table(item)
+                        if table_md:
+                            elements.append(table_md)
+                        else:
+                            elements.append(clean_text)
                     else:
                         elements.append(clean_text)
                 else:
                     elements.append(clean_text)
 
-        # Process tables if available
-        if hasattr(page, 'tables') and options.format_options.get('extract_tables', True):
-            for table in page.tables:
-                table_md = await self._convert_docling_table(table)
-                if table_md:
-                    elements.append(table_md)
-
         return "\n\n".join(elements)
 
+    async def _convert_docling_item_table(self, table_item) -> str:
+        """Convert docling table item to markdown format using v2 API.
+
+        Args:
+            table_item: Docling table item from iterate_items()
+
+        Returns:
+            Markdown table string
+        """
+        try:
+            # Try to export table as dataframe first (docling v2 method)
+            if hasattr(table_item, 'export_to_dataframe'):
+                import pandas as pd
+                df = table_item.export_to_dataframe()
+                if df is not None and not df.empty:
+                    return df.to_markdown(index=False)
+
+            # Fallback to text representation
+            if hasattr(table_item, 'text') and table_item.text:
+                return f"*[Table: {normalize_text_encoding(table_item.text)}]*"
+
+        except Exception as e:
+            logger.warning(f"Failed to convert table item: {e}")
+            return "*[Table conversion failed]*"
+
+        return ""
+
     async def _convert_docling_table(self, table) -> str:
-        """Convert docling table to markdown format.
+        """Convert docling table to markdown format (legacy method).
 
         Args:
             table: Docling table object
@@ -500,11 +561,28 @@ class PDFConverter(BaseConverter):
         }
 
         if docling_result.document:
+            # Get page count and check for tables/images using v2 API
+            page_count = 0
+            has_tables = False
+            has_images = False
+
+            for item, level in docling_result.document.iterate_items():
+                if hasattr(item, 'prov') and item.prov:
+                    for prov in item.prov:
+                        if hasattr(prov, 'page_no'):
+                            page_count = max(page_count, prov.page_no)
+
+                if hasattr(item, 'label'):
+                    if item.label == 'table':
+                        has_tables = True
+                    elif item.label in ['picture', 'figure']:
+                        has_images = True
+
             metadata.update({
-                'total_pages': len(docling_result.document.pages),
+                'total_pages': page_count,
                 'document_name': docling_result.document.name or file_path.stem,
-                'has_tables': any(hasattr(page, 'tables') and page.tables for page in docling_result.document.pages),
-                'has_images': any(hasattr(page, 'images') and page.images for page in docling_result.document.pages),
+                'has_tables': has_tables,
+                'has_images': has_images,
                 'ocr_used': True,  # Advanced docling always uses OCR
                 'table_extraction_used': True
             })

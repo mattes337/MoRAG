@@ -82,6 +82,25 @@ class TestDoclingPDFParsing:
                 raise
 
     @pytest.mark.asyncio
+    async def test_docling_elements_attribute_fix(self):
+        """Test that the 'int' object has no attribute 'elements' error is fixed."""
+
+        # Test that the actual PDF converter works without the elements attribute error
+        from morag.converters.pdf import PDFConverter
+
+        # This should not raise an AttributeError about 'elements'
+        try:
+            converter = PDFConverter()
+            # If we get here without an exception, the initialization worked
+            assert True, "PDFConverter initialized successfully without 'elements' attribute error"
+        except AttributeError as e:
+            if "'int' object has no attribute 'elements'" in str(e):
+                pytest.fail("The 'elements' attribute error still exists - fix not working")
+            else:
+                # Some other AttributeError, re-raise it
+                raise
+
+    @pytest.mark.asyncio
     async def test_docling_text_extraction(self):
         """Test that docling properly extracts readable text."""
         

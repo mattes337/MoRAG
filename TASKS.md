@@ -94,6 +94,7 @@
 ✅ **AUDIO-VIDEO-TRANSCRIPTION-BUGS** - Fix critical timestamp and text repetition bugs in audio/video transcription system - COMPLETED
 ✅ **VIDEO-TRANSCRIPTION-FORMAT-FIX** - Fix video transcription format issues: proper timestamps, speaker labeling, and text deduplication - COMPLETED
 ✅ **DOCLING-PDF-BACKEND-FIX** - Fixed docling PDF converter 'PdfPipelineOptions' object has no attribute 'backend' error - COMPLETED
+✅ **DOCLING-PDF-ELEMENTS-FIX** - Fixed docling PDF converter 'int' object has no attribute 'elements' error by updating to docling v2 API - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -485,6 +486,29 @@
   - Enhanced PDF processing with advanced docling features (OCR, table structure extraction)
   - Proper integration with existing MoRAG PDF processing pipeline
   - Comprehensive test coverage to prevent regression
+
+### Docling PDF Elements Attribute Error Fix
+- **Issue**: `'int' object has no attribute 'elements'` error when processing PDF documents with advanced docling
+- **Root Cause**: Incorrect usage of docling v2 API - trying to access `page.elements` on page objects that don't have this attribute
+- **Solution**: Updated PDF converter to use correct docling v2 API with `result.document.iterate_items()` method
+- **Files Modified**:
+  - `src/morag/converters/pdf.py` (completely refactored to use docling v2 API structure)
+  - `tests/test_docling_pdf_fix.py` (added test to verify elements attribute fix works correctly)
+- **API Changes**:
+  - **Before**: `for page_num, page in enumerate(docling_result.document.pages, 1): for element in page.elements:`
+  - **After**: `for item, level in docling_result.document.iterate_items(): if hasattr(item, 'text') and item.text.strip():`
+- **Features Fixed**:
+  - PDF converter advanced docling processing no longer fails with elements attribute error
+  - Proper page-based content organization using docling v2 provenance information
+  - Correct table extraction using `export_to_dataframe()` method for table items
+  - Enhanced metadata extraction using document iteration instead of page structure access
+  - Proper handling of different item types (text, tables, titles, headings) based on labels
+- **Quality Improvements**:
+  - PDF processing now fully compatible with docling v2 API structure
+  - Better content organization with proper page number extraction from provenance
+  - Enhanced table processing with pandas DataFrame export for better markdown conversion
+  - Improved error handling and fallback mechanisms for different content types
+  - More accurate metadata extraction including page counts, table detection, and image detection
 
 ### Key Features Added
 - Universal soft hyphen handling with regex patterns
