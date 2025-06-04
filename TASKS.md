@@ -97,6 +97,7 @@
 ✅ **DOCLING-PDF-ELEMENTS-FIX** - Fixed docling PDF converter 'int' object has no attribute 'elements' error by updating to docling v2 API - COMPLETED
 ✅ **GPU-CPU-FALLBACK-SYSTEM** - Implemented comprehensive GPU/CPU fallback system with automatic device detection and safe CPU fallbacks for all AI/ML components - COMPLETED
 ✅ **GPU-ERROR-SIMULATION-TESTS-FIX** - Fixed RecursionError in GPU error simulation tests by replacing problematic builtins.__import__ mocking with proper sys.modules patching - COMPLETED
+✅ **ALPINE-INSTALL-SCRIPT** - Created comprehensive Alpine Linux installation script (alpine-install.sh) that installs MoRAG for use with external Qdrant server - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -576,6 +577,34 @@
   - Better test isolation preventing side effects on other tests
   - Cleaner mocking approach following Python testing best practices
   - Enhanced test coverage for GPU fallback scenarios
+
+### Alpine Linux Installation Script Implementation
+- **Issue**: Need automated installation script for Alpine Linux that works with external Qdrant server
+- **Root Cause**: Existing ALPINE-INSTALL.md provided manual instructions but no automated script, and user has Qdrant running on separate server
+- **Solution**: Created comprehensive Alpine Linux installation script configured for external Qdrant server
+- **Files Created**:
+  - `alpine-install.sh` (comprehensive automated installation script)
+  - `ALPINE-INSTALL-SCRIPT.md` (detailed documentation and usage guide)
+- **Features Implemented**:
+  - **Automated System Setup**: Updates packages, installs build tools, system libraries, media processing, OCR, and web scraping dependencies
+  - **Python Environment**: Installs Python 3.11+ with development tools, creates virtual environment, handles Alpine-specific compatibility
+  - **Service Installation**: Redis for task queue only (no local vector database)
+  - **MoRAG Dependencies**: Installs all MoRAG features (docling, audio, image, office, web) with CPU-only versions and Alpine compatibility fixes
+  - **Configuration Management**: Creates environment file with Alpine-specific settings, external Qdrant configuration, and conservative resource limits
+  - **Error Handling**: Comprehensive logging, Alpine-specific package rebuilding, and robust fallback mechanisms
+- **Alpine-Specific Adaptations**:
+  - **musl libc Compatibility**: Rebuilds packages from source where needed for Alpine's musl libc
+  - **External Qdrant**: Configures connection to user's external Qdrant server instead of local installation
+  - **CPU-Only Processing**: Forces CPU usage with conservative resource limits for Alpine environments
+  - **Static Web Scraping**: Excludes Playwright due to Alpine compatibility issues, uses static content extraction
+  - **Package Filtering**: Dynamically removes qdrant-client from dependencies during installation (uses external server)
+- **Quality Improvements**:
+  - Comprehensive error checking and user privilege validation
+  - Colored logging output for better user experience
+  - Detailed post-installation instructions with external Qdrant configuration steps
+  - Complete documentation with troubleshooting guide and configuration details
+  - Automatic service setup with OpenRC integration for Redis only
+  - Conservative resource limits optimized for Alpine Linux environments
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)

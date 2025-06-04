@@ -84,7 +84,6 @@ sudo apk add --no-cache \
 # Install image processing libraries
 sudo apk add --no-cache \
     jpeg-dev \
-    png-dev \
     tiff-dev \
     freetype-dev \
     lcms2-dev \
@@ -269,15 +268,44 @@ pip install --upgrade pip wheel setuptools
 # Install base dependencies (CPU-only)
 pip install -e .
 
-# Install additional feature sets (CPU-only versions)
-pip install -e ".[docling,audio,image,office,web]"
+# Install feature sets individually to handle Alpine compatibility issues
+# Install docling for PDF processing
+pip install -e ".[docling]"
+
+# Install audio processing dependencies
+pip install -e ".[audio]"
+
+# Install image processing dependencies
+pip install -e ".[image]"
+
+# Install office document dependencies
+pip install -e ".[office]"
+
+# Install web dependencies manually (excluding playwright for Alpine compatibility)
+pip install beautifulsoup4 markdownify html2text lxml bleach trafilatura readability-lxml newspaper3k
 
 # Force CPU-only versions for key packages
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install TensorFlow CPU version if needed
 pip install tensorflow-cpu
 
 # Download spaCy language model
 python -m spacy download en_core_web_sm
+python -m spacy download de_core_news_sm
+```
+
+### Handle Alpine-Specific Package Issues
+```bash
+# Some packages may need to be installed with specific flags for Alpine
+export CARGO_NET_GIT_FETCH_WITH_CLI=true
+
+# Install packages that commonly have issues on Alpine
+pip install --no-binary=:all: lxml
+pip install --no-binary=:all: pillow
+
+# If you encounter build errors, try installing from source
+pip install --force-reinstall --no-binary=:all: problematic_package_name
 ```
 
 ## 7. Configuration
@@ -312,6 +340,11 @@ LOG_FILE=./logs/morag.log
 API_HOST=0.0.0.0
 API_PORT=8000
 LOG_LEVEL=INFO
+
+# Web scraping settings (Alpine compatibility)
+# Disable dynamic content scraping due to Playwright limitations
+ENABLE_DYNAMIC_WEB_SCRAPING=false
+WEB_SCRAPING_FALLBACK_ONLY=true
 ```
 
 ### Create Required Directories
@@ -461,6 +494,36 @@ sudo apk add --no-cache \
 # For packages requiring Rust:
 export CARGO_NET_GIT_FETCH_WITH_CLI=true
 pip install package_name
+```
+
+#### 6. Playwright Installation Issues
+```bash
+# Playwright doesn't have pre-built wheels for Alpine Linux (musl libc)
+# If you need dynamic web scraping, use alternative approaches:
+
+# Option 1: Use Chromium directly (already installed in system dependencies)
+# The web scraping will fall back to static content extraction
+
+# Option 2: Install playwright manually (advanced users)
+# This requires building from source and may be unstable:
+pip install playwright
+# Note: Browser installation may fail, but basic functionality might work
+
+# Option 3: Use Docker for web scraping tasks
+# Run a separate container with playwright for dynamic content
+```
+
+#### 7. Web Scraping Limitations
+```bash
+# Without Playwright, MoRAG will use fallback web scraping methods:
+# - Static HTML parsing with BeautifulSoup
+# - Content extraction with trafilatura
+# - Readability-based content extraction
+
+# To test web scraping functionality:
+curl -X POST "http://localhost:8000/api/v1/ingestion/web" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://example.com"}'
 ```
 
 #### 4. Memory Issues
