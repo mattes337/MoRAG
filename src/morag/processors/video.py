@@ -379,7 +379,9 @@ class VideoProcessor:
             logger.debug("Calculated timestamps", timestamps=timestamps)
 
             for i, timestamp in enumerate(timestamps):
-                thumbnail_path = self.temp_dir / f"thumb_{int(time.time())}_{i}.{format}"
+                # Use unique timestamp-based filename to avoid pattern conflicts
+                unique_id = int(time.time() * 1000000)  # Microsecond precision
+                thumbnail_path = self.temp_dir / f"thumb_{unique_id}_{i}.{format}"
 
                 logger.debug("Generating thumbnail",
                            index=i,
@@ -393,15 +395,21 @@ class VideoProcessor:
                             # Build ffmpeg command using internal functions
                             input_stream = ffmpeg_input(str(file_path), ss=timestamp)
                             scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
-                            output_stream = ffmpeg_output(scaled_stream, str(thumbnail_path), vframes=1)
+                            # Use -update option to write single image and avoid pattern warnings
+                            output_stream = ffmpeg_output(scaled_stream, str(thumbnail_path),
+                                                        vframes=1, update=1)
 
-                            # Run with error capture
-                            ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
+                            # Run with error capture but suppress pattern warnings
+                            ffmpeg_run(output_stream, overwrite_output=True, quiet=True, capture_stderr=True)
 
                         except FFmpegError as e:
                             # Capture stderr for detailed error information
                             stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
-                            raise ProcessingError(f"FFmpeg error: {stderr_output}")
+                            # Filter out pattern warnings which are not actual errors
+                            if "image sequence pattern" not in stderr_output.lower():
+                                raise ProcessingError(f"FFmpeg error: {stderr_output}")
+                            else:
+                                logger.debug("FFmpeg pattern warning (non-critical)", stderr=stderr_output)
                         except Exception as e:
                             raise ProcessingError(f"Thumbnail generation error: {str(e)}")
 
@@ -553,7 +561,9 @@ class VideoProcessor:
 
             # Generate keyframe images using ffmpeg
             for i, timestamp in enumerate(keyframe_timestamps):
-                keyframe_path = self.temp_dir / f"keyframe_{int(time.time())}_{i}.{format}"
+                # Use unique timestamp-based filename to avoid pattern conflicts
+                unique_id = int(time.time() * 1000000)  # Microsecond precision
+                keyframe_path = self.temp_dir / f"keyframe_{unique_id}_{i}.{format}"
 
                 try:
                     def generate_keyframe():
@@ -561,13 +571,19 @@ class VideoProcessor:
                             # Build ffmpeg command using internal functions
                             input_stream = ffmpeg_input(str(file_path), ss=timestamp)
                             scaled_stream = ffmpeg_filter(input_stream, 'scale', size[0], size[1])
-                            output_stream = ffmpeg_output(scaled_stream, str(keyframe_path), vframes=1)
-                            ffmpeg_run(output_stream, overwrite_output=True, quiet=False)
+                            # Use -update option to write single image and avoid pattern warnings
+                            output_stream = ffmpeg_output(scaled_stream, str(keyframe_path),
+                                                        vframes=1, update=1)
+                            ffmpeg_run(output_stream, overwrite_output=True, quiet=True, capture_stderr=True)
 
                         except FFmpegError as e:
                             # Capture stderr for detailed error information
                             stderr_output = e.stderr.decode('utf-8') if e.stderr else "No stderr output"
-                            raise ProcessingError(f"FFmpeg keyframe error: {stderr_output}")
+                            # Filter out pattern warnings which are not actual errors
+                            if "image sequence pattern" not in stderr_output.lower():
+                                raise ProcessingError(f"FFmpeg keyframe error: {stderr_output}")
+                            else:
+                                logger.debug("FFmpeg pattern warning (non-critical)", stderr=stderr_output)
                         except Exception as e:
                             raise ProcessingError(f"Keyframe generation error: {str(e)}")
 

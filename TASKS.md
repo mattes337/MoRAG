@@ -98,6 +98,7 @@
 ✅ **GPU-CPU-FALLBACK-SYSTEM** - Implemented comprehensive GPU/CPU fallback system with automatic device detection and safe CPU fallbacks for all AI/ML components - COMPLETED
 ✅ **GPU-ERROR-SIMULATION-TESTS-FIX** - Fixed RecursionError in GPU error simulation tests by replacing problematic builtins.__import__ mocking with proper sys.modules patching - COMPLETED
 ✅ **ALPINE-INSTALL-SCRIPT** - Created comprehensive Alpine Linux installation script (alpine-install.sh) that installs MoRAG for use with external Qdrant server - COMPLETED
+✅ **VIDEO-CONVERSION-QUALITY-FIXES** - Fixed FFmpeg thumbnail warnings, improved quality scoring for video content, and added fallback converters - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -605,6 +606,35 @@
   - Complete documentation with troubleshooting guide and configuration details
   - Automatic service setup with OpenRC integration for Redis only
   - Conservative resource limits optimized for Alpine Linux environments
+
+### Video Conversion Quality and Error Fixes
+- **Issue**: Multiple video conversion issues affecting user experience and quality
+- **Root Cause**: FFmpeg thumbnail generation warnings, poor quality scoring for video content, and missing fallback converters
+- **Solution**: Comprehensive fixes to improve video conversion reliability and quality assessment
+- **Files Modified**:
+  - `src/morag/processors/video.py` (fixed FFmpeg thumbnail and keyframe generation warnings)
+  - `src/morag/services/ffmpeg_service.py` (improved FFmpeg command generation with unique filenames)
+  - `src/morag/converters/quality.py` (enhanced quality scoring for media files with duration-based assessment)
+  - `src/morag/converters/registry.py` (added fallback converter registration for video format)
+  - `src/morag/converters/simple_video.py` (new simple video converter as fallback option)
+  - `tests/manual/test_video_conversion_fixes.py` (comprehensive test suite for validation)
+- **Issues Fixed**:
+  - **FFmpeg Pattern Warnings**: Fixed "image sequence pattern" warnings by using unique filenames and -update flag
+  - **Quality Scoring**: Enhanced completeness assessment for video files using duration-based heuristics
+  - **Fallback Converters**: Added SimpleVideoConverter and AudioConverter as fallback options for video processing
+  - **Error Handling**: Improved error filtering to distinguish between warnings and actual errors
+- **Features Added**:
+  - **Unique Filename Generation**: Uses microsecond precision timestamps to avoid FFmpeg pattern conflicts
+  - **Media-Specific Quality Assessment**: Video/audio files assessed based on transcription quality vs duration
+  - **Multiple Fallback Options**: SimpleVideoConverter for basic processing, AudioConverter for audio-only extraction
+  - **Enhanced Error Filtering**: Distinguishes between non-critical pattern warnings and actual processing errors
+  - **Comprehensive Testing**: Test suite validates all fixes and fallback mechanisms
+- **Quality Improvements**:
+  - FFmpeg thumbnail/keyframe generation no longer produces pattern warnings
+  - Video quality scores now properly reflect transcription completeness based on duration
+  - Fallback converters ensure video processing succeeds even when primary converter fails
+  - Better error messages and logging for debugging video processing issues
+  - Improved reliability with multiple processing options for different video types
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)

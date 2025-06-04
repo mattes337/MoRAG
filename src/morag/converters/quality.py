@@ -66,46 +66,75 @@ class ConversionQualityValidator:
     
     def _check_completeness(self, original_file: str, result: ConversionResult) -> float:
         """Check conversion completeness based on content analysis.
-        
+
         Args:
             original_file: Path to original document
             result: Conversion result
-            
+
         Returns:
             Completeness score (0.0 to 1.0)
         """
         if not result.content:
             return 0.0
-        
+
         # Basic completeness checks
         content_length = len(result.content)
         word_count = len(result.content.split())
-        
+
         # Minimum content requirements
         if content_length < self.min_content_length:
             return 0.1
-        
+
         if word_count < self.min_word_count:
             return 0.2
-        
-        # Estimate completeness based on file size vs content length
+
+        # Handle different file types with appropriate completeness assessment
         try:
-            file_size = Path(original_file).stat().st_size
-            # Rough heuristic: expect ~1-10 chars per byte for text content
-            expected_min_chars = file_size * 0.1
-            expected_max_chars = file_size * 10
-            
-            if content_length < expected_min_chars:
-                # Content seems too short
-                ratio = content_length / expected_min_chars
-                return min(0.8, ratio)
-            elif content_length > expected_max_chars:
-                # Content seems reasonable (could be expanded with formatting)
-                return 0.9
+            file_path = Path(original_file)
+            file_size = file_path.stat().st_size
+            file_extension = file_path.suffix.lower()
+
+            # For media files (audio/video), use different heuristics
+            if file_extension in ['.mp4', '.avi', '.mov', '.mkv', '.mp3', '.wav', '.m4a', '.flac']:
+                # Media files: assess based on transcription quality
+                # For video/audio, expect 1-5 words per second of content
+                if result.metadata and 'duration' in result.metadata:
+                    duration_seconds = result.metadata['duration']
+                    expected_words = duration_seconds * 2  # Conservative estimate: 2 words/second
+
+                    if word_count >= expected_words * 0.5:  # At least 50% of expected
+                        return 0.9
+                    elif word_count >= expected_words * 0.25:  # At least 25% of expected
+                        return 0.7
+                    else:
+                        return 0.5
+                else:
+                    # No duration metadata, use content-based assessment
+                    # For media files, any substantial transcription is good
+                    if word_count > 100:
+                        return 0.8
+                    elif word_count > 50:
+                        return 0.6
+                    else:
+                        return 0.4
+
+            # For document files, use file size heuristics
             else:
-                # Content length in reasonable range
-                return 0.85
-                
+                # Rough heuristic: expect ~1-10 chars per byte for text content
+                expected_min_chars = file_size * 0.1
+                expected_max_chars = file_size * 10
+
+                if content_length < expected_min_chars:
+                    # Content seems too short
+                    ratio = content_length / expected_min_chars
+                    return min(0.8, ratio)
+                elif content_length > expected_max_chars:
+                    # Content seems reasonable (could be expanded with formatting)
+                    return 0.9
+                else:
+                    # Content length in reasonable range
+                    return 0.85
+
         except Exception as e:
             logger.warning("Could not assess completeness from file size", error=str(e))
             # Fallback to content-based assessment

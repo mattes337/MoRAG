@@ -203,42 +203,43 @@ class VideoConverter(BaseConverter):
         if hasattr(video_result, 'keyframes') and video_result.keyframes and options.extract_images:
             sections.append("## Visual Timeline")
             sections.append("")
-            
-            for i, keyframe in enumerate(video_result.keyframes, 1):
-                timestamp = keyframe.get('timestamp', 0)
+
+            for i, keyframe_path in enumerate(video_result.keyframes, 1):
+                # keyframe_path is a Path object, not a dictionary
+                # Extract timestamp from filename if possible, otherwise use index
+                timestamp = i * (video_result.metadata.duration / len(video_result.keyframes)) if video_result.metadata.duration > 0 else i * 10
                 timestamp_str = self._format_timestamp(timestamp)
-                
+
                 sections.append(f"### Keyframe {i} ({timestamp_str})")
-                
-                if keyframe.get('description'):
-                    sections.append(f"**Scene**: {keyframe['description']}")
-                
-                if keyframe.get('objects'):
-                    objects_str = ", ".join(keyframe['objects'])
-                    sections.append(f"**Visual Elements**: {objects_str}")
-                
-                if keyframe.get('text_content'):
-                    sections.append(f"**Text Visible**: {keyframe['text_content']}")
-                
+                sections.append(f"**File**: {keyframe_path.name}")
+
+                # Note: keyframes are just image files, no additional metadata available
+                sections.append("*Keyframe extracted from video for visual reference*")
                 sections.append("")
         
         # Scene analysis (if available)
         if hasattr(video_result, 'scenes') and video_result.scenes:
             sections.append("## Scene Analysis")
             sections.append("")
-            
+
             for i, scene in enumerate(video_result.scenes, 1):
-                start_time = self._format_timestamp(scene.get('start_time', 0))
-                end_time = self._format_timestamp(scene.get('end_time', 0))
-                
-                sections.append(f"### Scene {i} ({start_time} - {end_time})")
-                
-                if scene.get('description'):
-                    sections.append(f"**Description**: {scene['description']}")
-                
-                if scene.get('activity'):
-                    sections.append(f"**Activity**: {scene['activity']}")
-                
+                # Check if scene is a dictionary or has the expected structure
+                if isinstance(scene, dict):
+                    start_time = self._format_timestamp(scene.get('start_time', 0))
+                    end_time = self._format_timestamp(scene.get('end_time', 0))
+
+                    sections.append(f"### Scene {i} ({start_time} - {end_time})")
+
+                    if scene.get('description'):
+                        sections.append(f"**Description**: {scene['description']}")
+
+                    if scene.get('activity'):
+                        sections.append(f"**Activity**: {scene['activity']}")
+                else:
+                    # Fallback for unexpected scene format
+                    sections.append(f"### Scene {i}")
+                    sections.append(f"**Content**: {str(scene)}")
+
                 sections.append("")
 
         return "\n".join(sections)

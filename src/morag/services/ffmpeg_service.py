@@ -170,14 +170,16 @@ class FFmpegService:
                 timestamps = [i * duration / (count - 1) for i in range(count)]
             
             for i, timestamp in enumerate(timestamps):
-                thumbnail_path = self.temp_dir / f"thumb_{int(time.time())}_{i}.{format}"
-                
+                # Use unique timestamp-based filename to avoid pattern conflicts
+                unique_id = int(time.time() * 1000000)  # Microsecond precision
+                thumbnail_path = self.temp_dir / f"thumb_{unique_id}_{i}.{format}"
+
                 await asyncio.to_thread(
                     lambda ts=timestamp, path=thumbnail_path: (
                         ffmpeg
                         .input(str(video_path), ss=ts)
                         .filter('scale', size[0], size[1])
-                        .output(str(path), vframes=1)
+                        .output(str(path), vframes=1, **{'update': 1})  # Use update flag
                         .overwrite_output()
                         .run(quiet=True, capture_stderr=True)
                     )
@@ -285,24 +287,25 @@ class FFmpegService:
         try:
             keyframes = []
             
-            # Use FFmpeg's scene detection filter
-            temp_pattern = self.temp_dir / f"keyframe_{int(time.time())}_%03d.{format}"
-            
+            # Use FFmpeg's scene detection filter with unique naming
+            unique_id = int(time.time() * 1000000)  # Microsecond precision
+            temp_pattern = self.temp_dir / f"keyframe_{unique_id}_%03d.{format}"
+
             await asyncio.to_thread(
                 lambda: (
                     ffmpeg
                     .input(str(video_path))
                     .filter('select', f'gt(scene,0.3)')
                     .filter('scale', size[0], size[1])
-                    .output(str(temp_pattern), vsync='vfr', vframes=max_frames)
+                    .output(str(temp_pattern), vsync='vfr', vframes=max_frames, **{'update': 1})
                     .overwrite_output()
                     .run(quiet=True, capture_stderr=True)
                 )
             )
-            
+
             # Collect generated keyframes
             for i in range(max_frames):
-                keyframe_path = self.temp_dir / f"keyframe_{int(time.time())}_{i:03d}.{format}"
+                keyframe_path = self.temp_dir / f"keyframe_{unique_id}_{i:03d}.{format}"
                 if keyframe_path.exists():
                     keyframes.append(keyframe_path)
             

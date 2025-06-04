@@ -40,7 +40,7 @@ class AudioConverter(BaseConverter):
 
     def __init__(self):
         super().__init__("Enhanced MoRAG Audio Converter")
-        self.supported_formats = ['audio', 'mp3', 'wav', 'm4a', 'flac']
+        self.supported_formats = ['audio', 'video', 'mp3', 'wav', 'm4a', 'flac', 'mp4', 'avi', 'mov', 'mkv']
         self.quality_validator = ConversionQualityValidator()
 
         # Initialize speaker diarization pipeline
@@ -114,12 +114,40 @@ class AudioConverter(BaseConverter):
         )
         
         try:
+            # Check if this is a video file and extract audio first
+            actual_audio_path = file_path
+            temp_audio_path = None
+
+            # Check if this is a video file
+            video_extensions = ['.mp4', '.avi', '.mov', '.mkv']
+            if file_path.suffix.lower() in video_extensions:
+                logger.info("Video file detected, extracting audio first", file_path=str(file_path))
+
+                # Extract audio from video using video processor
+                from ..processors.video import video_processor, VideoConfig
+
+                video_config = VideoConfig(
+                    extract_audio=True,
+                    generate_thumbnails=False,
+                    extract_keyframes=False,
+                    audio_format='mp3'
+                )
+
+                video_result = await video_processor.process_video(file_path, video_config)
+
+                if video_result.audio_path:
+                    actual_audio_path = video_result.audio_path
+                    temp_audio_path = video_result.audio_path  # Track for cleanup
+                    logger.info("Audio extracted from video", audio_path=str(actual_audio_path))
+                else:
+                    raise ProcessingError("Failed to extract audio from video file")
+
             # Use enhanced MoRAG audio processor with integrated features
             enable_diarization = options.format_options.get('enable_diarization', True)
             enable_topic_segmentation = options.format_options.get('enable_topic_segmentation', True)
 
             audio_result = await audio_processor.process_audio_file(
-                str(file_path),
+                str(actual_audio_path),
                 enable_diarization=enable_diarization,
                 enable_topic_segmentation=enable_topic_segmentation
             )
@@ -138,15 +166,28 @@ class AudioConverter(BaseConverter):
 
             processing_time = time.time() - start_time
 
+            # Determine original format
+            original_format = 'video' if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv'] else 'audio'
+
             result = ConversionResult(
                 content=markdown_content,
                 metadata=self._enhance_metadata(enhanced_result.metadata, file_path),
                 quality_score=quality_score,
                 processing_time=processing_time,
                 success=True,
-                original_format='audio',
+                original_format=original_format,
                 converter_used=self.name
             )
+
+            # Cleanup temporary audio file if we extracted it from video
+            if temp_audio_path and temp_audio_path.exists():
+                try:
+                    temp_audio_path.unlink()
+                    logger.debug("Cleaned up temporary audio file", path=str(temp_audio_path))
+                except Exception as cleanup_error:
+                    logger.warning("Failed to cleanup temporary audio file",
+                                 path=str(temp_audio_path),
+                                 error=str(cleanup_error))
 
             logger.info(
                 "Enhanced audio conversion completed",
@@ -163,21 +204,34 @@ class AudioConverter(BaseConverter):
         except Exception as e:
             processing_time = time.time() - start_time
             error_msg = f"Audio conversion failed: {str(e)}"
-            
+
+            # Cleanup temporary audio file if we extracted it from video
+            if 'temp_audio_path' in locals() and temp_audio_path and temp_audio_path.exists():
+                try:
+                    temp_audio_path.unlink()
+                    logger.debug("Cleaned up temporary audio file after error", path=str(temp_audio_path))
+                except Exception as cleanup_error:
+                    logger.warning("Failed to cleanup temporary audio file after error",
+                                 path=str(temp_audio_path),
+                                 error=str(cleanup_error))
+
             logger.error(
                 "Audio conversion failed",
                 error=str(e),
                 error_type=type(e).__name__,
                 processing_time=processing_time
             )
-            
+
+            # Determine original format for error result
+            original_format = 'video' if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv'] else 'audio'
+
             return ConversionResult(
                 content="",
                 metadata={},
                 processing_time=processing_time,
                 success=False,
                 error_message=error_msg,
-                original_format='audio',
+                original_format=original_format,
                 converter_used=self.name
             )
 

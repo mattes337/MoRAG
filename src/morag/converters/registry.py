@@ -61,6 +61,22 @@ class DocumentConverter:
             from .video import VideoConverter
             self.register_converter('video', VideoConverter())
             logger.info("Registered Video converter")
+
+            # Register fallback converters for video
+            try:
+                from .simple_video import SimpleVideoConverter
+                self.register_converter('video', SimpleVideoConverter(), is_primary=False)
+                logger.info("Registered Simple Video converter as video fallback")
+            except Exception as fallback_e:
+                logger.warning("Could not register simple video fallback", error=str(fallback_e))
+
+            try:
+                from .audio import AudioConverter
+                self.register_converter('video', AudioConverter(), is_primary=False)
+                logger.info("Registered Audio converter as video fallback")
+            except Exception as fallback_e:
+                logger.warning("Could not register audio fallback for video", error=str(fallback_e))
+
         except ImportError as e:
             logger.warning("Video converter not available", error=str(e))
         except Exception as e:
