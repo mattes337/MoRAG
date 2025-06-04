@@ -328,57 +328,125 @@ class EnhancedTopicSegmentation:
     ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
         """Calculate timing for topic segment."""
         if not transcript_segments or not topic_sentences:
+            logger.debug("No transcript segments or topic sentences for timing calculation")
             return None, None, None
 
         try:
+            logger.debug("Calculating topic timing",
+                        start_idx=start_idx,
+                        end_idx=end_idx,
+                        topic_sentences_count=len(topic_sentences),
+                        transcript_segments_count=len(transcript_segments))
+
             # Try to match topic sentences with transcript segments for better timing
             start_time = None
             end_time = None
+            matches_found = 0
 
             # Find the earliest and latest matching transcript segments
-            for sentence in topic_sentences:
+            for i, sentence in enumerate(topic_sentences):
                 sentence_clean = sentence.strip().lower()
+                logger.debug(f"Looking for timing for sentence {i}", sentence=sentence_clean[:50])
 
-                for segment in transcript_segments:
-                    if hasattr(segment, 'text') and hasattr(segment, 'start_time'):
+                for j, segment in enumerate(transcript_segments):
+                    if hasattr(segment, 'text') and hasattr(segment, 'start_time') and hasattr(segment, 'end_time'):
                         segment_text = segment.text.strip().lower()
 
-                        # Check for text similarity
+                        # Check for text similarity with more lenient matching
                         if (sentence_clean in segment_text or
                             segment_text in sentence_clean or
                             self._simple_text_match(sentence_clean, segment_text)):
+
+                            logger.debug(f"Found timing match for sentence {i}",
+                                       segment_start=segment.start_time,
+                                       segment_end=segment.end_time,
+                                       segment_text=segment_text[:30])
 
                             if start_time is None or segment.start_time < start_time:
                                 start_time = segment.start_time
                             if end_time is None or segment.end_time > end_time:
                                 end_time = segment.end_time
+                            matches_found += 1
+                            break
+
+            logger.debug("Timing matching results",
+                        matches_found=matches_found,
+                        start_time=start_time,
+                        end_time=end_time)
 
             # If we found matches, return the timing
             if start_time is not None and end_time is not None:
                 duration = end_time - start_time
+                logger.debug("Using matched timing",
+                           start_time=start_time,
+                           end_time=end_time,
+                           duration=duration)
                 return start_time, end_time, duration
 
-            # Fallback to proportional mapping
-            total_sentences = end_idx
-            segment_ratio_start = start_idx / total_sentences if total_sentences > 0 else 0
-            segment_ratio_end = end_idx / total_sentences if total_sentences > 0 else 1
+            # Fallback to proportional mapping based on segment indices
+            logger.debug("No timing matches found, using proportional mapping")
 
-            if transcript_segments:
-                total_duration = max(seg.end_time for seg in transcript_segments if hasattr(seg, 'end_time'))
-                start_time = segment_ratio_start * total_duration
-                end_time = segment_ratio_end * total_duration
-                duration = end_time - start_time
+            # Use the actual number of segments for proportional calculation
+            total_segments = len(transcript_segments)
+            if total_segments > 0:
+                # Map topic sentence indices to transcript segment indices
+                segment_start_idx = min(start_idx, total_segments - 1)
+                segment_end_idx = min(end_idx, total_segments)
 
-                return start_time, end_time, duration
+                # Get timing from the corresponding transcript segments
+                if segment_start_idx < total_segments:
+                    start_segment = transcript_segments[segment_start_idx]
+                    if hasattr(start_segment, 'start_time'):
+                        start_time = start_segment.start_time
+
+                if segment_end_idx > 0 and segment_end_idx <= total_segments:
+                    end_segment = transcript_segments[segment_end_idx - 1]
+                    if hasattr(end_segment, 'end_time'):
+                        end_time = end_segment.end_time
+
+                # If we still don't have timing, use proportional calculation
+                if start_time is None or end_time is None:
+                    total_duration = max(seg.end_time for seg in transcript_segments if hasattr(seg, 'end_time'))
+                    segment_ratio_start = segment_start_idx / total_segments
+                    segment_ratio_end = segment_end_idx / total_segments
+
+                    start_time = segment_ratio_start * total_duration
+                    end_time = segment_ratio_end * total_duration
+
+                if start_time is not None and end_time is not None:
+                    duration = end_time - start_time
+                    logger.debug("Using proportional timing",
+                               start_time=start_time,
+                               end_time=end_time,
+                               duration=duration)
+                    return start_time, end_time, duration
 
         except Exception as e:
-            logger.warning("Failed to calculate topic timing", error=str(e))
+            logger.warning("Failed to calculate topic timing", error=str(e), exc_info=True)
 
+        logger.warning("Could not calculate topic timing, returning None")
         return None, None, None
 
     def _simple_text_match(self, text1: str, text2: str) -> bool:
         """Simple text matching for timing calculation."""
         try:
+            # First check for direct substring matches (more lenient)
+            if len(text1) > 10 and len(text2) > 10:
+                # Check if either text contains a significant portion of the other
+                if text1 in text2 or text2 in text1:
+                    return True
+
+                # Check for partial matches (at least 50% of shorter text)
+                shorter_text = text1 if len(text1) < len(text2) else text2
+                longer_text = text2 if len(text1) < len(text2) else text1
+
+                # Split shorter text into words and check how many are in longer text
+                shorter_words = shorter_text.split()
+                if len(shorter_words) >= 3:
+                    matches = sum(1 for word in shorter_words if len(word) > 3 and word in longer_text)
+                    if matches / len(shorter_words) >= 0.5:
+                        return True
+
             # Check if they share significant words
             words1 = set(text1.split())
             words2 = set(text2.split())
@@ -387,18 +455,27 @@ class EnhancedTopicSegmentation:
                 return False
 
             # Remove very common words
-            common_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were'}
+            common_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'}
             words1 = words1 - common_words
             words2 = words2 - common_words
 
             if not words1 or not words2:
                 return False
 
-            # Check if they share at least 30% of words
+            # Check if they share at least 25% of words (reduced threshold for better matching)
             intersection = words1.intersection(words2)
-            return len(intersection) / min(len(words1), len(words2)) >= 0.3
+            match_ratio = len(intersection) / min(len(words1), len(words2))
 
-        except Exception:
+            logger.debug("Text matching analysis",
+                        text1_words=len(words1),
+                        text2_words=len(words2),
+                        intersection_words=len(intersection),
+                        match_ratio=match_ratio)
+
+            return match_ratio >= 0.25
+
+        except Exception as e:
+            logger.debug("Text matching failed", error=str(e))
             return False
     
     def _calculate_speaker_distribution(

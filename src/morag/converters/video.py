@@ -260,7 +260,18 @@ class VideoConverter(BaseConverter):
             # Create conversational format with topic headers and speaker dialogue
             for topic in audio_result.topic_segmentation.topics:
                 # Format topic header with single start timestamp in seconds
-                start_seconds = int(topic.start_time) if topic.start_time else 0
+                # Improved timestamp calculation with better fallback
+                start_seconds = 0
+                if topic.start_time is not None and topic.start_time > 0:
+                    start_seconds = int(topic.start_time)
+                    logger.debug("Using topic start time",
+                               topic_id=topic.topic_id,
+                               start_time=topic.start_time,
+                               start_seconds=start_seconds)
+                else:
+                    logger.debug("Topic start time is None or 0, using fallback",
+                               topic_id=topic.topic_id,
+                               start_time=topic.start_time)
 
                 # Use topic title or generate one
                 topic_title = topic.title if topic.title and topic.title != f"Topic {topic.topic_id.split('_')[-1]}" else f"Discussion Topic {topic.topic_id.split('_')[-1]}"
@@ -270,9 +281,19 @@ class VideoConverter(BaseConverter):
 
                 # Skip topic summary - user doesn't want summaries
 
-                # Create speaker dialogue for this topic
+                # Create speaker dialogue for this topic with deduplication
                 topic_dialogue = self._create_topic_dialogue(topic, audio_result)
-                sections.extend(topic_dialogue)
+
+                # Add safeguard against text repetition
+                added_texts = set()
+                for dialogue_line in topic_dialogue:
+                    dialogue_clean = dialogue_line.strip()
+                    if dialogue_clean and dialogue_clean not in added_texts:
+                        sections.append(dialogue_line)
+                        added_texts.add(dialogue_clean)
+                    elif dialogue_clean in added_texts:
+                        logger.debug("Skipping duplicate dialogue line", line=dialogue_clean[:50])
+
                 sections.append("")
         else:
             # Fallback to simple transcript format

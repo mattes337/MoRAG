@@ -595,19 +595,33 @@ class AudioConverter(BaseConverter):
                 )
 
                 if topic_dialogue:
+                    # Add safeguard against text repetition
+                    added_texts = set()
                     for dialogue_entry in topic_dialogue:
                         speaker_id = dialogue_entry.get('speaker', 'Speaker_00')
-                        text = dialogue_entry.get('text', '')
-                        if text.strip():
+                        text = dialogue_entry.get('text', '').strip()
+
+                        # Prevent duplicate text entries
+                        if text and text not in added_texts:
                             sections.append(f"{speaker_id}: {text}")
+                            added_texts.add(text)
+                        elif text in added_texts:
+                            logger.debug("Skipping duplicate text entry", text=text[:50])
                 else:
                     # Fallback to sentence list if dialogue creation fails
+                    added_sentences = set()
                     for sentence in topic.get('sentences', []):
-                        sections.append(f"Speaker_00: {sentence}")
+                        sentence_clean = sentence.strip()
+                        if sentence_clean and sentence_clean not in added_sentences:
+                            sections.append(f"Speaker_00: {sentence_clean}")
+                            added_sentences.add(sentence_clean)
 
                 sections.append("")
 
-        return "\n".join(sections)
+        # Final safeguard: check for repetitive patterns in the final output
+        final_content = "\n".join(sections)
+        final_content = self._remove_repetitive_patterns(final_content)
+        return final_content
 
     async def _create_structured_markdown(self, audio_result, options: ConversionOptions) -> str:
         """Create structured markdown from audio processing result.
@@ -680,7 +694,63 @@ class AudioConverter(BaseConverter):
                 sections.append("Speaker_00: *No transcript available*")
 
         return "\n".join(sections)
-    
+
+    def _remove_repetitive_patterns(self, content: str) -> str:
+        """Remove repetitive patterns from the final content.
+
+        Args:
+            content: The content to clean
+
+        Returns:
+            Cleaned content without repetitive patterns
+        """
+        try:
+            lines = content.split('\n')
+            cleaned_lines = []
+
+            # Track consecutive identical lines
+            last_line = None
+            consecutive_count = 0
+
+            for line in lines:
+                line_clean = line.strip()
+
+                if line_clean == last_line and line_clean:
+                    consecutive_count += 1
+                    # Allow up to 1 consecutive duplicate, but log excessive repetition
+                    if consecutive_count <= 1:
+                        cleaned_lines.append(line)
+                    else:
+                        logger.warning("Removing repetitive line",
+                                     line=line_clean[:50],
+                                     consecutive_count=consecutive_count)
+                else:
+                    consecutive_count = 0
+                    cleaned_lines.append(line)
+                    last_line = line_clean
+
+            # Check for patterns at the end (common issue)
+            if len(cleaned_lines) > 10:
+                last_10_lines = cleaned_lines[-10:]
+                unique_last_lines = []
+                seen_lines = set()
+
+                for line in last_10_lines:
+                    line_clean = line.strip()
+                    if line_clean not in seen_lines or not line_clean:
+                        unique_last_lines.append(line)
+                        if line_clean:
+                            seen_lines.add(line_clean)
+
+                # Replace last 10 lines with deduplicated version
+                cleaned_lines = cleaned_lines[:-10] + unique_last_lines
+
+            return '\n'.join(cleaned_lines)
+
+        except Exception as e:
+            logger.warning("Failed to remove repetitive patterns", error=str(e))
+            return content
+
     def _format_timestamp(self, seconds: float) -> str:
         """Format timestamp in MM:SS format.
         

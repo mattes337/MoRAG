@@ -91,8 +91,41 @@
 ✅ **AUDIO-VIDEO-TRANSCRIPTION-QUALITY-FIX** - Fixed audio/video transcription issues: topic timestamps, speaker diarization, summaries, and STT quality - COMPLETED
 ✅ **REPOSITORY-CLEANUP-AND-DOCUMENTATION** - Comprehensive repository cleanup with aggressive script removal, test consolidation, and enhanced documentation - COMPLETED
 ✅ **AI-ERROR-HANDLING-IMPLEMENTATION** - Comprehensive AI/LLM error handling and resilience framework with circuit breakers, exponential backoff, and health monitoring - COMPLETED
+✅ **AUDIO-VIDEO-TRANSCRIPTION-BUGS** - Fix critical timestamp and text repetition bugs in audio/video transcription system - COMPLETED
 
 ## Bug Fixes Completed
+
+### Audio/Video Transcription Critical Bugs Fix
+- **Issue**: Topic timestamps always showing as 0 instead of actual timestamps in seconds format [123]
+- **Root Cause**: Topic segmentation service's `_calculate_topic_timing` method was failing to properly match sentences with transcript segments, causing `start_time` and `end_time` to be `None`, which defaulted to `0` in converters
+- **Solution**: Enhanced timestamp calculation with improved text matching, better fallback mechanisms, and extensive debugging logging
+- **Issue**: Text repetition bug causing infinite loops at the end of transcriptions
+- **Root Cause**: Lack of deduplication in dialogue creation and potential repetitive patterns in final output
+- **Solution**: Added comprehensive text deduplication safeguards and repetitive pattern removal
+- **Files Modified**:
+  - `src/morag/services/topic_segmentation.py` (enhanced `_calculate_topic_timing` and `_simple_text_match` methods)
+  - `src/morag/converters/audio.py` (added text deduplication and `_remove_repetitive_patterns` method)
+  - `src/morag/converters/video.py` (added improved timestamp handling and text deduplication)
+  - `scripts/debug_transcription_issues.py` (comprehensive debugging script)
+  - `scripts/check_dependencies.py` (dependency checking script)
+  - `tests/manual/test_transcription_fixes.py` (validation test suite)
+  - `scripts/generate_test_audio.py` (test audio file generator)
+- **Features Added**:
+  - **Enhanced Timestamp Calculation**: Improved text matching algorithm with multiple fallback strategies
+  - **Better Text Matching**: More lenient text similarity detection with substring and word-based matching
+  - **Text Deduplication**: Comprehensive safeguards against duplicate text entries in dialogue creation
+  - **Repetitive Pattern Removal**: Final content cleaning to remove consecutive repeated lines and end-of-content repetition
+  - **Extensive Debugging**: Detailed logging throughout the timestamp calculation process
+  - **Improved Fallback Mechanisms**: Better proportional mapping when direct text matching fails
+  - **Dependency Checking**: Script to identify missing optional dependencies and their impact
+  - **Comprehensive Testing**: Validation suite to verify timestamp accuracy and repetition prevention
+- **Quality Improvements**:
+  - Topic timestamps now correctly show actual start times in seconds format [123] instead of always [0]
+  - Text repetition at the end of transcripts eliminated through multiple safeguard layers
+  - Better handling of edge cases where timing information is unavailable
+  - Enhanced error handling and logging for debugging timestamp calculation issues
+  - Improved text similarity matching with reduced threshold (25% vs 30%) for better matching
+  - Added substring matching for more accurate sentence-to-segment alignment
 
 ### Audio Processing Error Fix
 - **Issue**: `'AudioProcessor' object has no attribute 'process_audio'`
