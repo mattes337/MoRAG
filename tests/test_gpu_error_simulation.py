@@ -42,21 +42,21 @@ class TestGPUErrorSimulation:
     
     def test_device_detection_with_cuda_error(self):
         """Test device detection when CUDA throws an error."""
-        mock_torch = MagicMock()
-        mock_torch.cuda.is_available.side_effect = RuntimeError("CUDA driver error")
-        
-        with patch('builtins.__import__', return_value=mock_torch) as mock_import:
-            mock_import.side_effect = lambda name, *args: mock_torch if name == 'torch' else __import__(name, *args)
+        with patch.dict('sys.modules', {'torch': MagicMock()}):
+            import sys
+            mock_torch = sys.modules['torch']
+            mock_torch.cuda.is_available.side_effect = RuntimeError("CUDA driver error")
+
             device = detect_device()
             assert device == "cpu"
-    
+
     def test_safe_device_with_memory_error(self):
         """Test safe device function with memory error."""
-        mock_torch = MagicMock()
-        mock_torch.cuda.is_available.side_effect = RuntimeError("CUDA out of memory")
-        
-        with patch('builtins.__import__', return_value=mock_torch) as mock_import:
-            mock_import.side_effect = lambda name, *args: mock_torch if name == 'torch' else __import__(name, *args)
+        with patch.dict('sys.modules', {'torch': MagicMock()}):
+            import sys
+            mock_torch = sys.modules['torch']
+            mock_torch.cuda.is_available.side_effect = RuntimeError("CUDA out of memory")
+
             device = get_safe_device("cuda")
             assert device == "cpu"
     

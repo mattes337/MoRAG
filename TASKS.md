@@ -96,6 +96,7 @@
 ✅ **DOCLING-PDF-BACKEND-FIX** - Fixed docling PDF converter 'PdfPipelineOptions' object has no attribute 'backend' error - COMPLETED
 ✅ **DOCLING-PDF-ELEMENTS-FIX** - Fixed docling PDF converter 'int' object has no attribute 'elements' error by updating to docling v2 API - COMPLETED
 ✅ **GPU-CPU-FALLBACK-SYSTEM** - Implemented comprehensive GPU/CPU fallback system with automatic device detection and safe CPU fallbacks for all AI/ML components - COMPLETED
+✅ **GPU-ERROR-SIMULATION-TESTS-FIX** - Fixed RecursionError in GPU error simulation tests by replacing problematic builtins.__import__ mocking with proper sys.modules patching - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -555,6 +556,26 @@
   - Comprehensive logging for device selection and fallback events
   - Performance optimization: uses GPU when available, CPU when needed
   - Zero configuration required - works out of the box on any hardware
+
+### GPU Error Simulation Tests RecursionError Fix
+- **Issue**: GPU error simulation tests failing with "RecursionError: maximum recursion depth exceeded" when testing device detection with CUDA errors
+- **Root Cause**: Tests were using `patch('builtins.__import__')` with a lambda function that called `__import__` recursively, creating infinite recursion
+- **Solution**: Replaced problematic import mocking with proper `patch.dict('sys.modules')` approach for cleaner module mocking
+- **Files Modified**:
+  - `tests/test_gpu_error_simulation.py` (fixed `test_device_detection_with_cuda_error` and `test_safe_device_with_memory_error` methods)
+- **Technical Changes**:
+  - **Before**: `with patch('builtins.__import__', return_value=mock_torch) as mock_import: mock_import.side_effect = lambda name, *args: mock_torch if name == 'torch' else __import__(name, *args)`
+  - **After**: `with patch.dict('sys.modules', {'torch': MagicMock()}): import sys; mock_torch = sys.modules['torch']`
+- **Features Fixed**:
+  - GPU error simulation tests now run without recursion errors
+  - Proper mocking of torch module for CUDA error simulation
+  - Clean test isolation without affecting other imports
+  - All 13 GPU error simulation tests now pass successfully
+- **Quality Improvements**:
+  - More reliable test execution with proper module mocking
+  - Better test isolation preventing side effects on other tests
+  - Cleaner mocking approach following Python testing best practices
+  - Enhanced test coverage for GPU fallback scenarios
 
 ## Implementation Rules
 - ✅ Test-driven development (ALL tests must pass before advancing)
