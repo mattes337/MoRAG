@@ -18,17 +18,17 @@ async def main():
     """Initialize the database."""
     try:
         logger.info("Initializing Qdrant database")
-        
+
         # Connect to Qdrant
         await qdrant_service.connect()
-        
+
         # Create collection (vector size for text-embedding-004 is 768)
         await qdrant_service.create_collection(vector_size=768, force_recreate=False)
-        
+
         # Get collection info
         info = await qdrant_service.get_collection_info()
         logger.info("Database initialized successfully", collection_info=info)
-        
+
     except Exception as e:
         logger.error("Failed to initialize database", error=str(e))
         sys.exit(1)
