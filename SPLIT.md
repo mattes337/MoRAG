@@ -112,12 +112,12 @@ We will reorganize the project into the following packages:
   - [ ] Implement interface adapters to core
   - [ ] Write unit tests
 
-- [ ] **3.2 Implement morag-video package**
-  - [ ] Create package structure with pyproject.toml
-  - [ ] Move video processor code
-  - [ ] Define dependencies (FFmpeg, etc.)
-  - [ ] Implement interface adapters to core
-  - [ ] Write unit tests
+- [x] **3.2 Implement morag-video package**
+  - [x] Create package structure with pyproject.toml
+  - [x] Move video processor code
+  - [x] Define dependencies (FFmpeg, etc.)
+  - [x] Implement interface adapters to core
+  - [x] Write unit tests
 
 - [x] **3.3 Implement morag-document package**
   - [x] Create package structure with pyproject.toml
@@ -371,7 +371,7 @@ We will reorganize the project into the following packages:
 
 - [ ] **Complete remaining processor packages**
   - [ ] Implement morag-audio package
-  - [ ] Implement morag-video package
+  - [x] Implement morag-video package
   - [ ] Implement morag-image package
   - [ ] Implement morag-web package
   - [ ] Implement morag-youtube package
