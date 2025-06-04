@@ -103,6 +103,7 @@
 ✅ **ALPINE-CONTAINER-TESTING** - Testing Alpine container functionality, API startup, and basic operations - COMPLETED
 ✅ **ALPINE-PRODUCTION-SETUP** - Creating production-ready Alpine deployment with documentation and validation scripts - COMPLETED
 ✅ **ALPINE-INSTALL-SCRIPT-UPDATE** - Updated Alpine install script to reflect working Docker changes for native deployment - COMPLETED
+✅ **UBUNTU-INSTALL-SCRIPT** - Created comprehensive Ubuntu installation script with full feature support including GPU acceleration and local Qdrant installation - COMPLETED
 
 ## Bug Fixes Completed
 
@@ -597,6 +598,44 @@
   - **MoRAG Dependencies**: Installs all MoRAG features (docling, audio, image, office, web) with CPU-only versions and Alpine compatibility fixes
   - **Configuration Management**: Creates environment file with Alpine-specific settings, external Qdrant configuration, and conservative resource limits
   - **Error Handling**: Comprehensive logging, Alpine-specific package rebuilding, and robust fallback mechanisms
+
+### Ubuntu Linux Installation Script Implementation
+- **Issue**: Need comprehensive Ubuntu installation script with full feature support including GPU acceleration and local Qdrant installation
+- **Root Cause**: Alpine script was optimized for containers but Ubuntu users need full development environment with GPU support and local services
+- **Solution**: Created comprehensive Ubuntu installation script with GPU detection, CUDA installation, and optional local Qdrant setup
+- **Files Created**:
+  - `ubuntu-install.sh` (comprehensive Ubuntu installation script with GPU support)
+  - `scripts/test_ubuntu_install.py` (validation script for Ubuntu installation)
+  - `docs/installation-comparison.md` (detailed comparison between Alpine and Ubuntu installations)
+- **Features Implemented**:
+  - **Ubuntu Version Detection**: Supports Ubuntu 18.04+ with version-adaptive Python installation (3.8/3.9/3.11)
+  - **GPU Support**: Automatic NVIDIA GPU detection, CUDA toolkit installation, and driver setup
+  - **Package Management**: Full apt package management with comprehensive system dependencies
+  - **Whisper Backend Support**: All whisper backends including faster-whisper (preferred on Ubuntu)
+  - **Local Qdrant Option**: Interactive choice for local Qdrant installation with Docker and docker-compose setup
+  - **Enhanced Dependencies**: Complete system packages for OCR, image processing, audio/video processing, and web scraping
+  - **Environment Configuration**: Auto-detection of GPU capabilities with appropriate device settings
+  - **Installation Testing**: Built-in test suite to validate installation success
+- **Ubuntu-Specific Features**:
+  - **CUDA Installation**: Automatic CUDA toolkit installation for NVIDIA GPUs with repository setup
+  - **Docker Integration**: Automatic Docker and docker-compose installation for local Qdrant
+  - **Higher Resource Limits**: Optimized for development machines with higher concurrent tasks and file size limits
+  - **Full Feature Support**: All MoRAG features including docling, dynamic web scraping, and GPU acceleration
+  - **Interactive Setup**: User prompts for optional components like local Qdrant installation
+- **Comparison with Alpine**:
+  - **Target Use**: Development/production vs container deployment
+  - **GPU Support**: Full CUDA vs CPU-only
+  - **Package Size**: ~1GB+ vs ~200MB
+  - **Whisper Support**: All backends vs Alpine-compatible alternatives
+  - **Vector Database**: Local + external vs external only
+  - **Resource Limits**: Higher vs conservative
+- **Quality Improvements**:
+  - Comprehensive system dependency installation for all MoRAG features
+  - Automatic GPU detection and CUDA setup for optimal performance
+  - Interactive installation with user choice for optional components
+  - Built-in validation testing to ensure successful installation
+  - Detailed documentation comparing Alpine vs Ubuntu approaches
+  - Support for both development and production Ubuntu deployments
 - **Alpine-Specific Adaptations**:
   - **musl libc Compatibility**: Rebuilds packages from source where needed for Alpine's musl libc
   - **External Qdrant**: Configures connection to user's external Qdrant server instead of local installation
