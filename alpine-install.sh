@@ -78,218 +78,120 @@ install_build_tools() {
     log_info "Installing essential build tools..."
     $USE_SUDO apk add --no-cache \
         build-base \
-        linux-headers \
-        musl-dev \
         gcc \
         g++ \
         make \
         cmake \
         pkgconfig \
+        autoconf \
+        automake \
+        libtool \
         git \
         curl \
-        wget \
-        unzip
+        wget
     log_success "Build tools installed"
 }
 
 # Install system dependencies
 install_system_dependencies() {
-    log_info "Installing core system libraries..."
+    log_info "Installing system dependencies..."
     $USE_SUDO apk add --no-cache \
-        glib-dev \
-        cairo-dev \
-        pango-dev \
-        gdk-pixbuf-dev \
+        linux-headers \
+        musl-dev \
         libffi-dev \
         openssl-dev \
         zlib-dev \
-        bzip2-dev \
-        xz-dev \
-        sqlite-dev \
-        readline-dev
-    log_success "Core system libraries installed"
+        jpeg-dev \
+        libpng-dev \
+        freetype-dev \
+        lcms2-dev \
+        openjpeg-dev \
+        tiff-dev \
+        tk-dev \
+        tcl-dev \
+        harfbuzz-dev \
+        fribidi-dev \
+        libimagequant-dev \
+        libxcb-dev \
+        libxml2-dev \
+        libxslt-dev
+    log_success "System dependencies installed"
 }
 
 # Install media processing dependencies
 install_media_dependencies() {
     log_info "Installing media processing dependencies..."
-
-    # Try to install FFmpeg, fall back to alternatives if not available
-    if $USE_SUDO apk add --no-cache ffmpeg ffmpeg-dev 2>/dev/null; then
-        log_info "FFmpeg installed from community repository"
-    else
-        log_warning "FFmpeg not available, installing alternative media libraries"
-        # Install basic media libraries that are usually available
-        $USE_SUDO apk add --no-cache \
-            libavcodec \
-            libavformat \
-            libavutil \
-            libswscale \
-            libswresample 2>/dev/null || true
-    fi
-
-    # Install audio processing libraries
     $USE_SUDO apk add --no-cache \
-        libsndfile \
-        libsndfile-dev \
-        portaudio \
-        portaudio-dev \
-        alsa-lib \
-        alsa-lib-dev
-
+        ffmpeg \
+        ffmpeg-dev \
+        imagemagick \
+        imagemagick-dev
     log_success "Media processing dependencies installed"
 }
 
-# Install OCR and image processing
+# Install OCR dependencies
 install_ocr_dependencies() {
-    log_info "Installing OCR and image processing dependencies..."
-
-    # Install image processing libraries first (these are usually available)
+    log_info "Installing OCR dependencies..."
     $USE_SUDO apk add --no-cache \
-        jpeg-dev \
-        tiff-dev \
-        freetype-dev \
-        lcms2-dev \
-        openjpeg-dev \
-        libwebp-dev \
-        zlib-dev
-
-    # Try to install Tesseract with new package names (Alpine 3.21+)
-    if $USE_SUDO apk add --no-cache tesseract tesseract-data-eng tesseract-data-deu tesseract-dev 2>/dev/null; then
-        log_info "Tesseract OCR installed with new package names"
-    elif $USE_SUDO apk add --no-cache tesseract-ocr tesseract-ocr-data-eng tesseract-ocr-data-deu tesseract-ocr-dev 2>/dev/null; then
-        log_info "Tesseract OCR installed with legacy package names"
-    else
-        log_warning "Tesseract OCR not available, OCR functionality will be limited"
-        log_info "You can install Tesseract manually later if needed"
-    fi
-
-    log_success "OCR and image processing dependencies installed"
+        tesseract-ocr \
+        tesseract-ocr-data-eng \
+        tesseract-ocr-data-deu \
+        tesseract-ocr-data-fra \
+        tesseract-ocr-data-spa \
+        poppler-utils \
+        poppler-dev
+    log_success "OCR dependencies installed"
 }
 
-# Install web scraping dependencies
+# Install web dependencies
 install_web_dependencies() {
-    log_info "Installing web scraping dependencies..."
-
-    # Install core web scraping libraries
+    log_info "Installing web dependencies..."
     $USE_SUDO apk add --no-cache \
-        libxml2-dev \
-        libxslt-dev
-
-    # Try to install Chromium (may not be available in all Alpine versions)
-    if $USE_SUDO apk add --no-cache chromium chromium-chromedriver 2>/dev/null; then
-        log_info "Chromium installed successfully"
-    else
-        log_warning "Chromium not available, web scraping will use static methods only"
-    fi
-
-    log_success "Web scraping dependencies installed"
+        chromium \
+        chromium-chromedriver
+    log_success "Web dependencies installed"
 }
 
-# Install Python and development tools
+# Install Python
 install_python() {
-    log_info "Installing Python and development tools..."
-
-    # Install core Python packages (these should be available)
+    log_info "Installing Python 3.11..."
     $USE_SUDO apk add --no-cache \
         python3 \
-        python3-dev
+        python3-dev \
+        py3-pip \
+        py3-virtualenv
 
-    # Try to install pip with new package names (Alpine 3.21+)
-    if $USE_SUDO apk add --no-cache python3-pip 2>/dev/null; then
-        log_info "Python pip installed with new package name"
-    elif $USE_SUDO apk add --no-cache py3-pip 2>/dev/null; then
-        log_info "Python pip installed with legacy package name"
-    else
-        log_warning "pip package not available, will install via ensurepip"
-        python3 -m ensurepip --upgrade 2>/dev/null || true
+    # Create symlinks for compatibility
+    if [ ! -f /usr/bin/python ]; then
+        $USE_SUDO ln -sf /usr/bin/python3 /usr/bin/python
     fi
 
-    # Try to install virtualenv
-    if $USE_SUDO apk add --no-cache python3-venv 2>/dev/null; then
-        log_info "Python venv installed with new package name"
-    elif $USE_SUDO apk add --no-cache py3-virtualenv 2>/dev/null; then
-        log_info "Python virtualenv installed with legacy package name"
-    else
-        log_warning "virtualenv package not available, will install via pip later"
-    fi
-
-    # Try to install wheel and setuptools
-    $USE_SUDO apk add --no-cache python3-wheel python3-setuptools 2>/dev/null || \
-    $USE_SUDO apk add --no-cache py3-wheel py3-setuptools 2>/dev/null || \
-    log_warning "wheel/setuptools packages not available, will install via pip"
-
-    # Try to install common Python packages (optional)
-    log_info "Attempting to install optional Python packages..."
-    $USE_SUDO apk add --no-cache \
-        python3-numpy \
-        python3-scipy \
-        python3-pillow \
-        python3-lxml \
-        python3-cryptography \
-        python3-cffi 2>/dev/null || \
-    $USE_SUDO apk add --no-cache \
-        py3-numpy \
-        py3-scipy \
-        py3-pillow \
-        py3-lxml \
-        py3-cryptography \
-        py3-cffi 2>/dev/null || \
-    log_warning "Some Python packages not available, will install via pip in virtual environment"
-
-    # Verify Python version
-    local python_version=$(python3 --version)
-    log_info "Python version: $python_version"
-    log_success "Python and development tools installed"
+    log_success "Python 3.11 installed"
 }
 
-# Install and configure Redis/Valkey
+# Install Redis
 install_redis() {
-    log_info "Installing and configuring Redis/Valkey..."
+    log_info "Installing Redis..."
+    $USE_SUDO apk add --no-cache redis
 
-    # Alpine 3.21+ replaced Redis with Valkey due to licensing
-    if $USE_SUDO apk add --no-cache valkey 2>/dev/null; then
-        log_info "Valkey installed (Redis replacement in Alpine 3.21+)"
-        SERVICE_NAME="valkey"
-        CLI_COMMAND="valkey-cli"
-    elif $USE_SUDO apk add --no-cache redis6 2>/dev/null; then
-        log_info "Redis6 installed"
-        SERVICE_NAME="redis"
-        CLI_COMMAND="redis-cli"
-    elif $USE_SUDO apk add --no-cache redis 2>/dev/null; then
-        log_info "Redis installed"
-        SERVICE_NAME="redis"
-        CLI_COMMAND="redis-cli"
-    else
-        log_error "Neither Valkey nor Redis could be installed"
-        return 1
-    fi
+    # Enable and start service
+    $USE_SUDO rc-update add redis default
+    $USE_SUDO service redis start
 
-    # Enable service
-    $USE_SUDO rc-update add $SERVICE_NAME default
-
-    # Start service
-    $USE_SUDO service $SERVICE_NAME start
-
-    # Test connection
-    if $CLI_COMMAND ping > /dev/null 2>&1; then
-        log_success "$SERVICE_NAME installed and running"
-    else
-        log_warning "$SERVICE_NAME installed but not responding to ping"
-    fi
+    log_success "Redis installed and started"
 }
 
-# Install additional build dependencies for Python packages
+# Install Python build dependencies
 install_python_build_deps() {
-    log_info "Installing additional Python build dependencies..."
+    log_info "Installing Python build dependencies..."
     $USE_SUDO apk add --no-cache \
-        rust \
-        cargo \
-        libffi-dev \
-        openssl-dev
-
-    # Set environment variable for Rust packages
-    export CARGO_NET_GIT_FETCH_WITH_CLI=true
+        py3-wheel \
+        py3-setuptools \
+        cython \
+        py3-numpy \
+        blas-dev \
+        lapack-dev \
+        gfortran
     log_success "Python build dependencies installed"
 }
 
@@ -338,100 +240,60 @@ create_virtualenv() {
     log_success "Virtual environment activated and pip upgraded"
 }
 
-# Install MoRAG dependencies (excluding Qdrant)
+# Install MoRAG dependencies (Alpine-optimized)
 install_morag_dependencies() {
-    log_info "Installing MoRAG dependencies (CPU-only, no Qdrant)..."
+    log_info "Installing MoRAG dependencies (Alpine-optimized)..."
 
-    # Ensure virtual environment is activated
     source venv/bin/activate
 
-    # Create a temporary requirements file without qdrant-client
-    log_info "Creating temporary requirements without Qdrant..."
-    python -c "
+    # Extract dependencies from pyproject.toml, excluding problematic ones
+    python3 -c "
 import re
-with open('pyproject.toml', 'r') as f:
-    content = f.read()
+try:
+    with open('pyproject.toml', 'r') as f:
+        content = f.read()
 
-# Extract dependencies, excluding qdrant-client
-deps = re.findall(r'\"([^\"]+)\"', content.split('dependencies = [')[1].split(']')[0])
-filtered_deps = [dep for dep in deps if not dep.startswith('qdrant-client')]
+    # Extract dependencies, excluding qdrant-client and docling
+    deps = re.findall(r'\"([^\"]+)\"', content.split('dependencies = [')[1].split(']')[0])
+    filtered_deps = [dep for dep in deps if not dep.startswith('qdrant-client') and not dep.startswith('docling')]
 
-with open('requirements_no_qdrant.txt', 'w') as f:
-    for dep in filtered_deps:
-        f.write(dep + '\n')
+    # Write filtered requirements
+    with open('requirements_alpine.txt', 'w') as f:
+        for dep in filtered_deps:
+            f.write(dep + '\n')
+
+    print(f'Created requirements_alpine.txt with {len(filtered_deps)} dependencies')
+except Exception as e:
+    print(f'Error: {e}')
+    exit(1)
 "
 
-    # Install base dependencies without qdrant
-    log_info "Installing base dependencies (excluding Qdrant)..."
-    pip install -r requirements_no_qdrant.txt
+    # Install dependencies
+    pip install -r requirements_alpine.txt
 
-    # Install feature sets individually
-    log_info "Installing docling for PDF processing..."
-    pip install -e ".[docling]"
-
-    log_info "Installing audio processing dependencies..."
-    pip install -e ".[audio]"
-
-    log_info "Installing image processing dependencies..."
-    pip install -e ".[image]"
-
-    log_info "Installing office document dependencies..."
-    pip install -e ".[office]"
-
-    # Install web dependencies manually (excluding playwright for Alpine compatibility)
-    log_info "Installing web scraping dependencies..."
-    pip install beautifulsoup4 markdownify html2text lxml bleach trafilatura readability-lxml newspaper3k
-
-    # Note: No vector database packages needed - using external Qdrant server
-
-    # Force CPU-only versions for key packages
-    log_info "Installing CPU-only PyTorch..."
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-    # Install TensorFlow CPU version
-    log_info "Installing TensorFlow CPU..."
-    pip install tensorflow-cpu
-
-    # Download spaCy language models
-    log_info "Downloading spaCy language models..."
-    python -m spacy download en_core_web_sm
-    python -m spacy download de_core_news_sm
+    # Install the package itself in development mode (without docling extra)
+    pip install -e .
 
     # Clean up temporary file
-    rm -f requirements_no_qdrant.txt
+    rm -f requirements_alpine.txt
 
     log_success "MoRAG dependencies installed"
 }
 
-# Handle Alpine-specific package issues
-handle_alpine_issues() {
-    log_info "Handling Alpine-specific package compatibility..."
-    
-    # Ensure virtual environment is activated
-    source venv/bin/activate
-    
-    # Install packages that commonly have issues on Alpine
-    log_info "Rebuilding lxml from source..."
-    pip install --no-binary=:all: lxml
-    
-    log_info "Rebuilding Pillow from source..."
-    pip install --no-binary=:all: pillow
-    
-    log_success "Alpine-specific issues handled"
-}
+
 
 # Create environment configuration
 create_environment_config() {
     log_info "Creating environment configuration..."
-    
+
     if [ -f ".env" ]; then
         log_warning ".env file already exists. Creating .env.alpine as backup."
         cp .env.example .env.alpine
     else
         cp .env.example .env
     fi
-    
-    # Update .env for Alpine Linux (external Qdrant server)
+
+    # Update .env for Alpine Linux
     cat >> .env << 'EOF'
 
 # Alpine Linux specific settings
@@ -455,9 +317,8 @@ CELERY_WORKER_CONCURRENCY=1
 MAX_FILE_SIZE=50MB
 WHISPER_MODEL_SIZE=base
 EOF
-    
+
     log_success "Environment configuration created"
-    log_warning "Please edit .env file and add your GEMINI_API_KEY"
 }
 
 # Note: No local vector database installation needed
@@ -489,11 +350,10 @@ main() {
     check_repository
     create_virtualenv
     install_morag_dependencies
-    handle_alpine_issues
     create_environment_config
     create_directories
 
-    log_success "MoRAG installation completed successfully!"
+    log_success "MoRAG Alpine Linux installation completed successfully!"
     echo
     log_info "Next steps:"
     echo "1. Edit .env file and configure:"
@@ -501,7 +361,7 @@ main() {
     echo "   - Update QDRANT_HOST with your Qdrant server IP/hostname"
     echo "   - Update QDRANT_API_KEY if your Qdrant server requires authentication"
     echo "2. Verify services are running:"
-    echo "   - Redis/Valkey: redis-cli ping (or valkey-cli ping)"
+    echo "   - Redis: redis-cli ping"
     echo "   - External Qdrant: curl http://your_qdrant_server:6333/health"
     echo "3. Initialize the database: source venv/bin/activate && python scripts/init_db.py"
     echo "4. Start the Celery worker: source venv/bin/activate && python scripts/start_worker.py"
@@ -509,7 +369,7 @@ main() {
     echo "6. Test the installation: curl http://localhost:8000/health/"
     echo
     log_info "Services installed locally:"
-    echo "- Redis/Valkey (task queue): localhost:6379"
+    echo "- Redis (task queue): localhost:6379"
     echo "- MoRAG API (when started): localhost:8000"
     echo
     log_info "External services (configure in .env):"
