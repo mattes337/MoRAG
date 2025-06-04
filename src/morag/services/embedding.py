@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from morag.core.config import settings
 from morag.core.exceptions import ExternalServiceError, RateLimitError
+from morag.core.ai_error_handlers import execute_with_ai_resilience, get_ai_service_health
 
 logger = structlog.get_logger()
 
@@ -50,28 +51,29 @@ class GeminiService:
         text: str,
         task_type: str = "retrieval_document"
     ) -> EmbeddingResult:
-        """Generate embedding for a single text."""
+        """Generate embedding for a single text with resilience."""
         if not self.client:
             raise ExternalServiceError("Gemini client not initialized", "gemini")
 
-        try:
-            # Use asyncio.to_thread for CPU-bound operations
-            result = await asyncio.to_thread(
-                self._generate_embedding_sync,
-                text,
-                task_type
-            )
+        return await execute_with_ai_resilience(
+            "gemini",
+            self._generate_embedding_internal,
+            text,
+            task_type,
+            timeout=settings.gemini_timeout
+        )
 
-            logger.debug("Generated embedding", text_length=len(text), model=self.embedding_model)
-            return result
+    async def _generate_embedding_internal(self, text: str, task_type: str) -> EmbeddingResult:
+        """Internal embedding generation method."""
+        # Use asyncio.to_thread for CPU-bound operations
+        result = await asyncio.to_thread(
+            self._generate_embedding_sync,
+            text,
+            task_type
+        )
 
-        except Exception as e:
-            if "quota" in str(e).lower() or "rate" in str(e).lower():
-                logger.warning("Rate limit hit for embedding generation", error=str(e))
-                raise RateLimitError(f"Gemini API rate limit: {str(e)}")
-
-            logger.error("Failed to generate embedding", error=str(e))
-            raise ExternalServiceError(f"Embedding generation failed: {str(e)}", "gemini")
+        logger.debug("Generated embedding", text_length=len(text), model=self.embedding_model)
+        return result
 
     def _generate_embedding_sync(self, text: str, task_type: str) -> EmbeddingResult:
         """Synchronous embedding generation."""
@@ -137,52 +139,55 @@ class GeminiService:
         max_length: int = 150,
         style: str = "concise"
     ) -> SummaryResult:
-        """Generate a summary of the given text."""
-        try:
-            prompt = self._build_summary_prompt(text, max_length, style)
+        """Generate a summary of the given text with resilience."""
+        return await execute_with_ai_resilience(
+            "gemini",
+            self._generate_summary_internal,
+            text,
+            max_length,
+            style,
+            timeout=settings.gemini_timeout
+        )
 
-            logger.info("Generating summary with Gemini API",
-                       text_length=len(text),
-                       text_preview=text[:100] + "..." if len(text) > 100 else text,
-                       max_length=max_length,
-                       style=style,
-                       model=self.generation_model,
-                       prompt_preview=prompt[:200] + "..." if len(prompt) > 200 else prompt)
+    async def _generate_summary_internal(
+        self,
+        text: str,
+        max_length: int,
+        style: str
+    ) -> SummaryResult:
+        """Internal summary generation method."""
+        prompt = self._build_summary_prompt(text, max_length, style)
 
-            result = await asyncio.to_thread(
-                self._generate_text_sync,
-                prompt
-            )
+        logger.info("Generating summary with Gemini API",
+                   text_length=len(text),
+                   text_preview=text[:100] + "..." if len(text) > 100 else text,
+                   max_length=max_length,
+                   style=style,
+                   model=self.generation_model,
+                   prompt_preview=prompt[:200] + "..." if len(prompt) > 200 else prompt)
 
-            logger.info("Gemini API response received",
-                       original_length=len(text),
-                       summary_length=len(result),
-                       summary_preview=result[:100] + "..." if len(result) > 100 else result,
-                       model=self.generation_model)
+        result = await asyncio.to_thread(
+            self._generate_text_sync,
+            prompt
+        )
 
-            # Check if result looks like a proper summary or just truncated text
-            if result.strip().startswith(text[:50].strip()):
-                logger.warning("Gemini API returned text that appears to be truncated original",
-                             original_start=text[:50],
-                             result_start=result[:50])
+        logger.info("Gemini API response received",
+                   original_length=len(text),
+                   summary_length=len(result),
+                   summary_preview=result[:100] + "..." if len(result) > 100 else result,
+                   model=self.generation_model)
 
-            return SummaryResult(
-                summary=result,
-                token_count=len(result.split()),
-                model=self.generation_model
-            )
+        # Check if result looks like a proper summary or just truncated text
+        if result.strip().startswith(text[:50].strip()):
+            logger.warning("Gemini API returned text that appears to be truncated original",
+                         original_start=text[:50],
+                         result_start=result[:50])
 
-        except Exception as e:
-            if "quota" in str(e).lower() or "rate" in str(e).lower():
-                logger.warning("Rate limit hit for summary generation", error=str(e))
-                raise RateLimitError(f"Gemini API rate limit: {str(e)}")
-
-            logger.error("Failed to generate summary",
-                        error=str(e),
-                        error_type=type(e).__name__,
-                        text_length=len(text),
-                        text_preview=text[:100] + "..." if len(text) > 100 else text)
-            raise ExternalServiceError(f"Summary generation failed: {str(e)}", "gemini")
+        return SummaryResult(
+            summary=result,
+            token_count=len(result.split()),
+            model=self.generation_model
+        )
     
     def _generate_text_sync(self, prompt: str) -> str:
         """Synchronous text generation."""
@@ -193,35 +198,32 @@ class GeminiService:
         return response.text
 
     async def generate_text_from_prompt(self, prompt: str) -> str:
-        """Generate text directly from a prompt without additional processing."""
-        try:
-            logger.info("Generating text from direct prompt",
-                       prompt_length=len(prompt),
-                       prompt_preview=prompt[:200] + "..." if len(prompt) > 200 else prompt,
-                       model=self.generation_model)
+        """Generate text directly from a prompt with resilience."""
+        return await execute_with_ai_resilience(
+            "gemini",
+            self._generate_text_from_prompt_internal,
+            prompt,
+            timeout=settings.gemini_timeout
+        )
 
-            result = await asyncio.to_thread(
-                self._generate_text_sync,
-                prompt
-            )
+    async def _generate_text_from_prompt_internal(self, prompt: str) -> str:
+        """Internal text generation method."""
+        logger.info("Generating text from direct prompt",
+                   prompt_length=len(prompt),
+                   prompt_preview=prompt[:200] + "..." if len(prompt) > 200 else prompt,
+                   model=self.generation_model)
 
-            logger.info("Direct prompt response received",
-                       response_length=len(result),
-                       response_preview=result[:100] + "..." if len(result) > 100 else result,
-                       model=self.generation_model)
+        result = await asyncio.to_thread(
+            self._generate_text_sync,
+            prompt
+        )
 
-            return result
+        logger.info("Direct prompt response received",
+                   response_length=len(result),
+                   response_preview=result[:100] + "..." if len(result) > 100 else result,
+                   model=self.generation_model)
 
-        except Exception as e:
-            if "quota" in str(e).lower() or "rate" in str(e).lower():
-                logger.warning("Rate limit hit for text generation", error=str(e))
-                raise RateLimitError(f"Gemini API rate limit: {str(e)}")
-
-            logger.error("Failed to generate text from prompt",
-                        error=str(e),
-                        error_type=type(e).__name__,
-                        prompt_length=len(prompt))
-            raise ExternalServiceError(f"Text generation failed: {str(e)}", "gemini")
+        return result
     
     def _build_summary_prompt(self, text: str, max_length: int, style: str) -> str:
         """Build prompt for summary generation."""
@@ -245,24 +247,29 @@ Summary:
 """
 
     async def health_check(self) -> Dict[str, Any]:
-        """Check if Gemini API is accessible."""
+        """Check if Gemini API is accessible with resilience metrics."""
         try:
             if not self.client:
                 return {
                     "status": "unhealthy",
                     "error": "Gemini client not initialized",
                     "embedding_model": self.embedding_model,
-                    "generation_model": self.generation_model
+                    "generation_model": self.generation_model,
+                    "resilience_health": get_ai_service_health("gemini")
                 }
 
             # Test with a simple embedding request
             test_result = await self.generate_embedding("Health check test")
 
+            # Get resilience health metrics
+            resilience_health = get_ai_service_health("gemini")
+
             return {
                 "status": "healthy",
                 "embedding_model": self.embedding_model,
                 "generation_model": self.generation_model,
-                "embedding_dimension": len(test_result.embedding)
+                "embedding_dimension": len(test_result.embedding),
+                "resilience_health": resilience_health
             }
 
         except Exception as e:
@@ -271,7 +278,8 @@ Summary:
                 "status": "unhealthy",
                 "error": str(e),
                 "embedding_model": self.embedding_model,
-                "generation_model": self.generation_model
+                "generation_model": self.generation_model,
+                "resilience_health": get_ai_service_health("gemini")
             }
 
 # Global instance

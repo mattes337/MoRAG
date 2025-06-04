@@ -10,6 +10,7 @@ from faster_whisper import WhisperModel
 from morag.core.config import settings
 from morag.core.exceptions import ExternalServiceError, ProcessingError
 from morag.processors.audio import AudioConfig, AudioProcessingResult, AudioTranscriptSegment
+from morag.core.ai_error_handlers import execute_with_ai_resilience, get_ai_service_health
 
 logger = structlog.get_logger()
 
@@ -56,88 +57,96 @@ class WhisperService:
         audio_path: Union[str, Path],
         config: Optional[AudioConfig] = None
     ) -> AudioProcessingResult:
-        """Transcribe audio file to text."""
-        start_time = time.time()
+        """Transcribe audio file to text with resilience."""
         config = config or self._default_config
         audio_path = Path(audio_path)
-        
-        logger.info("Starting audio transcription", 
+
+        logger.info("Starting audio transcription",
                    audio_path=str(audio_path),
                    model_size=config.model_size)
-        
-        try:
-            # Get model
-            model = self._get_model(
-                config.model_size,
-                config.device,
-                config.compute_type
-            )
-            
-            # Perform transcription
-            segments, info = await asyncio.to_thread(
-                self._transcribe_sync,
-                model,
-                str(audio_path),
-                config
-            )
-            
-            # Process results
-            audio_segments = []
-            full_text_parts = []
-            
-            for segment in segments:
-                # Convert log probability to confidence (0-1 scale)
-                confidence = max(0.0, min(1.0, (segment.avg_logprob + 1.0) / 2.0))
 
-                audio_segment = AudioTranscriptSegment(
-                    text=segment.text.strip(),
-                    start_time=segment.start,
-                    end_time=segment.end,
-                    confidence=confidence,
-                    language=info.language
-                )
-                audio_segments.append(audio_segment)
-                full_text_parts.append(segment.text.strip())
-            
-            full_text = " ".join(full_text_parts)
-            
-            # Calculate overall confidence
-            overall_confidence = (
-                sum(seg.confidence for seg in audio_segments) / len(audio_segments)
-                if audio_segments else 0.0
+        return await execute_with_ai_resilience(
+            "whisper",
+            self._transcribe_audio_internal,
+            audio_path,
+            config,
+            timeout=settings.whisper_timeout
+        )
+
+    async def _transcribe_audio_internal(
+        self,
+        audio_path: Path,
+        config: AudioConfig
+    ) -> AudioProcessingResult:
+        """Internal transcription method."""
+        start_time = time.time()
+
+        # Get model
+        model = self._get_model(
+            config.model_size,
+            config.device,
+            config.compute_type
+        )
+
+        # Perform transcription
+        segments, info = await asyncio.to_thread(
+            self._transcribe_sync,
+            model,
+            str(audio_path),
+            config
+        )
+
+        # Process results
+        audio_segments = []
+        full_text_parts = []
+
+        for segment in segments:
+            # Convert log probability to confidence (0-1 scale)
+            confidence = max(0.0, min(1.0, (segment.avg_logprob + 1.0) / 2.0))
+
+            audio_segment = AudioTranscriptSegment(
+                text=segment.text.strip(),
+                start_time=segment.start,
+                end_time=segment.end,
+                confidence=confidence,
+                language=info.language
             )
-            
-            processing_time = time.time() - start_time
-            
-            result = AudioProcessingResult(
-                text=full_text,
-                language=info.language,
-                confidence=overall_confidence,
-                duration=info.duration,
-                segments=audio_segments,
-                metadata={
-                    "language_probability": info.language_probability,
-                    "duration_after_vad": info.duration_after_vad,
-                    "all_language_probs": info.all_language_probs
-                },
-                processing_time=processing_time,
-                model_used=config.model_size
-            )
-            
-            logger.info("Audio transcription completed", 
-                       audio_path=str(audio_path),
-                       duration=info.duration,
-                       language=info.language,
-                       confidence=overall_confidence,
-                       processing_time=processing_time)
-            
-            return result
-            
-        except Exception as e:
-            logger.error("Audio transcription failed", 
-                        audio_path=str(audio_path),
-                        error=str(e))
-            raise ExternalServiceError(f"Audio transcription failed: {str(e)}", "whisper")
+            audio_segments.append(audio_segment)
+            full_text_parts.append(segment.text.strip())
+
+        full_text = " ".join(full_text_parts)
+
+        # Calculate overall confidence
+        overall_confidence = (
+            sum(seg.confidence for seg in audio_segments) / len(audio_segments)
+            if audio_segments else 0.0
+        )
+
+        processing_time = time.time() - start_time
+
+        result = AudioProcessingResult(
+            text=full_text,
+            language=info.language,
+            confidence=overall_confidence,
+            duration=info.duration,
+            segments=audio_segments,
+            metadata={
+                "language_probability": info.language_probability,
+                "duration_after_vad": info.duration_after_vad,
+                "all_language_probs": info.all_language_probs
+            },
+            processing_time=processing_time,
+            model_used=config.model_size
+        )
+
+        logger.info("Audio transcription completed",
+                   audio_path=str(audio_path),
+                   duration=info.duration,
+                   language=info.language,
+                   confidence=overall_confidence,
+                   processing_time=processing_time)
+
+        return result
     
     def _transcribe_sync(
         self,

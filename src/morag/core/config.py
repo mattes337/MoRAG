@@ -113,6 +113,27 @@ class Settings(BaseSettings):
     webhook_timeout: int = 30
     webhook_max_retries: int = 3
     webhook_retry_delay: int = 5
+
+    # AI Error Handling Configuration
+    ai_retry_max_attempts: int = 3
+    ai_retry_base_delay: float = 1.0
+    ai_retry_max_delay: float = 60.0
+    ai_retry_exponential_base: float = 2.0
+    ai_retry_jitter: bool = True
+
+    # Circuit Breaker Configuration
+    ai_circuit_breaker_failure_threshold: int = 5
+    ai_circuit_breaker_recovery_timeout: float = 60.0
+    ai_circuit_breaker_half_open_max_calls: int = 3
+
+    # Service-specific timeouts
+    gemini_timeout: float = 30.0
+    whisper_timeout: float = 300.0  # 5 minutes for audio processing
+    vision_timeout: float = 60.0
+
+    # Health monitoring
+    ai_health_window_size: int = 100
+    ai_health_check_interval: int = 60  # seconds
     
     model_config = SettingsConfigDict(
         env_file=".env",
