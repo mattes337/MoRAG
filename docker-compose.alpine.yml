@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # Redis service for task queue
+  redis:
+    image: redis:7-alpine
+    container_name: morag-redis-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - morag-network
+
+  # MoRAG Alpine API service
+  morag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+    container_name: morag-api-alpine
+    ports:
+      - "8000:8000"
+    environment:
+      # Redis configuration
+      - REDIS_URL=redis://redis:6379/0
+      
+      # External Qdrant configuration (update with your server details)
+      - QDRANT_HOST=${QDRANT_HOST:-your_qdrant_server_ip}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_COLLECTION_NAME=${QDRANT_COLLECTION_NAME:-morag_documents}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      
+      # Gemini API configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      
+      # Alpine-specific settings
+      - PREFERRED_DEVICE=cpu
+      - FORCE_CPU=true
+      - ENABLE_DYNAMIC_WEB_SCRAPING=false
+      - WEB_SCRAPING_FALLBACK_ONLY=true
+      
+      # Conservative resource limits
+      - MAX_CONCURRENT_TASKS=2
+      - CELERY_WORKER_CONCURRENCY=1
+      - MAX_FILE_SIZE=50MB
+      - WHISPER_MODEL_SIZE=base
+    volumes:
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - morag-network
+
+  # Celery worker for background tasks
+  morag-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+    container_name: morag-worker-alpine
+    environment:
+      # Redis configuration
+      - REDIS_URL=redis://redis:6379/0
+      
+      # External Qdrant configuration (update with your server details)
+      - QDRANT_HOST=${QDRANT_HOST:-your_qdrant_server_ip}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_COLLECTION_NAME=${QDRANT_COLLECTION_NAME:-morag_documents}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      
+      # Gemini API configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      
+      # Alpine-specific settings
+      - PREFERRED_DEVICE=cpu
+      - FORCE_CPU=true
+      - ENABLE_DYNAMIC_WEB_SCRAPING=false
+      - WEB_SCRAPING_FALLBACK_ONLY=true
+      
+      # Conservative resource limits
+      - MAX_CONCURRENT_TASKS=2
+      - CELERY_WORKER_CONCURRENCY=1
+      - MAX_FILE_SIZE=50MB
+      - WHISPER_MODEL_SIZE=base
+    volumes:
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["sh", "-c", "source venv/bin/activate && celery -A src.morag.core.celery_app worker --loglevel=info --concurrency=1"]
+    networks:
+      - morag-network
+
+volumes:
+  redis_data:
+
+networks:
+  morag-network:
+    driver: bridge
+
+# Usage Instructions:
+# 
+# 1. Create .env file with your configuration:
+#    GEMINI_API_KEY=your_gemini_api_key_here
+#    QDRANT_HOST=your_qdrant_server_ip
+#    QDRANT_PORT=6333
+#    QDRANT_COLLECTION_NAME=morag_documents
+#    QDRANT_API_KEY=your_qdrant_api_key_if_needed
+#
+# 2. Build and start services:
+#    docker-compose -f docker-compose.alpine.yml up --build
+#
+# 3. Test the API:
+#    curl http://localhost:8000/health/
+#
+# 4. Access API documentation:
+#    http://localhost:8000/docs
+#
+# 5. Stop services:
+#    docker-compose -f docker-compose.alpine.yml down
+#
+# 6. Clean up (remove volumes):
+#    docker-compose -f docker-compose.alpine.yml down -v

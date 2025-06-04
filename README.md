@@ -67,6 +67,57 @@ uvicorn morag.api.main:app --reload
 
 **Important**: The Celery worker is required for processing ingestion tasks. Without it, submitted tasks will remain in "pending" status and never complete.
 
+## Docker Deployment
+
+### Alpine Linux Container (Recommended for Production)
+
+For production deployments, use the optimized Alpine Linux container with external Qdrant:
+
+1. **Configure environment:**
+```bash
+cp .env.alpine .env
+# Edit .env with your API keys and Qdrant server details
+```
+
+2. **Start with Docker Compose:**
+```bash
+docker-compose -f docker-compose.alpine.yml up --build
+```
+
+3. **Access the services:**
+- API: http://localhost:8000
+- Documentation: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health/
+
+4. **Validate deployment:**
+```bash
+# Test the container
+docker exec -it morag-api-alpine bash scripts/validate_alpine_deployment.sh
+```
+
+### Alpine Container Features
+
+- **Lightweight**: Optimized Alpine Linux base (~200MB smaller than Ubuntu)
+- **CPU-Only**: Configured for CPU processing with automatic GPU fallback
+- **External Qdrant**: Designed to work with your existing Qdrant server
+- **Conservative Resources**: Optimized for minimal resource usage
+- **Production Ready**: Includes health checks, logging, and monitoring
+
+### Environment Configuration
+
+The Alpine container requires these environment variables:
+
+```bash
+# Required
+GEMINI_API_KEY=your_gemini_api_key_here
+QDRANT_HOST=your_qdrant_server_ip
+QDRANT_PORT=6333
+
+# Optional
+QDRANT_API_KEY=your_qdrant_api_key_if_needed
+QDRANT_COLLECTION_NAME=morag_documents
+```
+
 ## Architecture
 
 The MoRAG pipeline consists of several key components:

@@ -1,0 +1,36 @@
+# Alpine Linux Dockerfile for MoRAG
+# This Dockerfile creates an Alpine Linux container and runs the install script
+FROM alpine:3.21
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Create working directory
+WORKDIR /app
+
+# Copy the entire project (needed for install script to detect MoRAG repository)
+COPY . .
+
+# Make install script executable
+RUN chmod +x alpine-install.sh
+
+# Install bash and dos2unix first (Alpine uses sh by default)
+RUN apk add --no-cache bash dos2unix
+
+# Create a simplified Docker-friendly install script
+COPY docker-alpine-install.sh .
+RUN chmod +x docker-alpine-install.sh && \
+    bash ./docker-alpine-install.sh
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health/ || exit 1
+
+# Default command
+CMD ["sh", "-c", "source venv/bin/activate && uvicorn src.morag.api.main:app --host 0.0.0.0 --port 8000"]
