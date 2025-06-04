@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     # Task Queue
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/0"
+    celery_worker_concurrency: int = 4
     
     # File Storage
     upload_dir: str = "./uploads"
@@ -181,6 +182,10 @@ class Settings(BaseSettings):
     # Health monitoring
     ai_health_window_size: int = 100
     ai_health_check_interval: int = 60  # seconds
+
+    # Web Scraping Configuration
+    enable_dynamic_web_scraping: bool = True
+    web_scraping_fallback_only: bool = False
     
     model_config = SettingsConfigDict(
         env_file=".env",
