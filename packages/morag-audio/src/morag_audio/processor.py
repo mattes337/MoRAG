@@ -75,6 +75,7 @@ class AudioProcessor:
             config: Configuration for audio processing. If None, default config is used.
         """
         self.config = config or AudioConfig()
+        self.metadata = {}
         self._initialize_components()
         
     def _initialize_components(self):
@@ -109,15 +110,18 @@ class AudioProcessor:
         # Initialize diarization if enabled
         if self.config.enable_diarization:
             try:
-                from pyannote.audio import Pipeline
+                from morag_audio.services import SpeakerDiarizationService
                 
-                self.diarization_pipeline = Pipeline.from_pretrained(
-                    "pyannote/speaker-diarization-3.1"
+                self.diarization_service = SpeakerDiarizationService(
+                    model_name="pyannote/speaker-diarization-3.1",
+                    device=self.config.device,
+                    min_speakers=self.config.min_speakers,
+                    max_speakers=self.config.max_speakers
                     # Users need to configure HF_TOKEN in their environment
                 )
-                logger.info("Speaker diarization pipeline initialized successfully")
+                logger.info("Speaker diarization service initialized successfully")
             except ImportError:
-                logger.warning("pyannote.audio not available, speaker diarization disabled")
+                logger.warning("Speaker diarization dependencies not available, diarization disabled")
                 self.config.enable_diarization = False
             except Exception as e:
                 logger.warning(f"Failed to initialize speaker diarization: {e}")
@@ -126,22 +130,14 @@ class AudioProcessor:
         # Initialize topic segmentation if enabled
         if self.config.enable_topic_segmentation:
             try:
-                from sentence_transformers import SentenceTransformer
-                from sklearn.cluster import AgglomerativeClustering
+                from morag_audio.services import TopicSegmentationService
                 
-                device = get_safe_device(self.config.device)
-                logger.info("Initializing topic segmentation model", device=device)
-                
-                try:
-                    self.topic_segmenter = SentenceTransformer('all-MiniLM-L6-v2', device=device)
-                    logger.info("Topic segmentation model initialized successfully")
-                except Exception as device_error:
-                    if device != "cpu":
-                        logger.warning("GPU initialization failed, trying CPU", error=str(device_error))
-                        self.topic_segmenter = SentenceTransformer('all-MiniLM-L6-v2', device="cpu")
-                        logger.info("Topic segmentation model initialized on CPU fallback")
-                    else:
-                        raise
+                self.topic_segmentation_service = TopicSegmentationService(
+                    embedding_model="all-MiniLM-L6-v2",
+                    device=self.config.device,
+                    max_segments=5  # Reasonable default
+                )
+                logger.info("Topic segmentation service initialized successfully")
             except ImportError:
                 logger.warning("Topic segmentation dependencies not available")
                 self.config.enable_topic_segmentation = False
@@ -173,24 +169,27 @@ class AudioProcessor:
                    enable_topic_segmentation=self.config.enable_topic_segmentation)
         
         try:
+            # Reset metadata for this processing run
+            self.metadata = {}
+            
             # Extract audio metadata
-            metadata = await self._extract_metadata(file_path)
+            self.metadata = await self._extract_metadata(file_path)
             
             # Transcribe audio
             segments, transcript = await self._transcribe_audio(file_path)
             
             # Apply speaker diarization if enabled
-            if self.config.enable_diarization and self.diarization_pipeline:
+            if self.config.enable_diarization and hasattr(self, 'diarization_service'):
                 segments = await self._apply_diarization(file_path, segments)
             
             # Apply topic segmentation if enabled
-            if self.config.enable_topic_segmentation and self.topic_segmenter:
+            if self.config.enable_topic_segmentation and hasattr(self, 'topic_segmentation_service'):
                 segments = await self._apply_topic_segmentation(segments)
             
             processing_time = time.time() - start_time
             
             # Update metadata with processing info
-            metadata.update({
+            self.metadata.update({
                 "processing_time": processing_time,
                 "word_count": len(transcript.split()),
                 "segment_count": len(segments),
@@ -210,14 +209,14 @@ class AudioProcessor:
             logger.info("Audio processing completed",
                        file_path=str(file_path),
                        processing_time=processing_time,
-                       word_count=metadata["word_count"],
-                       segment_count=metadata["segment_count"],
-                       num_speakers=metadata.get("num_speakers", 0))
+                       word_count=self.metadata["word_count"],
+                       segment_count=self.metadata["segment_count"],
+                       num_speakers=self.metadata.get("num_speakers", 0))
             
             return AudioProcessingResult(
                 transcript=transcript,
                 segments=segments,
-                metadata=metadata,
+                metadata=self.metadata,
                 file_path=str(file_path),
                 processing_time=processing_time
             )
@@ -228,10 +227,11 @@ class AudioProcessor:
                         error=str(e))
             
             processing_time = time.time() - start_time
+            self.metadata["error"] = str(e)
             return AudioProcessingResult(
                 transcript="",
                 segments=[],
-                metadata={"error": str(e)},
+                metadata=self.metadata,
                 file_path=str(file_path),
                 processing_time=processing_time,
                 success=False,
@@ -309,78 +309,128 @@ class AudioProcessor:
         
         return segments, full_transcript.strip()
     
-    async def _apply_diarization(self, file_path: Path, segments: List[AudioSegment]) -> List[AudioSegment]:
-        """Apply speaker diarization to segments."""
-        if not self.diarization_pipeline:
-            logger.warning("Diarization requested but pipeline not available")
+    async def _apply_diarization(self, file_path: Union[str, Path], segments: List[AudioSegment]) -> List[AudioSegment]:
+        """Apply speaker diarization to the audio segments.
+        
+        Args:
+            file_path: Path to the audio file
+            segments: List of audio segments from transcription
+            
+        Returns:
+            Updated list of audio segments with speaker information
+        """
+        if not hasattr(self, 'diarization_service') or not self.diarization_service:
+            logger.warning("Diarization requested but service not available")
             return segments
         
         try:
-            # Run diarization in a separate thread
-            loop = asyncio.get_event_loop()
-            diarization = await loop.run_in_executor(
-                None,
-                lambda: self.diarization_pipeline(
+            # Run diarization in thread pool to avoid blocking
+            diarization_result = await asyncio.get_event_loop().run_in_executor(
+                None, 
+                lambda: self.diarization_service.diarize_audio(
                     str(file_path),
-                    num_speakers=self.config.max_speakers
+                    min_speakers=self.config.min_speakers,
+                    max_speakers=self.config.max_speakers
                 )
             )
             
-            # Map diarization results to segments
+            # Map diarization results to segments based on overlap
             for segment in segments:
-                # Find overlapping speaker segments
-                speaker_times = []
-                for turn, _, speaker in diarization.itertracks(yield_label=True):
-                    if max(segment.start, turn.start) < min(segment.end, turn.end):
-                        overlap = min(segment.end, turn.end) - max(segment.start, turn.start)
-                        speaker_times.append((speaker, overlap))
+                # Find the speaker with the most overlap for this segment
+                max_overlap = 0
+                assigned_speaker = None
                 
-                # Assign the speaker with the most overlap
-                if speaker_times:
-                    segment.speaker = max(speaker_times, key=lambda x: x[1])[0]
+                for speaker_segment in diarization_result.segments:
+                    # Calculate overlap between transcription segment and speaker segment
+                    overlap_start = max(segment.start, speaker_segment.start)
+                    overlap_end = min(segment.end, speaker_segment.end)
+                    overlap = max(0, overlap_end - overlap_start)
+                    
+                    if overlap > max_overlap:
+                        max_overlap = overlap
+                        assigned_speaker = speaker_segment.speaker
+                
+                # Assign speaker to segment if found
+                if assigned_speaker:
+                    segment.speaker = assigned_speaker
+            
+            # Add speaker metadata
+            self.metadata["num_speakers"] = len(diarization_result.speakers)
+            self.metadata["speakers"] = [
+                {"id": s.id, "name": s.name or f"Speaker {s.id}"}
+                for s in diarization_result.speakers
+            ]
             
             return segments
             
         except Exception as e:
-            logger.warning("Speaker diarization failed", error=str(e))
+            logger.error(f"Error in speaker diarization: {str(e)}", exc_info=True)
             return segments
     
     async def _apply_topic_segmentation(self, segments: List[AudioSegment]) -> List[AudioSegment]:
-        """Apply topic segmentation to segments."""
-        if not self.topic_segmenter or len(segments) < 3:
+        """Apply topic segmentation to segments using the topic segmentation service."""
+        if not hasattr(self, 'topic_segmentation_service') or not self.topic_segmentation_service or len(segments) < 3:
             return segments
         
         try:
-            from sklearn.cluster import AgglomerativeClustering
+            # Prepare transcript and segments for the service
+            full_transcript = " ".join([segment.text for segment in segments])
             
-            # Get text from segments
-            texts = [segment.text for segment in segments]
+            # Convert our segments to the format expected by the service
+            transcript_segments = [
+                {
+                    "start": segment.start,
+                    "end": segment.end,
+                    "text": segment.text,
+                    "speaker": segment.speaker
+                } for segment in segments
+            ]
             
-            # Generate embeddings
-            loop = asyncio.get_event_loop()
-            embeddings = await loop.run_in_executor(
-                None,
-                lambda: self.topic_segmenter.encode(texts)
+            # Run topic segmentation using the service
+            segmentation_result = await self.topic_segmentation_service.segment_transcript(
+                transcript=full_transcript,
+                transcript_segments=transcript_segments,
+                max_segments=5  # Reasonable default
             )
             
-            # Determine optimal number of topics (between 1 and 5)
-            max_topics = min(5, max(1, len(segments) // 5))
+            # Create a mapping of topic segments to our audio segments
+            # by finding which topic segment each audio segment belongs to
+            for segment in segments:
+                segment.topic_id = None
+                segment.topic_label = None
+                
+                # Find the topic segment that contains this audio segment
+                for topic in segmentation_result.segments:
+                    # Check if the segment falls within this topic's time range
+                    if segment.start >= topic.start_time and segment.end <= topic.end_time:
+                        segment.topic_id = int(topic.topic_id.split('_')[1])  # Convert TOPIC_XX to integer
+                        segment.topic_label = topic.title
+                        break
+                    
+                    # If no exact match, find the topic with the most overlap
+                    elif max(segment.start, topic.start_time) < min(segment.end, topic.end_time):
+                        overlap = min(segment.end, topic.end_time) - max(segment.start, topic.start_time)
+                        segment_duration = segment.end - segment.start
+                        
+                        # If more than 50% of the segment is in this topic, assign it
+                        if overlap > (segment_duration * 0.5):
+                            segment.topic_id = int(topic.topic_id.split('_')[1])
+                            segment.topic_label = topic.title
+                            break
             
-            # Cluster the embeddings
-            clustering_model = AgglomerativeClustering(
-                n_clusters=max_topics,
-                affinity='cosine',
-                linkage='average'
-            )
-            
-            cluster_assignments = await loop.run_in_executor(
-                None,
-                lambda: clustering_model.fit_predict(embeddings)
-            )
-            
-            # Assign topic IDs to segments
-            for i, segment in enumerate(segments):
-                segment.topic_id = int(cluster_assignments[i])
+            # Add topic metadata
+            self.metadata["topics"] = [
+                {
+                    "id": topic.topic_id,
+                    "title": topic.title,
+                    "summary": topic.summary,
+                    "start_time": topic.start_time,
+                    "end_time": topic.end_time,
+                    "duration": topic.duration,
+                    "keywords": topic.keywords,
+                    "speaker_distribution": topic.speaker_distribution
+                } for topic in segmentation_result.segments
+            ]
             
             return segments
             
