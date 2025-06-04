@@ -35,7 +35,7 @@ class AudioConfig:
     supported_formats: List[str] = field(default_factory=lambda: [
         "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma"
     ])
-    device: str = "cpu"  # cpu or cuda
+    device: str = "auto"  # auto, cpu, or cuda - auto-detects best available device
     compute_type: str = "int8"  # int8, int16, float16, float32
 
     def __post_init__(self):
@@ -43,8 +43,11 @@ class AudioConfig:
         if self.max_file_size is None:
             self.max_file_size = settings.max_audio_size
 
-        # Ensure device is safe and available
-        self.device = get_safe_device(self.device)
+        # Ensure device is safe and available - auto-detect if "auto" is specified
+        if self.device == "auto":
+            self.device = get_safe_device()
+        else:
+            self.device = get_safe_device(self.device)
 
 @dataclass
 class AudioTranscriptSegment:

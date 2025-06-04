@@ -11,11 +11,11 @@ MoRAG includes a comprehensive GPU/CPU fallback system that ensures all processi
 
 ### Supported Components
 All AI/ML components include GPU fallback:
-- **Audio Processing**: Whisper models with CUDA/CPU fallback
-- **Image Processing**: EasyOCR with GPU/CPU fallback  
+- **Audio Processing**: Whisper models with CUDA/CPU fallback (auto-detects by default)
+- **Image Processing**: EasyOCR with GPU/CPU fallback
 - **Speaker Diarization**: PyAnnote.audio with device fallback
 - **Topic Segmentation**: SentenceTransformer with device fallback
-- **Video Processing**: Uses CPU by default to avoid conflicts
+- **Video Processing**: Auto-detects best available device (GPU/CPU)
 
 ## Configuration
 

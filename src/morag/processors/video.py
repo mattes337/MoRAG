@@ -132,7 +132,7 @@ class VideoProcessor:
                         audio_config = AudioConfig(
                             model_size=config.audio_model_size,
                             language=None,  # Auto-detect
-                            device="cpu"  # Use CPU for video processing to avoid GPU conflicts
+                            device="auto"  # Auto-detect best available device (GPU/CPU)
                         )
 
                         # Process audio with enhanced features
