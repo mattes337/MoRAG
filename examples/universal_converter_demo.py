@@ -16,12 +16,12 @@ import json
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.converters import (
+from morag_services import (
     DocumentConverter,
     ConversionOptions,
     ChunkingStrategy
 )
-from morag.converters.config import get_conversion_config, create_sample_config
+from morag_core.models import get_conversion_config, create_sample_config
 
 
 async def demo_basic_conversion():
@@ -144,8 +144,8 @@ async def demo_quality_assessment():
     print("📊 Quality Assessment Demo")
     print("-" * 30)
     
-    from morag.converters.quality import ConversionQualityValidator
-    from morag.converters.base import ConversionResult, QualityScore
+    from src.morag.converters.quality import ConversionQualityValidator
+    from morag_core.interfaces.converter import ConversionResult, QualityScore
     
     validator = ConversionQualityValidator()
     

@@ -2,8 +2,8 @@ import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
-from morag.tasks.document_tasks import process_document_task, _process_document_impl
-from morag.services.embedding import EmbeddingResult, SummaryResult
+from morag_document.tasks import process_document_task, _process_document_impl
+from morag_services.embedding import EmbeddingResult, SummaryResult
 
 @pytest.fixture
 def mock_gemini_service():

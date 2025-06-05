@@ -11,7 +11,7 @@ from collections import deque
 from datetime import datetime, timedelta
 import structlog
 
-from morag.core.exceptions import (
+from morag_core.exceptions import (
     CircuitBreakerOpenError, RateLimitError, QuotaExceededError,
     TimeoutError, ContentPolicyError, ExternalServiceError, AuthenticationError
 )

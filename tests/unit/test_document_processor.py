@@ -1,8 +1,8 @@
 import pytest
 import tempfile
 from pathlib import Path
-from morag.processors.document import document_processor, DocumentType
-from morag.core.exceptions import ValidationError
+from morag_document import document_processor, DocumentType
+from morag_core.exceptions import ValidationError
 
 def test_document_type_detection():
     """Test document type detection."""

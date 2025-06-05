@@ -7,13 +7,13 @@ from unittest.mock import Mock, patch, AsyncMock
 import tempfile
 import time
 
-from morag.processors.video import VideoProcessor, VideoConfig, VideoProcessingResult, VideoMetadata
-from morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
-from morag.services.speaker_diarization import DiarizationResult, SpeakerInfo, SpeakerSegment
-from morag.services.topic_segmentation import TopicSegmentationResult, TopicSegment
-from morag.tasks.video_tasks import _process_video_file_impl
-from morag.converters.video import VideoConverter
-from morag.converters.base import ConversionOptions
+from morag_video import VideoProcessor, VideoConfig, VideoProcessingResult, VideoMetadata
+from morag_audio import AudioProcessingResult, AudioTranscriptSegment
+from morag_audio.services import DiarizationResult, SpeakerInfo, SpeakerSegment
+from morag_audio.services import TopicSegmentationResult, TopicSegment
+from morag_video.tasks import _process_video_file_impl
+from morag_video import VideoConverter
+from morag_core.interfaces.converter import ConversionOptions
 
 
 class TestVideoAudioIntegration:

@@ -5,8 +5,8 @@ from datetime import datetime
 import tempfile
 import os
 
-from morag.services.logging_service import LoggingService
-from morag.services.metrics_service import MetricsCollector, SystemMetrics, ApplicationMetrics
+from morag_services import LoggingService
+from src.morag.services.metrics_service import MetricsCollector, SystemMetrics, ApplicationMetrics
 from morag.middleware.monitoring import PerformanceMonitoringMiddleware, ResourceMonitoringMiddleware
 
 class TestLoggingService:

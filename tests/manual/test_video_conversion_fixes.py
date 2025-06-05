@@ -20,8 +20,8 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from morag.converters import DocumentConverter, ConversionOptions
-from morag.converters.registry import document_converter
+from morag_services import DocumentConverter, ConversionOptions
+from src.morag.converters.registry import document_converter
 import structlog
 
 # Configure logging
@@ -176,7 +176,7 @@ async def test_video_conversion_fixes(video_path: Path):
     
     # Test primary video converter
     try:
-        from morag.converters.video import VideoConverter
+        from morag_video import VideoConverter
         video_converter = VideoConverter()
         
         start_time = time.time()
@@ -192,7 +192,7 @@ async def test_video_conversion_fixes(video_path: Path):
     
     # Test simple video converter
     try:
-        from morag.converters.simple_video import SimpleVideoConverter
+        from src.morag.converters.simple_video import SimpleVideoConverter
         simple_converter = SimpleVideoConverter()
         
         start_time = time.time()
@@ -208,7 +208,7 @@ async def test_video_conversion_fixes(video_path: Path):
     
     # Test audio converter as fallback
     try:
-        from morag.converters.audio import AudioConverter
+        from morag_audio import AudioConverter
         audio_converter = AudioConverter()
         
         start_time = time.time()

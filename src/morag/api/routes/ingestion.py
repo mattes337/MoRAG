@@ -9,13 +9,13 @@ from morag.api.models import (
     IngestionRequest, IngestionResponse, URLIngestionRequest,
     BatchIngestionRequest, BatchIngestionResponse, SourceType
 )
-from morag.utils.file_handling import file_handler
-from morag.tasks.document_tasks import process_document_task
-from morag.tasks.audio_tasks import process_audio_file
-from morag.tasks.video_tasks import process_video_file
-from morag.tasks.image_tasks import process_image_file
-from morag.tasks.web_tasks import process_web_url
-from morag.core.exceptions import ValidationError, AuthenticationError
+from morag_core.utils import file_handler
+from morag_document.tasks import process_document_task
+from morag_audio.tasks import process_audio_file
+from morag_video.tasks import process_video_file
+from morag_image.tasks import process_image_file
+from morag_web.tasks import process_web_url
+from morag_core.exceptions import ValidationError, AuthenticationError
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -254,7 +254,7 @@ async def cancel_ingestion(
     """Cancel an ingestion task."""
 
     try:
-        from morag.services.task_manager import task_manager
+        from src.morag.services.task_manager import task_manager
 
         success = task_manager.cancel_task(task_id)
 

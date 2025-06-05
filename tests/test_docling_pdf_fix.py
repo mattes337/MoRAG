@@ -8,7 +8,7 @@ import asyncio
 from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
 
-from morag.processors.document import document_processor, DocumentParseResult, DocumentChunk
+from morag_document import document_processor, DocumentParseResult, DocumentChunk
 
 
 class TestDoclingPDFParsing:
@@ -67,7 +67,7 @@ class TestDoclingPDFParsing:
         """Test that PDFConverter initializes docling correctly with PdfFormatOption."""
 
         # Test that the actual initialization works without the 'backend' attribute error
-        from morag.converters.pdf import PDFConverter
+        from src.morag.converters.pdf import PDFConverter
 
         # This should not raise an AttributeError about 'backend'
         try:
@@ -86,7 +86,7 @@ class TestDoclingPDFParsing:
         """Test that the 'int' object has no attribute 'elements' error is fixed."""
 
         # Test that the actual PDF converter works without the elements attribute error
-        from morag.converters.pdf import PDFConverter
+        from src.morag.converters.pdf import PDFConverter
 
         # This should not raise an AttributeError about 'elements'
         try:
@@ -283,8 +283,8 @@ class TestDoclingPDFParsing:
     async def test_document_task_defaults_to_docling_for_pdf(self):
         """Test that document task defaults to using docling for PDF files."""
         
-        from morag.tasks.document_tasks import _process_document_impl
-        from morag.tasks.base import ProcessingTask
+        from morag_document.tasks import _process_document_impl
+        from morag_services.tasks import ProcessingTask
         
         # Create a mock task instance
         mock_task = Mock(spec=ProcessingTask)
@@ -322,8 +322,8 @@ class TestDoclingPDFParsing:
     async def test_document_task_respects_docling_flag_for_non_pdf(self):
         """Test that document task respects the docling flag for non-PDF files."""
         
-        from morag.tasks.document_tasks import _process_document_impl
-        from morag.tasks.base import ProcessingTask
+        from morag_document.tasks import _process_document_impl
+        from morag_services.tasks import ProcessingTask
         
         # Create a mock task instance
         mock_task = Mock(spec=ProcessingTask)

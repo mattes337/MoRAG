@@ -11,8 +11,8 @@ import logging
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.services.ffmpeg_service import ffmpeg_service
-from morag.processors.video import video_processor, VideoConfig
+from morag_video.services import ffmpeg_service
+from morag_video import video_processor, VideoConfig
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

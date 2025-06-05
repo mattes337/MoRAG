@@ -4,10 +4,10 @@ import asyncio
 from typing import Optional, Dict, Any, List
 import structlog
 
-from morag.core.resilience import (
+from src.morag.core.resilience import (
     AIServiceResilience, RetryConfig, CircuitBreakerConfig, ErrorType
 )
-from morag.core.exceptions import (
+from morag_core.exceptions import (
     RateLimitError, QuotaExceededError, AuthenticationError, 
     ExternalServiceError, ContentPolicyError
 )

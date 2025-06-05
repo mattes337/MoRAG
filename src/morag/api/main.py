@@ -7,11 +7,11 @@ import time
 import asyncio
 from typing import Dict, Any
 
-from morag.core.config import settings
-from morag.core.exceptions import MoRAGException
+from morag_core.config import settings
+from morag_core.exceptions import MoRAGException
 from morag.api.routes import health, ingestion, status
 from morag.middleware.monitoring import PerformanceMonitoringMiddleware, ResourceMonitoringMiddleware
-from morag.services.metrics_service import metrics_collector
+from src.morag.services.metrics_service import metrics_collector
 
 # Configure structured logging
 structlog.configure(
@@ -67,7 +67,7 @@ def create_app() -> FastAPI:
     async def startup_event():
         # Initialize Qdrant connection
         try:
-            from morag.services.storage import qdrant_service
+            from morag_services.storage import qdrant_service
             await qdrant_service.connect()
             logger.info("Qdrant service initialized successfully")
         except Exception as e:
@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
     async def shutdown_event():
         # Disconnect from Qdrant
         try:
-            from morag.services.storage import qdrant_service
+            from morag_services.storage import qdrant_service
             await qdrant_service.disconnect()
             logger.info("Qdrant service disconnected")
         except Exception as e:

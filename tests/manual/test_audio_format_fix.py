@@ -17,8 +17,8 @@ from unittest.mock import Mock
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.converters.audio import AudioConverter
-from morag.converters.base import ConversionOptions
+from morag_audio import AudioConverter
+from morag_core.interfaces.converter import ConversionOptions
 
 
 async def test_enhanced_format():

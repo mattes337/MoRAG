@@ -10,9 +10,9 @@ import pytest
 from unittest.mock import Mock, AsyncMock
 from pathlib import Path
 
-from morag.converters.audio import AudioConverter
-from morag.converters import ConversionOptions, ChunkingStrategy
-from morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
+from morag_audio import AudioConverter
+from morag_services import ConversionOptions, ChunkingStrategy
+from morag_audio import AudioProcessingResult, AudioTranscriptSegment
 
 
 class TestAudioTranscriptFix:

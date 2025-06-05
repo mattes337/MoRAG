@@ -8,7 +8,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 import redis
-from morag.core.config import settings
+from morag_core.config import settings
 
 logger = structlog.get_logger()
 

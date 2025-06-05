@@ -7,15 +7,15 @@ from unittest.mock import Mock, patch, AsyncMock
 import tempfile
 import os
 
-from morag.processors.audio import AudioProcessor, AudioConfig, AudioProcessingResult, AudioTranscriptSegment
-from morag.services.speaker_diarization import (
+from morag_audio import AudioProcessor, AudioConfig, AudioProcessingResult, AudioTranscriptSegment
+from morag_audio.services import (
     EnhancedSpeakerDiarization, DiarizationResult, SpeakerInfo, SpeakerSegment
 )
-from morag.services.topic_segmentation import (
+from morag_audio.services import (
     EnhancedTopicSegmentation, TopicSegmentationResult, TopicSegment
 )
-from morag.converters.audio import AudioConverter
-from morag.converters.base import ConversionOptions
+from morag_audio import AudioConverter
+from morag_core.interfaces.converter import ConversionOptions
 
 
 class TestEnhancedSpeakerDiarization:

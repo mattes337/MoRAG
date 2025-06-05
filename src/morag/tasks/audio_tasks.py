@@ -5,14 +5,14 @@ import structlog
 import asyncio
 from pathlib import Path
 
-from morag.core.celery_app import celery_app
-from morag.tasks.base import ProcessingTask
-from morag.processors.audio import audio_processor, AudioConfig
-from morag.services.whisper_service import whisper_service
-from morag.services.embedding import gemini_service
-from morag.services.chunking import chunking_service
-from morag.services.storage import qdrant_service
-from morag.services.summarization import enhanced_summarization_service, SummaryConfig, SummaryStrategy
+from morag_services.celery_app import celery_app
+from morag_services.tasks import ProcessingTask
+from morag_audio import audio_processor, AudioConfig
+from morag_audio.services import whisper_service
+from morag_services.embedding import gemini_service
+from morag_services.processing import chunking_service
+from morag_services.storage import qdrant_service
+from morag_services.processing import enhanced_summarization_service, SummaryConfig, SummaryStrategy
 
 logger = structlog.get_logger()
 

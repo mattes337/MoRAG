@@ -7,9 +7,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import numpy as np
 
-from morag.processors.audio import AudioProcessor, AudioConfig
-from morag.services.whisper_service import WhisperService
-from morag.tasks.audio_tasks import process_audio_file
+from morag_audio import AudioProcessor, AudioConfig
+from morag_audio.services import WhisperService
+from morag_audio.tasks import process_audio_file
 
 class TestAudioPipeline:
     """Integration test cases for audio processing pipeline."""
@@ -175,7 +175,7 @@ class TestAudioPipeline:
         mock_model.transcribe.return_value = ([mock_segment], mock_info)
         
         # Mock chunking service
-        from morag.services.chunking import TextChunk
+        from morag_services.processing import TextChunk
         mock_chunks = [
             TextChunk(
                 text="This is a longer test transcription",

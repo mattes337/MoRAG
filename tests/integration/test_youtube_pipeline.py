@@ -4,9 +4,9 @@ import pytest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 
-from morag.processors.youtube import YouTubeProcessor, YouTubeConfig
-from morag.tasks.youtube_tasks import process_youtube_video
-from morag.services.embedding import EmbeddingResult
+from morag_youtube import YouTubeProcessor, YouTubeConfig
+from morag_youtube.tasks import process_youtube_video
+from morag_services.embedding import EmbeddingResult
 
 
 class TestYouTubeIntegration:
@@ -80,7 +80,7 @@ class TestYouTubeIntegration:
         video_file.write_text("mock video content")
         audio_file.write_text("mock audio content")
         
-        from morag.processors.youtube import YouTubeDownloadResult
+        from morag_youtube import YouTubeDownloadResult
         
         mock_result = YouTubeDownloadResult(
             video_path=video_file,
@@ -131,8 +131,8 @@ class TestYouTubeIntegration:
     ):
         """Test YouTube playlist processing integration."""
         
-        from morag.processors.youtube import YouTubeDownloadResult
-        from morag.tasks.youtube_tasks import process_youtube_playlist
+        from morag_youtube import YouTubeDownloadResult
+        from morag_youtube.tasks import process_youtube_playlist
         
         # Create mock results for multiple videos
         mock_results = []
@@ -211,7 +211,7 @@ class TestYouTubeIntegration:
     ):
         """Test different YouTube configuration options."""
         
-        from morag.processors.youtube import YouTubeDownloadResult
+        from morag_youtube import YouTubeDownloadResult
         
         # Test audio-only configuration
         audio_file = tmp_path / "test_audio.mp3"
@@ -248,8 +248,8 @@ class TestYouTubeIntegration:
     ):
         """Test metadata-only extraction."""
         
-        from morag.processors.youtube import YouTubeDownloadResult
-        from morag.tasks.youtube_tasks import extract_youtube_metadata
+        from morag_youtube import YouTubeDownloadResult
+        from morag_youtube.tasks import extract_youtube_metadata
         
         mock_result = YouTubeDownloadResult(
             video_path=None,

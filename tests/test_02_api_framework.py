@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 import json
 from morag.api.main import create_app
-from morag.core.exceptions import MoRAGException, ValidationError
+from morag_core.exceptions import MoRAGException, ValidationError
 
 @pytest.fixture
 def app():

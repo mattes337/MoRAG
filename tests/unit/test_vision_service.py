@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
 from PIL import Image
 
-from morag.services.vision_service import VisionService, vision_service
-from morag.core.exceptions import ExternalServiceError
+from morag_image.services import VisionService, vision_service
+from morag_core.exceptions import ExternalServiceError
 
 class TestVisionService:
     """Test cases for VisionService."""

@@ -15,7 +15,7 @@ import sys
 # Add the src directory to the path so we can import MoRAG modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.processors.web import WebProcessor, WebScrapingConfig
+from morag_web import WebProcessor, WebScrapingConfig
 
 
 async def demo_basic_scraping():

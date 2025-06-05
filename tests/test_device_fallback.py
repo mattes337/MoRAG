@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from morag.core.config import detect_device, get_safe_device, Settings
+from morag_core.config import detect_device, get_safe_device, Settings
 
 
 class TestDeviceDetection:
@@ -108,7 +108,7 @@ class TestAudioConfigDeviceFallback:
     
     def test_audio_config_device_fallback(self):
         """Test that AudioConfig uses safe device fallback."""
-        from morag.processors.audio import AudioConfig
+        from morag_audio import AudioConfig
         
         with patch('morag.processors.audio.get_safe_device', return_value="cpu") as mock_get_safe:
             config = AudioConfig(device="cuda")
@@ -122,7 +122,7 @@ class TestWhisperServiceDeviceFallback:
     @pytest.mark.asyncio
     async def test_whisper_model_gpu_fallback(self):
         """Test that Whisper model falls back to CPU when GPU fails."""
-        from morag.services.whisper_service import WhisperService
+        from morag_audio.services import WhisperService
         
         # Mock WhisperModel to fail on GPU but succeed on CPU
         def mock_whisper_model(model_size, device, compute_type):

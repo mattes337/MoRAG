@@ -7,8 +7,8 @@ import hashlib
 import structlog
 from fastapi import UploadFile
 
-from morag.core.config import settings
-from morag.core.exceptions import ValidationError
+from morag_core.config import settings
+from morag_core.exceptions import ValidationError
 
 logger = structlog.get_logger()
 

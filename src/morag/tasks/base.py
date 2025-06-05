@@ -3,8 +3,8 @@ import structlog
 import asyncio
 from datetime import datetime
 
-from morag.core.celery_app import celery_app, BaseTask
-from morag.services.task_manager import task_manager
+from morag_services.celery_app import celery_app, BaseTask
+from src.morag.services.task_manager import task_manager
 
 logger = structlog.get_logger()
 

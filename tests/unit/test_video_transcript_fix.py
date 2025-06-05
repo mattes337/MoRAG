@@ -4,11 +4,11 @@ import pytest
 from unittest.mock import Mock, patch
 from pathlib import Path
 
-from morag.converters.video import VideoConverter
-from morag.converters.base import ConversionOptions
-from morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
-from morag.services.speaker_diarization import DiarizationResult, SpeakerSegment, SpeakerInfo
-from morag.services.topic_segmentation import TopicSegmentationResult, TopicSegment
+from morag_video import VideoConverter
+from morag_core.interfaces.converter import ConversionOptions
+from morag_audio import AudioProcessingResult, AudioTranscriptSegment
+from morag_audio.services import DiarizationResult, SpeakerSegment, SpeakerInfo
+from morag_audio.services import TopicSegmentationResult, TopicSegment
 
 
 class TestVideoTranscriptFix:

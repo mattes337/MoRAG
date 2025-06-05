@@ -18,13 +18,13 @@ from typing import Dict, Any
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import structlog
-from morag.core.config import settings
-from morag.processors.audio import AudioProcessor, AudioConfig
-from morag.processors.video import VideoProcessor, VideoConfig
-from morag.converters.audio import AudioConverter
-from morag.converters.video import VideoConverter
-from morag.converters.config import ConversionOptions, ChunkingStrategy
-from morag.services.topic_segmentation import EnhancedTopicSegmentation
+from morag_core.config import settings
+from morag_audio import AudioProcessor, AudioConfig
+from morag_video import VideoProcessor, VideoConfig
+from morag_audio import AudioConverter
+from morag_video import VideoConverter
+from morag_core.models import ConversionOptions, ChunkingStrategy
+from morag_audio.services import EnhancedTopicSegmentation
 
 # Configure logging
 logging.basicConfig(

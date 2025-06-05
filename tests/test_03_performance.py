@@ -2,7 +2,7 @@ import pytest
 import time
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
-from morag.services.storage import QdrantService
+from morag_services.storage import QdrantService
 
 @pytest.mark.performance
 class TestQdrantPerformance:
@@ -351,7 +351,7 @@ class TestPerformanceBenchmarks:
     @pytest.mark.asyncio
     async def test_connection_pool_performance(self):
         """Test connection pooling performance simulation."""
-        from morag.services.storage import QdrantService
+        from morag_services.storage import QdrantService
         
         # Test multiple service instances
         services = [QdrantService() for _ in range(5)]

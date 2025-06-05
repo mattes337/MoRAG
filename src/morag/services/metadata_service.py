@@ -5,11 +5,11 @@ import mimetypes
 import structlog
 from datetime import datetime
 
-from morag.models.metadata import (
+from morag_core.models import (
     ComprehensiveMetadata, FileMetadata, ContentMetadata, 
     ProcessingMetadata, UserMetadata, SystemMetadata
 )
-from morag.core.exceptions import ValidationError
+from morag_core.exceptions import ValidationError
 
 logger = structlog.get_logger()
 

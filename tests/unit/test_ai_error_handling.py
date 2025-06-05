@@ -5,15 +5,15 @@ import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime, timedelta
 
-from morag.core.resilience import (
+from src.morag.core.resilience import (
     AIServiceResilience, RetryConfig, CircuitBreakerConfig,
     HealthMonitor, CircuitBreaker, ErrorType, CircuitBreakerState
 )
-from morag.core.ai_error_handlers import (
+from src.morag.core.ai_error_handlers import (
     GeminiErrorHandler, WhisperErrorHandler, VisionErrorHandler,
     UniversalAIErrorHandler, execute_with_ai_resilience
 )
-from morag.core.exceptions import (
+from morag_core.exceptions import (
     CircuitBreakerOpenError, RateLimitError, QuotaExceededError,
     TimeoutError, ContentPolicyError, ExternalServiceError
 )

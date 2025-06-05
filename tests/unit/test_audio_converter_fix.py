@@ -4,9 +4,9 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from pathlib import Path
 
-from morag.converters.audio import AudioConverter
-from morag.converters.base import ConversionOptions, ChunkingStrategy
-from morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
+from morag_audio import AudioConverter
+from morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
+from morag_audio import AudioProcessingResult, AudioTranscriptSegment
 
 
 class TestAudioConverterFix:
@@ -80,7 +80,7 @@ class TestAudioConverterFix:
             ))
 
             # Import and test the converter's method call
-            from morag.converters.audio import audio_processor
+            from morag_audio import audio_processor
 
             # Verify the method exists and can be called
             result = await audio_processor.process_audio_file("test_file.m4a")
@@ -161,7 +161,7 @@ class TestAudioConverterFix:
         conversion_options
     ):
         """Test integration with real audio processor (method exists)."""
-        from morag.processors.audio import AudioProcessor
+        from morag_audio import AudioProcessor
         
         # Verify the method exists on the real class
         processor = AudioProcessor()

@@ -18,8 +18,8 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.core.config import detect_device, get_safe_device, Settings
-from morag.processors.audio import AudioProcessor, AudioConfig
+from morag_core.config import detect_device, get_safe_device, Settings
+from morag_audio import AudioProcessor, AudioConfig
 import structlog
 
 # Configure logging
@@ -111,7 +111,7 @@ def test_video_processing_gpu():
     print_section("Video Processing GPU Tests")
     
     try:
-        from morag.processors.video import VideoProcessor, VideoConfig
+        from morag_video import VideoProcessor, VideoConfig
         
         print("1. VideoProcessor initialization:")
         video_processor = VideoProcessor()

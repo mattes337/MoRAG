@@ -5,11 +5,11 @@ import asyncio
 import structlog
 import redis
 
-from morag.core.config import settings
-from morag.services.storage import qdrant_service
-from morag.services.task_manager import task_manager
-from morag.services.embedding import gemini_service
-from morag.services.metrics_service import metrics_collector
+from morag_core.config import settings
+from morag_services.storage import qdrant_service
+from src.morag.services.task_manager import task_manager
+from morag_services.embedding import gemini_service
+from src.morag.services.metrics_service import metrics_collector
 
 logger = structlog.get_logger()
 router = APIRouter()

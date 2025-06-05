@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from morag.services.embedding import GeminiService, EmbeddingResult, SummaryResult
-from morag.core.exceptions import ExternalServiceError, RateLimitError
+from morag_services.embedding import GeminiService, EmbeddingResult, SummaryResult
+from morag_core.exceptions import ExternalServiceError, RateLimitError
 
 
 class TestGeminiService:

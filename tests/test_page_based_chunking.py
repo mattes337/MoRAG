@@ -3,8 +3,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from morag.processors.document import DocumentProcessor, DocumentChunk, DocumentParseResult
-from morag.core.config import settings
+from morag_document import DocumentProcessor, DocumentChunk, DocumentParseResult
+from morag_core.config import settings
 
 
 @pytest.fixture
@@ -225,7 +225,7 @@ class TestPageBasedChunking:
         assert hasattr(settings, 'max_page_chunk_size')
         
         # Test that page strategy is available
-        from morag.services.chunking import SemanticChunker
+        from morag_services.processing import SemanticChunker
         chunker = SemanticChunker()
         
         # This should not raise an exception

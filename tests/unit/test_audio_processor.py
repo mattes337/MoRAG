@@ -7,8 +7,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
 import numpy as np
 
-from morag.processors.audio import AudioProcessor, AudioConfig, AudioProcessingResult, AudioTranscriptSegment
-from morag.core.exceptions import ProcessingError, ExternalServiceError
+from morag_audio import AudioProcessor, AudioConfig, AudioProcessingResult, AudioTranscriptSegment
+from morag_core.exceptions import ProcessingError, ExternalServiceError
 
 class TestAudioProcessor:
     """Test cases for AudioProcessor."""
@@ -289,7 +289,7 @@ class TestAudioProcessor:
     
     def test_audio_segment_creation(self):
         """Test AudioTranscriptSegment creation."""
-        from morag.processors.audio import AudioTranscriptSegment
+        from morag_audio import AudioTranscriptSegment
 
         segment = AudioTranscriptSegment(
             text="Hello world",

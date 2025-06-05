@@ -6,8 +6,8 @@ from pathlib import Path
 import tempfile
 from PIL import Image
 
-from morag.processors.image import ImageProcessor, ImageConfig, ImageMetadata, ImageProcessingResult
-from morag.core.exceptions import ProcessingError
+from morag_image import ImageProcessor, ImageConfig, ImageMetadata, ImageProcessingResult
+from morag_core.exceptions import ProcessingError
 
 class TestImageProcessor:
     """Test cases for ImageProcessor."""

@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import List, Dict, Any
 
-from morag.services.storage import QdrantService
-from morag.core.exceptions import StorageError
+from morag_services.storage import QdrantService
+from morag_core.exceptions import StorageError
 
 
 class MockEmbeddingResult:

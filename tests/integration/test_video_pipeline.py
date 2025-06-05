@@ -5,9 +5,9 @@ from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
 import tempfile
 
-from morag.processors.video import video_processor, VideoConfig
-from morag.services.ffmpeg_service import ffmpeg_service
-from morag.tasks.video_tasks import process_video_file
+from morag_video import video_processor, VideoConfig
+from morag_video.services import ffmpeg_service
+from morag_video.tasks import process_video_file
 
 class TestVideoPipelineIntegration:
     """Integration tests for video processing pipeline."""
@@ -139,7 +139,7 @@ class TestVideoPipelineIntegration:
         mock_video_file
     ):
         """Test video task integration with audio processing."""
-        from morag.processors.video import VideoMetadata, VideoProcessingResult
+        from morag_video import VideoMetadata, VideoProcessingResult
         
         # Mock video processing result
         video_metadata = VideoMetadata(
@@ -270,7 +270,7 @@ class TestVideoPipelineIntegration:
     @patch('morag.tasks.video_tasks.video_processor')
     async def test_video_without_audio_integration(self, mock_processor, mock_video_file):
         """Test video processing for files without audio."""
-        from morag.processors.video import VideoMetadata, VideoProcessingResult
+        from morag_video import VideoMetadata, VideoProcessingResult
         
         # Mock video-only result
         video_metadata = VideoMetadata(

@@ -2,9 +2,9 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from morag.core.config import detect_device, get_safe_device
-from morag.core.ai_error_handlers import WhisperErrorHandler
-from morag.core.resilience import ErrorType
+from morag_core.config import detect_device, get_safe_device
+from src.morag.core.ai_error_handlers import WhisperErrorHandler
+from src.morag.core.resilience import ErrorType
 
 
 class TestGPUErrorSimulation:
@@ -62,7 +62,7 @@ class TestGPUErrorSimulation:
     
     def test_whisper_gpu_fallback_simulation(self):
         """Test Whisper service GPU fallback with simulated error."""
-        from morag.services.whisper_service import WhisperService
+        from morag_audio.services import WhisperService
         
         # Mock WhisperModel to simulate GPU failure
         def mock_whisper_model(model_size, device, compute_type):
@@ -79,7 +79,7 @@ class TestGPUErrorSimulation:
     
     def test_easyocr_gpu_fallback_simulation(self):
         """Test EasyOCR GPU fallback with simulated error."""
-        from morag.processors.image import ImageProcessor
+        from morag_image import ImageProcessor
         
         # Mock EasyOCR to simulate GPU failure
         mock_easyocr = MagicMock()
@@ -96,7 +96,7 @@ class TestGPUErrorSimulation:
     
     def test_sentence_transformer_gpu_fallback_simulation(self):
         """Test SentenceTransformer GPU fallback with simulated error."""
-        from morag.services.topic_segmentation import EnhancedTopicSegmentation
+        from morag_audio.services import EnhancedTopicSegmentation
         
         # Mock SentenceTransformer to simulate GPU failure
         mock_st = MagicMock()
@@ -160,7 +160,7 @@ class TestGPUFallbackIntegration:
     
     def test_audio_config_gpu_fallback_integration(self):
         """Test AudioConfig GPU fallback integration."""
-        from morag.processors.audio import AudioConfig
+        from morag_audio import AudioConfig
         
         # Mock get_safe_device to simulate GPU unavailable
         with patch('morag.processors.audio.get_safe_device', return_value="cpu"):
@@ -169,7 +169,7 @@ class TestGPUFallbackIntegration:
     
     def test_settings_device_configuration_integration(self):
         """Test Settings device configuration integration."""
-        from morag.core.config import Settings
+        from morag_core.config import Settings
         
         # Test force CPU override
         settings = Settings(force_cpu=True, preferred_device="cuda")
@@ -183,7 +183,7 @@ class TestGPUFallbackIntegration:
     @pytest.mark.asyncio
     async def test_async_gpu_fallback_integration(self):
         """Test async operations with GPU fallback."""
-        from morag.services.topic_segmentation import EnhancedTopicSegmentation
+        from morag_audio.services import EnhancedTopicSegmentation
         
         service = EnhancedTopicSegmentation()
         

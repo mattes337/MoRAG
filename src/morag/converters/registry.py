@@ -38,7 +38,7 @@ class DocumentConverter:
     
     def _register_default_converters(self):
         """Register default converters for common formats."""
-        # Import and register existing MoRAG converters
+        # Import and register converters from modular packages
         try:
             from .pdf import PDFConverter
             self.register_converter('pdf', PDFConverter())
@@ -49,18 +49,18 @@ class DocumentConverter:
             logger.error("Failed to register PDF converter", error=str(e))
 
         try:
-            from .audio import AudioConverter
+            from morag_audio.converters import AudioConverter
             self.register_converter('audio', AudioConverter())
-            logger.info("Registered Audio converter")
+            logger.info("Registered Audio converter from morag-audio package")
         except ImportError as e:
             logger.warning("Audio converter not available", error=str(e))
         except Exception as e:
             logger.error("Failed to register Audio converter", error=str(e))
 
         try:
-            from .video import VideoConverter
+            from morag_video.converters import VideoConverter
             self.register_converter('video', VideoConverter())
-            logger.info("Registered Video converter")
+            logger.info("Registered Video converter from morag-video package")
 
             # Register fallback converters for video
             try:
@@ -71,7 +71,7 @@ class DocumentConverter:
                 logger.warning("Could not register simple video fallback", error=str(fallback_e))
 
             try:
-                from .audio import AudioConverter
+                from morag_audio.converters import AudioConverter
                 self.register_converter('video', AudioConverter(), is_primary=False)
                 logger.info("Registered Audio converter as video fallback")
             except Exception as fallback_e:
@@ -94,9 +94,9 @@ class DocumentConverter:
             logger.error("Failed to register Office converter", error=str(e))
 
         try:
-            from .web import WebConverter
+            from morag_web import WebConverter
             self.register_converter('web', WebConverter())
-            logger.info("Registered Web converter")
+            logger.info("Registered Web converter from morag-web package")
         except ImportError as e:
             logger.warning("Web converter not available", error=str(e))
         except Exception as e:

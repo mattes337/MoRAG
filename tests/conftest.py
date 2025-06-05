@@ -14,8 +14,8 @@ from fastapi.testclient import TestClient
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.core.config import settings
-from morag.services.embedding import EmbeddingResult, SummaryResult
+from morag_core.config import settings
+from morag_services.embedding import EmbeddingResult, SummaryResult
 
 
 class TestSettings:
@@ -217,7 +217,7 @@ def auth_headers():
 @pytest.fixture
 def mock_youtube_metadata():
     """Mock YouTube metadata for testing."""
-    from morag.processors.youtube import YouTubeMetadata
+    from morag_youtube import YouTubeMetadata
     
     return YouTubeMetadata(
         id="test_video_123",

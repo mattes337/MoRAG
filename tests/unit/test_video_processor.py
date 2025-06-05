@@ -6,8 +6,8 @@ from pathlib import Path
 import tempfile
 import time
 
-from morag.processors.video import VideoProcessor, VideoConfig, VideoMetadata, VideoProcessingResult
-from morag.core.exceptions import ProcessingError, ExternalServiceError
+from morag_video import VideoProcessor, VideoConfig, VideoMetadata, VideoProcessingResult
+from morag_core.exceptions import ProcessingError, ExternalServiceError
 
 class TestVideoProcessor:
     """Test cases for VideoProcessor."""

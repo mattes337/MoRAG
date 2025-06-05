@@ -4,9 +4,9 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 import structlog
 
-from morag.core.ai_error_handlers import get_ai_service_health
-from morag.services.embedding import gemini_service
-from morag.services.whisper_service import whisper_service
+from src.morag.core.ai_error_handlers import get_ai_service_health
+from morag_services.embedding import gemini_service
+from morag_audio.services import whisper_service
 
 logger = structlog.get_logger()
 

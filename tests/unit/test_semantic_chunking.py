@@ -1,5 +1,5 @@
 import pytest
-from morag.services.chunking import chunking_service, ChunkInfo, SemanticChunker
+from morag_services.processing import chunking_service, ChunkInfo, SemanticChunker
 
 @pytest.mark.asyncio
 async def test_simple_chunking():

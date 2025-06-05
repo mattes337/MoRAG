@@ -2,15 +2,15 @@ from typing import Dict, Any, List
 import structlog
 from pathlib import Path
 
-from morag.core.celery_app import celery_app
-from morag.core.config import settings
-from morag.tasks.base import ProcessingTask
-from morag.processors.document import document_processor
-from morag.services.embedding import gemini_service
-from morag.services.chunking import chunking_service
-from morag.services.storage import qdrant_service
-from morag.services.summarization import enhanced_summarization_service, SummaryConfig, SummaryStrategy
-from morag.utils.text_processing import combine_text_and_summary
+from morag_services.celery_app import celery_app
+from morag_core.config import settings
+from morag_services.tasks import ProcessingTask
+from morag_document import document_processor
+from morag_services.embedding import gemini_service
+from morag_services.processing import chunking_service
+from morag_services.storage import qdrant_service
+from morag_services.processing import enhanced_summarization_service, SummaryConfig, SummaryStrategy
+from morag_core.utils import combine_text_and_summary
 
 logger = structlog.get_logger()
 

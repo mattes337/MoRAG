@@ -2,8 +2,8 @@ import pytest
 import asyncio
 import uuid
 from unittest.mock import patch, AsyncMock, MagicMock
-from morag.services.storage import qdrant_service, QdrantService
-from morag.core.exceptions import StorageError
+from morag_services.storage import qdrant_service, QdrantService
+from morag_core.exceptions import StorageError
 
 @pytest.fixture
 def mock_qdrant_service():

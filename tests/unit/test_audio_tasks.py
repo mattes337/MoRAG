@@ -7,8 +7,8 @@ from unittest.mock import Mock, patch, AsyncMock
 
 # Import the actual task functions, not the Celery tasks
 from morag.tasks import audio_tasks
-from morag.processors.audio import AudioConfig, AudioProcessingResult, AudioTranscriptSegment
-from morag.services.chunking import ChunkInfo
+from morag_audio import AudioConfig, AudioProcessingResult, AudioTranscriptSegment
+from morag_services.processing import ChunkInfo
 
 class TestAudioTasks:
     """Test cases for audio processing tasks."""

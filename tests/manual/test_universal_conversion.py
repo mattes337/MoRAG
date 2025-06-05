@@ -29,14 +29,14 @@ import json
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.converters import (
+from morag_services import (
     DocumentConverter,
     ConversionOptions,
     ChunkingStrategy,
     ConversionError,
     UnsupportedFormatError
 )
-from morag.converters.config import get_conversion_config
+from morag_core.models import get_conversion_config
 import structlog
 
 # Configure logging

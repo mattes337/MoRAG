@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from typing import List, Dict, Any
 import asyncio
 
-from morag.services.storage import QdrantService
-from morag.services.embedding import GeminiService, EmbeddingResult
-from morag.core.exceptions import StorageError
+from morag_services.storage import QdrantService
+from morag_services.embedding import GeminiService, EmbeddingResult
+from morag_core.exceptions import StorageError
 
 
 class TestVectorStorageIntegration:

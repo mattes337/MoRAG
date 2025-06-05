@@ -3,8 +3,8 @@ from typing import List
 import structlog
 
 from morag.api.models import TaskStatusResponse
-from morag.services.task_manager import task_manager, TaskStatus
-from morag.services.status_history import status_history
+from src.morag.services.task_manager import task_manager, TaskStatus
+from src.morag.services.status_history import status_history
 from morag.api.routes.ingestion import verify_api_key
 
 logger = structlog.get_logger()

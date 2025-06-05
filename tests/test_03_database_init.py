@@ -72,7 +72,7 @@ class TestDatabaseInitialization:
     @pytest.mark.asyncio
     async def test_collection_configuration(self):
         """Test that collection is configured correctly."""
-        from morag.services.storage import QdrantService
+        from morag_services.storage import QdrantService
         
         service = QdrantService()
         
@@ -122,7 +122,7 @@ import os
 sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 
 try:
-    from morag.services.storage import QdrantService
+    from morag_services.storage import QdrantService
     service = QdrantService()
     # Simulate connection failure
     raise Exception("Simulated connection error")
@@ -174,15 +174,15 @@ class TestDatabaseConfiguration:
 
     def test_collection_name_configuration(self):
         """Test that collection name is properly configured."""
-        from morag.core.config import settings
-        from morag.services.storage import qdrant_service
+        from morag_core.config import settings
+        from morag_services.storage import qdrant_service
         
         assert hasattr(settings, 'qdrant_collection_name')
         assert qdrant_service.collection_name == settings.qdrant_collection_name
 
     def test_qdrant_connection_parameters(self):
         """Test Qdrant connection parameters."""
-        from morag.core.config import settings
+        from morag_core.config import settings
         
         # Test that all required Qdrant settings exist
         assert hasattr(settings, 'qdrant_host')
@@ -198,7 +198,7 @@ class TestDatabaseConfiguration:
     @pytest.mark.asyncio
     async def test_service_initialization(self):
         """Test service initialization process."""
-        from morag.services.storage import QdrantService
+        from morag_services.storage import QdrantService
         
         service = QdrantService()
         

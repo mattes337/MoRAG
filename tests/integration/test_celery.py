@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 import time
-from morag.tasks.base import process_document_task
-from morag.services.task_manager import task_manager, TaskStatus
+from morag_services.tasks import process_document_task
+from src.morag.services.task_manager import task_manager, TaskStatus
 
 def test_task_submission():
     """Test task submission and status tracking."""

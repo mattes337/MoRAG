@@ -4,11 +4,11 @@ from typing import Dict, Any, List, Optional
 import structlog
 from pathlib import Path
 
-from morag.core.celery_app import celery_app
-from morag.tasks.base import ProcessingTask
-from morag.processors.youtube import youtube_processor, YouTubeConfig
-from morag.services.embedding import gemini_service
-from morag.services.storage import qdrant_service
+from morag_services.celery_app import celery_app
+from morag_services.tasks import ProcessingTask
+from morag_youtube import youtube_processor, YouTubeConfig
+from morag_services.embedding import gemini_service
+from morag_services.storage import qdrant_service
 
 logger = structlog.get_logger()
 

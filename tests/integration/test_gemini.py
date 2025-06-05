@@ -3,8 +3,8 @@
 import pytest
 import asyncio
 from unittest.mock import patch, AsyncMock, MagicMock
-from morag.services.embedding import gemini_service, EmbeddingResult, SummaryResult
-from morag.core.exceptions import ExternalServiceError, RateLimitError
+from morag_services.embedding import gemini_service, EmbeddingResult, SummaryResult
+from morag_core.exceptions import ExternalServiceError, RateLimitError
 
 
 class TestGeminiIntegration:
@@ -202,7 +202,7 @@ class TestGeminiServiceConfiguration:
                 mock_client = MagicMock()
                 mock_client_class.return_value = mock_client
 
-                from morag.services.embedding import GeminiService
+                from morag_services.embedding import GeminiService
                 service = GeminiService()
 
                 assert service.client is not None
@@ -214,7 +214,7 @@ class TestGeminiServiceConfiguration:
         with patch('morag.services.embedding.settings') as mock_settings:
             mock_settings.gemini_api_key = None
 
-            from morag.services.embedding import GeminiService
+            from morag_services.embedding import GeminiService
             service = GeminiService()
 
             assert service.client is None
@@ -226,7 +226,7 @@ class TestTextProcessingIntegration:
     @pytest.mark.asyncio
     async def test_embedding_with_text_preparation(self):
         """Test embedding generation with text preparation."""
-        from morag.utils.text_processing import prepare_text_for_embedding
+        from morag_core.utils import prepare_text_for_embedding
         
         with patch.object(gemini_service, 'client') as mock_client:
             # Mock the response
@@ -247,7 +247,7 @@ class TestTextProcessingIntegration:
     @pytest.mark.asyncio
     async def test_summary_with_text_preparation(self):
         """Test summary generation with text preparation."""
-        from morag.utils.text_processing import prepare_text_for_summary
+        from morag_core.utils import prepare_text_for_summary
         
         with patch.object(gemini_service, 'client') as mock_client:
             # Mock the response

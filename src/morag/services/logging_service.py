@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from morag.core.config import settings
+from morag_core.config import settings
 
 class LoggingService:
     """Enhanced logging service with rotation and structured output."""

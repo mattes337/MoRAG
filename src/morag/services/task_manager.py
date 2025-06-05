@@ -6,7 +6,7 @@ import json
 import structlog
 
 from celery.result import AsyncResult
-from morag.core.celery_app import celery_app
+from morag_services.celery_app import celery_app
 
 logger = structlog.get_logger()
 
@@ -117,7 +117,7 @@ class TaskManager:
             )
 
             # Add to status history
-            from morag.services.status_history import status_history
+            from src.morag.services.status_history import status_history
             status_history.add_status_event(
                 task_id=task_id,
                 status='progress',
@@ -207,7 +207,7 @@ class TaskManager:
         webhook_url = metadata.get('webhook_url')
 
         # Add to status history
-        from morag.services.status_history import status_history
+        from src.morag.services.status_history import status_history
         status_history.add_status_event(
             task_id=task_id,
             status='completed' if result.get('status') != 'failure' else 'failed',
@@ -217,7 +217,7 @@ class TaskManager:
         )
 
         if webhook_url:
-            from morag.services.webhook import webhook_service
+            from morag_services import webhook_service
             if result.get('status') != 'failure':
                 await webhook_service.send_task_completed(
                     task_id=task_id,
@@ -239,7 +239,7 @@ class TaskManager:
         webhook_url = metadata.get('webhook_url')
 
         # Add to status history
-        from morag.services.status_history import status_history
+        from src.morag.services.status_history import status_history
         status_history.add_status_event(
             task_id=task_id,
             status='started',
@@ -249,7 +249,7 @@ class TaskManager:
         )
 
         if webhook_url:
-            from morag.services.webhook import webhook_service
+            from morag_services import webhook_service
             await webhook_service.send_task_started(
                 task_id=task_id,
                 webhook_url=webhook_url,
@@ -268,7 +268,7 @@ class TaskManager:
 
         # Only send webhook for significant progress milestones
         if webhook_url and progress in [0.25, 0.5, 0.75]:
-            from morag.services.webhook import webhook_service
+            from morag_services import webhook_service
             await webhook_service.send_task_progress(
                 task_id=task_id,
                 webhook_url=webhook_url,

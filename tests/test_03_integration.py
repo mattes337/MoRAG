@@ -94,7 +94,7 @@ class TestQdrantIntegration:
     def test_qdrant_service_import(self):
         """Test that Qdrant service can be imported correctly."""
         try:
-            from morag.services.storage import qdrant_service, QdrantService
+            from morag_services.storage import qdrant_service, QdrantService
             assert qdrant_service is not None
             assert isinstance(qdrant_service, QdrantService)
         except ImportError as e:
@@ -103,7 +103,7 @@ class TestQdrantIntegration:
     @pytest.mark.asyncio
     async def test_qdrant_service_mock_operations(self):
         """Test Qdrant service operations with mocked client."""
-        from morag.services.storage import QdrantService
+        from morag_services.storage import QdrantService
         
         service = QdrantService()
         
@@ -213,7 +213,7 @@ class TestQdrantConfiguration:
 
     def test_qdrant_settings_configuration(self):
         """Test Qdrant settings configuration."""
-        from morag.core.config import settings
+        from morag_core.config import settings
         
         # Test that Qdrant settings are properly configured
         assert hasattr(settings, 'qdrant_host')
@@ -228,17 +228,17 @@ class TestQdrantConfiguration:
 
     def test_service_singleton_pattern(self):
         """Test that qdrant_service follows singleton pattern."""
-        from morag.services.storage import qdrant_service
+        from morag_services.storage import qdrant_service
         
         # Import again to test singleton
-        from morag.services.storage import qdrant_service as qdrant_service2
+        from morag_services.storage import qdrant_service as qdrant_service2
         
         assert qdrant_service is qdrant_service2
 
     @pytest.mark.asyncio
     async def test_service_lifecycle(self):
         """Test service connection lifecycle."""
-        from morag.services.storage import QdrantService
+        from morag_services.storage import QdrantService
         
         service = QdrantService()
         

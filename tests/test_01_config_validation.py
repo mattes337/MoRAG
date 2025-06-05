@@ -9,7 +9,7 @@ src_path = Path("src").resolve()
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from morag.core.config import Settings
+from morag_core.config import Settings
 
 class TestConfigValidation:
     """Test configuration validation and defaults."""

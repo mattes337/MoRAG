@@ -5,14 +5,14 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from morag.services.summarization import (
+from morag_services.processing import (
     enhanced_summarization_service,
     SummaryConfig,
     SummaryStrategy,
     DocumentType
 )
-from morag.tasks.document_tasks import _process_document_impl
-from morag.services.embedding import SummaryResult, EmbeddingResult
+from morag_document.tasks import _process_document_impl
+from morag_services.embedding import SummaryResult, EmbeddingResult
 
 @pytest.fixture
 def mock_gemini_service():

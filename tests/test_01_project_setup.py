@@ -47,7 +47,7 @@ def test_config_import():
         if str(src_path) not in sys.path:
             sys.path.insert(0, str(src_path))
         
-        from morag.core.config import settings
+        from morag_core.config import settings
         assert settings is not None
         assert hasattr(settings, 'api_host')
         assert hasattr(settings, 'gemini_api_key')
@@ -61,7 +61,7 @@ def test_environment_variables():
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
     
-    from morag.core.config import Settings
+    from morag_core.config import Settings
     
     # Test with minimal required env vars
     import os

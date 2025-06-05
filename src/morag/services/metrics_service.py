@@ -6,7 +6,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 import structlog
 
-from morag.core.config import settings
+from morag_core.config import settings
 
 logger = structlog.get_logger()
 
@@ -127,8 +127,8 @@ class MetricsCollector:
         """Collect application-specific metrics."""
         # Import here to avoid circular imports
         try:
-            from morag.services.task_manager import task_manager
-            from morag.services.storage import qdrant_service
+            from src.morag.services.task_manager import task_manager
+            from morag_services.storage import qdrant_service
             
             # Task queue metrics
             queue_stats = task_manager.get_queue_stats()

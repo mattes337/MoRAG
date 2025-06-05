@@ -17,12 +17,12 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.core.config import Settings, detect_device, get_safe_device
-from morag.processors.audio import AudioProcessor, AudioConfig
-from morag.processors.image import ImageProcessor
-from morag.services.topic_segmentation import EnhancedTopicSegmentation
-from morag.services.speaker_diarization import EnhancedSpeakerDiarization
-from morag.services.whisper_service import WhisperService
+from morag_core.config import Settings, detect_device, get_safe_device
+from morag_audio import AudioProcessor, AudioConfig
+from morag_image import ImageProcessor
+from morag_audio.services import EnhancedTopicSegmentation
+from morag_audio.services import EnhancedSpeakerDiarization
+from morag_audio.services import WhisperService
 
 
 def print_section(title: str):

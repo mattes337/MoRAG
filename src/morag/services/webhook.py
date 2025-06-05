@@ -6,8 +6,8 @@ import structlog
 import asyncio
 from datetime import datetime
 
-from morag.core.config import settings
-from morag.core.exceptions import ExternalServiceError
+from morag_core.config import settings
+from morag_core.exceptions import ExternalServiceError
 
 logger = structlog.get_logger()
 

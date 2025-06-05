@@ -1,5 +1,5 @@
 import pytest
-from morag.core.exceptions import (
+from morag_core.exceptions import (
     MoRAGException, ValidationError, ProcessingError,
     StorageError, ExternalServiceError, AuthenticationError, RateLimitError
 )
