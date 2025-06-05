@@ -1,0 +1,1 @@
+"""Test resources for morag-image package."""
