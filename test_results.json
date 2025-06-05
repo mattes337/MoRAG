@@ -1,17 +1,14 @@
 {
-  "configuration": {
+  "basic_functionality": {
     "success": true
   },
-  "processing_configs": {
-    "success": false
-  },
   "components": {
-    "AudioProcessor": false,
-    "DocumentProcessor": false,
+    "AudioProcessor": true,
+    "DocumentProcessor": true,
     "VideoProcessor": true,
     "ImageProcessor": true,
-    "WebProcessor": false,
-    "YouTubeProcessor": false
+    "WebProcessor": true,
+    "YouTubeProcessor": true
   },
   "sample_files": {
     "audio_Sprache.mp3": true,

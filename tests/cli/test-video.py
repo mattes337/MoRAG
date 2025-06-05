@@ -21,9 +21,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from morag_video import VideoProcessor
-    from morag_services import ServiceConfig, ContentType
-    from morag_core.models import ProcessingConfig
+    from morag_video import VideoProcessor, VideoConfig
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
@@ -65,91 +63,110 @@ async def test_video_processing(video_file: Path) -> bool:
     print_result("File Extension", video_file.suffix.lower())
     
     try:
-        # Initialize configuration
-        config = ServiceConfig()
-        print_result("Configuration", "✅ Loaded successfully")
+        # Initialize video configuration
+        config = VideoConfig(
+            extract_audio=True,
+            generate_thumbnails=True,
+            thumbnail_count=3,  # Fewer thumbnails for faster processing
+            extract_keyframes=False,  # Disable for faster processing
+            enable_enhanced_audio=True,
+            enable_speaker_diarization=False,  # Disable for faster processing
+            enable_topic_segmentation=False,  # Disable for faster processing
+            audio_model_size="base",  # Use base model for faster processing
+            enable_ocr=False  # Disable for faster processing
+        )
+        print_result("Video Configuration", "✅ Created successfully")
 
         # Initialize video processor
         processor = VideoProcessor(config)
         print_result("Video Processor", "✅ Initialized successfully")
 
-        # Create processing configuration
-        processing_config = ProcessingConfig(
-            max_file_size=500 * 1024 * 1024,  # 500MB
-            timeout=600.0,
-            extract_metadata=True
-        )
-        print_result("Processing Config", "✅ Created successfully")
-        
         print_section("Processing Video File")
         print("🔄 Starting video processing...")
         print("   This may take a while for large videos...")
-        
+
         # Process the video file
-        result = await processor.process_file(video_file, processing_config)
-        
-        if result.success:
-            print("✅ Video processing completed successfully!")
-            
-            print_section("Processing Results")
-            print_result("Status", "✅ Success")
-            print_result("Content Type", result.content_type)
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
-            
-            if result.metadata:
-                print_section("Metadata")
-                for key, value in result.metadata.items():
-                    if isinstance(value, (dict, list)):
-                        print_result(key, json.dumps(value, indent=2))
-                    else:
-                        print_result(key, str(value))
-            
-            if result.content:
-                print_section("Content Preview")
-                content_preview = result.content[:1000] + "..." if len(result.content) > 1000 else result.content
-                print(f"📄 Content ({len(result.content)} characters):")
-                print(content_preview)
-                
-                # Check for transcription content
-                if "## Audio Transcription" in result.content:
-                    print_result("Audio Transcription", "✅ Found")
-                if "## Visual Content" in result.content:
-                    print_result("Visual Content", "✅ Found")
-                if "## Keyframes" in result.content:
-                    print_result("Keyframes", "✅ Found")
-            
-            if result.summary:
-                print_section("Summary")
-                print(f"📝 {result.summary}")
-            
-            # Save results to file
-            output_file = video_file.parent / f"{video_file.stem}_test_result.json"
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'success': result.success,
-                    'content_type': result.content_type,
-                    'processing_time': result.processing_time,
-                    'metadata': result.metadata,
-                    'content': result.content,
-                    'summary': result.summary,
-                    'error': result.error
-                }, f, indent=2, ensure_ascii=False)
-            
-            # Also save markdown content
-            markdown_file = video_file.parent / f"{video_file.stem}_converted.md"
-            with open(markdown_file, 'w', encoding='utf-8') as f:
-                f.write(result.content)
-            
-            print_section("Output")
-            print_result("Results saved to", str(output_file))
-            print_result("Markdown saved to", str(markdown_file))
-            
-            return True
-            
-        else:
-            print("❌ Video processing failed!")
-            print_result("Error", result.error or "Unknown error")
-            return False
+        result = await processor.process_video(video_file)
+
+        print("✅ Video processing completed successfully!")
+
+        print_section("Processing Results")
+        print_result("Status", "✅ Success")
+        print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+
+        print_section("Video Metadata")
+        metadata = result.metadata
+        print_result("Duration", f"{metadata.duration:.2f} seconds")
+        print_result("Resolution", f"{metadata.width}x{metadata.height}")
+        print_result("FPS", f"{metadata.fps:.2f}")
+        print_result("Codec", metadata.codec)
+        print_result("Format", metadata.format)
+        print_result("Has Audio", "✅ Yes" if metadata.has_audio else "❌ No")
+        print_result("File Size", f"{metadata.file_size / 1024 / 1024:.2f} MB")
+
+        if result.audio_path:
+            print_section("Audio Processing")
+            print_result("Audio Extracted", "✅ Yes")
+            print_result("Audio Path", str(result.audio_path))
+
+            if result.audio_processing_result:
+                audio_result = result.audio_processing_result
+                print_result("Transcript Length", f"{len(audio_result.transcript)} characters")
+                print_result("Segments Count", f"{len(audio_result.segments)}")
+
+                if audio_result.transcript:
+                    print_section("Transcript Preview")
+                    transcript_preview = audio_result.transcript[:500] + "..." if len(audio_result.transcript) > 500 else audio_result.transcript
+                    print(f"📄 Transcript ({len(audio_result.transcript)} characters):")
+                    print(transcript_preview)
+
+        if result.thumbnails:
+            print_section("Thumbnails")
+            print_result("Thumbnails Generated", f"{len(result.thumbnails)}")
+            for i, thumb in enumerate(result.thumbnails):
+                print_result(f"Thumbnail {i+1}", str(thumb))
+
+        if result.keyframes:
+            print_section("Keyframes")
+            print_result("Keyframes Generated", f"{len(result.keyframes)}")
+            for i, frame in enumerate(result.keyframes):
+                print_result(f"Keyframe {i+1}", str(frame))
+
+        if result.ocr_results:
+            print_section("OCR Results")
+            print_result("OCR Performed", "✅ Yes")
+            print_result("OCR Data", json.dumps(result.ocr_results, indent=2))
+
+        # Save results to file
+        output_file = video_file.parent / f"{video_file.stem}_test_result.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'processing_time': result.processing_time,
+                'metadata': {
+                    'duration': metadata.duration,
+                    'width': metadata.width,
+                    'height': metadata.height,
+                    'fps': metadata.fps,
+                    'codec': metadata.codec,
+                    'format': metadata.format,
+                    'has_audio': metadata.has_audio,
+                    'file_size': metadata.file_size
+                },
+                'audio_path': str(result.audio_path) if result.audio_path else None,
+                'thumbnails': [str(t) for t in result.thumbnails],
+                'keyframes': [str(k) for k in result.keyframes],
+                'audio_processing_result': {
+                    'transcript': result.audio_processing_result.transcript if result.audio_processing_result else None,
+                    'segments_count': len(result.audio_processing_result.segments) if result.audio_processing_result else 0
+                } if result.audio_processing_result else None,
+                'ocr_results': result.ocr_results,
+                'temp_files': [str(f) for f in result.temp_files]
+            }, f, indent=2, ensure_ascii=False)
+
+        print_section("Output")
+        print_result("Results saved to", str(output_file))
+
+        return True
             
     except Exception as e:
         print(f"❌ Error during video processing: {e}")

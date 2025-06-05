@@ -22,9 +22,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from morag_web import WebProcessor
-    from morag_services import ServiceConfig, ContentType
-    from morag_core.models import ProcessingConfig
+    from morag_web import WebProcessor, WebScrapingConfig
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
@@ -73,94 +71,121 @@ async def test_web_processing(url: str) -> bool:
     print_result("Target URL", url)
     
     try:
-        # Initialize configuration
-        config = ServiceConfig()
-        print_result("Configuration", "✅ Loaded successfully")
-
         # Initialize web processor
-        processor = WebProcessor(config)
+        processor = WebProcessor()
         print_result("Web Processor", "✅ Initialized successfully")
 
-        # Create processing configuration
-        processing_config = ProcessingConfig(
-            max_file_size=10 * 1024 * 1024,  # 10MB
-            timeout=60.0,
-            extract_metadata=True
+        # Create web scraping configuration
+        config = WebScrapingConfig(
+            timeout=30,
+            max_retries=2,
+            rate_limit_delay=1.0,
+            extract_links=True,
+            convert_to_markdown=True,
+            clean_content=True,
+            remove_navigation=True,
+            remove_footer=True
         )
-        print_result("Processing Config", "✅ Created successfully")
-        
+        print_result("Web Scraping Config", "✅ Created successfully")
+
         print_section("Processing Web Content")
         print("🔄 Starting web content extraction...")
         print("   This may take a while depending on the website...")
-        
+
         # Process the URL
-        result = await processor.process_url(url, processing_config)
+        result = await processor.process_url(url, config)
         
         if result.success:
             print("✅ Web processing completed successfully!")
-            
+
             print_section("Processing Results")
             print_result("Status", "✅ Success")
-            print_result("Content Type", result.content_type)
             print_result("Processing Time", f"{result.processing_time:.2f} seconds")
-            
-            if result.metadata:
-                print_section("Metadata")
-                for key, value in result.metadata.items():
-                    if isinstance(value, (dict, list)):
-                        print_result(key, json.dumps(value, indent=2))
-                    else:
-                        print_result(key, str(value))
-            
+            print_result("URL", result.url or url)
+
             if result.content:
-                print_section("Content Preview")
-                content_preview = result.content[:1000] + "..." if len(result.content) > 1000 else result.content
-                print(f"📄 Content ({len(result.content)} characters):")
-                print(content_preview)
-                
-                # Check for specific content sections
-                if "## Page Title" in result.content:
-                    print_result("Page Title", "✅ Found")
-                if "## Main Content" in result.content:
-                    print_result("Main Content", "✅ Found")
-                if "## Links" in result.content:
-                    print_result("Links", "✅ Found")
-            
-            if result.summary:
-                print_section("Summary")
-                print(f"📝 {result.summary}")
-            
+                web_content = result.content
+                print_section("Web Content Information")
+                print_result("Title", web_content.title)
+                print_result("Content Type", web_content.content_type)
+                print_result("Content Length", f"{web_content.content_length} characters")
+                print_result("Links Found", f"{len(web_content.links)}")
+                print_result("Images Found", f"{len(web_content.images)}")
+                print_result("Extraction Time", f"{web_content.extraction_time:.2f} seconds")
+
+                if web_content.metadata:
+                    print_section("Page Metadata")
+                    for key, value in web_content.metadata.items():
+                        if isinstance(value, (dict, list)):
+                            print_result(key, json.dumps(value, indent=2))
+                        else:
+                            print_result(key, str(value))
+
+                if web_content.content:
+                    print_section("Content Preview")
+                    content_preview = web_content.content[:500] + "..." if len(web_content.content) > 500 else web_content.content
+                    print(f"📄 Raw Content ({len(web_content.content)} characters):")
+                    print(content_preview)
+
+                if web_content.markdown_content:
+                    print_section("Markdown Preview")
+                    markdown_preview = web_content.markdown_content[:500] + "..." if len(web_content.markdown_content) > 500 else web_content.markdown_content
+                    print(f"📄 Markdown Content ({len(web_content.markdown_content)} characters):")
+                    print(markdown_preview)
+
+                if web_content.links:
+                    print_section("Links Found (first 5)")
+                    for i, link in enumerate(web_content.links[:5]):
+                        print_result(f"Link {i+1}", link)
+
+            if result.chunks:
+                print_section("Document Chunks")
+                print_result("Chunks Count", f"{len(result.chunks)}")
+                for i, chunk in enumerate(result.chunks[:3]):
+                    print(f"  Chunk {i+1}: {chunk.content[:100]}{'...' if len(chunk.content) > 100 else ''}")
+
             # Create safe filename from URL
             safe_filename = urllib.parse.quote(url, safe='').replace('%', '_')[:50]
-            
+
             # Save results to file
-            output_file = Path(f"web_{safe_filename}_test_result.json")
+            output_file = Path(f"uploads/web_{safe_filename}_test_result.json")
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
-                    'url': url,
+                    'url': result.url,
                     'success': result.success,
-                    'content_type': result.content_type,
                     'processing_time': result.processing_time,
-                    'metadata': result.metadata,
-                    'content': result.content,
-                    'summary': result.summary,
-                    'error': result.error
+                    'content': {
+                        'title': web_content.title if result.content else None,
+                        'content_type': web_content.content_type if result.content else None,
+                        'content_length': web_content.content_length if result.content else 0,
+                        'links_count': len(web_content.links) if result.content else 0,
+                        'images_count': len(web_content.images) if result.content else 0,
+                        'extraction_time': web_content.extraction_time if result.content else 0,
+                        'metadata': web_content.metadata if result.content else {},
+                        'content': web_content.content if result.content else None,
+                        'markdown_content': web_content.markdown_content if result.content else None,
+                        'links': web_content.links if result.content else [],
+                        'images': web_content.images if result.content else []
+                    },
+                    'chunks_count': len(result.chunks),
+                    'error_message': result.error_message
                 }, f, indent=2, ensure_ascii=False)
-            
-            # Also save markdown content
-            markdown_file = Path(f"web_{safe_filename}_converted.md")
-            with open(markdown_file, 'w', encoding='utf-8') as f:
-                f.write(result.content)
-            
+
+            # Also save markdown content if available
+            if result.content and result.content.markdown_content:
+                markdown_file = Path(f"uploads/web_{safe_filename}_converted.md")
+                with open(markdown_file, 'w', encoding='utf-8') as f:
+                    f.write(result.content.markdown_content)
+                print_result("Markdown saved to", str(markdown_file))
+
             print_section("Output")
             print_result("Results saved to", str(output_file))
-            print_result("Markdown saved to", str(markdown_file))
-            
+
             return True
-            
+
         else:
             print("❌ Web processing failed!")
-            print_result("Error", result.error or "Unknown error")
+            print_result("Error", result.error_message or "Unknown error")
             return False
             
     except Exception as e:

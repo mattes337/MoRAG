@@ -83,6 +83,9 @@ class DocumentProcessor(BaseProcessor):
         await self.validate_input(config)
 
         try:
+            import time
+            start_time = time.time()
+
             # Get file path from config
             file_path = config.file_path
             if not file_path:
@@ -112,12 +115,16 @@ class DocumentProcessor(BaseProcessor):
             # Convert document
             conversion_result = await converter.convert(file_path, options)
 
+            processing_time = time.time() - start_time
+
             # Return processing result
             return ProcessingResult(
+                success=True,
+                processing_time=processing_time,
                 document=conversion_result.document,
                 metadata={
-                    "quality_score": conversion_result.quality.score,
-                    "quality_issues": conversion_result.quality.issues,
+                    "quality_score": conversion_result.quality_score.overall_score,
+                    "quality_issues": conversion_result.quality_score.issues_detected,
                     "warnings": conversion_result.warnings,
                 },
             )

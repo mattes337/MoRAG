@@ -23,8 +23,7 @@ sys.path.insert(0, str(project_root))
 
 try:
     from morag_document import DocumentProcessor
-    from morag_services import ServiceConfig, ContentType
-    from morag_core.models import ProcessingConfig
+    from morag_core.interfaces.processor import ProcessingConfig
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
@@ -66,34 +65,28 @@ async def test_document_processing(document_file: Path) -> bool:
     print_result("File Extension", document_file.suffix.lower())
     
     try:
-        # Initialize configuration
-        config = ServiceConfig()
-        print_result("Configuration", "✅ Loaded successfully")
-
-        # Initialize document processor
-        processor = DocumentProcessor(config)
+        # Initialize document processor (no config needed)
+        processor = DocumentProcessor()
         print_result("Document Processor", "✅ Initialized successfully")
 
-        # Create processing configuration
-        processing_config = ProcessingConfig(
-            max_file_size=100 * 1024 * 1024,  # 100MB
-            timeout=300.0,
-            extract_metadata=True
-        )
-        print_result("Processing Config", "✅ Created successfully")
-        
         print_section("Processing Document File")
         print("🔄 Starting document processing...")
-        
-        # Process the document file
-        result = await processor.process_file(document_file, processing_config)
+
+        # Process the document file with options
+        result = await processor.process_file(
+            document_file,
+            extract_metadata=True,
+            chunking_strategy="paragraph",
+            chunk_size=1000,
+            chunk_overlap=200
+        )
         
         if result.success:
             print("✅ Document processing completed successfully!")
             
             print_section("Processing Results")
             print_result("Status", "✅ Success")
-            print_result("Content Type", result.content_type)
+            # Content type not available in ProcessingResult
             print_result("Processing Time", f"{result.processing_time:.2f} seconds")
             
             if result.metadata:
@@ -104,48 +97,66 @@ async def test_document_processing(document_file: Path) -> bool:
                     else:
                         print_result(key, str(value))
             
-            if result.content:
-                print_section("Content Preview")
-                content_preview = result.content[:1000] + "..." if len(result.content) > 1000 else result.content
-                print(f"📄 Content ({len(result.content)} characters):")
-                print(content_preview)
-                
-                # Count pages if available
-                page_count = result.content.count("## Page ")
-                if page_count > 0:
-                    print_result("Pages Detected", str(page_count))
+            if result.document:
+                print_section("Document Information")
+                doc = result.document
+                print_result("Title", doc.metadata.title or "N/A")
+                print_result("Author", doc.metadata.author or "N/A")
+                print_result("Page Count", str(doc.metadata.page_count or "N/A"))
+                print_result("Word Count", str(doc.metadata.word_count or "N/A"))
+                print_result("Chunks Count", str(len(doc.chunks)))
+
+                if doc.raw_text:
+                    print_section("Content Preview")
+                    content_preview = doc.raw_text[:500] + "..." if len(doc.raw_text) > 500 else doc.raw_text
+                    print(f"📄 Raw Text ({len(doc.raw_text)} characters):")
+                    print(content_preview)
+
+                if doc.chunks:
+                    print_section("Chunks Preview (first 3)")
+                    for i, chunk in enumerate(doc.chunks[:3]):
+                        print(f"  Chunk {i+1}:")
+                        print(f"    Content: {chunk.content[:100]}{'...' if len(chunk.content) > 100 else ''}")
+                        if chunk.page_number:
+                            print(f"    Page: {chunk.page_number}")
+                        if chunk.metadata:
+                            print(f"    Metadata: {chunk.metadata}")
             
-            if result.summary:
-                print_section("Summary")
-                print(f"📝 {result.summary}")
+            # Summary not available in ProcessingResult
             
             # Save results to file
             output_file = document_file.parent / f"{document_file.stem}_test_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     'success': result.success,
-                    'content_type': result.content_type,
                     'processing_time': result.processing_time,
                     'metadata': result.metadata,
-                    'content': result.content,
-                    'summary': result.summary,
-                    'error': result.error
+                    'document': {
+                        'title': result.document.metadata.title if result.document else None,
+                        'author': result.document.metadata.author if result.document else None,
+                        'page_count': result.document.metadata.page_count if result.document else None,
+                        'word_count': result.document.metadata.word_count if result.document else None,
+                        'raw_text': result.document.raw_text if result.document else None,
+                        'chunks_count': len(result.document.chunks) if result.document else 0,
+                        'chunks': [
+                            {
+                                'content': chunk.content,
+                                'page_number': chunk.page_number,
+                                'metadata': chunk.metadata
+                            } for chunk in result.document.chunks
+                        ] if result.document else []
+                    },
+                    'error_message': result.error_message
                 }, f, indent=2, ensure_ascii=False)
-            
-            # Also save markdown content
-            markdown_file = document_file.parent / f"{document_file.stem}_converted.md"
-            with open(markdown_file, 'w', encoding='utf-8') as f:
-                f.write(result.content)
             
             print_section("Output")
             print_result("Results saved to", str(output_file))
-            print_result("Markdown saved to", str(markdown_file))
             
             return True
             
         else:
             print("❌ Document processing failed!")
-            print_result("Error", result.error or "Unknown error")
+            print_result("Error", result.error_message or "Unknown error")
             return False
             
     except Exception as e:

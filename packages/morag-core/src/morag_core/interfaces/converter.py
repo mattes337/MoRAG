@@ -28,6 +28,9 @@ class ChunkingStrategy(str, Enum):
     """Strategy for chunking converted content."""
     PAGE = "page"  # Chunk by page boundaries
     PARAGRAPH = "paragraph"  # Chunk by paragraphs
+    SENTENCE = "sentence"  # Chunk by sentences
+    WORD = "word"  # Chunk by words
+    CHARACTER = "character"  # Chunk by characters
     FIXED_SIZE = "fixed_size"  # Chunk by fixed token/character size
     SEMANTIC = "semantic"  # Chunk by semantic boundaries
     HYBRID = "hybrid"  # Combination of strategies
@@ -38,25 +41,28 @@ class ChunkingStrategy(str, Enum):
 class ConversionOptions:
     """Options for document conversion."""
     # General options
+    format_type: Optional[str] = None
     chunking_strategy: ChunkingStrategy = ChunkingStrategy.PARAGRAPH
+    chunk_size: int = 1000
+    chunk_overlap: int = 100
     extract_metadata: bool = True
     extract_images: bool = True
     extract_tables: bool = True
     extract_code_blocks: bool = True
     extract_math: bool = True
     extract_links: bool = True
-    
+
     # Quality options
     quality_threshold: float = 0.7
     validate_output: bool = True
     fix_encoding_issues: bool = True
-    
+
     # Output options
     include_page_numbers: bool = True
     include_line_numbers: bool = False
     include_headers_footers: bool = True
     preserve_formatting: bool = True
-    
+
     # Format-specific options
     format_options: Dict[str, Any] = field(default_factory=dict)
     
@@ -112,6 +118,7 @@ class ConversionResult:
     original_format: Optional[str] = None
     images: List[Dict[str, Any]] = field(default_factory=list)
     word_count: int = 0
+    document: Optional[Any] = None  # For document processing results
 
 
 class BaseConverter(ABC):

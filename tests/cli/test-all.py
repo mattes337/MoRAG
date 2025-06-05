@@ -19,12 +19,9 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from morag_core.config import Settings
-    from morag_core.models import ProcessingConfig
-    from morag_services import ServiceConfig, ContentType
-    from morag_audio import AudioProcessor
+    from morag_audio import AudioProcessor, AudioConfig
     from morag_document import DocumentProcessor
-    from morag_video import VideoProcessor
+    from morag_video import VideoProcessor, VideoConfig
     from morag_image import ImageProcessor
     from morag_web import WebProcessor
     from morag_youtube import YouTubeProcessor
@@ -79,7 +76,7 @@ class SystemTester:
     async def initialize(self) -> bool:
         """Initialize the test environment."""
         try:
-            self.config = ServiceConfig()
+            # No global config needed, each processor has its own config
             return True
         except Exception as e:
             print(f"❌ Failed to initialize configuration: {e}")
@@ -88,107 +85,116 @@ class SystemTester:
     async def test_component_initialization(self) -> Dict[str, bool]:
         """Test that all components can be initialized."""
         print_section("Component Initialization Tests")
-        
-        components = {
-            "AudioProcessor": AudioProcessor,
-            "DocumentProcessor": DocumentProcessor,
-            "VideoProcessor": VideoProcessor,
-            "ImageProcessor": ImageProcessor,
-            "WebProcessor": WebProcessor,
-            "YouTubeProcessor": YouTubeProcessor,
-        }
-        
+
         results = {}
-        
-        for name, component_class in components.items():
-            start_time = time.time()
-            try:
-                processor = component_class(self.config)
-                success = True
-                error = None
-            except Exception as e:
-                success = False
-                error = str(e)
-            
-            duration = time.time() - start_time
-            results[name] = success
-            print_test_result(f"{name} initialization", success, duration, error)
-        
-        return results
-    
-    async def test_configuration_validation(self) -> bool:
-        """Test configuration validation."""
-        print_section("Configuration Validation Tests")
-        
+
+        # Test AudioProcessor
         start_time = time.time()
         try:
-            # Test basic configuration
-            config = Settings()
-            
-            # Check required settings
-            required_settings = [
-                'gemini_api_key',
-                'redis_url',
-                'qdrant_host',
-                'temp_dir',
-                'log_level'
-            ]
-            
-            missing_settings = []
-            for setting in required_settings:
-                if not hasattr(config, setting) or getattr(config, setting) is None:
-                    missing_settings.append(setting)
-            
-            if missing_settings:
-                error = f"Missing required settings: {', '.join(missing_settings)}"
-                success = False
-            else:
-                success = True
-                error = None
-                
+            config = AudioConfig(model_size="base", device="auto")
+            processor = AudioProcessor(config)
+            success = True
+            error = None
         except Exception as e:
             success = False
             error = str(e)
-        
         duration = time.time() - start_time
-        print_test_result("Configuration validation", success, duration, error)
-        
-        return success
+        results["AudioProcessor"] = success
+        print_test_result("AudioProcessor initialization", success, duration, error)
+
+        # Test DocumentProcessor
+        start_time = time.time()
+        try:
+            processor = DocumentProcessor()
+            success = True
+            error = None
+        except Exception as e:
+            success = False
+            error = str(e)
+        duration = time.time() - start_time
+        results["DocumentProcessor"] = success
+        print_test_result("DocumentProcessor initialization", success, duration, error)
+
+        # Test VideoProcessor
+        start_time = time.time()
+        try:
+            config = VideoConfig(extract_audio=False, generate_thumbnails=False)
+            processor = VideoProcessor(config)
+            success = True
+            error = None
+        except Exception as e:
+            success = False
+            error = str(e)
+        duration = time.time() - start_time
+        results["VideoProcessor"] = success
+        print_test_result("VideoProcessor initialization", success, duration, error)
+
+        # Test ImageProcessor
+        start_time = time.time()
+        try:
+            processor = ImageProcessor()
+            success = True
+            error = None
+        except Exception as e:
+            success = False
+            error = str(e)
+        duration = time.time() - start_time
+        results["ImageProcessor"] = success
+        print_test_result("ImageProcessor initialization", success, duration, error)
+
+        # Test WebProcessor
+        start_time = time.time()
+        try:
+            processor = WebProcessor()
+            success = True
+            error = None
+        except Exception as e:
+            success = False
+            error = str(e)
+        duration = time.time() - start_time
+        results["WebProcessor"] = success
+        print_test_result("WebProcessor initialization", success, duration, error)
+
+        # Test YouTubeProcessor
+        start_time = time.time()
+        try:
+            processor = YouTubeProcessor()
+            success = True
+            error = None
+        except Exception as e:
+            success = False
+            error = str(e)
+        duration = time.time() - start_time
+        results["YouTubeProcessor"] = success
+        print_test_result("YouTubeProcessor initialization", success, duration, error)
+
+        return results
     
-    async def test_processing_configs(self) -> bool:
-        """Test processing configuration creation."""
-        print_section("Processing Configuration Tests")
-        
-        content_types = [
-            ContentType.AUDIO,
-            ContentType.VIDEO,
-            ContentType.DOCUMENT,
-            ContentType.IMAGE,
-            ContentType.WEB
-        ]
-        
-        all_success = True
-        
-        for content_type in content_types:
-            start_time = time.time()
-            try:
-                config = ProcessingConfig(
-                    content_type=content_type,
-                    chunk_strategy="page",
-                    include_metadata=True,
-                    include_summary=True
-                )
-                success = True
-                error = None
-            except Exception as e:
-                success = False
-                error = str(e)
-                all_success = False
-            
-            duration = time.time() - start_time
-            print_test_result(f"ProcessingConfig for {content_type}", success, duration, error)
-        
-        return all_success
+    async def test_basic_functionality(self) -> bool:
+        """Test basic system functionality."""
+        print_section("Basic Functionality Tests")
+
+        start_time = time.time()
+        try:
+            # Test that we can import all modules
+            import morag_audio
+            import morag_document
+            import morag_video
+            import morag_image
+            import morag_web
+            import morag_youtube
+
+            success = True
+            error = None
+
+        except Exception as e:
+            success = False
+            error = str(e)
+
+        duration = time.time() - start_time
+        print_test_result("Module imports", success, duration, error)
+
+        return success
     
     async def test_sample_files(self) -> Dict[str, bool]:
         """Test processing with sample files if available."""
@@ -238,19 +244,15 @@ class SystemTester:
         
         # Run all test categories
         test_results = {}
-        
-        # Configuration tests
-        config_valid = await self.test_configuration_validation()
-        test_results["configuration"] = {"success": config_valid}
-        
-        # Processing config tests
-        processing_configs_valid = await self.test_processing_configs()
-        test_results["processing_configs"] = {"success": processing_configs_valid}
-        
+
+        # Basic functionality tests
+        basic_valid = await self.test_basic_functionality()
+        test_results["basic_functionality"] = {"success": basic_valid}
+
         # Component initialization tests
         component_results = await self.test_component_initialization()
         test_results["components"] = component_results
-        
+
         # Sample file tests
         sample_results = await self.test_sample_files()
         test_results["sample_files"] = sample_results

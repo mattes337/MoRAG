@@ -21,8 +21,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from morag_audio import AudioProcessor
-    from morag_services import ServiceConfig, ContentType
+    from morag_audio import AudioProcessor, AudioConfig
     from morag_core.models import ProcessingConfig
 except ImportError as e:
     print(f"❌ Import error: {e}")
@@ -64,36 +63,37 @@ async def test_audio_processing(audio_file: Path) -> bool:
     print_result("File Size", f"{audio_file.stat().st_size / 1024 / 1024:.2f} MB")
     
     try:
-        # Initialize configuration
-        config = ServiceConfig()
-        print_result("Configuration", "✅ Loaded successfully")
+        # Initialize audio configuration
+        config = AudioConfig(
+            model_size="base",  # Use base model for faster processing
+            device="auto",  # Auto-detect best available device
+            enable_diarization=False,  # Disable for faster processing
+            enable_topic_segmentation=False,  # Disable for faster processing
+            vad_filter=True,
+            word_timestamps=True,
+            include_metadata=True
+        )
+        print_result("Audio Configuration", "✅ Created successfully")
 
         # Initialize audio processor
         processor = AudioProcessor(config)
         print_result("Audio Processor", "✅ Initialized successfully")
 
-        # Create processing configuration
-        processing_config = ProcessingConfig(
-            max_file_size=100 * 1024 * 1024,  # 100MB
-            timeout=300.0,
-            extract_metadata=True
-        )
-        print_result("Processing Config", "✅ Created successfully")
-        
         print_section("Processing Audio File")
         print("🔄 Starting audio processing...")
-        
+
         # Process the audio file
-        result = await processor.process_file(audio_file, processing_config)
+        result = await processor.process(audio_file)
         
         if result.success:
             print("✅ Audio processing completed successfully!")
-            
+
             print_section("Processing Results")
             print_result("Status", "✅ Success")
-            print_result("Content Type", result.content_type)
             print_result("Processing Time", f"{result.processing_time:.2f} seconds")
-            
+            print_result("Transcript Length", f"{len(result.transcript)} characters")
+            print_result("Segments Count", f"{len(result.segments)}")
+
             if result.metadata:
                 print_section("Metadata")
                 for key, value in result.metadata.items():
@@ -101,38 +101,54 @@ async def test_audio_processing(audio_file: Path) -> bool:
                         print_result(key, json.dumps(value, indent=2))
                     else:
                         print_result(key, str(value))
-            
-            if result.content:
-                print_section("Content Preview")
-                content_preview = result.content[:500] + "..." if len(result.content) > 500 else result.content
-                print(f"📄 Content ({len(result.content)} characters):")
-                print(content_preview)
-            
-            if result.summary:
-                print_section("Summary")
-                print(f"📝 {result.summary}")
-            
+
+            if result.transcript:
+                print_section("Transcript Preview")
+                transcript_preview = result.transcript[:500] + "..." if len(result.transcript) > 500 else result.transcript
+                print(f"📄 Transcript ({len(result.transcript)} characters):")
+                print(transcript_preview)
+
+            if result.segments:
+                print_section("Segments Preview (first 3)")
+                for i, segment in enumerate(result.segments[:3]):
+                    print(f"  Segment {i+1}: [{segment.start:.2f}s - {segment.end:.2f}s]")
+                    print(f"    Text: {segment.text[:100]}{'...' if len(segment.text) > 100 else ''}")
+                    if segment.speaker:
+                        print(f"    Speaker: {segment.speaker}")
+                    if segment.confidence:
+                        print(f"    Confidence: {segment.confidence:.3f}")
+
             # Save results to file
             output_file = audio_file.parent / f"{audio_file.stem}_test_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     'success': result.success,
-                    'content_type': result.content_type,
                     'processing_time': result.processing_time,
+                    'transcript': result.transcript,
+                    'segments': [
+                        {
+                            'start': seg.start,
+                            'end': seg.end,
+                            'text': seg.text,
+                            'speaker': seg.speaker,
+                            'confidence': seg.confidence,
+                            'topic_id': seg.topic_id,
+                            'topic_label': seg.topic_label
+                        } for seg in result.segments
+                    ],
                     'metadata': result.metadata,
-                    'content': result.content,
-                    'summary': result.summary,
-                    'error': result.error
+                    'file_path': result.file_path,
+                    'error_message': result.error_message
                 }, f, indent=2, ensure_ascii=False)
-            
+
             print_section("Output")
             print_result("Results saved to", str(output_file))
-            
+
             return True
-            
+
         else:
             print("❌ Audio processing failed!")
-            print_result("Error", result.error or "Unknown error")
+            print_result("Error", result.error_message or "Unknown error")
             return False
             
     except Exception as e:

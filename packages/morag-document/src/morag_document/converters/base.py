@@ -55,7 +55,7 @@ class DocumentConverter(BaseConverter):
         format_type = options.format_type or self.detect_format(file_path)
 
         # Check if format is supported
-        if not self.supports_format(format_type):
+        if not await self.supports_format(format_type):
             raise UnsupportedFormatError(f"Format '{format_type}' is not supported by this converter")
 
         try:
@@ -96,8 +96,11 @@ class DocumentConverter(BaseConverter):
             quality = await self.assess_quality(document)
 
             return ConversionResult(
+                success=True,
+                content=document.raw_text or "",
+                metadata={},
+                quality_score=quality,
                 document=document,
-                quality=quality,
                 warnings=[],
             )
 
@@ -207,8 +210,8 @@ class DocumentConverter(BaseConverter):
                     issues.append("Majority of chunks are very short")
 
         return QualityScore(
-            score=score,
-            issues=issues,
+            overall_score=score,
+            issues_detected=issues,
         )
 
     async def _extract_text(self, file_path: Path, document: Document, options: ConversionOptions) -> Document:
@@ -241,6 +244,7 @@ class DocumentConverter(BaseConverter):
         if not document.raw_text:
             return document
 
+        import re
         text = document.raw_text
         strategy = options.chunking_strategy
         chunk_size = options.chunk_size or 1000
@@ -280,7 +284,6 @@ class DocumentConverter(BaseConverter):
 
         elif strategy == ChunkingStrategy.SENTENCE:
             # Sentence-based chunking (simplified)
-            import re
             sentences = re.split(r'(?<=[.!?])\s+', text)
             current_chunk = []
             current_size = 0

@@ -32,6 +32,7 @@ class ProcessingResult:
     processing_time: float
     metadata: Dict[str, Any] = field(default_factory=dict)
     error_message: Optional[str] = None
+    document: Optional[Any] = None  # For document processing results
 
 
 class BaseProcessor(ABC):

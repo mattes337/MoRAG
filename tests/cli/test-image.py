@@ -22,8 +22,8 @@ sys.path.insert(0, str(project_root))
 
 try:
     from morag_image import ImageProcessor
-    from morag_services import ServiceConfig, ContentType
-    from morag_core.models import ProcessingConfig
+    from morag_image.processor import ImageConfig
+    from morag_core.interfaces.processor import ProcessingConfig
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
@@ -65,90 +65,90 @@ async def test_image_processing(image_file: Path) -> bool:
     print_result("File Extension", image_file.suffix.lower())
     
     try:
-        # Initialize configuration
-        config = ServiceConfig()
-        print_result("Configuration", "✅ Loaded successfully")
-
-        # Initialize image processor
-        processor = ImageProcessor(config)
+        # Initialize image processor (no API key for basic functionality)
+        processor = ImageProcessor()
         print_result("Image Processor", "✅ Initialized successfully")
 
-        # Create processing configuration
-        processing_config = ProcessingConfig(
-            max_file_size=50 * 1024 * 1024,  # 50MB
-            timeout=120.0,
-            extract_metadata=True
+        # Create image configuration (disable OCR since tesseract is not installed)
+        image_config = ImageConfig(
+            generate_caption=False,  # Requires API key
+            extract_text=False,  # Requires tesseract
+            extract_metadata=True,
+            resize_max_dimension=1024
         )
-        print_result("Processing Config", "✅ Created successfully")
-        
+        print_result("Image Config", "✅ Created successfully")
+
         print_section("Processing Image File")
         print("🔄 Starting image processing...")
-        
+
         # Process the image file
-        result = await processor.process_file(image_file, processing_config)
-        
-        if result.success:
-            print("✅ Image processing completed successfully!")
-            
-            print_section("Processing Results")
-            print_result("Status", "✅ Success")
-            print_result("Content Type", result.content_type)
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
-            
-            if result.metadata:
-                print_section("Metadata")
-                for key, value in result.metadata.items():
-                    if isinstance(value, (dict, list)):
-                        print_result(key, json.dumps(value, indent=2))
-                    else:
-                        print_result(key, str(value))
-            
-            if result.content:
-                print_section("Content Preview")
-                content_preview = result.content[:1000] + "..." if len(result.content) > 1000 else result.content
-                print(f"📄 Content ({len(result.content)} characters):")
-                print(content_preview)
-                
-                # Check for specific content types
-                if "## Image Description" in result.content:
-                    print_result("Image Description", "✅ Found")
-                if "## OCR Text" in result.content:
-                    print_result("OCR Text", "✅ Found")
-                if "## Visual Elements" in result.content:
-                    print_result("Visual Elements", "✅ Found")
-            
-            if result.summary:
-                print_section("Summary")
-                print(f"📝 {result.summary}")
-            
-            # Save results to file
-            output_file = image_file.parent / f"{image_file.stem}_test_result.json"
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'success': result.success,
-                    'content_type': result.content_type,
-                    'processing_time': result.processing_time,
-                    'metadata': result.metadata,
-                    'content': result.content,
-                    'summary': result.summary,
-                    'error': result.error
-                }, f, indent=2, ensure_ascii=False)
-            
-            # Also save markdown content
-            markdown_file = image_file.parent / f"{image_file.stem}_converted.md"
-            with open(markdown_file, 'w', encoding='utf-8') as f:
-                f.write(result.content)
-            
-            print_section("Output")
-            print_result("Results saved to", str(output_file))
-            print_result("Markdown saved to", str(markdown_file))
-            
-            return True
-            
+        result = await processor.process_image(image_file, image_config)
+
+        print("✅ Image processing completed successfully!")
+
+        print_section("Processing Results")
+        print_result("Status", "✅ Success")
+        print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+
+        print_section("Image Information")
+        if result.caption:
+            print_result("Caption", result.caption)
         else:
-            print("❌ Image processing failed!")
-            print_result("Error", result.error or "Unknown error")
-            return False
+            print_result("Caption", "Not generated (requires API key)")
+
+        if result.extracted_text:
+            print_result("Extracted Text", result.extracted_text)
+        else:
+            print_result("Extracted Text", "None found (OCR disabled)")
+
+        print_section("Image Metadata")
+        metadata = result.metadata
+        print_result("Width", f"{metadata.width}px")
+        print_result("Height", f"{metadata.height}px")
+        print_result("Format", metadata.format)
+        print_result("Mode", metadata.mode)
+        print_result("File Size", f"{metadata.file_size / 1024:.2f} KB")
+        print_result("Has EXIF", "✅ Yes" if metadata.has_exif else "❌ No")
+
+        if metadata.camera_make:
+            print_result("Camera Make", metadata.camera_make)
+        if metadata.camera_model:
+            print_result("Camera Model", metadata.camera_model)
+        if metadata.creation_time:
+            print_result("Creation Time", metadata.creation_time)
+
+        if result.confidence_scores:
+            print_section("Confidence Scores")
+            for key, score in result.confidence_scores.items():
+                print_result(key, f"{score:.3f}")
+
+        # Save results to file
+        output_file = image_file.parent / f"{image_file.stem}_test_result.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'processing_time': result.processing_time,
+                'caption': result.caption,
+                'extracted_text': result.extracted_text,
+                'metadata': {
+                    'width': metadata.width,
+                    'height': metadata.height,
+                    'format': metadata.format,
+                    'mode': metadata.mode,
+                    'file_size': metadata.file_size,
+                    'has_exif': metadata.has_exif,
+                    'exif_data': metadata.exif_data,
+                    'creation_time': metadata.creation_time,
+                    'camera_make': metadata.camera_make,
+                    'camera_model': metadata.camera_model
+                },
+                'confidence_scores': result.confidence_scores,
+                'temp_files': [str(f) for f in result.temp_files]
+            }, f, indent=2, ensure_ascii=False)
+
+        print_section("Output")
+        print_result("Results saved to", str(output_file))
+
+        return True
             
     except Exception as e:
         print(f"❌ Error during image processing: {e}")
