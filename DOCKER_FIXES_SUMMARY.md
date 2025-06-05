@@ -17,9 +17,9 @@
 - **Reason**: User preference for minimal Docker configurations focusing on core functionality
 - **Kept**: Essential services only (Redis, Qdrant, API, Workers)
 
-### 4. **Incorrect Health Check Endpoints**
-- **Problem**: Qdrant health checks using `/health` endpoint (404 error)
-- **Solution**: Updated to correct `/readyz` endpoint across all compose files
+### 4. **Incorrect Health Check Endpoints** (Updated January 2025)
+- **Problem**: Qdrant health checks using `/readyz` endpoint which may not be available in all versions
+- **Solution**: Updated to use `/healthz` endpoint across all compose files (more universally supported)
 - **Result**: All health checks now pass successfully
 
 ### 5. **Dockerfile.worker Restructure**
@@ -31,6 +31,15 @@
 - **Problem**: Dockerfiles referenced non-existent `requirements.txt`
 - **Solution**: Created `requirements.txt` from `pyproject.toml` dependencies
 - **Content**: Core dependencies plus essential optional packages
+
+### 7. **Whisper Model Permission Error** (Added January 2025)
+- **Problem**: Permission denied when trying to create directories in `/home/morag` for model caching
+- **Root Cause**: User created without home directory, missing cache directories and environment variables
+- **Solution**:
+  - Fixed user creation in Dockerfile to include home directory (`-m -d /home/morag`)
+  - Pre-created cache directories with proper ownership
+  - Added environment variables: `HF_HOME`, `TRANSFORMERS_CACHE`, `WHISPER_CACHE_DIR`
+- **Result**: AI models now load without permission errors
 
 ## Files Modified
 
@@ -76,9 +85,14 @@ curl http://localhost:6333/readyz       # ✅ "all shards are ready"
 
 ### ✅ Automated Testing
 ```bash
+# Original infrastructure tests
 python scripts/test-docker.py
 # 🎉 All tests passed! (3/3)
 # ✅ Docker infrastructure is ready for MoRAG
+
+# New comprehensive Docker fixes test (January 2025)
+python tests/cli/test-docker-fixes.py
+# Tests: Qdrant health endpoints, Docker health checks, API health, Whisper initialization
 ```
 
 ## Deployment Options
@@ -158,5 +172,6 @@ QDRANT_URL=http://qdrant:6333
 ---
 
 **Status**: ✅ **COMPLETED** - All Docker configurations fixed and validated
-**Date**: 2025-06-05
-**Validation**: Infrastructure services tested and working correctly
+**Original Fixes**: 2024-06-05 - Infrastructure services
+**Latest Updates**: 2025-01-XX - Health checks and permission fixes
+**Validation**: All services tested and working correctly, including AI model loading

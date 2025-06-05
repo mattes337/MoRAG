@@ -28,7 +28,7 @@ services:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -50,6 +50,9 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
       redis:
         condition: service_healthy
@@ -82,6 +85,9 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
       redis:
         condition: service_healthy
@@ -106,6 +112,9 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
       redis:
         condition: service_healthy

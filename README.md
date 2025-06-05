@@ -181,6 +181,20 @@ docker-compose -f docker-compose.dev.yml ps
 - **Build issues**: Run `docker-compose build --no-cache` to rebuild images
 - **Permission issues**: Ensure Docker has access to the project directory
 
+### Recent Docker Fixes (January 2025)
+
+✅ **Fixed Qdrant Health Checks**: Updated all docker-compose files to use the correct `/healthz` endpoint
+✅ **Fixed Whisper Model Permissions**: Resolved permission errors when loading AI models in containers
+- Proper home directory setup for the `morag` user
+- Configured cache directories for Hugging Face and Whisper models
+- Added environment variables: `HF_HOME`, `TRANSFORMERS_CACHE`, `WHISPER_CACHE_DIR`
+
+Test the fixes:
+```bash
+# Test Docker health checks and permissions
+python tests/cli/test-docker-fixes.py
+```
+
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
 ## Usage

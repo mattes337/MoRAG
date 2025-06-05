@@ -48,6 +48,16 @@ For detailed information about completed tasks and implementation history, see [
 - ✅ **High Test Coverage**: Comprehensive test suite with >95% coverage
 - ✅ **GPU/CPU Flexibility**: Automatic fallback system for hardware compatibility
 
+## 🔧 Recent Fixes (January 2025)
+
+### ✅ Docker Health Check & Permission Fixes
+- **Fixed Qdrant Health Check**: Updated all docker-compose files to use `/healthz` endpoint instead of `/readyz`
+- **Fixed Whisper Model Permissions**:
+  - Added proper home directory for `morag` user in Dockerfile
+  - Configured cache directories: `/home/morag/.cache/huggingface`, `/home/morag/.cache/whisper`
+  - Added environment variables: `HF_HOME`, `TRANSFORMERS_CACHE`, `WHISPER_CACHE_DIR`
+  - Updated all docker-compose files (main, dev, prod, microservices)
+
 ## 🎯 Next Steps
 
 The MoRAG system is production-ready. For ongoing maintenance and future enhancements:

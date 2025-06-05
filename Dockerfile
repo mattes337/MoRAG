@@ -168,8 +168,8 @@ COPY --from=builder /opt/venv /opt/venv
 # Install Playwright browsers (optional, for web scraping with dynamic content)
 RUN python -m playwright install chromium || echo "Playwright browser installation failed, will use fallback"
 
-# Create app user
-RUN groupadd -r morag && useradd -r -g morag morag
+# Create app user with home directory
+RUN groupadd -r morag && useradd -r -g morag -m -d /home/morag morag
 
 # Create app directory
 WORKDIR /app
@@ -182,9 +182,9 @@ COPY docs/ ./docs/
 COPY *.md ./
 COPY *.txt ./
 
-# Create necessary directories
-RUN mkdir -p uploads temp logs data && \
-    chown -R morag:morag /app
+# Create necessary directories including cache directories
+RUN mkdir -p uploads temp logs data /home/morag/.cache/huggingface /home/morag/.cache/whisper && \
+    chown -R morag:morag /app /home/morag
 
 # Switch to app user
 USER morag
