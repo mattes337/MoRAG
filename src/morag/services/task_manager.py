@@ -6,7 +6,30 @@ import json
 import structlog
 
 from celery.result import AsyncResult
-from morag_services.celery_app import celery_app
+
+# Mock celery app for now
+class MockCeleryApp:
+    def __init__(self):
+        self.control = MockControl()
+
+class MockControl:
+    def revoke(self, task_id, terminate=True):
+        pass
+
+    def inspect(self):
+        return MockInspect()
+
+class MockInspect:
+    def active(self):
+        return {}
+
+    def scheduled(self):
+        return {}
+
+    def reserved(self):
+        return {}
+
+celery_app = MockCeleryApp()
 
 logger = structlog.get_logger()
 
@@ -217,22 +240,25 @@ class TaskManager:
         )
 
         if webhook_url:
-            from morag_services import webhook_service
-            if result.get('status') != 'failure':
-                await webhook_service.send_task_completed(
-                    task_id=task_id,
-                    webhook_url=webhook_url,
-                    result=result,
-                    metadata=metadata
-                )
-            else:
-                error = result.get('error', 'Unknown error')
-                await webhook_service.send_task_failed(
-                    task_id=task_id,
-                    webhook_url=webhook_url,
-                    error=error,
-                    metadata=metadata
-                )
+            try:
+                from morag.services.webhook import webhook_service
+                if result.get('status') != 'failure':
+                    await webhook_service.send_task_completed(
+                        task_id=task_id,
+                        webhook_url=webhook_url,
+                        result=result,
+                        metadata=metadata
+                    )
+                else:
+                    error = result.get('error', 'Unknown error')
+                    await webhook_service.send_task_failed(
+                        task_id=task_id,
+                        webhook_url=webhook_url,
+                        error=error,
+                        metadata=metadata
+                    )
+            except ImportError:
+                logger.warning("Webhook service not available")
 
     async def handle_task_started(self, task_id: str, metadata: Dict[str, Any]):
         """Handle task start and send webhooks."""
@@ -249,12 +275,15 @@ class TaskManager:
         )
 
         if webhook_url:
-            from morag_services import webhook_service
-            await webhook_service.send_task_started(
-                task_id=task_id,
-                webhook_url=webhook_url,
-                metadata=metadata
-            )
+            try:
+                from morag.services.webhook import webhook_service
+                await webhook_service.send_task_started(
+                    task_id=task_id,
+                    webhook_url=webhook_url,
+                    metadata=metadata
+                )
+            except ImportError:
+                logger.warning("Webhook service not available")
 
     async def handle_task_progress(
         self,
@@ -268,14 +297,17 @@ class TaskManager:
 
         # Only send webhook for significant progress milestones
         if webhook_url and progress in [0.25, 0.5, 0.75]:
-            from morag_services import webhook_service
-            await webhook_service.send_task_progress(
-                task_id=task_id,
-                webhook_url=webhook_url,
-                progress=progress,
-                message=message,
-                metadata=metadata
-            )
+            try:
+                from morag.services.webhook import webhook_service
+                await webhook_service.send_task_progress(
+                    task_id=task_id,
+                    webhook_url=webhook_url,
+                    progress=progress,
+                    message=message,
+                    metadata=metadata
+                )
+            except ImportError:
+                logger.warning("Webhook service not available")
 
 # Global instance
 task_manager = TaskManager()

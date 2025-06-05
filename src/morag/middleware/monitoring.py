@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import structlog
 
 from morag_core.config import settings
-from morag_services import logging_service
+from morag.services.logging_service import logging_service
 
 logger = structlog.get_logger()
 

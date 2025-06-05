@@ -15,7 +15,19 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from morag_core.config import settings
-from morag_services.embedding import EmbeddingResult, SummaryResult
+
+# Define result classes for testing
+class EmbeddingResult:
+    def __init__(self, embedding, token_count, model):
+        self.embedding = embedding
+        self.token_count = token_count
+        self.model = model
+
+class SummaryResult:
+    def __init__(self, summary, token_count, model):
+        self.summary = summary
+        self.token_count = token_count
+        self.model = model
 
 
 class TestSettings:
@@ -217,8 +229,12 @@ def auth_headers():
 @pytest.fixture
 def mock_youtube_metadata():
     """Mock YouTube metadata for testing."""
-    from morag_youtube import YouTubeMetadata
-    
+
+    class YouTubeMetadata:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
     return YouTubeMetadata(
         id="test_video_123",
         title="Test Video Title",

@@ -1,8 +1,10 @@
 """Configuration management for MoRAG."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List, Optional
+from pydantic import field_validator
+from typing import List, Optional, Union
 import os
+import json
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -54,6 +56,26 @@ class Settings(BaseSettings):
     api_workers: int = 4
     allowed_origins: List[str] = ["*"]
 
+    # Gemini API Configuration
+    gemini_api_key: Optional[str] = None
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_embedding_model: str = "text-embedding-004"
+
+    # Redis Configuration
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Qdrant Configuration
+    qdrant_host: str = "localhost"
+    qdrant_port: int = 6333
+    qdrant_collection_name: str = "morag_documents"
+    qdrant_api_key: Optional[str] = None
+
+    # Performance Monitoring
+    slow_query_threshold: float = 5.0  # seconds
+    cpu_threshold: float = 80.0  # percentage
+    memory_threshold: float = 80.0  # percentage
+    metrics_enabled: bool = True
+
     # File Storage
     upload_dir: str = "./uploads"
     temp_dir: str = "./temp"
@@ -76,6 +98,19 @@ class Settings(BaseSettings):
     # Environment settings
     environment: str = "development"  # development, testing, production
     debug: bool = True
+
+    @field_validator('allowed_origins', mode='before')
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        """Parse allowed_origins from string or list."""
+        if isinstance(v, str):
+            try:
+                # Try to parse as JSON
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # If not JSON, treat as single origin
+                return [v] if v else ["*"]
+        return v or ["*"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
