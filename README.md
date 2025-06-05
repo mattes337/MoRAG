@@ -1,19 +1,38 @@
-# MoRAG - Multimodal RAG Ingestion Pipeline
+# MoRAG - Multimodal Retrieval Augmented Generation
 
-A comprehensive, production-ready multimodal RAG (Retrieval Augmented Generation) ingestion pipeline that processes documents, audio, video, web content, and YouTube videos into a searchable vector database.
+A comprehensive, modular system for processing and indexing various types of content for retrieval-augmented generation (RAG) applications.
+
+## 🎉 Modular Architecture Complete!
+
+MoRAG has been successfully transformed into a modular architecture with separate, independently deployable packages:
+
+### Package Structure
+```
+packages/
+├── morag-core/          # Core interfaces and models
+├── morag-services/      # AI and storage services
+├── morag-audio/         # Audio processing
+├── morag-document/      # Document processing
+├── morag-video/         # Video processing
+├── morag-image/         # Image processing
+├── morag-web/          # Web content processing
+├── morag-youtube/      # YouTube video processing
+└── morag/              # Main integration package
+```
 
 ## Features
 
+- **Modular Design**: Independent packages for different content types
+- **Multi-format Support**: Process PDFs, audio, video, web pages, YouTube videos, and more
+- **Advanced AI Integration**: Gemini API for embeddings and summarization
+- **Vector Storage**: Qdrant integration for similarity search
+- **Background Processing**: Celery-based task queue for scalable processing
+- **Docker Support**: Complete containerization with docker-compose
+- **Multiple Interfaces**: REST API, CLI, and Python API
 - **Universal Document Conversion**: Unified framework for converting any document format to structured markdown
-- **Multimodal Processing**: Support for documents (PDF, DOCX, MD), audio, video, images, web content, and YouTube videos
 - **Intelligent Chunking**: Page-based chunking for documents with configurable strategies (page, semantic, sentence, paragraph)
 - **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
-- **Vector Storage**: Qdrant vector database integration for efficient similarity search
-- **Async Processing**: Celery-based task queue for scalable background processing
-- **API-First**: FastAPI-based REST API with comprehensive documentation
-- **Monitoring**: Built-in progress tracking and webhook notifications
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
-- **Modular Architecture**: Separate packages for each processing type with isolated dependencies
 
 ## Quick Start
 
@@ -24,7 +43,34 @@ A comprehensive, production-ready multimodal RAG (Retrieval Augmented Generation
 - Qdrant (vector database)
 - Gemini API key
 
-### Installation
+### Option 1: Using the Main Package (Recommended)
+
+```bash
+# Install the main package (includes all components)
+pip install packages/morag/
+
+# Or install from source
+cd packages/morag
+pip install -e .
+
+# Start services with Docker
+docker-compose up -d
+
+# Use the CLI
+morag process-url https://example.com
+morag health
+```
+
+### Option 2: Individual Packages
+
+```bash
+# Install only what you need
+pip install packages/morag-core/
+pip install packages/morag-web/
+pip install packages/morag-youtube/
+```
+
+### Option 3: Traditional Installation
 
 1. Clone the repository:
 ```bash
@@ -102,52 +148,21 @@ docker-compose logs -f
 
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
-## Testing Individual Packages
+## Usage
 
-MoRAG provides individual test scripts for each processing component:
+For detailed usage examples including Python API, CLI commands, REST API endpoints, and configuration options, see [USAGE.md](USAGE.md).
 
-### Audio Processing
+### Quick Examples
+
 ```bash
+# Test individual components
 python tests/cli/test-audio.py my-audio.mp3
-python tests/cli/test-audio.py recording.wav
-python tests/cli/test-audio.py video.mp4  # Extract audio from video
-```
-
-### Document Processing
-```bash
 python tests/cli/test-document.py my-document.pdf
-python tests/cli/test-document.py presentation.pptx
-python tests/cli/test-document.py spreadsheet.xlsx
-```
-
-### Video Processing
-```bash
-python tests/cli/test-video.py my-video.mp4
-python tests/cli/test-video.py recording.avi
-```
-
-### Image Processing
-```bash
-python tests/cli/test-image.py my-image.jpg
-python tests/cli/test-image.py screenshot.png
-```
-
-### Web Content Processing
-```bash
 python tests/cli/test-web.py https://example.com
-python tests/cli/test-web.py https://en.wikipedia.org/wiki/Python
-```
 
-### YouTube Processing
-```bash
-python tests/cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID
-python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID
-```
-
-### Complete System Test
-```bash
-python tests/cli/test-simple.py  # Quick system validation (recommended)
-python tests/cli/test-all.py     # Comprehensive system test with detailed report
+# Complete system test
+python tests/cli/test-simple.py  # Quick validation (recommended)
+python tests/cli/test-all.py     # Comprehensive test with detailed report
 ```
 
 ## Architecture
@@ -163,13 +178,13 @@ The MoRAG pipeline consists of several key components:
 
 ## Documentation
 
+- [Usage Guide](USAGE.md) - Comprehensive usage examples and API reference
 - [API Documentation](http://localhost:8000/docs) (when running locally)
 - [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) - Complete Docker deployment instructions
 - [Universal Document Conversion](docs/UNIVERSAL_DOCUMENT_CONVERSION.md) - Complete guide to the conversion framework
 - [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md) - Development setup and guidelines
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
-- [Task Implementation Guide](tasks/README.md)
 
 ## Development
 
