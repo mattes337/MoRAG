@@ -58,44 +58,65 @@ The modularized MoRAG project will consist of the following packages:
    - [x] Basic audio processing
    - [x] Speech-to-text conversion
    - [x] Audio metadata extraction
+   - [x] Speaker diarization services
+   - [x] Topic segmentation services
+   - [x] Package structure and dependencies
 
 - [x] Create and implement `morag-video` package
    - [x] Basic video processing
    - [x] Video metadata extraction
    - [x] Frame extraction
    - [x] Video transcription
+   - [x] Audio extraction integration
+   - [x] Package structure and dependencies
 
 - [x] Create and implement `morag-document` package
    - [x] Basic document processing
    - [x] Text extraction
    - [x] Document metadata extraction
    - [x] Document conversion
+   - [x] Multiple format support (PDF, Office, etc.)
+   - [x] Package structure and dependencies
 
 - [x] Create and implement `morag-image` package
    - [x] Basic image processing
    - [x] Image captioning
    - [x] OCR (Optical Character Recognition)
    - [x] Image metadata extraction
+   - [x] Comprehensive documentation and examples
+   - [x] Package structure and dependencies
 
-- [ ] Create and implement `morag-web` package
-   - [x] Web scraping
+- [x] Create and implement `morag-embedding` package
+   - [x] Text embedding generation
+   - [x] Embedding storage and retrieval
+   - [x] Similarity search
+   - [x] Package structure and dependencies
+
+- [ ] Complete `morag-web` package separation
+   - [x] Web scraping functionality
    - [x] Content extraction
    - [x] Content cleaning
    - [x] HTML to Markdown conversion
-   - [ ] Move to separate package
+   - [x] Package structure created
+   - [ ] Move implementation from main codebase
+   - [ ] Update dependencies and imports
 
-- [ ] Create and implement `morag-youtube` package
+- [ ] Complete `morag-youtube` package separation
    - [x] YouTube video downloading
    - [x] Metadata extraction
    - [x] Caption extraction
-   - [ ] Move to separate package
+   - [x] Package structure created
+   - [ ] Move implementation from main codebase
+   - [ ] Update dependencies and imports
 
 ### Phase 4: Services Package Implementation
 
-- [ ] Create package structure for `morag-services`
+- [x] Create package structure for `morag-services`
 - [x] Implement embedding services
-- [ ] Implement vector storage services
-- [ ] Implement AI services
+- [x] Implement unified service layer
+- [x] Implement pipeline framework
+- [ ] Complete vector storage services integration
+- [ ] Complete AI services integration
 - [ ] Test and publish `morag-services` package
 
 ### Phase 5: Integration Layer Implementation
@@ -178,24 +199,52 @@ The migration will be done incrementally, with each package being implemented an
 ### In Progress
 
 #### morag-web
-- Web scraping
-- Content extraction
-- Content cleaning
-- HTML to Markdown conversion
-- Need to move to separate package
+- Web scraping functionality implemented
+- Content extraction implemented
+- Content cleaning implemented
+- HTML to Markdown conversion implemented
+- Package structure created
+- **Need to**: Move implementation from main codebase to package
+
+#### morag-youtube
+- YouTube video downloading implemented
+- Metadata extraction implemented
+- Caption extraction implemented
+- Package structure created
+- **Need to**: Move implementation from main codebase to package
+
+#### morag-services
+- Unified service layer implemented
+- Pipeline framework implemented
+- **Need to**: Complete vector storage and AI services integration
 
 ### Pending
 
-- Complete remaining processor packages (morag-web, morag-youtube)
-- Implement morag-services (vector storage, AI services)
-- Implement integration layer (morag)
-- Clean up obsolete code
-- Update documentation
+- Complete morag-web package separation (move from src/morag to packages/morag-web)
+- Complete morag-youtube package separation (move from src/morag to packages/morag-youtube)
+- Complete morag-services package (vector storage, AI services)
+- Implement integration layer (morag package)
+- Create Docker containers for each package
+- Clean up obsolete code from main codebase
+- Update documentation and deployment guides
 
 ## Next Steps
 
-1. Create and implement the `morag-web` package
-2. Create and implement the `morag-youtube` package
-3. Create and implement the `morag-services` package
-4. Create and implement the integration layer (`morag`)
-5. Clean up obsolete code and update documentation
+1. **Complete morag-web package separation** - Move web processing implementation from main codebase
+2. **Complete morag-youtube package separation** - Move YouTube processing implementation from main codebase
+3. **Complete morag-services package** - Integrate vector storage and AI services
+4. **Create integration layer (morag package)** - Unified API and CLI interface
+5. **Create Docker containers** - Individual containers for each package component
+6. **Clean up main codebase** - Remove obsolete code after successful migration
+7. **Update deployment documentation** - Docker Compose orchestration for modular system
+
+## Architecture Benefits
+
+The modular architecture provides several key benefits:
+
+- **Isolated Dependencies**: Each converter has its own package and container, eliminating dependency conflicts
+- **Scalability**: Scale individual converters based on demand (e.g., more document workers, fewer video workers)
+- **Resource Optimization**: Allocate resources appropriately per converter type
+- **Simplified Maintenance**: Update converters independently without affecting the entire system
+- **Resilience**: If one converter fails, others continue working
+- **Microservices Ready**: Each package can be deployed as a separate microservice

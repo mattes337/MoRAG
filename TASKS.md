@@ -48,7 +48,17 @@
 - [x] **29-web-markdown-conversion.md** - Enhanced web content to markdown conversion ✅
 - [x] **30-ai-error-handling.md** - Robust AI/LLM error handling and resilience ✅
 
+### Modular Architecture & Package Separation
+- [ ] **31-complete-morag-web-separation.md** - Complete separation of web processing into standalone package
+- [ ] **32-complete-morag-youtube-separation.md** - Complete separation of YouTube processing into standalone package
+- [ ] **33-complete-morag-services-package.md** - Complete the unified services package with vector storage and AI services
+- [ ] **34-create-integration-layer.md** - Create main morag package with unified API, CLI, and orchestration
+- [ ] **35-docker-containerization.md** - Create individual Docker containers for each package component
+- [ ] **36-cleanup-and-migration.md** - Clean up obsolete code and complete migration to modular architecture
+
 ## Current Focus
+
+### Core Implementation (Completed)
 ✅ Task 01: Project Setup and Configuration - COMPLETED
 ✅ Task 02: FastAPI Service Setup with Async Support - COMPLETED
 ✅ Task 03: Qdrant Vector Database Configuration - COMPLETED
@@ -68,6 +78,14 @@
 ✅ Task 17: RESTful Ingestion API Implementation - COMPLETED
 ✅ Task 18: Status Tracking and Webhooks Implementation - COMPLETED
 ✅ Task 20: Testing Framework Implementation - COMPLETED
+
+### Modular Architecture (In Progress)
+🔄 **Task 31**: Complete MoRAG Web Package Separation - IN PROGRESS
+🔄 **Task 32**: Complete MoRAG YouTube Package Separation - IN PROGRESS
+🔄 **Task 33**: Complete MoRAG Services Package - IN PROGRESS
+⏳ **Task 34**: Create Integration Layer (Main MoRAG Package) - PENDING
+⏳ **Task 35**: Docker Containerization for Each Package - PENDING
+⏳ **Task 36**: Cleanup and Migration to Modular Architecture - PENDING
 ✅ **DEBUG-SCRIPT** - PowerShell debugging script creation - COMPLETED
 ✅ **DEPENDENCY-FIX** - Fixed missing dependencies and configuration tests - COMPLETED
 ✅ **CELERY-ASYNC-FIX** - Fixed Celery async task issues and Windows permission errors - COMPLETED
