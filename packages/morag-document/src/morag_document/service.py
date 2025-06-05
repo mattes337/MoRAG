@@ -27,9 +27,10 @@ class DocumentService(BaseService):
         Args:
             config: Service configuration
         """
-        super().__init__(config or ServiceConfig())
+        self.config = config or ServiceConfig()
         self.processor = DocumentProcessor()
         self.embedding_service = None
+        self._status = ServiceStatus.INITIALIZING
 
     async def initialize(self) -> bool:
         """Initialize service.
@@ -39,8 +40,8 @@ class DocumentService(BaseService):
         """
         try:
             # Initialize embedding service if configured
-            if self.config.get("enable_embedding", False):
-                embedding_config = self.config.get("embedding", {})
+            if hasattr(self.config, 'custom_options') and self.config.custom_options.get("enable_embedding", False):
+                embedding_config = self.config.custom_options.get("embedding", {})
                 self.embedding_service = GeminiEmbeddingService(ServiceConfig(**embedding_config))
                 await self.embedding_service.initialize()
 

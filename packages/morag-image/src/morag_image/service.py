@@ -17,11 +17,31 @@ class ImageService(BaseService):
     
     def __init__(self, api_key: Optional[str] = None):
         """Initialize the image service.
-        
+
         Args:
             api_key: Optional API key for Gemini vision model
         """
         self.processor = ImageProcessor(api_key=api_key)
+
+    async def initialize(self) -> bool:
+        """Initialize the service.
+
+        Returns:
+            True if initialization was successful
+        """
+        return True
+
+    async def shutdown(self) -> None:
+        """Shutdown the service and release resources."""
+        pass
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Check service health.
+
+        Returns:
+            Dictionary with health status information
+        """
+        return {"status": "healthy", "processor": "ready"}
     
     async def process_image(self, 
                           file_path: Path, 

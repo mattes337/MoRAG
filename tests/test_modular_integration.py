@@ -8,13 +8,15 @@ import tempfile
 import json
 
 # Test imports for all packages
+IMPORTS_AVAILABLE = True
+IMPORT_ERROR = None
+
 try:
     from morag import MoRAGAPI, MoRAGOrchestrator
     from morag_core.models import Document, DocumentChunk, ProcessingResult
     from morag_services import MoRAGServices, ServiceConfig, ContentType
     from morag_web import WebProcessor, WebConverter
     from morag_youtube import YouTubeProcessor
-    IMPORTS_AVAILABLE = True
 except ImportError as e:
     IMPORTS_AVAILABLE = False
     IMPORT_ERROR = str(e)

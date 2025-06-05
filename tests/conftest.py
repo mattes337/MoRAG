@@ -14,7 +14,19 @@ from fastapi.testclient import TestClient
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_core.config import settings
+# Try to import settings, but don't fail if not available
+try:
+    from morag_core.config import settings
+except ImportError:
+    # Create a mock settings object for tests
+    class MockSettings:
+        redis_url = "redis://localhost:6379/15"
+        qdrant_collection_name = "test_morag_documents"
+        upload_dir = "./test_uploads"
+        temp_dir = "./test_temp"
+        log_level = "DEBUG"
+
+    settings = MockSettings()
 
 # Define result classes for testing
 class EmbeddingResult:

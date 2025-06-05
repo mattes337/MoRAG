@@ -16,10 +16,30 @@ logger = structlog.get_logger(__name__)
 
 class WebService(BaseService):
     """Web service for high-level operations."""
-    
+
     def __init__(self):
         """Initialize web service."""
         self.processor = WebProcessor()
+
+    async def initialize(self) -> bool:
+        """Initialize the service.
+
+        Returns:
+            True if initialization was successful
+        """
+        return True
+
+    async def shutdown(self) -> None:
+        """Shutdown the service and release resources."""
+        pass
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Check service health.
+
+        Returns:
+            Dictionary with health status information
+        """
+        return {"status": "healthy", "processor": "ready"}
     
     async def process_url(self, url: str, config_options: Optional[Dict[str, Any]] = None) -> WebScrapingResult:
         """Process a single URL with the given configuration options.

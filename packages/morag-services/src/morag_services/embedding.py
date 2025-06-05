@@ -32,7 +32,7 @@ class SummaryResult:
 
 class GeminiEmbeddingService(BaseEmbeddingService):
     """Gemini-based embedding service."""
-    
+
     def __init__(
         self,
         api_key: str,
@@ -40,12 +40,21 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         generation_model: str = "gemini-2.0-flash-001"
     ):
         """Initialize Gemini embedding service.
-        
+
         Args:
             api_key: Gemini API key
             embedding_model: Model for embeddings
             generation_model: Model for text generation
         """
+        # Create a basic config for the parent class
+        from morag_core.interfaces.embedding import EmbeddingConfig
+        config = EmbeddingConfig(
+            model=embedding_model,
+            max_tokens=8192,
+            batch_size=10
+        )
+        super().__init__(config)
+
         self.api_key = api_key
         self.embedding_model = embedding_model
         self.generation_model = generation_model
@@ -61,6 +70,18 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         else:
             self.client = None
             logger.warning("Gemini API key not found - service will not work")
+
+    async def initialize(self) -> bool:
+        """Initialize the embedding service.
+
+        Returns:
+            True if initialization was successful
+        """
+        return self.client is not None
+
+    async def shutdown(self) -> None:
+        """Shutdown the embedding service and release resources."""
+        pass
     
     async def generate_embedding(
         self,

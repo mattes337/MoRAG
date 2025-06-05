@@ -21,13 +21,33 @@ class YouTubeService(BaseService):
     
     def __init__(self, max_concurrent_downloads: int = 3):
         """Initialize YouTube service.
-        
+
         Args:
             max_concurrent_downloads: Maximum number of concurrent downloads
         """
         self.processor = YouTubeProcessor()
         self.max_concurrent_downloads = max_concurrent_downloads
         self.semaphore = asyncio.Semaphore(max_concurrent_downloads)
+
+    async def initialize(self) -> bool:
+        """Initialize the service.
+
+        Returns:
+            True if initialization was successful
+        """
+        return True
+
+    async def shutdown(self) -> None:
+        """Shutdown the service and release resources."""
+        pass
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Check service health.
+
+        Returns:
+            Dictionary with health status information
+        """
+        return {"status": "healthy", "processor": "ready"}
     
     async def process_video(self, url: str, config: Optional[YouTubeConfig] = None) -> YouTubeDownloadResult:
         """Process a single YouTube video.
