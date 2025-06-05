@@ -36,15 +36,18 @@ services:
   morag-api:
     build:
       context: .
-      dockerfile: packages/morag/Dockerfile
-      target: api-server
+      target: production
+    container_name: morag-api
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENVIRONMENT=production
       - LOG_LEVEL=INFO
     depends_on:
       redis:
@@ -52,70 +55,80 @@ services:
       qdrant:
         condition: service_healthy
     volumes:
-      - ./config:/app/config:ro
-      - temp_files:/tmp
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./temp:/app/temp
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
-  # MoRAG Background Workers
+  # Celery Worker for background tasks
   morag-worker:
     build:
       context: .
-      dockerfile: packages/morag/Dockerfile
-      target: worker
+      target: production
+    container_name: morag-worker
+    restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - WORKER_TYPE=celery
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
+    deploy:
+      replicas: 2
+
+  # Celery Beat for scheduled tasks
+  morag-beat:
+    build:
+      context: .
+      target: production
+    container_name: morag-beat
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
       - LOG_LEVEL=INFO
     depends_on:
       redis:
         condition: service_healthy
-      qdrant:
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: ["celery", "-A", "morag.worker", "beat", "--loglevel=info"]
+
+  # Flower for monitoring Celery tasks (optional)
+  flower:
+    build:
+      context: .
+      target: production
+    container_name: morag-flower
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - FLOWER_PORT=5555
+    depends_on:
+      redis:
         condition: service_healthy
-    volumes:
-      - ./config:/app/config:ro
-      - temp_files:/tmp
-    deploy:
-      replicas: 2
-    healthcheck:
-      test: ["CMD", "celery", "-A", "morag.worker", "inspect", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Web Processing Service
-  morag-web:
-    build:
-      context: .
-      dockerfile: packages/morag-web/Dockerfile
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=INFO
-    depends_on:
-      - redis
-    volumes:
-      - temp_files:/tmp
-
-  # YouTube Processing Service
-  morag-youtube:
-    build:
-      context: .
-      dockerfile: packages/morag-youtube/Dockerfile
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=INFO
-    depends_on:
-      - redis
-    volumes:
-      - temp_files:/tmp
-      - youtube_downloads:/app/downloads
+    command: ["celery", "-A", "morag.worker", "flower", "--port=5555"]
+    profiles:
+      - monitoring
 
   # Nginx reverse proxy (optional)
   nginx:
@@ -170,10 +183,6 @@ volumes:
     driver: local
   qdrant_data:
     driver: local
-  temp_files:
-    driver: local
-  youtube_downloads:
-    driver: local
   prometheus_data:
     driver: local
   grafana_data:
@@ -181,4 +190,5 @@ volumes:
 
 networks:
   default:
+    name: morag-network
     driver: bridge

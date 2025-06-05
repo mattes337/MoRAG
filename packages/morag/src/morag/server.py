@@ -89,6 +89,29 @@ def normalize_content_type(content_type: Optional[str]) -> Optional[str]:
     return mime_to_morag.get(content_type, 'document')
 
 
+def normalize_processing_result(result: ProcessingResult) -> ProcessingResult:
+    """Normalize ProcessingResult to ensure it has a content attribute.
+
+    Args:
+        result: ProcessingResult from any processor
+
+    Returns:
+        ProcessingResult with normalized content attribute
+    """
+    # If result already has content attribute, return as-is
+    if hasattr(result, 'content') and result.content is not None:
+        return result
+
+    # If result has text_content, use that as content
+    if hasattr(result, 'text_content') and result.text_content is not None:
+        result.content = result.text_content
+        return result
+
+    # If no content found, set empty string
+    result.content = ""
+    return result
+
+
 # Pydantic models for API
 class ProcessURLRequest(BaseModel):
     url: str
@@ -168,10 +191,11 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Process content from a URL."""
         try:
             result = await morag_api.process_url(
-                request.url, 
-                request.content_type, 
+                request.url,
+                request.content_type,
                 request.options
             )
+            result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
                 content=result.content,
@@ -232,6 +256,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            success=result.success,
                            processing_time=result.processing_time)
 
+                result = normalize_processing_result(result)
                 return ProcessingResultResponse(
                     success=result.success,
                     content=result.content,
@@ -270,6 +295,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Process a web page."""
         try:
             result = await morag_api.process_web_page(request.url, request.options)
+            result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
                 content=result.content,
@@ -286,6 +312,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Process a YouTube video."""
         try:
             result = await morag_api.process_youtube_video(request.url, request.options)
+            result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
                 content=result.content,
@@ -305,7 +332,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             return [
                 ProcessingResultResponse(
                     success=result.success,
-                    content=result.content,
+                    content=normalize_processing_result(result).content,
                     metadata=result.metadata,
                     processing_time=result.processing_time,
                     error_message=result.error_message

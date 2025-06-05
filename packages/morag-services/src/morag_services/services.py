@@ -209,6 +209,7 @@ class MoRAGServices:
                 content_type=content_type,
                 content_path=path_or_url if not path_or_url.startswith("http") else None,
                 content_url=path_or_url if path_or_url.startswith("http") else None,
+                text_content="",
                 success=False,
                 error_message=str(e)
             )
@@ -224,20 +225,21 @@ class MoRAGServices:
             ProcessingResult with extracted text and metadata
         """
         try:
+            # Use process_document method with kwargs instead of config parameter
             result = await self.document_service.process_document(
                 Path(document_path),
-                config=self.config.document_config
+                **(options or {})
             )
-            
+
             return ProcessingResult(
                 content_type=ContentType.DOCUMENT,
                 content_path=document_path,
-                text_content=result.text,
+                text_content=result.document.raw_text if result.document else "",
                 metadata=result.metadata,
-                extracted_files=[str(p) for p in result.extracted_files],
-                processing_time=result.processing_time,
-                success=result.success,
-                error_message=result.error_message,
+                extracted_files=[],  # Document service doesn't return extracted files in this format
+                processing_time=0.0,  # Document service doesn't return processing time
+                success=True,
+                error_message=None,
                 raw_result=result
             )
         except Exception as e:
@@ -245,6 +247,7 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.DOCUMENT,
                 content_path=str(document_path),  # Convert Path to string
+                text_content="",
                 success=False,
                 error_message=str(e)
             )
@@ -260,19 +263,21 @@ class MoRAGServices:
             ProcessingResult with transcription and metadata
         """
         try:
-            result = await self.audio_service.process_audio(
+            # Use process_file method which exists in AudioService
+            result = await self.audio_service.process_file(
                 Path(audio_path),
-                config=self.config.audio_config
+                save_output=False,  # Don't save files, just return content
+                output_format="markdown"
             )
-            
+
             return ProcessingResult(
                 content_type=ContentType.AUDIO,
                 content_path=audio_path,
-                text_content=result.transcription,
-                metadata=result.metadata,
-                processing_time=result.processing_time,
-                success=result.success,
-                error_message=result.error_message,
+                text_content=result.get("content", ""),
+                metadata=result.get("metadata", {}),
+                processing_time=result.get("processing_time", 0.0),
+                success=result.get("success", False),
+                error_message=result.get("error"),
                 raw_result=result
             )
         except Exception as e:
@@ -280,6 +285,7 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.AUDIO,
                 content_path=audio_path,
+                text_content="",
                 success=False,
                 error_message=str(e)
             )
@@ -295,20 +301,22 @@ class MoRAGServices:
             ProcessingResult with extracted information
         """
         try:
-            result = await self.video_service.process_video(
+            # Use process_file method which exists in VideoService
+            result = await self.video_service.process_file(
                 Path(video_path),
-                config=self.config.video_config
+                save_output=False,  # Don't save files, just return content
+                output_format="markdown"
             )
-            
+
             return ProcessingResult(
                 content_type=ContentType.VIDEO,
                 content_path=video_path,
-                text_content=result.transcription,
-                metadata=result.metadata,
-                extracted_files=[str(p) for p in result.extracted_files],
-                processing_time=result.processing_time,
-                success=result.success,
-                error_message=result.error_message,
+                text_content="",  # Video service doesn't return direct text content
+                metadata=result.get("metadata", {}),
+                extracted_files=result.get("thumbnails", []) + result.get("keyframes", []),
+                processing_time=result.get("processing_time", 0.0),
+                success=result.get("success", False),
+                error_message=result.get("error"),
                 raw_result=result
             )
         except Exception as e:
@@ -316,6 +324,7 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.VIDEO,
                 content_path=video_path,
+                text_content="",
                 success=False,
                 error_message=str(e)
             )
@@ -331,19 +340,35 @@ class MoRAGServices:
             ProcessingResult with extracted text and metadata
         """
         try:
-            result = await self.image_service.process_image(
-                Path(image_path),
-                config=self.config.image_config
+            # Use process_image method from ImageProcessor directly
+            from morag_image.processor import ImageProcessor, ImageConfig
+
+            # Create processor with API key from config
+            api_key = getattr(self.config, 'google_api_key', None)
+            processor = ImageProcessor(api_key=api_key)
+
+            # Create image config
+            image_config = ImageConfig(
+                generate_caption=True,
+                extract_text=True,
+                extract_metadata=True,
+                ocr_engine="tesseract"
             )
-            
+
+            result = await processor.process_image(Path(image_path), image_config)
+
             return ProcessingResult(
                 content_type=ContentType.IMAGE,
                 content_path=image_path,
-                text_content=result.text,
-                metadata=result.metadata,
+                text_content=result.extracted_text or "",
+                metadata={
+                    "caption": result.caption,
+                    "metadata": result.metadata.__dict__ if result.metadata else {},
+                    "confidence_scores": result.confidence_scores
+                },
                 processing_time=result.processing_time,
-                success=result.success,
-                error_message=result.error_message,
+                success=True,
+                error_message=None,
                 raw_result=result
             )
         except Exception as e:
@@ -351,6 +376,7 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.IMAGE,
                 content_path=image_path,
+                text_content="",
                 success=False,
                 error_message=str(e)
             )
@@ -386,6 +412,7 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.WEB,
                 content_url=url,
+                text_content="",
                 success=False,
                 error_message=str(e)
             )
@@ -452,6 +479,7 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.YOUTUBE,
                 content_url=url,
+                text_content="",
                 success=False,
                 error_message=str(e)
             )
@@ -485,6 +513,7 @@ class MoRAGServices:
                     content_type=ContentType.UNKNOWN,
                     content_path=item if not item.startswith("http") else None,
                     content_url=item if item.startswith("http") else None,
+                    text_content="",
                     success=False,
                     error_message=str(result)
                 )

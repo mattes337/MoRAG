@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Redis for development
+  redis:
+    image: redis:7-alpine
+    container_name: morag-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Qdrant vector database for development
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: morag-qdrant-dev
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_dev_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MoRAG API Server for development
+  morag-api-dev:
+    build:
+      context: .
+      target: development
+    container_name: morag-api-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app/packages/morag/src:/app/packages/morag-services/src:/app/packages/morag-core/src
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    command: ["python", "-m", "morag.server", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # Development worker
+  morag-worker-dev:
+    build:
+      context: .
+      target: development
+    container_name: morag-worker-dev
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app/packages/morag/src:/app/packages/morag-services/src:/app/packages/morag-core/src
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=debug", "--concurrency=1"]
+
+  # Jupyter notebook for development and testing
+  jupyter:
+    build:
+      context: .
+      target: development
+    container_name: morag-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+      - ./notebooks:/app/notebooks
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - PYTHONPATH=/app/packages/morag/src:/app/packages/morag-services/src:/app/packages/morag-core/src
+    command: ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--NotebookApp.token=''"]
+
+volumes:
+  redis_dev_data:
+    driver: local
+  qdrant_dev_data:
+    driver: local
+
+networks:
+  default:
+    name: morag-dev-network
+    driver: bridge
