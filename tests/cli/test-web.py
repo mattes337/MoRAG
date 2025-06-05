@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-MoRAG Audio Processing Test Script
+MoRAG Web Processing Test Script
 
-Usage: python test-audio.py <audio_file>
+Usage: python test-web.py <url>
 
 Examples:
-    python test-audio.py my-audio.mp3
-    python test-audio.py recording.wav
-    python test-audio.py video.mp4  # Extract audio from video
+    python test-web.py https://example.com
+    python test-web.py https://en.wikipedia.org/wiki/Python
+    python test-web.py https://github.com/your-repo
 """
 
 import sys
@@ -15,20 +15,21 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Optional
+import urllib.parse
 
 # Add the project root to the path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from morag_audio import AudioProcessor
+    from morag_web import WebProcessor
     from morag_services import ServiceConfig, ContentType
     from morag_core.models import ProcessingConfig
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
-    print("  pip install -e packages/morag-audio")
+    print("  pip install -e packages/morag-web")
     sys.exit(1)
 
 
@@ -52,42 +53,51 @@ def print_result(key: str, value: str, indent: int = 0):
     print(f"{spaces}📋 {key}: {value}")
 
 
-async def test_audio_processing(audio_file: Path) -> bool:
-    """Test audio processing functionality."""
-    print_header("MoRAG Audio Processing Test")
+def validate_url(url: str) -> bool:
+    """Validate URL format."""
+    try:
+        result = urllib.parse.urlparse(url)
+        return all([result.scheme, result.netloc])
+    except:
+        return False
+
+
+async def test_web_processing(url: str) -> bool:
+    """Test web processing functionality."""
+    print_header("MoRAG Web Processing Test")
     
-    if not audio_file.exists():
-        print(f"❌ Error: Audio file not found: {audio_file}")
+    if not validate_url(url):
+        print(f"❌ Error: Invalid URL format: {url}")
         return False
     
-    print_result("Input File", str(audio_file))
-    print_result("File Size", f"{audio_file.stat().st_size / 1024 / 1024:.2f} MB")
+    print_result("Target URL", url)
     
     try:
         # Initialize configuration
         config = ServiceConfig()
         print_result("Configuration", "✅ Loaded successfully")
 
-        # Initialize audio processor
-        processor = AudioProcessor(config)
-        print_result("Audio Processor", "✅ Initialized successfully")
+        # Initialize web processor
+        processor = WebProcessor(config)
+        print_result("Web Processor", "✅ Initialized successfully")
 
         # Create processing configuration
         processing_config = ProcessingConfig(
-            max_file_size=100 * 1024 * 1024,  # 100MB
-            timeout=300.0,
+            max_file_size=10 * 1024 * 1024,  # 10MB
+            timeout=60.0,
             extract_metadata=True
         )
         print_result("Processing Config", "✅ Created successfully")
         
-        print_section("Processing Audio File")
-        print("🔄 Starting audio processing...")
+        print_section("Processing Web Content")
+        print("🔄 Starting web content extraction...")
+        print("   This may take a while depending on the website...")
         
-        # Process the audio file
-        result = await processor.process_file(audio_file, processing_config)
+        # Process the URL
+        result = await processor.process_url(url, processing_config)
         
         if result.success:
-            print("✅ Audio processing completed successfully!")
+            print("✅ Web processing completed successfully!")
             
             print_section("Processing Results")
             print_result("Status", "✅ Success")
@@ -104,18 +114,30 @@ async def test_audio_processing(audio_file: Path) -> bool:
             
             if result.content:
                 print_section("Content Preview")
-                content_preview = result.content[:500] + "..." if len(result.content) > 500 else result.content
+                content_preview = result.content[:1000] + "..." if len(result.content) > 1000 else result.content
                 print(f"📄 Content ({len(result.content)} characters):")
                 print(content_preview)
+                
+                # Check for specific content sections
+                if "## Page Title" in result.content:
+                    print_result("Page Title", "✅ Found")
+                if "## Main Content" in result.content:
+                    print_result("Main Content", "✅ Found")
+                if "## Links" in result.content:
+                    print_result("Links", "✅ Found")
             
             if result.summary:
                 print_section("Summary")
                 print(f"📝 {result.summary}")
             
+            # Create safe filename from URL
+            safe_filename = urllib.parse.quote(url, safe='').replace('%', '_')[:50]
+            
             # Save results to file
-            output_file = audio_file.parent / f"{audio_file.stem}_test_result.json"
+            output_file = Path(f"web_{safe_filename}_test_result.json")
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
+                    'url': url,
                     'success': result.success,
                     'content_type': result.content_type,
                     'processing_time': result.processing_time,
@@ -125,18 +147,24 @@ async def test_audio_processing(audio_file: Path) -> bool:
                     'error': result.error
                 }, f, indent=2, ensure_ascii=False)
             
+            # Also save markdown content
+            markdown_file = Path(f"web_{safe_filename}_converted.md")
+            with open(markdown_file, 'w', encoding='utf-8') as f:
+                f.write(result.content)
+            
             print_section("Output")
             print_result("Results saved to", str(output_file))
+            print_result("Markdown saved to", str(markdown_file))
             
             return True
             
         else:
-            print("❌ Audio processing failed!")
+            print("❌ Web processing failed!")
             print_result("Error", result.error or "Unknown error")
             return False
             
     except Exception as e:
-        print(f"❌ Error during audio processing: {e}")
+        print(f"❌ Error during web processing: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -145,23 +173,25 @@ async def test_audio_processing(audio_file: Path) -> bool:
 def main():
     """Main function."""
     if len(sys.argv) != 2:
-        print("Usage: python test-audio.py <audio_file>")
+        print("Usage: python test-web.py <url>")
         print()
         print("Examples:")
-        print("  python test-audio.py my-audio.mp3")
-        print("  python test-audio.py recording.wav")
-        print("  python test-audio.py video.mp4  # Extract audio from video")
+        print("  python test-web.py https://example.com")
+        print("  python test-web.py https://en.wikipedia.org/wiki/Python")
+        print("  python test-web.py https://github.com/your-repo")
+        print()
+        print("Note: Make sure the URL is accessible and includes the protocol (http:// or https://)")
         sys.exit(1)
     
-    audio_file = Path(sys.argv[1])
+    url = sys.argv[1]
     
     try:
-        success = asyncio.run(test_audio_processing(audio_file))
+        success = asyncio.run(test_web_processing(url))
         if success:
-            print("\n🎉 Audio processing test completed successfully!")
+            print("\n🎉 Web processing test completed successfully!")
             sys.exit(0)
         else:
-            print("\n💥 Audio processing test failed!")
+            print("\n💥 Web processing test failed!")
             sys.exit(1)
     except KeyboardInterrupt:
         print("\n⏹️  Test interrupted by user")

@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 # Add the project root to the path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 
@@ -195,8 +195,8 @@ def main():
         print("\n🎉 MoRAG system appears to be working correctly!")
         print("\nNext steps:")
         print("1. Try individual test scripts:")
-        print("   python test-audio.py uploads/Sprache.mp3")
-        print("   python test-document.py uploads/your-document.pdf")
+        print("   python tests/cli/test-audio.py uploads/Sprache.mp3")
+        print("   python tests/cli/test-document.py uploads/your-document.pdf")
         print("2. Start the system with Docker:")
         print("   docker-compose up -d")
         print("3. Check the API documentation:")

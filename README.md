@@ -108,46 +108,46 @@ MoRAG provides individual test scripts for each processing component:
 
 ### Audio Processing
 ```bash
-python test-audio.py my-audio.mp3
-python test-audio.py recording.wav
-python test-audio.py video.mp4  # Extract audio from video
+python tests/cli/test-audio.py my-audio.mp3
+python tests/cli/test-audio.py recording.wav
+python tests/cli/test-audio.py video.mp4  # Extract audio from video
 ```
 
 ### Document Processing
 ```bash
-python test-document.py my-document.pdf
-python test-document.py presentation.pptx
-python test-document.py spreadsheet.xlsx
+python tests/cli/test-document.py my-document.pdf
+python tests/cli/test-document.py presentation.pptx
+python tests/cli/test-document.py spreadsheet.xlsx
 ```
 
 ### Video Processing
 ```bash
-python test-video.py my-video.mp4
-python test-video.py recording.avi
+python tests/cli/test-video.py my-video.mp4
+python tests/cli/test-video.py recording.avi
 ```
 
 ### Image Processing
 ```bash
-python test-image.py my-image.jpg
-python test-image.py screenshot.png
+python tests/cli/test-image.py my-image.jpg
+python tests/cli/test-image.py screenshot.png
 ```
 
 ### Web Content Processing
 ```bash
-python test-web.py https://example.com
-python test-web.py https://en.wikipedia.org/wiki/Python
+python tests/cli/test-web.py https://example.com
+python tests/cli/test-web.py https://en.wikipedia.org/wiki/Python
 ```
 
 ### YouTube Processing
 ```bash
-python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID
-python test-youtube.py https://youtu.be/VIDEO_ID
+python tests/cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID
+python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID
 ```
 
 ### Complete System Test
 ```bash
-python test-simple.py  # Quick system validation (recommended)
-python test-all.py     # Comprehensive system test with detailed report
+python tests/cli/test-simple.py  # Quick system validation (recommended)
+python tests/cli/test-all.py     # Comprehensive system test with detailed report
 ```
 
 ## Architecture
@@ -191,9 +191,9 @@ pytest tests/manual/        # Manual tests
 pytest --cov=src/morag --cov-report=html
 
 # Test individual components
-python test-all.py          # Complete system test
-python test-audio.py sample.mp3
-python test-document.py sample.pdf
+python tests/cli/test-all.py          # Complete system test
+python tests/cli/test-audio.py sample.mp3
+python tests/cli/test-document.py sample.pdf
 ```
 
 ### Code Quality

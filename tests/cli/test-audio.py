@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-MoRAG Image Processing Test Script
+MoRAG Audio Processing Test Script
 
-Usage: python test-image.py <image_file>
+Usage: python test-audio.py <audio_file>
 
 Examples:
-    python test-image.py my-image.jpg
-    python test-image.py screenshot.png
-    python test-image.py diagram.gif
+    python test-audio.py my-audio.mp3
+    python test-audio.py recording.wav
+    python test-audio.py video.mp4  # Extract audio from video
 """
 
 import sys
@@ -17,18 +17,18 @@ from pathlib import Path
 from typing import Optional
 
 # Add the project root to the path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from morag_image import ImageProcessor
+    from morag_audio import AudioProcessor
     from morag_services import ServiceConfig, ContentType
     from morag_core.models import ProcessingConfig
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
-    print("  pip install -e packages/morag-image")
+    print("  pip install -e packages/morag-audio")
     sys.exit(1)
 
 
@@ -52,43 +52,42 @@ def print_result(key: str, value: str, indent: int = 0):
     print(f"{spaces}📋 {key}: {value}")
 
 
-async def test_image_processing(image_file: Path) -> bool:
-    """Test image processing functionality."""
-    print_header("MoRAG Image Processing Test")
+async def test_audio_processing(audio_file: Path) -> bool:
+    """Test audio processing functionality."""
+    print_header("MoRAG Audio Processing Test")
     
-    if not image_file.exists():
-        print(f"❌ Error: Image file not found: {image_file}")
+    if not audio_file.exists():
+        print(f"❌ Error: Audio file not found: {audio_file}")
         return False
     
-    print_result("Input File", str(image_file))
-    print_result("File Size", f"{image_file.stat().st_size / 1024:.2f} KB")
-    print_result("File Extension", image_file.suffix.lower())
+    print_result("Input File", str(audio_file))
+    print_result("File Size", f"{audio_file.stat().st_size / 1024 / 1024:.2f} MB")
     
     try:
         # Initialize configuration
         config = ServiceConfig()
         print_result("Configuration", "✅ Loaded successfully")
 
-        # Initialize image processor
-        processor = ImageProcessor(config)
-        print_result("Image Processor", "✅ Initialized successfully")
+        # Initialize audio processor
+        processor = AudioProcessor(config)
+        print_result("Audio Processor", "✅ Initialized successfully")
 
         # Create processing configuration
         processing_config = ProcessingConfig(
-            max_file_size=50 * 1024 * 1024,  # 50MB
-            timeout=120.0,
+            max_file_size=100 * 1024 * 1024,  # 100MB
+            timeout=300.0,
             extract_metadata=True
         )
         print_result("Processing Config", "✅ Created successfully")
         
-        print_section("Processing Image File")
-        print("🔄 Starting image processing...")
+        print_section("Processing Audio File")
+        print("🔄 Starting audio processing...")
         
-        # Process the image file
-        result = await processor.process_file(image_file, processing_config)
+        # Process the audio file
+        result = await processor.process_file(audio_file, processing_config)
         
         if result.success:
-            print("✅ Image processing completed successfully!")
+            print("✅ Audio processing completed successfully!")
             
             print_section("Processing Results")
             print_result("Status", "✅ Success")
@@ -105,24 +104,16 @@ async def test_image_processing(image_file: Path) -> bool:
             
             if result.content:
                 print_section("Content Preview")
-                content_preview = result.content[:1000] + "..." if len(result.content) > 1000 else result.content
+                content_preview = result.content[:500] + "..." if len(result.content) > 500 else result.content
                 print(f"📄 Content ({len(result.content)} characters):")
                 print(content_preview)
-                
-                # Check for specific content types
-                if "## Image Description" in result.content:
-                    print_result("Image Description", "✅ Found")
-                if "## OCR Text" in result.content:
-                    print_result("OCR Text", "✅ Found")
-                if "## Visual Elements" in result.content:
-                    print_result("Visual Elements", "✅ Found")
             
             if result.summary:
                 print_section("Summary")
                 print(f"📝 {result.summary}")
             
             # Save results to file
-            output_file = image_file.parent / f"{image_file.stem}_test_result.json"
+            output_file = audio_file.parent / f"{audio_file.stem}_test_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     'success': result.success,
@@ -134,24 +125,18 @@ async def test_image_processing(image_file: Path) -> bool:
                     'error': result.error
                 }, f, indent=2, ensure_ascii=False)
             
-            # Also save markdown content
-            markdown_file = image_file.parent / f"{image_file.stem}_converted.md"
-            with open(markdown_file, 'w', encoding='utf-8') as f:
-                f.write(result.content)
-            
             print_section("Output")
             print_result("Results saved to", str(output_file))
-            print_result("Markdown saved to", str(markdown_file))
             
             return True
             
         else:
-            print("❌ Image processing failed!")
+            print("❌ Audio processing failed!")
             print_result("Error", result.error or "Unknown error")
             return False
             
     except Exception as e:
-        print(f"❌ Error during image processing: {e}")
+        print(f"❌ Error during audio processing: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -160,24 +145,23 @@ async def test_image_processing(image_file: Path) -> bool:
 def main():
     """Main function."""
     if len(sys.argv) != 2:
-        print("Usage: python test-image.py <image_file>")
+        print("Usage: python test-audio.py <audio_file>")
         print()
         print("Examples:")
-        print("  python test-image.py my-image.jpg")
-        print("  python test-image.py screenshot.png")
-        print("  python test-image.py diagram.gif")
-        print("  python test-image.py chart.bmp")
+        print("  python test-audio.py my-audio.mp3")
+        print("  python test-audio.py recording.wav")
+        print("  python test-audio.py video.mp4  # Extract audio from video")
         sys.exit(1)
     
-    image_file = Path(sys.argv[1])
+    audio_file = Path(sys.argv[1])
     
     try:
-        success = asyncio.run(test_image_processing(image_file))
+        success = asyncio.run(test_audio_processing(audio_file))
         if success:
-            print("\n🎉 Image processing test completed successfully!")
+            print("\n🎉 Audio processing test completed successfully!")
             sys.exit(0)
         else:
-            print("\n💥 Image processing test failed!")
+            print("\n💥 Audio processing test failed!")
             sys.exit(1)
     except KeyboardInterrupt:
         print("\n⏹️  Test interrupted by user")

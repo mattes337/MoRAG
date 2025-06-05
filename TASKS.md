@@ -401,11 +401,11 @@ The MoRAG (Multimodal Retrieval Augmented Generation) system is now **PRODUCTION
 ### 🎯 Ready for Use
 ```bash
 # Quick validation
-python test-simple.py
+python tests/cli/test-simple.py
 
 # Test individual components
-python test-audio.py uploads/audio.mp3
-python test-document.py uploads/document.pdf
+python tests/cli/test-audio.py uploads/audio.mp3
+python tests/cli/test-document.py uploads/document.pdf
 
 # Deploy with Docker
 docker-compose up -d

@@ -120,16 +120,16 @@ uvicorn morag.api.main:app --reload
 ### Test Individual Components
 ```bash
 # Test audio processing
-python test-audio.py my-audio.mp3
+python tests/cli/test-audio.py my-audio.mp3
 
 # Test document processing
-python test-document.py my-document.pdf
+python tests/cli/test-document.py my-document.pdf
 
 # Test video processing
-python test-video.py my-video.mp4
+python tests/cli/test-video.py my-video.mp4
 
 # Test complete system
-python test-all.py
+python tests/cli/test-all.py
 ```
 
 ### Docker Deployment
