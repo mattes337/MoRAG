@@ -270,10 +270,19 @@ class MoRAGServices:
                 output_format="markdown"
             )
 
+            # Get content from various possible fields
+            text_content = ""
+            if "content" in result:
+                text_content = result["content"]
+            elif "markdown" in result:
+                text_content = result["markdown"]
+            elif "transcript" in result:
+                text_content = result["transcript"]
+
             return ProcessingResult(
                 content_type=ContentType.AUDIO,
                 content_path=audio_path,
-                text_content=result.get("content", ""),
+                text_content=text_content,
                 metadata=result.get("metadata", {}),
                 processing_time=result.get("processing_time", 0.0),
                 success=result.get("success", False),
@@ -301,6 +310,15 @@ class MoRAGServices:
             ProcessingResult with extracted information
         """
         try:
+            # Check if thumbnails should be generated (default to False - opt-in)
+            include_thumbnails = options and options.get('include_thumbnails', False)
+
+            # Configure video processor based on options
+            if not include_thumbnails:
+                # Temporarily disable thumbnail generation
+                original_config = self.video_service.config.generate_thumbnails
+                self.video_service.config.generate_thumbnails = False
+
             # Use process_file method which exists in VideoService
             result = await self.video_service.process_file(
                 Path(video_path),
@@ -308,10 +326,21 @@ class MoRAGServices:
                 output_format="markdown"
             )
 
+            # Restore original config
+            if not include_thumbnails:
+                self.video_service.config.generate_thumbnails = original_config
+
+            # Get markdown content if available
+            text_content = ""
+            if "markdown" in result:
+                text_content = result["markdown"]
+            elif "content" in result:
+                text_content = result["content"]
+
             return ProcessingResult(
                 content_type=ContentType.VIDEO,
                 content_path=video_path,
-                text_content="",  # Video service doesn't return direct text content
+                text_content=text_content,
                 metadata=result.get("metadata", {}),
                 extracted_files=result.get("thumbnails", []) + result.get("keyframes", []),
                 processing_time=result.get("processing_time", 0.0),

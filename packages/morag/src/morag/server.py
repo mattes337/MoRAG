@@ -1,6 +1,7 @@
 """FastAPI server for MoRAG system."""
 
 import asyncio
+import base64
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 
@@ -99,18 +100,61 @@ def normalize_processing_result(result: ProcessingResult) -> ProcessingResult:
     Returns:
         ProcessingResult with normalized content attribute
     """
+    # Import here to avoid circular imports
+    from morag_core.models.config import ProcessingResult as CoreProcessingResult
+
     # If result already has content attribute, return as-is
     if hasattr(result, 'content') and result.content is not None:
         return result
 
-    # If result has text_content, use that as content
+    # Get content from text_content or set empty string
+    content = ""
     if hasattr(result, 'text_content') and result.text_content is not None:
-        result.content = result.text_content
-        return result
+        content = result.text_content
 
-    # If no content found, set empty string
-    result.content = ""
-    return result
+    # Create a new ProcessingResult with content field
+    # This handles both Pydantic models and dataclasses
+    return CoreProcessingResult(
+        success=result.success,
+        task_id=getattr(result, 'task_id', 'unknown'),
+        source_type=getattr(result, 'content_type', 'unknown'),
+        content=content,
+        metadata=getattr(result, 'metadata', {}),
+        processing_time=getattr(result, 'processing_time', 0.0),
+        error_message=getattr(result, 'error_message', None)
+    )
+
+
+def encode_thumbnails_to_base64(thumbnail_paths: List[str]) -> List[str]:
+    """Encode thumbnail images to base64 strings.
+
+    Args:
+        thumbnail_paths: List of paths to thumbnail files
+
+    Returns:
+        List of base64 encoded thumbnail strings
+    """
+    encoded_thumbnails = []
+    for path in thumbnail_paths:
+        try:
+            if Path(path).exists():
+                with open(path, 'rb') as f:
+                    image_data = f.read()
+                    encoded = base64.b64encode(image_data).decode('utf-8')
+                    # Add data URL prefix for direct use in HTML
+                    mime_type = 'image/jpeg'  # Default to JPEG
+                    if path.lower().endswith('.png'):
+                        mime_type = 'image/png'
+                    elif path.lower().endswith('.gif'):
+                        mime_type = 'image/gif'
+                    elif path.lower().endswith('.webp'):
+                        mime_type = 'image/webp'
+
+                    encoded_thumbnails.append(f"data:{mime_type};base64,{encoded}")
+        except Exception as e:
+            logger.warning("Failed to encode thumbnail", path=path, error=str(e))
+
+    return encoded_thumbnails
 
 
 # Pydantic models for API
@@ -137,6 +181,7 @@ class ProcessingResultResponse(BaseModel):
     metadata: Dict[str, Any]
     processing_time: float
     error_message: Optional[str] = None
+    thumbnails: Optional[List[str]] = None  # Base64 encoded thumbnails
 
 
 def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
@@ -259,12 +304,37 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            processing_time=result.processing_time)
 
                 result = normalize_processing_result(result)
+
+                # Handle thumbnails if requested and available
+                thumbnails = None
+                if parsed_options and parsed_options.get('include_thumbnails', False):
+                    # Get thumbnails from the original result before normalization
+                    original_result = getattr(result, 'raw_result', None)
+                    if original_result:
+                        # Check if it's a dictionary (from services)
+                        if isinstance(original_result, dict):
+                            thumbnail_paths = original_result.get('thumbnails', [])
+                            if thumbnail_paths:
+                                thumbnails = encode_thumbnails_to_base64(thumbnail_paths)
+                        # Check if it has thumbnails attribute (from processors)
+                        elif hasattr(original_result, 'thumbnails'):
+                            thumbnail_paths = [str(p) for p in original_result.thumbnails]
+                            if thumbnail_paths:
+                                thumbnails = encode_thumbnails_to_base64(thumbnail_paths)
+
+                    # Also check extracted_files for thumbnails
+                    if not thumbnails and hasattr(result, 'extracted_files'):
+                        thumbnail_paths = [f for f in result.extracted_files if 'thumb' in f.lower()]
+                        if thumbnail_paths:
+                            thumbnails = encode_thumbnails_to_base64(thumbnail_paths)
+
                 return ProcessingResultResponse(
                     success=result.success,
                     content=result.content,
                     metadata=result.metadata,
                     processing_time=result.processing_time,
-                    error_message=result.error_message
+                    error_message=result.error_message,
+                    thumbnails=thumbnails
                 )
             except Exception as e:
                 logger.error("File processing failed",

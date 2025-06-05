@@ -176,6 +176,7 @@ class VideoService:
             response = {
                 "success": True,
                 "processing_time": processing_time,
+                "content": markdown_content or "",  # Include markdown content
                 "metadata": {
                     "duration": result.metadata.duration,
                     "resolution": f"{result.metadata.width}x{result.metadata.height}",

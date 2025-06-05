@@ -64,6 +64,17 @@ For detailed information about completed tasks and implementation history, see [
 - **Fixed Celery Deprecation**: Added broker_connection_retry_on_startup=True
 - **Documented Missing Dependencies**: Added optional dependencies to requirements.txt with installation notes
 
+### ✅ Processing Result & Thumbnail Fixes (June 2025)
+- **Fixed ProcessingResult Content Field Error**:
+  - Fixed `"ProcessingResult" object has no field "content"` error in file processing
+  - Updated `normalize_processing_result()` to properly handle Pydantic models
+  - Creates new CoreProcessingResult with content field instead of dynamic attribute assignment
+- **Added Thumbnail Support**:
+  - Added optional thumbnail generation with `include_thumbnails` option (opt-in, defaults to False)
+  - Thumbnails are encoded as base64 data URLs when requested
+  - Updated API response model to include thumbnails field
+  - Fixed video and audio processing to include markdown content in responses
+
 ## 🎯 Next Steps
 
 The MoRAG system is production-ready. For ongoing maintenance and future enhancements:
