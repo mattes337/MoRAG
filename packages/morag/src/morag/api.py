@@ -141,15 +141,31 @@ class MoRAGAPI:
         options: Optional[Dict[str, Any]] = None
     ) -> ProcessingResult:
         """Process a video file.
-        
+
         Args:
             file_path: Path to video file
             options: Processing options
-            
+
         Returns:
             Processing result
         """
         return await self.orchestrator.process_content(file_path, ContentType.VIDEO, options)
+
+    async def process_image(
+        self,
+        file_path: Union[str, Path],
+        options: Optional[Dict[str, Any]] = None
+    ) -> ProcessingResult:
+        """Process an image file.
+
+        Args:
+            file_path: Path to image file
+            options: Processing options
+
+        Returns:
+            Processing result
+        """
+        return await self.orchestrator.process_content(file_path, ContentType.IMAGE, options)
     
     async def process_batch(
         self,
@@ -217,31 +233,35 @@ class MoRAGAPI:
     
     def _detect_content_type_from_file(self, file_path: Path) -> str:
         """Auto-detect content type from file extension.
-        
+
         Args:
             file_path: File path to analyze
-            
+
         Returns:
             Detected content type
         """
         suffix = file_path.suffix.lower()
-        
+
         # Document types
-        if suffix in ['.pdf', '.doc', '.docx', '.txt', '.md', '.rtf']:
+        if suffix in ['.pdf', '.doc', '.docx', '.txt', '.md', '.rtf', '.pptx', '.ppt', '.xlsx', '.xls', '.csv', '.json', '.xml']:
             return 'document'
-        
+
         # Audio types
         if suffix in ['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac']:
             return 'audio'
-        
+
         # Video types
         if suffix in ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm']:
             return 'video'
-        
+
+        # Image types
+        if suffix in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg']:
+            return 'image'
+
         # Web types
         if suffix in ['.html', '.htm']:
             return 'web'
-        
+
         # Default to document
         return 'document'
     

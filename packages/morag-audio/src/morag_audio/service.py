@@ -146,24 +146,28 @@ class AudioService:
                 except Exception as e:
                     logger.warning("Failed to generate embeddings", error=str(e))
             
-            # Convert to markdown if requested
-            markdown_content = None
-            if result.success and output_format == "markdown":
+            # Convert to requested format
+            formatted_content = None
+            if result.success:
                 conversion_options = AudioConversionOptions(
                     include_timestamps=True,
                     include_speakers=self.config.enable_diarization,
                     include_topics=self.config.enable_topic_segmentation
                 )
-                markdown_result = await self.converter.convert_to_markdown(result, conversion_options)
-                markdown_content = markdown_result.content
+
+                if output_format == "markdown":
+                    markdown_result = await self.converter.convert_to_markdown(result, conversion_options)
+                    formatted_content = markdown_result.content
+                elif output_format == "json":
+                    formatted_content = await self.converter.convert_to_json(result, conversion_options)
             
             # Save output files if requested
             output_files = {}
             if save_output and result.success and self.output_dir:
-                output_files = await self._save_output_files(file_path, result, markdown_content, output_format)
-            
+                output_files = await self._save_output_files(file_path, result, formatted_content if output_format == "markdown" else None, output_format)
+
             processing_time = time.time() - start_time
-            
+
             # Prepare response
             response = {
                 "success": result.success,
@@ -171,10 +175,12 @@ class AudioService:
                 "metadata": result.metadata,
                 "output_files": output_files
             }
-            
+
             if not save_output or not self.output_dir:
-                if output_format == "markdown" and markdown_content:
-                    response["content"] = markdown_content
+                if output_format == "markdown" and formatted_content:
+                    response["content"] = formatted_content
+                elif output_format == "json" and formatted_content:
+                    response["content"] = formatted_content
                 elif output_format == "txt":
                     response["content"] = result.transcript
             

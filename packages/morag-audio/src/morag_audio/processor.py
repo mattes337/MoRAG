@@ -31,8 +31,8 @@ class AudioConfig:
     """Configuration for audio processing."""
     model_size: str = "medium"  # tiny, base, small, medium, large-v2
     language: Optional[str] = None  # Auto-detect if None
-    enable_diarization: bool = False
-    enable_topic_segmentation: bool = False
+    enable_diarization: bool = True  # Enable by default
+    enable_topic_segmentation: bool = True  # Enable by default
     min_speakers: int = 1
     max_speakers: int = 5
     device: str = "auto"  # auto, cpu, cuda

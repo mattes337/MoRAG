@@ -315,6 +315,11 @@ class DocumentConverter(BaseConverter):
                 chunk_text = " ".join(current_chunk)
                 document.add_chunk(chunk_text)
 
+        elif strategy == ChunkingStrategy.CHAPTER:
+            # Chapter-based chunking (fallback for non-PDF documents)
+            await self._chunk_by_chapters_fallback(document, options)
+            return document
+
         elif strategy == ChunkingStrategy.PARAGRAPH:
             # Paragraph-based chunking
             paragraphs = re.split(r'\n\s*\n', text)
@@ -384,3 +389,83 @@ class DocumentConverter(BaseConverter):
         }
 
         return format_map.get(format_type.lower(), DocumentType.UNKNOWN)
+
+    async def _chunk_by_chapters_fallback(self, document: Document, options: ConversionOptions) -> None:
+        """Fallback chapter chunking for non-PDF documents.
+
+        Args:
+            document: Document to chunk
+            options: Conversion options
+        """
+        import re
+
+        if not document.raw_text:
+            return
+
+        text = document.raw_text
+
+        # Chapter detection patterns for general text
+        chapter_patterns = [
+            r'^Chapter\s+\d+.*$',  # "Chapter 1", "Chapter 2", etc.
+            r'^CHAPTER\s+\d+.*$',  # "CHAPTER 1", "CHAPTER 2", etc.
+            r'^\d+\.\s+[A-Z][^.]*$',  # "1. Introduction", "2. Methods", etc.
+            r'^[A-Z][A-Z\s]{3,}$',  # All caps titles like "INTRODUCTION"
+            r'^\d+\s+[A-Z][^.]*$',  # "1 Introduction", "2 Methods", etc.
+            r'^#{1,3}\s+.*$',  # Markdown headers "# Title", "## Title", "### Title"
+        ]
+
+        lines = text.split('\n')
+        current_chapter = ""
+        current_chapter_title = ""
+        chapter_count = 0
+
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                current_chapter += "\n"
+                continue
+
+            # Check if this line is a chapter header
+            is_chapter_header = False
+            for pattern in chapter_patterns:
+                if re.match(pattern, line, re.IGNORECASE):
+                    is_chapter_header = True
+                    break
+
+            if is_chapter_header:
+                # Save previous chapter if exists
+                if current_chapter and current_chapter_title:
+                    document.add_chunk(
+                        content=current_chapter.strip(),
+                        section=current_chapter_title,
+                        metadata={
+                            "chapter_number": chapter_count,
+                            "is_chapter": True
+                        }
+                    )
+
+                # Start new chapter
+                chapter_count += 1
+                current_chapter_title = line
+                current_chapter = f"{line}\n\n"
+            else:
+                # Add line to current chapter
+                if not current_chapter_title:
+                    # First content without chapter header - create default chapter
+                    current_chapter_title = "Introduction"
+                    chapter_count = 1
+
+                current_chapter += line + "\n"
+
+        # Add final chapter
+        if current_chapter and current_chapter_title:
+            document.add_chunk(
+                content=current_chapter.strip(),
+                section=current_chapter_title,
+                metadata={
+                    "chapter_number": chapter_count,
+                    "is_chapter": True
+                }
+            )
+
+        logger.info(f"Created {chapter_count} chapters using fallback method")

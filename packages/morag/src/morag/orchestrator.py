@@ -64,6 +64,8 @@ class MoRAGOrchestrator:
                 return await self._process_audio_content(content, options)
             elif content_type == ContentType.VIDEO:
                 return await self._process_video_content(content, options)
+            elif content_type == ContentType.IMAGE:
+                return await self._process_image_content(content, options)
             else:
                 raise ValueError(f"Unsupported content type: {content_type}")
                 
@@ -78,68 +80,16 @@ class MoRAGOrchestrator:
         content: Union[str, Dict[str, Any]],
         options: Optional[Dict[str, Any]]
     ) -> ProcessingResult:
-        """Process web content."""
-        if isinstance(content, str):
-            url = content
-        elif isinstance(content, dict) and 'url' in content:
-            url = content['url']
-        else:
-            raise ValueError("Web content must be a URL string or dict with 'url' key")
-        
-        # Use web processor to extract content
-        web_result = await self.web_processor.process(url, options)
-        
-        # Convert to standard processing result
-        return ProcessingResult(
-            content=web_result.content.markdown_content or web_result.content.content,
-            metadata={
-                "source_type": "web",
-                "url": url,
-                "title": web_result.content.title,
-                **web_result.content.metadata
-            },
-            processing_time=web_result.processing_time,
-            success=web_result.success,
-            error_message=web_result.error_message
-        )
+        """Process web content using services."""
+        return await self.services.process_url(content, options)
     
     async def _process_youtube_content(
         self,
         content: Union[str, Dict[str, Any]],
         options: Optional[Dict[str, Any]]
     ) -> ProcessingResult:
-        """Process YouTube content."""
-        if isinstance(content, str):
-            url = content
-        elif isinstance(content, dict) and 'url' in content:
-            url = content['url']
-        else:
-            raise ValueError("YouTube content must be a URL string or dict with 'url' key")
-        
-        # Use YouTube processor to download and extract content
-        youtube_result = await self.youtube_processor.process(url, options)
-        
-        # Convert to standard processing result
-        return ProcessingResult(
-            content=f"# {youtube_result.metadata.title}\n\n{youtube_result.metadata.description}",
-            metadata={
-                "source_type": "youtube",
-                "url": url,
-                "title": youtube_result.metadata.title,
-                "uploader": youtube_result.metadata.uploader,
-                "duration": youtube_result.metadata.duration,
-                "view_count": youtube_result.metadata.view_count,
-                "video_id": youtube_result.metadata.id,
-                "files": {
-                    "video_path": str(youtube_result.video_path) if youtube_result.video_path else None,
-                    "audio_path": str(youtube_result.audio_path) if youtube_result.audio_path else None,
-                    "subtitle_paths": [str(p) for p in youtube_result.subtitle_paths],
-                    "thumbnail_paths": [str(p) for p in youtube_result.thumbnail_paths]
-                }
-            },
-            processing_time=youtube_result.processing_time,
-            success=youtube_result.success
-        )
+        """Process YouTube content using services."""
+        return await self.services.process_youtube(content, options)
     
     async def _process_document_content(
         self,
@@ -164,6 +114,14 @@ class MoRAGOrchestrator:
     ) -> ProcessingResult:
         """Process video content using services."""
         return await self.services.process_content(content, ContentType.VIDEO, options)
+
+    async def _process_image_content(
+        self,
+        content: Union[str, Path, Dict[str, Any]],
+        options: Optional[Dict[str, Any]]
+    ) -> ProcessingResult:
+        """Process image content using services."""
+        return await self.services.process_content(content, ContentType.IMAGE, options)
     
     async def process_batch(
         self,
@@ -242,5 +200,5 @@ class MoRAGOrchestrator:
     
     async def cleanup(self) -> None:
         """Clean up resources."""
-        await self.services.cleanup()
+        self.services.cleanup()
         logger.info("MoRAG Orchestrator cleaned up")

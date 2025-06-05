@@ -225,22 +225,43 @@ class MoRAGServices:
             ProcessingResult with extracted text and metadata
         """
         try:
-            # Use process_document method with kwargs instead of config parameter
-            result = await self.document_service.process_document(
+            # Get both formats: markdown for Qdrant, JSON for API response
+            markdown_result = await self.document_service.process_document(
                 Path(document_path),
                 **(options or {})
             )
 
+            json_result = await self.document_service.process_document_to_json(
+                Path(document_path),
+                **(options or {})
+            )
+
+            # Use markdown content for text_content (Qdrant storage)
+            text_content = ""
+            if markdown_result.document:
+                if markdown_result.document.chunks:
+                    # Create markdown from chunks
+                    markdown_parts = []
+                    for chunk in markdown_result.document.chunks:
+                        if chunk.section:
+                            markdown_parts.append(f"## {chunk.section}\n\n{chunk.content}")
+                        else:
+                            markdown_parts.append(chunk.content)
+                    text_content = "\n\n".join(markdown_parts)
+                else:
+                    # Use raw text if no chunks
+                    text_content = markdown_result.document.raw_text or ""
+
             return ProcessingResult(
                 content_type=ContentType.DOCUMENT,
                 content_path=document_path,
-                text_content=result.document.raw_text if result.document else "",
-                metadata=result.metadata,
+                text_content=text_content,  # Markdown for Qdrant
+                metadata=json_result.get("metadata", {}),
                 extracted_files=[],  # Document service doesn't return extracted files in this format
-                processing_time=0.0,  # Document service doesn't return processing time
+                processing_time=json_result.get("metadata", {}).get("processing_time", 0.0),
                 success=True,
-                error_message=None,
-                raw_result=result
+                error_message=json_result.get("error"),
+                raw_result=json_result  # JSON for API response
             )
         except Exception as e:
             logger.exception(f"Error processing document", document_path=document_path)
@@ -263,31 +284,37 @@ class MoRAGServices:
             ProcessingResult with transcription and metadata
         """
         try:
-            # Use process_file method which exists in AudioService
-            result = await self.audio_service.process_file(
+            # Get both markdown (for Qdrant) and JSON (for API response)
+            markdown_result = await self.audio_service.process_file(
                 Path(audio_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="markdown"
+                output_format="markdown"  # Use markdown format for Qdrant storage
             )
 
-            # Get content from various possible fields
+            json_result = await self.audio_service.process_file(
+                Path(audio_path),
+                save_output=False,  # Don't save files, just return content
+                output_format="json"  # Use JSON format for API response
+            )
+
+            # Use markdown content for text_content (Qdrant storage)
             text_content = ""
-            if "content" in result:
-                text_content = result["content"]
-            elif "markdown" in result:
-                text_content = result["markdown"]
-            elif "transcript" in result:
-                text_content = result["transcript"]
+            if "content" in markdown_result:
+                text_content = markdown_result["content"]
+            elif "markdown" in markdown_result:
+                text_content = markdown_result["markdown"]
+            elif "transcript" in markdown_result:
+                text_content = markdown_result["transcript"]
 
             return ProcessingResult(
                 content_type=ContentType.AUDIO,
                 content_path=audio_path,
-                text_content=text_content,
-                metadata=result.get("metadata", {}),
-                processing_time=result.get("processing_time", 0.0),
-                success=result.get("success", False),
-                error_message=result.get("error"),
-                raw_result=result
+                text_content=text_content,  # Markdown for Qdrant
+                metadata=json_result.get("metadata", {}),
+                processing_time=json_result.get("processing_time", 0.0),
+                success=json_result.get("success", False),
+                error_message=json_result.get("error"),
+                raw_result=json_result  # JSON for API response
             )
         except Exception as e:
             logger.exception(f"Error processing audio", audio_path=audio_path)
@@ -319,34 +346,40 @@ class MoRAGServices:
                 original_config = self.video_service.config.generate_thumbnails
                 self.video_service.config.generate_thumbnails = False
 
-            # Use process_file method which exists in VideoService
-            result = await self.video_service.process_file(
+            # Get both markdown (for Qdrant) and JSON (for API response)
+            markdown_result = await self.video_service.process_file(
                 Path(video_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="markdown"
+                output_format="markdown"  # Use markdown format for Qdrant storage
+            )
+
+            json_result = await self.video_service.process_file(
+                Path(video_path),
+                save_output=False,  # Don't save files, just return content
+                output_format="json"  # Use JSON format for API response
             )
 
             # Restore original config
             if not include_thumbnails:
                 self.video_service.config.generate_thumbnails = original_config
 
-            # Get markdown content if available
+            # Use markdown content for text_content (Qdrant storage)
             text_content = ""
-            if "markdown" in result:
-                text_content = result["markdown"]
-            elif "content" in result:
-                text_content = result["content"]
+            if "content" in markdown_result:
+                text_content = markdown_result["content"]
+            elif "markdown" in markdown_result:
+                text_content = markdown_result["markdown"]
 
             return ProcessingResult(
                 content_type=ContentType.VIDEO,
                 content_path=video_path,
-                text_content=text_content,
-                metadata=result.get("metadata", {}),
-                extracted_files=result.get("thumbnails", []) + result.get("keyframes", []),
-                processing_time=result.get("processing_time", 0.0),
-                success=result.get("success", False),
-                error_message=result.get("error"),
-                raw_result=result
+                text_content=text_content,  # Markdown for Qdrant
+                metadata=json_result.get("metadata", {}),
+                extracted_files=json_result.get("thumbnails", []) + json_result.get("keyframes", []),
+                processing_time=json_result.get("processing_time", 0.0),
+                success=json_result.get("success", False),
+                error_message=json_result.get("error"),
+                raw_result=json_result  # JSON for API response
             )
         except Exception as e:
             logger.exception(f"Error processing video", video_path=video_path)

@@ -49,8 +49,97 @@ class AudioConverter:
         """Check if this converter supports the given format."""
         return format_type.lower() in self.supported_formats
     
-    async def convert_to_markdown(self, 
-                                result: AudioProcessingResult, 
+    async def convert_to_json(self,
+                             result: AudioProcessingResult,
+                             options: Optional[AudioConversionOptions] = None) -> Dict[str, Any]:
+        """Convert audio processing result to structured JSON.
+
+        Args:
+            result: Audio processing result
+            options: Conversion options
+
+        Returns:
+            Dictionary with structured JSON data
+        """
+        options = options or AudioConversionOptions()
+
+        try:
+            if not result.success:
+                return {
+                    "title": "",
+                    "filename": result.file_path,
+                    "metadata": result.metadata,
+                    "topics": [],
+                    "error": result.error_message
+                }
+
+            # Group segments by topic if topic segmentation is enabled
+            topics = []
+            if options.include_topics and any(hasattr(segment, 'topic') and segment.topic is not None for segment in result.segments):
+                # Group by topic
+                topic_groups = {}
+                for segment in result.segments:
+                    topic_id = getattr(segment, 'topic', 0) if hasattr(segment, 'topic') else 0
+                    if topic_id not in topic_groups:
+                        topic_groups[topic_id] = []
+                    topic_groups[topic_id].append(segment)
+
+                # Create topic entries
+                for topic_id, segments in sorted(topic_groups.items()):
+                    topic_data = {
+                        "timestamp": int(segments[0].start) if segments else 0,
+                        "sentences": []
+                    }
+
+                    for segment in segments:
+                        sentence = {
+                            "timestamp": int(segment.start),
+                            "speaker": getattr(segment, 'speaker', 1) if hasattr(segment, 'speaker') else 1,
+                            "text": segment.text
+                        }
+                        topic_data["sentences"].append(sentence)
+
+                    topics.append(topic_data)
+            else:
+                # Single topic with all segments
+                topic_data = {
+                    "timestamp": int(result.segments[0].start) if result.segments else 0,
+                    "sentences": []
+                }
+
+                for segment in result.segments:
+                    sentence = {
+                        "timestamp": int(segment.start),
+                        "speaker": getattr(segment, 'speaker', 1) if hasattr(segment, 'speaker') else 1,
+                        "text": segment.text
+                    }
+                    topic_data["sentences"].append(sentence)
+
+                topics.append(topic_data)
+
+            # Extract title from filename
+            filename = Path(result.file_path).name
+            title = Path(result.file_path).stem
+
+            return {
+                "title": title,
+                "filename": filename,
+                "metadata": result.metadata,
+                "topics": topics
+            }
+
+        except Exception as e:
+            logger.error("Failed to convert to JSON", error=str(e))
+            return {
+                "title": "",
+                "filename": result.file_path,
+                "metadata": result.metadata,
+                "topics": [],
+                "error": str(e)
+            }
+
+    async def convert_to_markdown(self,
+                                result: AudioProcessingResult,
                                 options: Optional[AudioConversionOptions] = None) -> AudioConversionResult:
         """Convert audio processing result to structured markdown.
         

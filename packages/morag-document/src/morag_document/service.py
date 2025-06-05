@@ -132,6 +132,46 @@ class DocumentService(BaseService):
             )
             raise ProcessingError(f"Failed to process document: {str(e)}")
 
+    async def process_document_to_json(
+        self,
+        file_path: Union[str, Path],
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Process document and return structured JSON.
+
+        Args:
+            file_path: Path to document file
+            **kwargs: Additional processing options
+
+        Returns:
+            Dictionary with structured JSON data
+
+        Raises:
+            ProcessingError: If processing fails
+            ValidationError: If input is invalid
+        """
+        try:
+            # Process document
+            result = await self.process_document(file_path, **kwargs)
+
+            # Convert to JSON format
+            return await self._convert_to_json(result, file_path)
+
+        except Exception as e:
+            logger.error(
+                "Document JSON processing failed",
+                error=str(e),
+                error_type=e.__class__.__name__,
+                file_path=str(file_path),
+            )
+            return {
+                "title": "",
+                "filename": str(Path(file_path).name),
+                "metadata": {},
+                "chapters": [],
+                "error": str(e)
+            }
+
     async def process_text(self, text: str, **kwargs) -> ProcessingResult:
         """Process text document.
 
@@ -201,6 +241,80 @@ class DocumentService(BaseService):
                 error_type=e.__class__.__name__,
             )
             raise ProcessingError(f"Failed to process text: {str(e)}")
+
+    async def _convert_to_json(self, result: ProcessingResult, file_path: Union[str, Path]) -> Dict[str, Any]:
+        """Convert document processing result to structured JSON.
+
+        Args:
+            result: Document processing result
+            file_path: Original file path
+
+        Returns:
+            Dictionary with structured JSON data
+        """
+        try:
+            # Extract basic information
+            filename = Path(file_path).name
+            title = result.document.metadata.title or Path(file_path).stem
+
+            # Build chapters/chunks
+            chapters = []
+            if result.document.chunks:
+                for chunk in result.document.chunks:
+                    chapter_data = {
+                        "title": chunk.section or f"Section {chunk.chunk_index + 1}",
+                        "content": chunk.content,
+                        "page_number": chunk.page_number,
+                        "chapter_index": chunk.chunk_index,
+                        "metadata": chunk.metadata
+                    }
+                    chapters.append(chapter_data)
+            else:
+                # No chunks - create single chapter from raw text
+                chapters.append({
+                    "title": title,
+                    "content": result.document.raw_text or "",
+                    "page_number": 1,
+                    "chapter_index": 0,
+                    "metadata": {}
+                })
+
+            # Build metadata
+            metadata = {
+                "source_type": result.document.metadata.source_type.value if result.document.metadata.source_type else "unknown",
+                "source_name": result.document.metadata.source_name,
+                "source_path": result.document.metadata.source_path,
+                "file_size": result.document.metadata.file_size,
+                "page_count": result.document.metadata.page_count,
+                "word_count": result.document.metadata.word_count,
+                "author": result.document.metadata.author,
+                "created_at": result.document.metadata.created_at.isoformat() if result.document.metadata.created_at else None,
+                "modified_at": result.document.metadata.modified_at.isoformat() if result.document.metadata.modified_at else None,
+                "language": result.document.metadata.language,
+                "mime_type": result.document.metadata.mime_type,
+                "quality_score": result.metadata.get("quality_score", 0.0),
+                "quality_issues": result.metadata.get("quality_issues", []),
+                "warnings": result.metadata.get("warnings", []),
+                "chunks_count": len(result.document.chunks),
+                "processing_time": getattr(result, 'processing_time', 0.0)
+            }
+
+            return {
+                "title": title,
+                "filename": filename,
+                "metadata": metadata,
+                "chapters": chapters
+            }
+
+        except Exception as e:
+            logger.error("Failed to convert document result to JSON", error=str(e))
+            return {
+                "title": "",
+                "filename": str(Path(file_path).name),
+                "metadata": {},
+                "chapters": [],
+                "error": str(e)
+            }
 
     async def _generate_embeddings(self, document: Document) -> None:
         """Generate embeddings for document chunks.

@@ -107,9 +107,21 @@ def normalize_processing_result(result: ProcessingResult) -> ProcessingResult:
     if hasattr(result, 'content') and result.content is not None:
         return result
 
-    # Get content from text_content or set empty string
+    # Get content for API response (prefer JSON from raw_result, fallback to text_content)
     content = ""
-    if hasattr(result, 'text_content') and result.text_content is not None:
+
+    # First try to get JSON content from raw_result for API response
+    if hasattr(result, 'raw_result') and result.raw_result is not None:
+        raw_result = result.raw_result
+        if isinstance(raw_result, dict):
+            # Convert JSON to string for API response
+            import json
+            content = json.dumps(raw_result, indent=2)
+        elif hasattr(raw_result, 'content'):
+            content = str(raw_result.content)
+
+    # Fallback to text_content if no raw_result available
+    if not content and hasattr(result, 'text_content') and result.text_content is not None:
         content = result.text_content
 
     # Create a new ProcessingResult with content field

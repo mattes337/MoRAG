@@ -144,8 +144,8 @@ class VideoService:
                 except Exception as e:
                     logger.warning("Failed to generate embeddings", error=str(e))
             
-            # Convert to markdown if requested
-            markdown_content = None
+            # Convert to requested format
+            formatted_content = None
             if output_format == "markdown":
                 try:
                     logger.info("Converting video processing result to markdown")
@@ -157,26 +157,32 @@ class VideoService:
                         group_by_speaker=self.config.enable_speaker_diarization,
                         group_by_topic=self.config.enable_topic_segmentation
                     )
-                    markdown_content = await self.converter.convert_to_markdown(result, conversion_options)
+                    formatted_content = await self.converter.convert_to_markdown(result, conversion_options)
                 except Exception as e:
                     logger.warning("Failed to convert to markdown", error=str(e))
+            elif output_format == "json":
+                try:
+                    logger.info("Converting video processing result to JSON")
+                    formatted_content = await self._convert_to_json(result)
+                except Exception as e:
+                    logger.warning("Failed to convert to JSON", error=str(e))
             
             # Save output files if requested
             output_files = {}
             if save_output and self.output_dir:
                 output_files = await self._save_output_files(
-                    file_path, 
-                    result, 
-                    markdown_content,
+                    file_path,
+                    result,
+                    formatted_content if output_format == "markdown" else None,
                     output_format
                 )
-            
+
             # Prepare response
             processing_time = time.time() - start_time
             response = {
                 "success": True,
                 "processing_time": processing_time,
-                "content": markdown_content or "",  # Include markdown content
+                "content": formatted_content or "",  # Include formatted content
                 "metadata": {
                     "duration": result.metadata.duration,
                     "resolution": f"{result.metadata.width}x{result.metadata.height}",
@@ -328,3 +334,98 @@ class VideoService:
                    files=list(output_files.keys()))
         
         return output_files
+
+    async def _convert_to_json(self, result: VideoProcessingResult) -> Dict[str, Any]:
+        """Convert video processing result to structured JSON.
+
+        Args:
+            result: Video processing result
+
+        Returns:
+            Dictionary with structured JSON data
+        """
+        try:
+            # Extract title from file path if available
+            title = ""
+            filename = ""
+            if hasattr(result, 'file_path') and result.file_path:
+                filename = Path(result.file_path).name
+                title = Path(result.file_path).stem
+
+            # Build topics from audio processing result
+            topics = []
+            if result.audio_processing_result and result.audio_processing_result.segments:
+                # Group segments by topic if topic segmentation is available
+                if (hasattr(result.audio_processing_result, 'topic_segments') and
+                    result.audio_processing_result.topic_segments):
+
+                    for topic_segment in result.audio_processing_result.topic_segments:
+                        topic_data = {
+                            "timestamp": int(topic_segment.start_time) if hasattr(topic_segment, 'start_time') else 0,
+                            "sentences": []
+                        }
+
+                        # Add sentences from this topic
+                        if hasattr(topic_segment, 'segments'):
+                            for segment in topic_segment.segments:
+                                sentence = {
+                                    "timestamp": int(segment.start),
+                                    "speaker": getattr(segment, 'speaker', 1) if hasattr(segment, 'speaker') else 1,
+                                    "text": segment.text
+                                }
+                                topic_data["sentences"].append(sentence)
+
+                        topics.append(topic_data)
+                else:
+                    # Single topic with all segments
+                    topic_data = {
+                        "timestamp": int(result.audio_processing_result.segments[0].start) if result.audio_processing_result.segments else 0,
+                        "sentences": []
+                    }
+
+                    for segment in result.audio_processing_result.segments:
+                        sentence = {
+                            "timestamp": int(segment.start),
+                            "speaker": getattr(segment, 'speaker', 1) if hasattr(segment, 'speaker') else 1,
+                            "text": segment.text
+                        }
+                        topic_data["sentences"].append(sentence)
+
+                    topics.append(topic_data)
+
+            # Build metadata
+            metadata = {
+                "duration": result.metadata.duration,
+                "resolution": f"{result.metadata.width}x{result.metadata.height}",
+                "fps": result.metadata.fps,
+                "format": result.metadata.format,
+                "has_audio": result.metadata.has_audio,
+                "thumbnails_count": len(result.thumbnails),
+                "keyframes_count": len(result.keyframes)
+            }
+
+            # Add audio processing metadata if available
+            if result.audio_processing_result:
+                metadata.update({
+                    "transcript_length": len(result.audio_processing_result.transcript) if result.audio_processing_result.transcript else 0,
+                    "segments_count": len(result.audio_processing_result.segments) if result.audio_processing_result.segments else 0,
+                    "has_speaker_diarization": hasattr(result.audio_processing_result, 'speaker_segments') and result.audio_processing_result.speaker_segments is not None,
+                    "has_topic_segmentation": hasattr(result.audio_processing_result, 'topic_segments') and result.audio_processing_result.topic_segments is not None
+                })
+
+            return {
+                "title": title,
+                "filename": filename,
+                "metadata": metadata,
+                "topics": topics
+            }
+
+        except Exception as e:
+            logger.error("Failed to convert video result to JSON", error=str(e))
+            return {
+                "title": "",
+                "filename": "",
+                "metadata": {},
+                "topics": [],
+                "error": str(e)
+            }

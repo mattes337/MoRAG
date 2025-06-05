@@ -27,6 +27,7 @@ class UnsupportedFormatError(ConversionError):
 class ChunkingStrategy(str, Enum):
     """Strategy for chunking converted content."""
     PAGE = "page"  # Chunk by page boundaries
+    CHAPTER = "chapter"  # Chunk by chapter boundaries with page numbers
     PARAGRAPH = "paragraph"  # Chunk by paragraphs
     SENTENCE = "sentence"  # Chunk by sentences
     WORD = "word"  # Chunk by words
