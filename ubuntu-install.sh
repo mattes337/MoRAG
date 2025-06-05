@@ -66,16 +66,8 @@ check_ubuntu_version() {
     fi
     
     # Set version-specific variables
-    if [ "$version_major" -ge 22 ]; then
-        PYTHON_VERSION="python3.11"
-        PYTHON_DEV="python3.11-dev"
-    elif [ "$version_major" -ge 20 ]; then
-        PYTHON_VERSION="python3.9"
-        PYTHON_DEV="python3.9-dev"
-    else
-        PYTHON_VERSION="python3.8"
-        PYTHON_DEV="python3.8-dev"
-    fi
+    PYTHON_VERSION="python3"
+    PYTHON_DEV="python3-dev"
     
     log_info "Will use Python version: $PYTHON_VERSION"
 }
@@ -207,7 +199,7 @@ install_python() {
     fi
     
     # Upgrade pip
-    python3 -m pip install --user --upgrade pip
+    python3 -m pip install --user --upgrade pip --break-system-packages
     
     log_success "Python installed and configured"
 }
@@ -438,6 +430,10 @@ except Exception as e:
 
     # Clean up temporary file
     rm -f requirements_ubuntu.txt
+
+    # Manual re-install the packages
+    pip install pydub librosa mutagen ffmpeg-python Pillow opencv-python google.generativeai
+    pip install protobuf==5.29.5
 
     log_success "MoRAG dependencies installed"
 }
