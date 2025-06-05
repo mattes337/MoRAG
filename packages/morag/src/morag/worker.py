@@ -1,6 +1,7 @@
 """Background worker for MoRAG system using Celery."""
 
 import asyncio
+import os
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
@@ -15,10 +16,13 @@ logger = structlog.get_logger(__name__)
 # Create Celery app
 celery_app = Celery('morag_worker')
 
+# Get Redis URL from environment or use default
+redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
 # Configure Celery
 celery_app.conf.update(
-    broker_url='redis://localhost:6379/0',
-    result_backend='redis://localhost:6379/0',
+    broker_url=redis_url,
+    result_backend=redis_url,
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
@@ -231,22 +235,22 @@ def worker_shutdown_handler(sender=None, **kwargs):
 def main():
     """Main entry point for the worker."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="MoRAG Background Worker")
     parser.add_argument("--loglevel", default="info", help="Log level")
     parser.add_argument("--concurrency", type=int, default=1, help="Number of concurrent workers")
     parser.add_argument("--queues", default="celery", help="Comma-separated list of queues")
-    parser.add_argument("--broker", default="redis://localhost:6379/0", help="Broker URL")
-    parser.add_argument("--backend", default="redis://localhost:6379/0", help="Result backend URL")
-    
+    parser.add_argument("--broker", default=redis_url, help="Broker URL")
+    parser.add_argument("--backend", default=redis_url, help="Result backend URL")
+
     args = parser.parse_args()
-    
+
     # Update Celery configuration
     celery_app.conf.update(
         broker_url=args.broker,
         result_backend=args.backend
     )
-    
+
     # Start worker
     celery_app.worker_main([
         'worker',

@@ -18,6 +18,9 @@ RUN apt-get update && apt-get install -y \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Set working directory for consistent paths
+WORKDIR /build
+
 # Copy package files and install MoRAG packages
 COPY packages/ ./packages/
 COPY requirements.txt ./
@@ -26,17 +29,17 @@ COPY requirements.txt ./
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Install MoRAG packages in dependency order
-RUN pip install -e packages/morag-core && \
-    pip install -e packages/morag-embedding && \
-    pip install -e packages/morag-audio && \
-    pip install -e packages/morag-video && \
-    pip install -e packages/morag-document && \
-    pip install -e packages/morag-image && \
-    pip install -e packages/morag-web && \
-    pip install -e packages/morag-youtube && \
-    pip install -e packages/morag-services && \
-    pip install -e packages/morag
+# Install MoRAG packages in dependency order (non-editable for Docker)
+RUN pip install /build/packages/morag-core && \
+    pip install /build/packages/morag-embedding && \
+    pip install /build/packages/morag-audio && \
+    pip install /build/packages/morag-video && \
+    pip install /build/packages/morag-document && \
+    pip install /build/packages/morag-image && \
+    pip install /build/packages/morag-web && \
+    pip install /build/packages/morag-youtube && \
+    pip install /build/packages/morag-services && \
+    pip install /build/packages/morag
 
 # Download spaCy model (optional, will fallback if not available)
 RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
