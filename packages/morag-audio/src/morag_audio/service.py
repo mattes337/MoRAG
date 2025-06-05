@@ -51,10 +51,47 @@ class AudioService:
         else:
             self.output_dir = None
         
-        logger.info("Audio service initialized", 
+        logger.info("Audio service initialized",
                    enable_diarization=self.config.enable_diarization,
                    enable_topic_segmentation=self.config.enable_topic_segmentation,
                    has_embedding_service=self.embedding_service is not None)
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Check service health.
+
+        Returns:
+            Dictionary with health status information
+        """
+        try:
+            # Check if processor is available
+            if not self.processor:
+                return {
+                    "status": "unhealthy",
+                    "error": "Audio processor not initialized"
+                }
+
+            # Check if transcriber is available
+            if not hasattr(self.processor, 'transcriber') or not self.processor.transcriber:
+                return {
+                    "status": "unhealthy",
+                    "error": "Whisper transcriber not initialized"
+                }
+
+            return {
+                "status": "healthy",
+                "processor": "ready",
+                "transcriber": "ready",
+                "diarization_enabled": self.config.enable_diarization,
+                "topic_segmentation_enabled": self.config.enable_topic_segmentation,
+                "embedding_service": self.embedding_service is not None
+            }
+
+        except Exception as e:
+            logger.error("Audio service health check failed", error=str(e))
+            return {
+                "status": "unhealthy",
+                "error": str(e)
+            }
     
     async def process_file(self, 
                          file_path: Union[str, Path], 

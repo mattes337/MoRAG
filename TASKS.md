@@ -51,12 +51,18 @@ For detailed information about completed tasks and implementation history, see [
 ## 🔧 Recent Fixes (January 2025)
 
 ### ✅ Docker Health Check & Permission Fixes
-- **Fixed Qdrant Health Check**: Updated all docker-compose files to use `/healthz` endpoint instead of `/readyz`
+- **Removed Health Checks**: Removed all Docker health checks to simplify deployment and avoid issues
 - **Fixed Whisper Model Permissions**:
   - Added proper home directory for `morag` user in Dockerfile
   - Configured cache directories: `/home/morag/.cache/huggingface`, `/home/morag/.cache/whisper`
   - Added environment variables: `HF_HOME`, `TRANSFORMERS_CACHE`, `WHISPER_CACHE_DIR`
   - Updated all docker-compose files (main, dev, prod, microservices)
+
+### ✅ Application Fixes
+- **Fixed Missing Health Check Methods**: Added health_check methods to AudioService and VideoService
+- **Fixed FastAPI Deprecation**: Converted from on_event to lifespan handlers
+- **Fixed Celery Deprecation**: Added broker_connection_retry_on_startup=True
+- **Documented Missing Dependencies**: Added optional dependencies to requirements.txt with installation notes
 
 ## 🎯 Next Steps
 

@@ -9,11 +9,6 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -27,11 +22,6 @@ services:
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Core MoRAG Services
   morag-api:
@@ -54,21 +44,13 @@ services:
       - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
+      - redis
+      - qdrant
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
       - ./uploads:/app/uploads
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
   # Celery Workers for processing
   morag-worker-1:
@@ -89,8 +71,7 @@ services:
       - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -116,8 +97,7 @@ services:
       - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

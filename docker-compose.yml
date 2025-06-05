@@ -9,11 +9,8 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # Note: To fix memory overcommit warning, run on host:
+    # echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
   # Qdrant vector database
   qdrant:
@@ -28,11 +25,6 @@ services:
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # MoRAG API Server
   morag-api:
@@ -51,25 +43,20 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - WHISPER_CACHE_DIR=/app/.cache/whisper
+      - HUGGINGFACE_HUB_CACHE=/app/.cache/huggingface
+      - XDG_CACHE_HOME=/app/.cache
     depends_on:
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
+      - redis
+      - qdrant
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
       - ./uploads:/app/uploads
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+
 
   # Celery Worker for background tasks
   morag-worker-1:
@@ -87,12 +74,13 @@ services:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
       - WORKER_TYPE=celery
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - WHISPER_CACHE_DIR=/app/.cache/whisper
+      - HUGGINGFACE_HUB_CACHE=/app/.cache/huggingface
+      - XDG_CACHE_HOME=/app/.cache
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -119,8 +107,7 @@ services:
       - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -140,8 +127,7 @@ services:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

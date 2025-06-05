@@ -51,13 +51,45 @@ class VideoService:
         else:
             self.output_dir = None
         
-        logger.info("Video service initialized", 
+        logger.info("Video service initialized",
                    extract_audio=self.config.extract_audio,
                    generate_thumbnails=self.config.generate_thumbnails,
                    extract_keyframes=self.config.extract_keyframes,
                    enable_enhanced_audio=self.config.enable_enhanced_audio,
                    enable_ocr=self.config.enable_ocr,
                    has_embedding_service=self.embedding_service is not None)
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Check service health.
+
+        Returns:
+            Dictionary with health status information
+        """
+        try:
+            # Check if processor is available
+            if not self.processor:
+                return {
+                    "status": "unhealthy",
+                    "error": "Video processor not initialized"
+                }
+
+            return {
+                "status": "healthy",
+                "processor": "ready",
+                "enhanced_audio_enabled": self.config.enable_enhanced_audio,
+                "ocr_enabled": self.config.enable_ocr,
+                "extract_audio": self.config.extract_audio,
+                "extract_keyframes": self.config.extract_keyframes,
+                "generate_thumbnails": self.config.generate_thumbnails,
+                "embedding_service": self.embedding_service is not None
+            }
+
+        except Exception as e:
+            logger.error("Video service health check failed", error=str(e))
+            return {
+                "status": "unhealthy",
+                "error": str(e)
+            }
 
     async def process_file(self, 
                          file_path: Union[str, Path], 

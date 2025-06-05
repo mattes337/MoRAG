@@ -9,11 +9,6 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - morag-network
 
@@ -29,11 +24,6 @@ services:
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - morag-network
 
@@ -63,15 +53,8 @@ services:
       - ./logs:/app/logs
       - ./temp:/app/temp
     depends_on:
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - redis
+      - qdrant
     networks:
       - morag-network
 
@@ -99,8 +82,7 @@ services:
       - ./temp:/app/temp
       - ./logs:/app/logs
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
     networks:
       - morag-network
@@ -128,8 +110,7 @@ services:
       - ./temp:/app/temp
       - ./logs:/app/logs
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
     networks:
       - morag-network

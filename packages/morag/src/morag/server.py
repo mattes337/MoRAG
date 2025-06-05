@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTa
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 import structlog
 
 from morag.api import MoRAGAPI
@@ -140,14 +141,29 @@ class ProcessingResultResponse(BaseModel):
 
 def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     """Create FastAPI application."""
+
+    # Initialize MoRAG API outside of lifespan for access in routes
+    morag_api = MoRAGAPI(config)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Lifespan context manager for startup and shutdown."""
+        # Startup
+        logger.info("MoRAG API server starting up")
+        yield
+        # Shutdown
+        await morag_api.cleanup()
+        logger.info("MoRAG API server shut down")
+
     app = FastAPI(
         title="MoRAG API",
         description="Modular Retrieval Augmented Generation System",
         version="0.1.0",
         docs_url="/docs",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        lifespan=lifespan
     )
-    
+
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
@@ -156,20 +172,6 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
-    # Initialize MoRAG API
-    morag_api = MoRAGAPI(config)
-    
-    @app.on_event("startup")
-    async def startup_event():
-        """Startup event handler."""
-        logger.info("MoRAG API server starting up")
-    
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Shutdown event handler."""
-        await morag_api.cleanup()
-        logger.info("MoRAG API server shut down")
     
     @app.get("/")
     async def root():

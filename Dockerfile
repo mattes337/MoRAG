@@ -189,9 +189,7 @@ RUN mkdir -p uploads temp logs data /home/morag/.cache/huggingface /home/morag/.
 # Switch to app user
 USER morag
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+
 
 # Default command - run MoRAG API server
 CMD ["python", "-m", "morag.server", "--host", "0.0.0.0", "--port", "8000"]

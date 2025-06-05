@@ -41,3 +41,14 @@ openpyxl>=3.1.0,<4.0.0
 
 # NLP (basic)
 spacy>=3.7.0,<4.0.0
+
+# Optional advanced dependencies (commented out by default)
+# Uncomment these for enhanced functionality:
+
+# Advanced audio processing
+# pyannote.audio>=3.1.0  # Speaker diarization
+# sentence-transformers>=2.2.0  # Topic segmentation
+
+# Advanced web processing
+# readability>=0.3.1  # Content cleaning
+# newspaper3k>=0.2.8  # Article extraction
