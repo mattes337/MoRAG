@@ -37,8 +37,8 @@
 
 ### Medium Priority
 
-#### **Task 36: Complete Cleanup and Migration** - COMPLETE
-- **Status**: COMPLETE
+#### **Task 36: Complete Cleanup and Migration** - IN_PROGRESS
+- **Status**: IN_PROGRESS
 - **Priority**: MEDIUM
 - **Description**: Clean up obsolete code from src/morag and complete migration to modular architecture
 - **Completed Actions**:
@@ -49,10 +49,19 @@
   - ✅ Updated converter registry to use modular package imports
   - ✅ Created backward compatibility layer in processors __init__.py
   - ✅ Cleaned up duplicate functionality between src/morag and packages/
+  - ✅ Fixed core import issues and dataclass field ordering
+  - ✅ Created missing interfaces and base classes
+  - ✅ Fixed Celery signals import issues
+  - ✅ Successfully imported MoRAGAPI with modular architecture
+- **Remaining Actions**:
+  - 🔄 Fix test imports to use new modular structure
+  - 🔄 Update test files to use correct class names and imports
+  - 🔄 Ensure all package __init__.py files export correct classes
 - **Deliverables**:
   - ✅ Remove obsolete code from src/morag
   - ✅ Update all import paths to use modular packages
   - ✅ Ensure backward compatibility during transition
+  - 🔄 Fix all test imports and ensure tests pass
 
 #### **Task 37: Repository Structure Optimization** - COMPLETE
 - **Status**: COMPLETE

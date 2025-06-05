@@ -48,9 +48,9 @@ class DocumentMetadata:
 @dataclass
 class DocumentChunk:
     """Document chunk."""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     document_id: str
     content: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     metadata: Dict[str, Any] = field(default_factory=dict)
     embedding: Optional[List[float]] = None
     chunk_index: int = 0
@@ -77,8 +77,8 @@ class DocumentChunk:
 @dataclass
 class Document:
     """Document model."""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     metadata: DocumentMetadata
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     chunks: List[DocumentChunk] = field(default_factory=list)
     raw_text: Optional[str] = None
     processed_at: datetime = field(default_factory=datetime.now)

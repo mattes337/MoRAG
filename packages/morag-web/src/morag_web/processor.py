@@ -58,10 +58,9 @@ class WebContent:
 @dataclass
 class WebScrapingResult(ProcessingResult):
     """Result of web scraping operation."""
-    url: str
-    content: WebContent
-    chunks: List[DocumentChunk]
-    error_message: Optional[str] = None
+    url: Optional[str] = None
+    content: Optional[WebContent] = None
+    chunks: List[DocumentChunk] = field(default_factory=list)
 
 
 class WebProcessor(BaseProcessor):

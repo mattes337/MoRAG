@@ -27,6 +27,12 @@ class ProcessingError(MoRAGException):
     def __init__(self, message: str):
         super().__init__(message, status_code=422, error_type="processing_error")
 
+class UnsupportedFormatError(MoRAGException):
+    """Raised when an unsupported file format is encountered."""
+
+    def __init__(self, message: str):
+        super().__init__(message, status_code=415, error_type="unsupported_format_error")
+
 class StorageError(MoRAGException):
     """Raised when storage operations fail."""
 

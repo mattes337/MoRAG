@@ -17,7 +17,7 @@ from PIL import Image
 import cv2
 import numpy as np
 
-from morag_core.errors import ProcessingError, ExternalServiceError
+from morag_core.exceptions import ProcessingError, ExternalServiceError
 
 logger = structlog.get_logger(__name__)
 

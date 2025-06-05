@@ -11,7 +11,7 @@ import asyncio
 from datetime import datetime, timezone
 import uuid
 
-from morag_core.interfaces.storage import BaseVectorStorage
+from morag_core.interfaces.storage import VectorStorage as BaseVectorStorage
 from morag_core.exceptions import StorageError
 
 logger = structlog.get_logger(__name__)

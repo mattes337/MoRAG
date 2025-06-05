@@ -1,9 +1,31 @@
 """Base interfaces for services."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 from ..exceptions import ExternalServiceError
+
+
+class ServiceStatus(str, Enum):
+    """Service status enum."""
+    INITIALIZING = "initializing"
+    READY = "ready"
+    BUSY = "busy"
+    ERROR = "error"
+    SHUTDOWN = "shutdown"
+
+
+@dataclass
+class ServiceConfig:
+    """Base configuration for services."""
+    enabled: bool = True
+    timeout: float = 300.0
+    retry_attempts: int = 3
+    retry_delay: float = 1.0
+    max_concurrent_tasks: int = 5
+    custom_options: Dict[str, Any] = field(default_factory=dict)
 
 
 class BaseService(ABC):

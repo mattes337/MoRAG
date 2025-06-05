@@ -9,10 +9,10 @@ import uuid
 @dataclass
 class EmbeddingResult:
     """Result of embedding generation."""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     text: str
     embedding: List[float]
     model: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
     
@@ -80,10 +80,10 @@ class BatchEmbeddingResult:
 @dataclass
 class SummaryResult:
     """Result of text summarization."""
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     original_text: str
     summary: str
     model: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
     

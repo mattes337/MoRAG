@@ -21,7 +21,7 @@ from morag_document.service import DocumentService
 from morag_audio.service import AudioService
 from morag_video.service import VideoService
 from morag_image.service import ImageService
-from morag_embedding.service import EmbeddingService
+from morag_embedding import EmbeddingService
 from morag_web.service import WebService
 from morag_youtube.service import YouTubeService
 

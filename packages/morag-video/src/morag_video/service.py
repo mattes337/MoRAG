@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 import structlog
 
-from morag_core.errors import ServiceError
-from morag_core.utils import ensure_directory_exists
+from morag_core.exceptions import ProcessingError as ServiceError
+from morag_core.utils import ensure_directory as ensure_directory_exists
 from morag_embedding import EmbeddingService
 
 from morag_video.processor import VideoProcessor, VideoConfig, VideoProcessingResult, VideoProcessingError

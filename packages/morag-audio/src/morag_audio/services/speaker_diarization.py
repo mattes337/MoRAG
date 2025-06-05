@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import structlog
 import numpy as np
 
-from morag_core.errors import ProcessingError, ExternalServiceError
+from morag_core.exceptions import ProcessingError, ExternalServiceError
 from morag_core.utils import get_safe_device
 
 logger = structlog.get_logger(__name__)

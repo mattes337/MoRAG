@@ -205,19 +205,21 @@ def health_check_task():
 
 
 # Worker event handlers
-@celery_app.signals.worker_init.connect
+from celery.signals import worker_init, worker_ready, worker_shutdown
+
+@worker_init.connect
 def worker_init_handler(sender=None, conf=None, **kwargs):
     """Initialize worker."""
     logger.info("MoRAG worker initializing")
 
 
-@celery_app.signals.worker_ready.connect
+@worker_ready.connect
 def worker_ready_handler(sender=None, **kwargs):
     """Worker ready handler."""
     logger.info("MoRAG worker ready")
 
 
-@celery_app.signals.worker_shutdown.connect
+@worker_shutdown.connect
 def worker_shutdown_handler(sender=None, **kwargs):
     """Worker shutdown handler."""
     global morag_api

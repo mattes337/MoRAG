@@ -6,7 +6,7 @@ from typing import Union, List, Dict, Any, Optional
 from dataclasses import dataclass, field
 import structlog
 
-from morag_core.errors import ConversionError
+from morag_core.exceptions import ProcessingError as ConversionError
 from morag_audio.processor import AudioProcessingResult, AudioSegment
 
 logger = structlog.get_logger(__name__)

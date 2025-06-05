@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import asyncio
 import structlog
 
-from morag_core.errors import ProcessingError
+from morag_core.exceptions import ProcessingError
 from morag_core.utils import get_safe_device
 
 logger = structlog.get_logger(__name__)

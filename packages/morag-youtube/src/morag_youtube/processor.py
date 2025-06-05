@@ -54,12 +54,12 @@ class YouTubeMetadata:
 @dataclass
 class YouTubeDownloadResult(ProcessingResult):
     """Result of YouTube download operation."""
-    video_path: Optional[Path]
-    audio_path: Optional[Path]
-    subtitle_paths: List[Path]
-    thumbnail_paths: List[Path]
-    metadata: YouTubeMetadata
-    file_size: int
+    video_path: Optional[Path] = None
+    audio_path: Optional[Path] = None
+    subtitle_paths: List[Path] = field(default_factory=list)
+    thumbnail_paths: List[Path] = field(default_factory=list)
+    metadata: Optional[YouTubeMetadata] = None
+    file_size: int = 0
     temp_files: List[Path] = field(default_factory=list)
 
 class YouTubeProcessor(BaseProcessor):

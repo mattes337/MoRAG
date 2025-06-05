@@ -113,3 +113,7 @@ def log_exception(
         **kwargs,
         exc_info=exc,
     )
+
+
+# Alias for backward compatibility
+setup_logging = configure_logging
