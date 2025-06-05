@@ -43,6 +43,76 @@ RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed
 
 
 
+# Development stage
+FROM python:3.11-slim AS development
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install runtime dependencies for development
+RUN apt-get update && apt-get install -y \
+    curl \
+    ffmpeg \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-deu \
+    libreoffice \
+    poppler-utils \
+    chromium \
+    chromium-driver \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libsndfile1 \
+    git \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxss1 \
+    libgtk-3-0 \
+    libxrandr2 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libcairo-gobject2 \
+    libgdk-pixbuf2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Chrome/Chromium path for web scraping
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Install Playwright browsers (optional, for web scraping with dynamic content)
+RUN python -m playwright install chromium || echo "Playwright browser installation failed, will use fallback"
+
+# Create app directory
+WORKDIR /app
+
+# Copy application code and configuration
+COPY packages/ ./packages/
+COPY scripts/ ./scripts/
+COPY examples/ ./examples/
+COPY docs/ ./docs/
+COPY *.md ./
+COPY *.txt ./
+
+# Create necessary directories
+RUN mkdir -p uploads temp logs data
+
+# Default command for development - run MoRAG API server with reload
+CMD ["python", "-m", "morag.server", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+
 # Production stage
 FROM python:3.11-slim AS production
 

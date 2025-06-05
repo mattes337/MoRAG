@@ -146,6 +146,41 @@ docker-compose logs -f
    docker-compose -f docker-compose.microservices.yml up -d
    ```
 
+### Environment Setup
+
+Create a `.env` file from the template:
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+Required variables:
+```bash
+GOOGLE_API_KEY=your_google_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+```
+
+### Testing Docker Setup
+
+Test infrastructure services:
+```bash
+# Test Redis
+docker exec morag-redis-dev redis-cli ping
+
+# Test Qdrant
+curl http://localhost:6333/health
+
+# Check all services
+docker-compose -f docker-compose.dev.yml ps
+```
+
+### Troubleshooting Docker
+
+- **Port conflicts**: Stop existing services on ports 6379 (Redis), 6333/6334 (Qdrant), 8000 (API)
+- **Build issues**: Run `docker-compose build --no-cache` to rebuild images
+- **Permission issues**: Ensure Docker has access to the project directory
+
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
 ## Usage
