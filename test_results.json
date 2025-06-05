@@ -1,0 +1,21 @@
+{
+  "configuration": {
+    "success": true
+  },
+  "processing_configs": {
+    "success": false
+  },
+  "components": {
+    "AudioProcessor": false,
+    "DocumentProcessor": false,
+    "VideoProcessor": true,
+    "ImageProcessor": true,
+    "WebProcessor": false,
+    "YouTubeProcessor": false
+  },
+  "sample_files": {
+    "audio_Sprache.mp3": true,
+    "document_super saftiger Schoko Schmand Kuchen fur ein ganzes Blech - 2014-02-08.pdf": true,
+    "video_test_video.mp4": true
+  }
+}

@@ -13,6 +13,7 @@ A comprehensive, production-ready multimodal RAG (Retrieval Augmented Generation
 - **API-First**: FastAPI-based REST API with comprehensive documentation
 - **Monitoring**: Built-in progress tracking and webhook notifications
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
+- **Modular Architecture**: Separate packages for each processing type with isolated dependencies
 
 ## Quick Start
 
@@ -67,6 +68,88 @@ uvicorn morag.api.main:app --reload
 
 **Important**: The Celery worker is required for processing ingestion tasks. Without it, submitted tasks will remain in "pending" status and never complete.
 
+## Docker Deployment
+
+### Quick Docker Start
+
+```bash
+# Start all services with Docker Compose
+docker-compose up -d
+
+# Check service health
+curl http://localhost:8000/health
+
+# View logs
+docker-compose logs -f
+```
+
+### Docker Deployment Options
+
+1. **Monolithic (Development)**:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Development with Hot-Reload**:
+   ```bash
+   docker-compose -f docker-compose.dev.yml up -d
+   ```
+
+3. **Microservices (Production)**:
+   ```bash
+   docker-compose -f docker-compose.microservices.yml up -d
+   ```
+
+For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
+
+## Testing Individual Packages
+
+MoRAG provides individual test scripts for each processing component:
+
+### Audio Processing
+```bash
+python test-audio.py my-audio.mp3
+python test-audio.py recording.wav
+python test-audio.py video.mp4  # Extract audio from video
+```
+
+### Document Processing
+```bash
+python test-document.py my-document.pdf
+python test-document.py presentation.pptx
+python test-document.py spreadsheet.xlsx
+```
+
+### Video Processing
+```bash
+python test-video.py my-video.mp4
+python test-video.py recording.avi
+```
+
+### Image Processing
+```bash
+python test-image.py my-image.jpg
+python test-image.py screenshot.png
+```
+
+### Web Content Processing
+```bash
+python test-web.py https://example.com
+python test-web.py https://en.wikipedia.org/wiki/Python
+```
+
+### YouTube Processing
+```bash
+python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID
+python test-youtube.py https://youtu.be/VIDEO_ID
+```
+
+### Complete System Test
+```bash
+python test-simple.py  # Quick system validation (recommended)
+python test-all.py     # Comprehensive system test with detailed report
+```
+
 ## Architecture
 
 The MoRAG pipeline consists of several key components:
@@ -76,14 +159,17 @@ The MoRAG pipeline consists of several key components:
 - **Embedding Layer**: Gemini API integration for text embeddings
 - **Storage Layer**: Qdrant vector database for similarity search
 - **Task Queue**: Celery for async processing and scalability
+- **Modular Packages**: Independent packages for each content type
 
 ## Documentation
 
 - [API Documentation](http://localhost:8000/docs) (when running locally)
+- [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) - Complete Docker deployment instructions
 - [Universal Document Conversion](docs/UNIVERSAL_DOCUMENT_CONVERSION.md) - Complete guide to the conversion framework
+- [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
+- [Development Guide](docs/DEVELOPMENT_GUIDE.md) - Development setup and guidelines
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
 - [Task Implementation Guide](tasks/README.md)
-- [Deployment Guide](docs/deployment.md)
 
 ## Development
 
@@ -93,11 +179,21 @@ The MoRAG pipeline consists of several key components:
 # Install development dependencies
 pip install -e ".[dev]"
 
-# Run tests
+# Run all tests
 pytest
+
+# Run specific test categories
+pytest tests/unit/          # Unit tests
+pytest tests/integration/   # Integration tests
+pytest tests/manual/        # Manual tests
 
 # Run with coverage
 pytest --cov=src/morag --cov-report=html
+
+# Test individual components
+python test-all.py          # Complete system test
+python test-audio.py sample.mp3
+python test-document.py sample.pdf
 ```
 
 ### Code Quality
@@ -110,6 +206,30 @@ isort src/ tests/
 # Lint code
 flake8 src/ tests/
 mypy src/
+```
+
+### Package Development
+
+Each MoRAG component is a separate package in the `packages/` directory:
+
+```
+packages/
+├── morag-core/          # Core functionality and models
+├── morag-audio/         # Audio processing
+├── morag-document/      # Document processing
+├── morag-video/         # Video processing
+├── morag-image/         # Image processing
+├── morag-web/           # Web scraping
+├── morag-youtube/       # YouTube processing
+├── morag-services/      # Shared services
+└── morag-embedding/     # Embedding services
+```
+
+Install packages individually for development:
+```bash
+pip install -e packages/morag-core
+pip install -e packages/morag-audio
+# ... etc
 ```
 
 ## Troubleshooting
