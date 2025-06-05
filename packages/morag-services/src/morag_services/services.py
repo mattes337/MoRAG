@@ -89,6 +89,8 @@ class MoRAGServices:
         
         # Create semaphore for concurrent processing
         self.semaphore = asyncio.Semaphore(self.config.max_concurrent_tasks)
+
+        logger.info("MoRAG Services initialized")
         
         # Register content type detectors
         self._content_type_detectors = {
@@ -493,6 +495,70 @@ class MoRAGServices:
             config=self.config.embedding_config
         )
     
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Get health status of all services.
+
+        Returns:
+            Health status information for all services
+        """
+        health_status = {
+            "overall_status": "healthy",
+            "services": {}
+        }
+
+        # Check each service
+        services_to_check = [
+            ("document", self.document_service),
+            ("audio", self.audio_service),
+            ("video", self.video_service),
+            ("image", self.image_service),
+            ("embedding", self.embedding_service),
+            ("web", self.web_service),
+            ("youtube", self.youtube_service),
+        ]
+
+        unhealthy_services = []
+
+        for service_name, service in services_to_check:
+            try:
+                service_health = await service.health_check()
+                health_status["services"][service_name] = service_health
+
+                # Check if service is unhealthy
+                if service_health.get("status") != "healthy":
+                    unhealthy_services.append(service_name)
+
+            except Exception as e:
+                logger.error(f"Health check failed for {service_name} service", error=str(e))
+                health_status["services"][service_name] = {
+                    "status": "unhealthy",
+                    "error": str(e)
+                }
+                unhealthy_services.append(service_name)
+
+        # Set overall status
+        if unhealthy_services:
+            health_status["overall_status"] = "degraded" if len(unhealthy_services) < len(services_to_check) else "unhealthy"
+            health_status["unhealthy_services"] = unhealthy_services
+
+        return health_status
+
+    async def search_similar(self, query: str, limit: int = 10, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Search for similar content using vector similarity.
+
+        Args:
+            query: Search query
+            limit: Maximum number of results
+            filters: Optional filters
+
+        Returns:
+            List of similar content items
+        """
+        # This would typically use the embedding service and vector storage
+        # For now, return empty list as placeholder
+        logger.warning("Search functionality not yet implemented")
+        return []
+
     def cleanup(self):
         """Clean up resources used by services."""
         # Implement cleanup for each service if needed

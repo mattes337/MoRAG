@@ -47,7 +47,8 @@ class WebConverter(BaseConverter):
     """Enhanced Web content to Markdown converter with dynamic content extraction."""
 
     def __init__(self):
-        super().__init__("Enhanced MoRAG Web Converter")
+        super().__init__()
+        self.name = "Enhanced MoRAG Web Converter"
         self.supported_formats = ['web', 'html', 'htm', 'url']
 
         # Initialize extraction methods

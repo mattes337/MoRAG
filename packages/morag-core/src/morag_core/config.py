@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     # Gemini API Configuration
     gemini_api_key: Optional[str] = None
     gemini_model: str = "gemini-2.0-flash"
+    gemini_generation_model: str = "gemini-2.0-flash"
     gemini_embedding_model: str = "text-embedding-004"
 
     # Redis Configuration

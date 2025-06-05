@@ -13,7 +13,7 @@ from PIL import Image, ExifTags
 import google.generativeai as genai
 
 from morag_core.exceptions import ProcessingError, ExternalServiceError
-from morag_core.interfaces.processor import BaseProcessor
+from morag_core.interfaces.processor import BaseProcessor, ProcessingResult as BaseProcessingResult, ProcessingConfig
 
 logger = structlog.get_logger()
 
@@ -62,6 +62,64 @@ class ImageProcessor(BaseProcessor):
         # Configure Gemini for vision tasks
         if api_key:
             genai.configure(api_key=api_key)
+
+    async def process(self, file_path, config: Optional[ProcessingConfig] = None) -> BaseProcessingResult:
+        """Process image file according to BaseProcessor interface.
+
+        Args:
+            file_path: Path to image file
+            config: Processing configuration
+
+        Returns:
+            BaseProcessingResult with processed content
+        """
+        try:
+            # Convert to Path if string
+            if isinstance(file_path, str):
+                file_path = Path(file_path)
+
+            # Create ImageConfig from ProcessingConfig
+            image_config = ImageConfig()
+            if config:
+                if hasattr(config, 'extract_metadata'):
+                    image_config.extract_metadata = config.extract_metadata
+
+            # Process the image
+            result = await self.process_image(file_path, image_config)
+
+            # Convert to BaseProcessingResult
+            return BaseProcessingResult(
+                success=True,
+                processing_time=result.processing_time,
+                metadata={
+                    'caption': result.caption,
+                    'extracted_text': result.extracted_text,
+                    'image_metadata': result.metadata.__dict__,
+                    'confidence_scores': result.confidence_scores
+                }
+            )
+        except Exception as e:
+            return BaseProcessingResult(
+                success=False,
+                processing_time=0.0,
+                error_message=str(e)
+            )
+
+    def supports_format(self, format_type: str) -> bool:
+        """Check if processor supports the given format.
+
+        Args:
+            format_type: Format type to check (e.g., 'jpg', 'png', 'image/jpeg')
+
+        Returns:
+            True if format is supported
+        """
+        supported_formats = {
+            'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp',
+            'image/jpeg', 'image/png', 'image/gif', 'image/bmp',
+            'image/tiff', 'image/webp'
+        }
+        return format_type.lower() in supported_formats
         
     async def process_image(
         self,

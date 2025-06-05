@@ -5,10 +5,10 @@ import sys
 import os
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add packages to path for modular architecture
+sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag" / "src"))
 
-from morag_services.celery_app import celery_app
+from morag.worker import celery_app
 
 if __name__ == "__main__":
     # Use solo pool for Windows compatibility
