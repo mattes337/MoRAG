@@ -58,7 +58,7 @@ class MoRAGOrchestrator:
                 return await self._process_web_content(content, options)
             elif content_type == ContentType.YOUTUBE:
                 return await self._process_youtube_content(content, options)
-            elif content_type in [ContentType.PDF, ContentType.DOCUMENT]:
+            elif content_type == ContentType.DOCUMENT:
                 return await self._process_document_content(content, options)
             elif content_type == ContentType.AUDIO:
                 return await self._process_audio_content(content, options)

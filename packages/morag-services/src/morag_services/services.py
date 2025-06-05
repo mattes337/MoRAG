@@ -8,6 +8,7 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional, Union, Tuple, Set
 from pathlib import Path
+from enum import Enum
 import os
 import structlog
 from pydantic import BaseModel
@@ -39,8 +40,8 @@ class ServiceConfig:
     youtube_config: Optional[ProcessingConfig] = None
     max_concurrent_tasks: int = 5
 
-class ContentType:
-    """Content type constants."""
+class ContentType(str, Enum):
+    """Content type enum."""
     DOCUMENT = "document"
     AUDIO = "audio"
     VIDEO = "video"
@@ -167,13 +168,14 @@ class MoRAGServices:
         
         return ContentType.UNKNOWN
     
-    async def process_content(self, path_or_url: str, content_type: Optional[str] = None) -> ProcessingResult:
+    async def process_content(self, path_or_url: str, content_type: Optional[str] = None, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process content based on its type.
-        
+
         Args:
             path_or_url: File path or URL
             content_type: Content type (auto-detected if not provided)
-            
+            options: Processing options
+
         Returns:
             ProcessingResult with extracted information
         """
@@ -181,20 +183,24 @@ class MoRAGServices:
         if content_type is None:
             content_type = self.detect_content_type(path_or_url)
         
+        # Convert Path objects to strings
+        if isinstance(path_or_url, Path):
+            path_or_url = str(path_or_url)
+
         # Process based on content type
         try:
             if content_type == ContentType.DOCUMENT:
-                return await self.process_document(path_or_url)
+                return await self.process_document(path_or_url, options)
             elif content_type == ContentType.AUDIO:
-                return await self.process_audio(path_or_url)
+                return await self.process_audio(path_or_url, options)
             elif content_type == ContentType.VIDEO:
-                return await self.process_video(path_or_url)
+                return await self.process_video(path_or_url, options)
             elif content_type == ContentType.IMAGE:
-                return await self.process_image(path_or_url)
+                return await self.process_image(path_or_url, options)
             elif content_type == ContentType.WEB:
-                return await self.process_url(path_or_url)
+                return await self.process_url(path_or_url, options)
             elif content_type == ContentType.YOUTUBE:
-                return await self.process_youtube(path_or_url)
+                return await self.process_youtube(path_or_url, options)
             else:
                 raise UnsupportedFormatError(f"Unsupported content type: {content_type}")
         except Exception as e:
@@ -207,12 +213,13 @@ class MoRAGServices:
                 error_message=str(e)
             )
     
-    async def process_document(self, document_path: str) -> ProcessingResult:
+    async def process_document(self, document_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a document file.
-        
+
         Args:
             document_path: Path to document file
-            
+            options: Processing options
+
         Returns:
             ProcessingResult with extracted text and metadata
         """
@@ -237,17 +244,18 @@ class MoRAGServices:
             logger.exception(f"Error processing document", document_path=document_path)
             return ProcessingResult(
                 content_type=ContentType.DOCUMENT,
-                content_path=document_path,
+                content_path=str(document_path),  # Convert Path to string
                 success=False,
                 error_message=str(e)
             )
     
-    async def process_audio(self, audio_path: str) -> ProcessingResult:
+    async def process_audio(self, audio_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process an audio file.
-        
+
         Args:
             audio_path: Path to audio file
-            
+            options: Processing options
+
         Returns:
             ProcessingResult with transcription and metadata
         """
@@ -276,12 +284,13 @@ class MoRAGServices:
                 error_message=str(e)
             )
     
-    async def process_video(self, video_path: str) -> ProcessingResult:
+    async def process_video(self, video_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a video file.
-        
+
         Args:
             video_path: Path to video file
-            
+            options: Processing options
+
         Returns:
             ProcessingResult with extracted information
         """
@@ -311,12 +320,13 @@ class MoRAGServices:
                 error_message=str(e)
             )
     
-    async def process_image(self, image_path: str) -> ProcessingResult:
+    async def process_image(self, image_path: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process an image file.
-        
+
         Args:
             image_path: Path to image file
-            
+            options: Processing options
+
         Returns:
             ProcessingResult with extracted text and metadata
         """
@@ -345,12 +355,13 @@ class MoRAGServices:
                 error_message=str(e)
             )
     
-    async def process_url(self, url: str) -> ProcessingResult:
+    async def process_url(self, url: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a web URL.
-        
+
         Args:
             url: Web URL to process
-            
+            options: Processing options
+
         Returns:
             ProcessingResult with extracted content and metadata
         """
@@ -379,12 +390,13 @@ class MoRAGServices:
                 error_message=str(e)
             )
     
-    async def process_youtube(self, url: str) -> ProcessingResult:
+    async def process_youtube(self, url: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
         """Process a YouTube URL.
-        
+
         Args:
             url: YouTube URL to process
-            
+            options: Processing options
+
         Returns:
             ProcessingResult with extracted content and metadata
         """

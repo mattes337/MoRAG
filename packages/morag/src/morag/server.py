@@ -14,8 +14,79 @@ import structlog
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult
+from morag.utils.file_upload import get_upload_handler, FileUploadError
 
 logger = structlog.get_logger(__name__)
+
+
+def normalize_content_type(content_type: Optional[str]) -> Optional[str]:
+    """Normalize content type from MIME type to MoRAG content type.
+
+    Args:
+        content_type: MIME type or MoRAG content type
+
+    Returns:
+        Normalized MoRAG content type or None
+    """
+    if not content_type:
+        return None
+
+    content_type = content_type.lower().strip()
+
+    # If it's already a MoRAG content type, return as-is
+    morag_types = {'document', 'audio', 'video', 'image', 'web', 'youtube', 'text', 'unknown'}
+    if content_type in morag_types:
+        return content_type
+
+    # Convert MIME types to MoRAG content types
+    mime_to_morag = {
+        # Document types
+        'application/pdf': 'document',
+        'application/msword': 'document',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+        'application/vnd.ms-powerpoint': 'document',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'document',
+        'application/vnd.ms-excel': 'document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'document',
+        'text/plain': 'document',
+        'text/markdown': 'document',
+        'text/html': 'document',
+        'application/rtf': 'document',
+
+        # Audio types
+        'audio/mpeg': 'audio',
+        'audio/mp3': 'audio',
+        'audio/wav': 'audio',
+        'audio/x-wav': 'audio',
+        'audio/mp4': 'audio',
+        'audio/m4a': 'audio',
+        'audio/x-m4a': 'audio',
+        'audio/flac': 'audio',
+        'audio/ogg': 'audio',
+        'audio/aac': 'audio',
+
+        # Video types
+        'video/mp4': 'video',
+        'video/avi': 'video',
+        'video/x-msvideo': 'video',
+        'video/quicktime': 'video',
+        'video/x-matroska': 'video',
+        'video/webm': 'video',
+        'video/x-ms-wmv': 'video',
+        'video/x-flv': 'video',
+
+        # Image types
+        'image/jpeg': 'image',
+        'image/jpg': 'image',
+        'image/png': 'image',
+        'image/gif': 'image',
+        'image/bmp': 'image',
+        'image/webp': 'image',
+        'image/tiff': 'image',
+        'image/svg+xml': 'image',
+    }
+
+    return mime_to_morag.get(content_type, 'document')
 
 
 # Pydantic models for API
@@ -119,25 +190,48 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         options: Optional[str] = Form(None)  # JSON string
     ):
         """Process content from an uploaded file."""
+        temp_path = None
         try:
             # Parse options if provided
             parsed_options = None
             if options:
                 import json
-                parsed_options = json.loads(options)
-            
-            # Save uploaded file temporarily
-            temp_path = Path(f"/tmp/{file.filename}")
-            with open(temp_path, "wb") as f:
-                content = await file.read()
-                f.write(content)
-            
+                try:
+                    parsed_options = json.loads(options)
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON in options", options=options, error=str(e))
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON in options: {str(e)}")
+
+            # Save uploaded file using secure file upload handler
+            upload_handler = get_upload_handler()
             try:
+                temp_path = await upload_handler.save_upload(file)
+                logger.info("File uploaded successfully",
+                           filename=file.filename,
+                           temp_path=str(temp_path),
+                           content_type=content_type)
+            except FileUploadError as e:
+                logger.error("File upload validation failed",
+                           filename=file.filename,
+                           error=str(e))
+                raise HTTPException(status_code=400, detail=str(e))
+
+            # Process the file
+            try:
+                # Normalize content type from MIME type to MoRAG content type
+                normalized_content_type = normalize_content_type(content_type)
+
                 result = await morag_api.process_file(
                     temp_path,
-                    content_type,
+                    normalized_content_type,
                     parsed_options
                 )
+
+                logger.info("File processing completed",
+                           filename=file.filename,
+                           success=result.success,
+                           processing_time=result.processing_time)
+
                 return ProcessingResultResponse(
                     success=result.success,
                     content=result.content,
@@ -145,14 +239,31 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                     processing_time=result.processing_time,
                     error_message=result.error_message
                 )
-            finally:
-                # Clean up temporary file
-                if temp_path.exists():
-                    temp_path.unlink()
-                    
+            except Exception as e:
+                logger.error("File processing failed",
+                           filename=file.filename,
+                           temp_path=str(temp_path),
+                           error=str(e))
+                raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
         except Exception as e:
-            logger.error("File processing failed", filename=file.filename, error=str(e))
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.error("Unexpected error in file upload endpoint",
+                        filename=getattr(file, 'filename', 'unknown'),
+                        error=str(e))
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        finally:
+            # Clean up temporary file immediately after processing
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                    logger.debug("Cleaned up temporary file", temp_path=str(temp_path))
+                except Exception as e:
+                    logger.warning("Failed to clean up temporary file",
+                                 temp_path=str(temp_path),
+                                 error=str(e))
     
     @app.post("/process/web", response_model=ProcessingResultResponse)
     async def process_web_page(request: ProcessURLRequest):

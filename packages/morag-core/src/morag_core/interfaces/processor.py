@@ -11,10 +11,18 @@ from ..exceptions import ProcessingError
 @dataclass
 class ProcessingConfig:
     """Base configuration for content processing."""
+    # File path (required for document processing)
+    file_path: Optional[str] = None
+
     # Common configuration options for all processors
     max_file_size: Optional[int] = None
     quality_threshold: float = 0.7
     extract_metadata: bool = True
+
+    # Document-specific options
+    chunking_strategy: Optional[str] = None
+    chunk_size: Optional[int] = None
+    chunk_overlap: Optional[int] = None
 
 
 @dataclass
