@@ -244,13 +244,21 @@ class FileUploadHandler:
             file_path: Path to file to clean up
         """
         async def cleanup_task():
+            logger.debug("Scheduled cleanup task started",
+                        file_path=str(file_path),
+                        timeout_seconds=self.config.cleanup_timeout)
             await asyncio.sleep(self.config.cleanup_timeout)
             try:
                 if file_path.exists():
                     file_path.unlink()
-                    logger.debug("Cleaned up temporary file", file_path=str(file_path))
+                    logger.info("Cleaned up temporary file after timeout",
+                               file_path=str(file_path),
+                               timeout_seconds=self.config.cleanup_timeout)
+                else:
+                    logger.debug("Temporary file already cleaned up",
+                                file_path=str(file_path))
             except Exception as e:
-                logger.warning("Failed to clean up temporary file", 
+                logger.warning("Failed to clean up temporary file",
                              file_path=str(file_path), error=str(e))
         
         task = asyncio.create_task(cleanup_task())
@@ -269,10 +277,10 @@ class FileUploadHandler:
     
     def __del__(self):
         """Cleanup on object destruction."""
-        try:
-            self.cleanup_temp_dir()
-        except Exception:
-            pass  # Ignore errors during cleanup
+        # NOTE: Removed aggressive temp directory cleanup to prevent race conditions
+        # with background tasks. Individual files are cleaned up by scheduled tasks
+        # or by the background tasks themselves after processing.
+        pass
 
 
 # Global file upload handler instance
@@ -290,6 +298,6 @@ def get_upload_handler() -> FileUploadHandler:
 def configure_upload_handler(config: FileUploadConfig) -> None:
     """Configure global file upload handler."""
     global _upload_handler
-    if _upload_handler is not None:
-        _upload_handler.cleanup_temp_dir()
+    # NOTE: Don't cleanup existing temp directory to avoid race conditions
+    # with background tasks that might still be processing files
     _upload_handler = FileUploadHandler(config)

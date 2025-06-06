@@ -130,10 +130,21 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
     async def _ingest():
         api = get_morag_api()
         options = task_options or {}
+
+        # Log task start and file existence check
+        logger.info("Starting file ingestion task",
+                   task_id=self.request.id,
+                   file_path=file_path,
+                   content_type=content_type,
+                   file_exists=Path(file_path).exists())
         
         try:
+            # Check if file still exists before processing
+            if not Path(file_path).exists():
+                raise FileNotFoundError(f"Temporary file was cleaned up before processing: {file_path}")
+
             self.update_state(state='PROGRESS', meta={'stage': 'processing', 'progress': 0.1})
-            
+
             # Process the file
             result = await api.process_file(file_path, content_type, options)
             
@@ -196,7 +207,18 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
             }
             
         except Exception as e:
-            logger.error("File ingestion task failed", file_path=file_path, error=str(e))
+            # Add specific context for file not found errors
+            if isinstance(e, FileNotFoundError):
+                logger.error("File ingestion task failed - temporary file was cleaned up prematurely",
+                           file_path=file_path,
+                           error=str(e),
+                           error_type="FileNotFoundError",
+                           suggestion="This indicates a race condition between file cleanup and task processing")
+            else:
+                logger.error("File ingestion task failed",
+                           file_path=file_path,
+                           error=str(e),
+                           error_type=e.__class__.__name__)
 
             # Send failure webhook notification
             webhook_url = options.get('webhook_url')

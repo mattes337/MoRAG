@@ -211,9 +211,27 @@ For detailed information about completed tasks and implementation history, see [
   - **Validation Layer**: Added ContentType enum validation with fallback to 'unknown' for unrecognized types
 - **Status**: All worker process errors resolved, comprehensive test suite validates fixes
 
+### ✅ File Upload Race Condition Fix (January 2025)
+
+#### 11. **Temporary File Cleanup Race Condition** ✅ FIXED
+- **Issue**: `ValidationError: File not found: /tmp/morag_uploads_*/filename.pdf` during document processing
+- **Root Cause**: Race condition between file upload handler cleanup and background task processing
+  - FileUploadHandler.__del__() method aggressively removes entire temp directory when object is garbage collected
+  - Background tasks receive file paths but files are deleted before processing starts
+  - Premature cleanup occurs due to upload handler object lifecycle management
+- **Solution**: Fixed file cleanup strategy to prevent race conditions
+  - **Removed Aggressive Cleanup**: Eliminated temp directory removal in __del__ method
+  - **Enhanced Logging**: Added detailed logging for file cleanup tracking and debugging
+  - **Better Error Handling**: Added specific FileNotFoundError detection with helpful error messages
+  - **File Existence Check**: Added pre-processing file existence validation in ingest tasks
+- **Files Modified**:
+  - `packages/morag/src/morag/utils/file_upload.py`: Fixed cleanup strategy
+  - `packages/morag/src/morag/ingest_tasks.py`: Enhanced error handling and logging
+- **Status**: Race condition eliminated, background tasks now process files reliably
+
 ### ✅ Docker Build Optimization (January 2025)
 
-#### 11. **Docker Build Time Optimization** ✅ IMPLEMENTED
+#### 12. **Docker Build Time Optimization** ✅ IMPLEMENTED
 - **Issue**: Docker builds taking 12-15 minutes even for small code changes due to poor layer caching
 - **Root Cause**: Application code copied early in Dockerfile, invalidating dependency installation layers on every code change
 - **Solution**: Restructured Dockerfiles with strategic layer ordering and multi-stage builds
