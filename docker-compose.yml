@@ -38,7 +38,6 @@ services:
     env_file: .env
     depends_on:
       - redis
-      - qdrant
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
