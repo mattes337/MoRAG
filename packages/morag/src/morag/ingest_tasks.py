@@ -175,9 +175,13 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
             
             if not result.success:
                 raise Exception(f"Processing failed: {result.error_message}")
-            
+
+            # Ensure metadata is always a dictionary
+            if result.metadata is None:
+                result.metadata = {}
+
             self.update_state(state='PROGRESS', meta={'stage': 'storing', 'progress': 0.7})
-            
+
             # Store in vector database if requested
             if options.get('store_in_vector_db', True):
                 # Prepare metadata for vector storage
@@ -188,13 +192,13 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     **result.metadata,
                     **(options.get('metadata', {}))
                 }
-                
+
                 # Store content in vector database
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
                     vector_metadata
                 )
-                
+
                 # Add vector storage info to result
                 result.metadata['vector_point_ids'] = point_ids
                 result.metadata['stored_in_vector_db'] = True
@@ -285,9 +289,13 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
             
             if not result.success:
                 raise Exception(f"Processing failed: {result.error_message}")
-            
+
+            # Ensure metadata is always a dictionary
+            if result.metadata is None:
+                result.metadata = {}
+
             self.update_state(state='PROGRESS', meta={'stage': 'storing', 'progress': 0.7})
-            
+
             # Store in vector database if requested
             if options.get('store_in_vector_db', True):
                 # Prepare metadata for vector storage
@@ -298,13 +306,13 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                     **result.metadata,
                     **(options.get('metadata', {}))
                 }
-                
+
                 # Store content in vector database
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
                     vector_metadata
                 )
-                
+
                 # Add vector storage info to result
                 result.metadata['vector_point_ids'] = point_ids
                 result.metadata['stored_in_vector_db'] = True
@@ -413,6 +421,10 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
                         )
                     else:
                         raise ValueError(f"Invalid item format: {item}")
+
+                    # Ensure metadata is always a dictionary
+                    if result.metadata is None:
+                        result.metadata = {}
 
                     if result.success and options.get('store_in_vector_db', True):
                         # Store in vector database
