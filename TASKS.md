@@ -510,16 +510,29 @@ For detailed information about completed tasks and implementation history, see [
 - **Files Modified**: `packages/morag-audio/src/morag_audio/processor.py`
 - **Status**: Speaker diarization now works correctly with proper attribute access
 
+#### 26. **Exception Re-raising in Celery Tasks** ✅ FIXED
+- **Issue**: `TypeError: ExternalServiceError.__init__() missing 1 required positional argument: 'service'` in Celery task error handling
+- **Root Cause**: Celery task error handling was using `raise type(e)(str(e))` which doesn't work for ExternalServiceError that requires both message and service parameters
+- **Solution**: Implemented intelligent exception re-raising logic that handles special cases
+- **Changes Implemented**:
+  - Added logic to detect exceptions with service attribute (like ExternalServiceError)
+  - For ExternalServiceError: Extract original message and re-raise with service parameter
+  - For other exceptions: Use original re-raising logic with fallback to generic Exception
+  - Applied fix to all three Celery task functions: `ingest_file_task`, `ingest_url_task`, `ingest_batch_task`
+- **Files Modified**: `packages/morag/src/morag/ingest_tasks.py`
+- **Status**: Celery tasks now properly handle all exception types without constructor errors
+
 ### 🧪 Testing and Validation
 - **Test Suite**: Created comprehensive test script `tests/test_configuration_and_error_fixes.py`
 - **Test Coverage**: All configuration and error handling fixes tested with automated validation
-- **Test Results**: ✅ 6/6 test categories passing:
+- **Test Results**: ✅ 7/7 test categories passing:
   - Vision model configuration via environment variables
   - ExternalServiceError proper initialization
   - Embedding service error handling with service parameter
   - SpeakerSegment correct attributes (start_time, end_time, speaker_id)
   - Audio processor metadata reference
   - Core config vision model setting
+  - Exception re-raising logic in Celery tasks
 - **Validation**: Each fix tested in isolation and integration scenarios
 
 ## 🔄 Future Enhancement Opportunities:

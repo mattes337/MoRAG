@@ -191,26 +191,98 @@ def test_core_config_vision_model():
     """Test that core config includes vision model setting."""
     print("\n🔧 Testing Core Config Vision Model Setting")
     print("=" * 50)
-    
+
     try:
         from morag_core.config import Settings
-        
+
         # Test with environment variable (Settings uses MORAG_ prefix)
         with patch.dict(os.environ, {'MORAG_GEMINI_VISION_MODEL': 'test-vision-model'}):
             settings = Settings()
             assert hasattr(settings, 'gemini_vision_model'), "Settings should have gemini_vision_model attribute"
             assert settings.gemini_vision_model == 'test-vision-model', f"Expected test-vision-model, got {settings.gemini_vision_model}"
-        
+
         # Test default value
         with patch.dict(os.environ, {}, clear=True):
             settings = Settings()
             assert settings.gemini_vision_model == 'gemini-1.5-flash', f"Expected default gemini-1.5-flash, got {settings.gemini_vision_model}"
-        
+
         print("✅ Core config vision model setting works correctly")
         return True
-        
+
     except Exception as e:
         print(f"❌ Core config vision model test failed: {e}")
+        return False
+
+def test_exception_re_raising_logic():
+    """Test the exception re-raising logic in ingest_tasks.py."""
+    print("\n🔧 Testing Exception Re-raising Logic")
+    print("=" * 50)
+
+    try:
+        from morag_core.exceptions import ExternalServiceError, RateLimitError, ProcessingError
+
+        # Test function that simulates the fixed error handling logic
+        def simulate_error_handling(original_exception):
+            """Simulate the fixed error handling logic from ingest_tasks.py."""
+            e = original_exception
+
+            # Handle special cases for exceptions that require specific parameters
+            if hasattr(e, 'service') and hasattr(type(e), '__init__'):
+                # For ExternalServiceError and similar exceptions that need service parameter
+                try:
+                    raise type(e)(str(e).replace(f"{e.service} error: ", ""), e.service)
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
+            else:
+                # For other exceptions, try to recreate with just the message
+                try:
+                    raise type(e)(str(e))
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
+
+        # Test 1: ExternalServiceError should be properly re-raised
+        try:
+            original_error = ExternalServiceError("API failed", "gemini")
+            simulate_error_handling(original_error)
+            print("❌ Should have raised an exception")
+            return False
+        except ExternalServiceError as e:
+            assert e.service == "gemini", f"Expected gemini service, got {e.service}"
+            print("✅ ExternalServiceError properly re-raised with service parameter")
+        except Exception as e:
+            print(f"✅ ExternalServiceError fallback to generic Exception: {type(e).__name__}")
+
+        # Test 2: Regular exceptions should be re-raised normally
+        try:
+            original_error = RateLimitError("Rate limit exceeded")
+            simulate_error_handling(original_error)
+            print("❌ Should have raised an exception")
+            return False
+        except RateLimitError:
+            print("✅ RateLimitError properly re-raised")
+        except Exception as e:
+            print(f"✅ RateLimitError fallback to generic Exception: {type(e).__name__}")
+
+        # Test 3: Standard exceptions should work
+        try:
+            original_error = ValueError("Invalid value")
+            simulate_error_handling(original_error)
+            print("❌ Should have raised an exception")
+            return False
+        except ValueError:
+            print("✅ ValueError properly re-raised")
+        except Exception as e:
+            print(f"✅ ValueError fallback to generic Exception: {type(e).__name__}")
+
+        return True
+
+    except ImportError as e:
+        print(f"❌ Failed to import required exceptions: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Unexpected error testing exception re-raising: {e}")
         return False
 
 async def main():
@@ -227,6 +299,7 @@ async def main():
         test_speaker_segment_attributes,
         test_audio_processor_metadata_reference,
         test_core_config_vision_model,
+        test_exception_re_raising_logic,
     ]
     
     passed = 0

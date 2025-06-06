@@ -289,7 +289,21 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
             self.update_state(state='FAILURE', meta=error_info)
 
             # Re-raise with proper exception type information
-            raise type(e)(str(e))
+            # Handle special cases for exceptions that require specific parameters
+            if hasattr(e, 'service') and hasattr(type(e), '__init__'):
+                # For ExternalServiceError and similar exceptions that need service parameter
+                try:
+                    raise type(e)(str(e).replace(f"{e.service} error: ", ""), e.service)
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
+            else:
+                # For other exceptions, try to recreate with just the message
+                try:
+                    raise type(e)(str(e))
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
     
     return asyncio.run(_ingest())
 
@@ -381,7 +395,21 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
             self.update_state(state='FAILURE', meta=error_info)
 
             # Re-raise with proper exception type information
-            raise type(e)(str(e))
+            # Handle special cases for exceptions that require specific parameters
+            if hasattr(e, 'service') and hasattr(type(e), '__init__'):
+                # For ExternalServiceError and similar exceptions that need service parameter
+                try:
+                    raise type(e)(str(e).replace(f"{e.service} error: ", ""), e.service)
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
+            else:
+                # For other exceptions, try to recreate with just the message
+                try:
+                    raise type(e)(str(e))
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
 
     return asyncio.run(_ingest())
 
@@ -531,6 +559,20 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
             self.update_state(state='FAILURE', meta=error_info)
 
             # Re-raise with proper exception type information
-            raise type(e)(str(e))
+            # Handle special cases for exceptions that require specific parameters
+            if hasattr(e, 'service') and hasattr(type(e), '__init__'):
+                # For ExternalServiceError and similar exceptions that need service parameter
+                try:
+                    raise type(e)(str(e).replace(f"{e.service} error: ", ""), e.service)
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
+            else:
+                # For other exceptions, try to recreate with just the message
+                try:
+                    raise type(e)(str(e))
+                except:
+                    # Fallback to generic exception if reconstruction fails
+                    raise Exception(str(e))
 
     return asyncio.run(_ingest())
