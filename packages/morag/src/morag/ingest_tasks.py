@@ -65,7 +65,9 @@ async def store_content_in_vector_db(
         qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
         qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
         qdrant_api_key = os.getenv('QDRANT_API_KEY')
-        collection_name_env = os.getenv('QDRANT_COLLECTION_NAME', 'morag_vectors')
+        collection_name_env = os.getenv('QDRANT_COLLECTION_NAME')
+        if not collection_name_env:
+            raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
 
         vector_storage = QdrantVectorStorage(
             host=qdrant_host,

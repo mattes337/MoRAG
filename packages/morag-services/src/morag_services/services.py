@@ -109,7 +109,9 @@ class MoRAGServices:
             qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
             qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
             qdrant_api_key = os.getenv('QDRANT_API_KEY')
-            collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'morag_vectors')
+            collection_name = os.getenv('QDRANT_COLLECTION_NAME')
+            if not collection_name:
+                raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
 
             self._vector_storage = QdrantVectorStorage(
                 host=qdrant_host,

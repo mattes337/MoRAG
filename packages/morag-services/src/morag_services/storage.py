@@ -25,7 +25,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         host: str = "localhost",
         port: int = 6333,
         api_key: Optional[str] = None,
-        collection_name: str = "morag_vectors"
+        collection_name: Optional[str] = None
     ):
         """Initialize Qdrant storage.
 
@@ -33,11 +33,13 @@ class QdrantVectorStorage(BaseVectorStorage):
             host: Qdrant host
             port: Qdrant port
             api_key: API key for authentication
-            collection_name: Default collection name
+            collection_name: Collection name (required, no default)
         """
         self.host = host
         self.port = port
         self.api_key = api_key
+        if not collection_name:
+            raise ValueError("collection_name is required - set QDRANT_COLLECTION_NAME environment variable")
         self.collection_name = collection_name
         self.client: Optional[QdrantClient] = None
         self._initialized = False

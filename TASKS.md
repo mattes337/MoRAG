@@ -473,6 +473,54 @@ For detailed information about completed tasks and implementation history, see [
   - Separate retry logic for embedding and text generation
 - **Status**: Rate limiting errors now handled gracefully with automatic retries
 
+### ✅ Qdrant Collection Name Unification (January 2025)
+
+#### 29. **Qdrant Collection Name Mixup** ✅ FIXED
+- **Issue**: Inconsistent collection names across MoRAG components - sometimes "morag-vectors", sometimes "morag_documents"
+- **Root Cause**: Different default values in various components causing ingestion and search to use different collections
+- **Problems Identified**:
+  - `morag-core` config defaulted to "morag_documents"
+  - `morag-services` and `ingest_tasks.py` defaulted to "morag_vectors"
+  - Install script used "morag_vectors" while env examples used "morag_documents"
+  - Points written to one collection but searches performed on another
+- **Solution**: Unified all components to use single environment variable with no defaults and fail-fast validation
+- **Changes Implemented**:
+  - **Removed All Default Values**: No component provides fallback collection names
+  - **Fail-Fast Validation**: All components now require `QDRANT_COLLECTION_NAME` environment variable
+  - **Unified Collection Name**: Standardized on "morag_documents" in all example configurations
+  - **Core Config Validation**: Added field validator to ensure collection name is provided
+  - **Storage Class Validation**: QdrantVectorStorage constructor validates collection name is not empty
+  - **Service Initialization**: MoRAGServices fails immediately if collection name not provided
+  - **Ingest Tasks**: All ingestion tasks validate collection name before processing
+- **Files Modified**:
+  - `packages/morag-core/src/morag_core/config.py`: Removed default, added validation
+  - `packages/morag-services/src/morag_services/storage.py`: Removed default, added constructor validation
+  - `packages/morag-services/src/morag_services/services.py`: Added environment variable validation
+  - `packages/morag/src/morag/ingest_tasks.py`: Added environment variable validation
+  - `.env.example`, `.env.prod.example`: Standardized on "morag_documents"
+  - `scripts/install_morag.py`: Updated to use "morag_documents"
+  - `packages/morag/README.md`: Updated documentation example
+  - `tasks/task-10-configuration-management.md`: Updated configuration documentation
+- **Files Added**:
+  - `tests/test_qdrant_collection_unification.py`: Comprehensive test suite validating unification
+- **Benefits**:
+  - **Guaranteed Consistency**: All components use same collection name from single source
+  - **Early Error Detection**: Immediate failure if collection name not configured
+  - **No Silent Failures**: Prevents ingestion/search mismatches due to different collection names
+  - **Clear Error Messages**: Helpful validation messages guide users to correct configuration
+- **Files Added**:
+  - `tests/test_qdrant_collection_unification.py`: Comprehensive test suite validating unification
+  - `tests/test_collection_validation.py`: Simple validation tests for core logic
+  - `tests/test_component_integration.py`: Component integration tests
+  - `validate_collection_fix.py`: Validation script for checking unification
+  - `demo_collection_unification.py`: Demonstration script showing unified behavior
+- **Validation Results**: ✅ All validation tests pass
+  - Default values removal: ✅ Verified across all components
+  - Validation logic: ✅ Fail-fast behavior implemented
+  - Environment consistency: ✅ All files use "morag_documents"
+  - Documentation updates: ✅ All examples updated
+- **Status**: All components now use unified collection name with fail-fast validation
+
 ### ✅ Configuration and Error Handling Fixes (January 2025)
 
 #### 23. **Vision Model Configuration** ✅ IMPLEMENTED

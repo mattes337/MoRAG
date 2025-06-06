@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     # Qdrant Configuration
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
-    qdrant_collection_name: str = "morag_documents"
+    qdrant_collection_name: Optional[str] = None  # Required - no default, fail fast
     qdrant_api_key: Optional[str] = None
 
     # Performance Monitoring
@@ -130,6 +130,17 @@ class Settings(BaseSettings):
                 # If not JSON, treat as single origin
                 return [v] if v else ["*"]
         return v or ["*"]
+
+    @field_validator('qdrant_collection_name')
+    @classmethod
+    def validate_collection_name(cls, v):
+        """Validate that collection name is provided."""
+        if not v:
+            raise ValueError(
+                "QDRANT_COLLECTION_NAME environment variable is required. "
+                "Please set it to your desired collection name (e.g., 'morag_documents')"
+            )
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -132,7 +132,7 @@ GEMINI_API_KEY=your-gemini-api-key-here
 # Vector Database Configuration
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
-QDRANT_COLLECTION_NAME=morag_vectors
+QDRANT_COLLECTION_NAME=morag_documents
 
 # Optional: Qdrant Cloud Configuration
 # QDRANT_API_KEY=your-qdrant-cloud-api-key

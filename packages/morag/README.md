@@ -109,7 +109,7 @@ Create a configuration file (JSON format):
   "gemini_api_key": "your-gemini-api-key",
   "qdrant_host": "localhost",
   "qdrant_port": 6333,
-  "qdrant_collection_name": "morag_vectors",
+  "qdrant_collection_name": "morag_documents",
   "redis_url": "redis://localhost:6379/0",
   "max_workers": 4,
   "chunk_size": 1000,

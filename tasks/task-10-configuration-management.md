@@ -57,7 +57,7 @@ class DatabaseConfig(BaseModel):
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
     qdrant_api_key: Optional[str] = None
-    qdrant_collection_name: str = "morag_documents"
+    qdrant_collection_name: str = "morag_documents"  # Required - no default
     qdrant_timeout: int = 30
 
 class APIConfig(BaseModel):

@@ -67,7 +67,7 @@ async def test_vector_storage():
         qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
         qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
         qdrant_api_key = os.getenv('QDRANT_API_KEY')
-        collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'debug_test')
+        collection_name = os.getenv('QDRANT_COLLECTION_NAME') or 'debug_test'  # Allow debug fallback
 
         storage = QdrantVectorStorage(
             host=qdrant_host,
