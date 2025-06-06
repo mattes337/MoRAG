@@ -227,15 +227,18 @@ For detailed information about completed tasks and implementation history, see [
   - **File Existence Check**: Added pre-processing file existence validation in ingest tasks
   - **Fixed AsyncIO Issue**: Replaced asyncio.create_task() with daemon threads for cleanup to prevent cancellation
 - **Technical Details**:
-  - **Problem**: `asyncio.create_task()` creates tasks in current event loop, which get cancelled when HTTP request completes
-  - **Solution**: Use daemon threads with `threading.Thread(daemon=True)` for cleanup operations
-  - **Benefits**: Cleanup threads survive HTTP request lifecycle and prevent blocking application shutdown
+  - **Problem 1**: `asyncio.create_task()` creates tasks in current event loop, which get cancelled when HTTP request completes
+  - **Solution 1**: Use daemon threads with `threading.Thread(daemon=True)` for cleanup operations
+  - **Problem 2**: System temp directories (`/tmp`) may have automatic cleanup that removes directories quickly
+  - **Solution 2**: Use application temp directory (`./temp`) when available, fall back to system temp
+  - **Benefits**: Cleanup threads survive HTTP request lifecycle, temp directories persist longer, enhanced debugging
 - **Files Modified**:
-  - `packages/morag/src/morag/utils/file_upload.py`: Fixed cleanup strategy and replaced asyncio with threading
+  - `packages/morag/src/morag/utils/file_upload.py`: Fixed cleanup strategy, replaced asyncio with threading, improved temp directory location, added comprehensive logging
   - `packages/morag/src/morag/ingest_tasks.py`: Enhanced error handling and logging with detailed debugging
 - **Tests Added**:
   - `tests/test_file_upload_race_condition_fix_v2.py`: Unit tests for threading-based cleanup
   - `tests/test_race_condition_integration.py`: Integration tests simulating real race condition scenarios
+  - `tests/test_enhanced_race_condition_fix.py`: Tests for enhanced temp directory handling and logging
 - **Status**: Race condition eliminated, background tasks now process files reliably
 
 ### ✅ Docker Build Optimization (January 2025)

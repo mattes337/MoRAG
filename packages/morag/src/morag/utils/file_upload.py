@@ -1,6 +1,7 @@
 """File upload handling utilities for MoRAG system."""
 
 import tempfile
+import time
 import uuid
 import asyncio
 import aiofiles
@@ -66,8 +67,28 @@ class FileUploadHandler:
     
     def __init__(self, config: Optional[FileUploadConfig] = None):
         self.config = config or FileUploadConfig()
-        self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
+
+        # Try to create temp directory in a more persistent location first
+        # Fall back to system temp if that fails
+        try:
+            # Try to use ./temp directory if it exists (Docker/app directory)
+            app_temp_dir = Path("./temp")
+            if app_temp_dir.exists() and app_temp_dir.is_dir():
+                self.temp_dir = app_temp_dir / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
+                self.temp_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                # Fall back to system temp directory
+                self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
+        except Exception as e:
+            logger.warning("Failed to create temp directory in app location, using system temp",
+                         error=str(e))
+            self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
+
         self._cleanup_threads: List = []  # Track cleanup threads instead of asyncio tasks
+
+        # Create a marker file to help track directory lifecycle
+        marker_file = self.temp_dir / ".morag_upload_handler_active"
+        marker_file.write_text(f"Created at {time.time()}")
 
         logger.info("FileUploadHandler initialized",
                    temp_dir=str(self.temp_dir),
@@ -291,7 +312,15 @@ class FileUploadHandler:
         # NOTE: Removed aggressive temp directory cleanup to prevent race conditions
         # with background tasks. Individual files are cleaned up by scheduled tasks
         # or by the background tasks themselves after processing.
-        pass
+
+        # Log when handler is being garbage collected for debugging
+        try:
+            logger.warning("FileUploadHandler being garbage collected",
+                         temp_dir=str(self.temp_dir) if hasattr(self, 'temp_dir') else 'unknown',
+                         temp_dir_exists=self.temp_dir.exists() if hasattr(self, 'temp_dir') else False)
+        except Exception:
+            # Ignore any errors during destruction
+            pass
 
 
 # Global file upload handler instance
@@ -302,13 +331,29 @@ def get_upload_handler() -> FileUploadHandler:
     """Get global file upload handler instance."""
     global _upload_handler
     if _upload_handler is None:
+        logger.info("Creating new global FileUploadHandler instance")
         _upload_handler = FileUploadHandler()
+    else:
+        # Check if the handler's temp directory still exists
+        if not _upload_handler.temp_dir.exists():
+            logger.warning("Global FileUploadHandler temp directory missing, creating new handler",
+                         old_temp_dir=str(_upload_handler.temp_dir))
+            _upload_handler = FileUploadHandler()
     return _upload_handler
 
 
 def configure_upload_handler(config: FileUploadConfig) -> None:
     """Configure global file upload handler."""
     global _upload_handler
+
+    old_temp_dir = None
+    if _upload_handler is not None:
+        old_temp_dir = str(_upload_handler.temp_dir)
+
+    logger.info("Configuring new FileUploadHandler",
+               old_temp_dir=old_temp_dir,
+               new_config=config.__dict__)
+
     # NOTE: Don't cleanup existing temp directory to avoid race conditions
     # with background tasks that might still be processing files
     _upload_handler = FileUploadHandler(config)
