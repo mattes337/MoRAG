@@ -4,7 +4,7 @@
 
 **Last Updated**: January 2025
 **Status**: ✅ ALL API ISSUES RESOLVED
-**Total Completed Tasks**: 47
+**Total Completed Tasks**: 49
 **System Status**: 🚀 PRODUCTION READY
 
 ## 🎉 PROJECT COMPLETION
@@ -341,6 +341,63 @@ For detailed information about completed tasks and implementation history, see [
   - **Solution**: Two-layer defense - sanitize inputs at API level and initialize metadata at worker level
   - **Benefits**: Immediate error feedback for invalid inputs, guaranteed safe processing in workers
 - **Status**: Comprehensive fix implemented, metadata errors eliminated at both API and worker levels
+
+### ✅ API Key Standardization and CLI Independence (January 2025)
+
+#### 15. **GEMINI_API_KEY Standardization** ✅ IMPLEMENTED
+- **Issue**: Confusion between `GEMINI_API_KEY` and `GOOGLE_API_KEY` environment variables causing inconsistent configuration
+- **Problems Identified**:
+  - Both `GEMINI_API_KEY` and `GOOGLE_API_KEY` used inconsistently across codebase
+  - Documentation referenced both keys without clear preference
+  - Some services checked one key, others checked both
+  - Potential for configuration errors when users set wrong key
+- **Solution**: Standardized on `GEMINI_API_KEY` with backward compatibility
+- **Changes Implemented**:
+  - **Consistent Key Usage**: Updated all services to prefer `GEMINI_API_KEY` over `GOOGLE_API_KEY`
+  - **Backward Compatibility**: Maintained fallback to `GOOGLE_API_KEY` for existing installations
+  - **Documentation Updates**: Updated all documentation files to use `GEMINI_API_KEY`
+  - **Environment Templates**: Updated `.env.example` and other config files
+  - **Deprecation Warnings**: Added warnings when `GOOGLE_API_KEY` is used without `GEMINI_API_KEY`
+- **Files Updated**:
+  - Configuration: `.env.example`, `README.md`, `LOCAL_DEVELOPMENT.md`, `CLI.md`
+  - Services: `packages/morag/src/morag/ingest_tasks.py`, `debug_morag.py`
+  - Examples: `packages/morag-document/examples/*.py`, `packages/morag-image/examples/*.py`
+  - Tests: `packages/morag-image/tests/test_cli.py`, `tests/cli/test-simple.py`
+- **Status**: All references standardized, backward compatibility maintained
+
+#### 16. **CLI Scripts Independence** ✅ IMPLEMENTED
+- **Issue**: CLI scripts required running API server for ingestion mode, limiting standalone usage
+- **Problems Identified**:
+  - Ingestion mode made HTTP requests to `localhost:8000` API server
+  - Scripts couldn't work offline or without full MoRAG deployment
+  - Users needed to start entire stack just to test individual components
+  - No direct access to processor/ingestor code from CLI
+- **Solution**: Implemented direct processing for CLI scripts with vector storage
+- **Changes Implemented**:
+  - **Direct Processing**: CLI scripts now use processors and services directly instead of API calls
+  - **Environment Integration**: Added automatic `.env` file loading to all CLI scripts
+  - **Vector Storage**: Added direct vector storage functionality to CLI ingestion mode
+  - **Standalone Operation**: Scripts work completely independently without API server
+  - **Enhanced Functionality**: Ingestion mode now provides immediate feedback and results
+- **Technical Details**:
+  - **Import Updates**: Added imports for `QdrantVectorStorage`, `GeminiEmbeddingService`
+  - **Direct Storage Function**: Added `store_content_in_vector_db()` function to CLI scripts
+  - **Environment Loading**: Added `from dotenv import load_dotenv; load_dotenv()` to all scripts
+  - **Parameter Passing**: Enhanced ingestion functions to accept processing parameters
+  - **Result Validation**: Added comprehensive error handling and progress reporting
+- **Files Updated**:
+  - `tests/cli/test-document.py`: Added direct processing and vector storage
+  - `tests/cli/test-audio.py`: Added direct processing and vector storage
+  - `tests/cli/test-simple.py`: Added environment validation
+  - `tests/cli/README.md`: Updated documentation for standalone operation
+- **Files Added**:
+  - `tests/cli/validate-standalone-cli.py`: Validation script for standalone functionality
+- **Benefits**:
+  - **True Standalone Operation**: No API server required for any CLI functionality
+  - **Faster Development**: Immediate testing without full stack deployment
+  - **Better Error Handling**: Direct access to processing errors and logs
+  - **Consistent Environment**: Same `.env` configuration used by CLI and API
+- **Status**: CLI scripts now work completely independently with full ingestion capabilities
 
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents

@@ -112,10 +112,10 @@ async def test_embedding_service():
     try:
         from morag_services.embedding import GeminiEmbeddingService
         
-        # Check if API key is available
+        # Check if API key is available (prefer GEMINI_API_KEY for consistency)
         api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
         if not api_key:
-            logger.warning("WARNING No API key found - embedding service will fail")
+            logger.warning("WARNING No GEMINI_API_KEY found - embedding service will fail")
             return True
         
         service = GeminiEmbeddingService(api_key)
@@ -171,7 +171,7 @@ async def check_environment():
     """Check environment configuration."""
     logger.info("Checking environment configuration...")
 
-    required_vars = ['GOOGLE_API_KEY', 'GEMINI_API_KEY']
+    required_vars = ['GEMINI_API_KEY']
     optional_vars = ['REDIS_URL', 'QDRANT_HOST', 'QDRANT_PORT', 'QDRANT_API_KEY', 'QDRANT_COLLECTION_NAME']
     
     for var in required_vars:
@@ -181,13 +181,15 @@ async def check_environment():
         else:
             logger.warning(f"WARNING {var} is not set")
 
-    # Check if at least one API key is set
-    google_key = os.getenv('GOOGLE_API_KEY')
+    # Check if API key is set (with backward compatibility)
     gemini_key = os.getenv('GEMINI_API_KEY')
-    if google_key or gemini_key:
-        logger.info("OK At least one API key is available")
+    google_key = os.getenv('GOOGLE_API_KEY')  # For backward compatibility
+    if gemini_key or google_key:
+        if google_key and not gemini_key:
+            logger.warning("WARNING Using deprecated GOOGLE_API_KEY, please use GEMINI_API_KEY instead")
+        logger.info("OK API key is available")
     else:
-        logger.warning("WARNING No API keys found")
+        logger.warning("WARNING No GEMINI_API_KEY found")
     
     for var in optional_vars:
         value = os.getenv(var)
@@ -212,8 +214,8 @@ async def main():
     load_dotenv()
 
     # Use real API key from .env if available, otherwise use dummy
-    if not os.getenv('GOOGLE_API_KEY') and not os.getenv('GEMINI_API_KEY'):
-        os.environ['GOOGLE_API_KEY'] = 'dummy_key_for_testing'
+    if not os.getenv('GEMINI_API_KEY') and not os.getenv('GOOGLE_API_KEY'):
+        os.environ['GEMINI_API_KEY'] = 'dummy_key_for_testing'
     
     # Check environment
     await check_environment()

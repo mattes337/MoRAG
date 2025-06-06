@@ -31,9 +31,14 @@ import sys
 import asyncio
 import json
 import argparse
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 import requests
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
@@ -42,11 +47,13 @@ sys.path.insert(0, str(project_root))
 try:
     from morag_audio import AudioProcessor, AudioConfig
     from morag_core.models import ProcessingConfig
+    from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-audio")
+    print("  pip install -e packages/morag-services")
     sys.exit(1)
 
 
@@ -182,10 +189,100 @@ async def test_audio_processing(audio_file: Path, model_size: str = "base",
         return False
 
 
+async def store_content_in_vector_db(
+    content: str,
+    metadata: Dict[str, Any],
+    collection_name: str = "morag_vectors"
+) -> list:
+    """Store processed content in vector database."""
+    if not content.strip():
+        print("⚠️  Warning: Empty content provided for vector storage")
+        return []
+
+    try:
+        # Initialize services with environment configuration
+        qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+        qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+        qdrant_api_key = os.getenv('QDRANT_API_KEY')
+        collection_name_env = os.getenv('QDRANT_COLLECTION_NAME', 'morag_vectors')
+
+        vector_storage = QdrantVectorStorage(
+            host=qdrant_host,
+            port=qdrant_port,
+            api_key=qdrant_api_key,
+            collection_name=collection_name_env
+        )
+
+        # Get API key from environment (prefer GEMINI_API_KEY for consistency)
+        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is required for vector storage")
+
+        embedding_service = GeminiEmbeddingService(api_key=api_key)
+
+        # Connect to vector storage
+        await vector_storage.connect()
+
+        # Create document chunks for better retrieval
+        chunk_size = 1000  # characters
+        chunks = []
+
+        if len(content) <= chunk_size:
+            chunks = [content]
+        else:
+            # Split into overlapping chunks
+            overlap = 200
+            for i in range(0, len(content), chunk_size - overlap):
+                chunk = content[i:i + chunk_size]
+                if chunk.strip():
+                    chunks.append(chunk)
+
+        # Generate embeddings for each chunk
+        embeddings = []
+        chunk_metadata = []
+
+        for i, chunk in enumerate(chunks):
+            # Generate embedding
+            embedding_result = await embedding_service.generate_embedding_with_result(
+                chunk,
+                task_type="retrieval_document"
+            )
+
+            embeddings.append(embedding_result.embedding)
+
+            # Prepare metadata for this chunk
+            chunk_meta = {
+                **metadata,
+                "chunk_index": i,
+                "chunk_count": len(chunks),
+                "text": chunk,  # Store the actual text for retrieval
+                "text_length": len(chunk)
+            }
+            chunk_metadata.append(chunk_meta)
+
+        # Store vectors in Qdrant
+        point_ids = await vector_storage.store_vectors(
+            embeddings,
+            chunk_metadata,
+            collection_name
+        )
+
+        print_result("Vector Storage", f"✅ Stored {len(chunks)} chunks with {len(point_ids)} vectors")
+
+        return point_ids
+
+    except Exception as e:
+        print(f"❌ Error storing content in vector database: {e}")
+        raise
+
+
 async def test_audio_ingestion(audio_file: Path, webhook_url: Optional[str] = None,
-                              metadata: Optional[Dict[str, Any]] = None) -> bool:
-    """Test audio ingestion functionality."""
-    print_header("MoRAG Audio Ingestion Test")
+                              metadata: Optional[Dict[str, Any]] = None,
+                              model_size: str = "base",
+                              enable_diarization: bool = False,
+                              enable_topics: bool = False) -> bool:
+    """Test audio ingestion functionality using direct processing."""
+    print_header("MoRAG Audio Ingestion Test (Direct Processing)")
 
     if not audio_file.exists():
         print(f"❌ Error: Audio file not found: {audio_file}")
@@ -195,64 +292,95 @@ async def test_audio_ingestion(audio_file: Path, webhook_url: Optional[str] = No
     print_result("File Size", f"{audio_file.stat().st_size / 1024 / 1024:.2f} MB")
     print_result("Webhook URL", webhook_url or "None")
     print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+    print_result("Model Size", model_size)
+    print_result("Speaker Diarization", "✅ Enabled" if enable_diarization else "❌ Disabled")
+    print_result("Topic Segmentation", "✅ Enabled" if enable_topics else "❌ Disabled")
 
     try:
-        print_section("Submitting Ingestion Task")
-        print("🔄 Starting audio ingestion...")
+        print_section("Processing Audio")
+        print("🔄 Starting audio processing and ingestion...")
 
-        # Prepare form data
-        files = {'file': open(audio_file, 'rb')}
-        data = {'source_type': 'audio'}
-
-        if webhook_url:
-            data['webhook_url'] = webhook_url
-        if metadata:
-            data['metadata'] = json.dumps(metadata)
-
-        # Submit to ingestion API
-        response = requests.post(
-            'http://localhost:8000/api/v1/ingest/file',
-            files=files,
-            data=data,
-            timeout=30
+        # Initialize audio configuration
+        config = AudioConfig(
+            model_size=model_size,
+            device="auto",  # Auto-detect best available device
+            enable_diarization=enable_diarization,
+            enable_topic_segmentation=enable_topics,
+            vad_filter=True,
+            word_timestamps=True,
+            include_metadata=True
         )
 
-        files['file'].close()
+        # Initialize audio processor
+        processor = AudioProcessor(config)
 
-        if response.status_code == 200:
-            result = response.json()
-            print("✅ Audio ingestion task submitted successfully!")
+        # Process the audio file
+        result = await processor.process(audio_file)
 
-            print_section("Ingestion Results")
-            print_result("Status", "✅ Success")
-            print_result("Task ID", result.get('task_id', 'Unknown'))
-            print_result("Message", result.get('message', 'Task created'))
-            print_result("Estimated Time", f"{result.get('estimated_time', 'Unknown')} seconds")
-
-            # Save ingestion result
-            output_file = audio_file.parent / f"{audio_file.stem}_ingest_result.json"
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'mode': 'ingestion',
-                    'task_id': result.get('task_id'),
-                    'status': result.get('status'),
-                    'message': result.get('message'),
-                    'estimated_time': result.get('estimated_time'),
-                    'webhook_url': webhook_url,
-                    'metadata': metadata,
-                    'file_path': str(audio_file)
-                }, f, indent=2, ensure_ascii=False)
-
-            print_section("Output")
-            print_result("Ingestion result saved to", str(output_file))
-            print_result("Monitor task status", f"curl http://localhost:8000/api/v1/status/{result.get('task_id')}")
-
-            return True
-        else:
-            print("❌ Audio ingestion failed!")
-            print_result("Status Code", str(response.status_code))
-            print_result("Error", response.text)
+        if not result.success:
+            print("❌ Audio processing failed!")
+            print_result("Error", result.error_message or "Unknown error")
             return False
+
+        print("✅ Audio processing completed successfully!")
+        print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+        print_result("Transcript Length", f"{len(result.transcript)} characters")
+
+        # Prepare metadata for vector storage
+        vector_metadata = {
+            "source_type": "audio",
+            "source_path": str(audio_file),
+            "processing_time": result.processing_time,
+            "model_size": model_size,
+            "enable_diarization": enable_diarization,
+            "enable_topics": enable_topics,
+            "transcript_length": len(result.transcript),
+            "segments_count": len(result.segments),
+            **(result.metadata or {}),
+            **(metadata or {})
+        }
+
+        print_section("Storing in Vector Database")
+        print("🔄 Storing transcript in vector database...")
+
+        # Store transcript in vector database
+        point_ids = await store_content_in_vector_db(
+            result.transcript,
+            vector_metadata
+        )
+
+        print("✅ Audio ingestion completed successfully!")
+
+        print_section("Ingestion Results")
+        print_result("Status", "✅ Success")
+        print_result("Chunks Processed", str(len(point_ids)))
+        print_result("Vector Points Created", str(len(point_ids)))
+        print_result("Transcript Length", str(len(result.transcript)))
+
+        # Save ingestion result
+        output_file = audio_file.parent / f"{audio_file.stem}_ingest_result.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'mode': 'direct_ingestion',
+                'success': True,
+                'processing_time': result.processing_time,
+                'chunks_processed': len(point_ids),
+                'vector_point_ids': point_ids,
+                'transcript_length': len(result.transcript),
+                'segments_count': len(result.segments),
+                'model_size': model_size,
+                'enable_diarization': enable_diarization,
+                'enable_topics': enable_topics,
+                'webhook_url': webhook_url,
+                'metadata': vector_metadata,
+                'file_path': str(audio_file)
+            }, f, indent=2, ensure_ascii=False)
+
+        print_section("Output")
+        print_result("Ingestion result saved to", str(output_file))
+        print_result("Vector Points", f"{len(point_ids)} chunks stored in Qdrant")
+
+        return True
 
     except Exception as e:
         print(f"❌ Error during audio ingestion: {e}")
@@ -311,7 +439,10 @@ Examples:
             success = asyncio.run(test_audio_ingestion(
                 audio_file,
                 webhook_url=args.webhook_url,
-                metadata=metadata
+                metadata=metadata,
+                model_size=args.model_size,
+                enable_diarization=args.enable_diarization,
+                enable_topics=args.enable_topics
             ))
             if success:
                 print("\n🎉 Audio ingestion test completed successfully!")

@@ -11,9 +11,9 @@ from morag_image.service import ImageService
 async def process_single_image():
     """Process a single image file."""
     # Get API key from environment variable
-    api_key = os.environ.get("GOOGLE_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        print("Warning: GOOGLE_API_KEY environment variable not set. Captioning will not work.")
+        print("Warning: GEMINI_API_KEY environment variable not set. Captioning will not work.")
     
     # Create processor
     processor = ImageProcessor(api_key=api_key)

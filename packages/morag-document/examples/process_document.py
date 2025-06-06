@@ -35,7 +35,7 @@ async def main():
     config = ServiceConfig()
 
     # Enable embedding if API key is available
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if api_key:
         config["enable_embedding"] = True
         config["embedding"] = {

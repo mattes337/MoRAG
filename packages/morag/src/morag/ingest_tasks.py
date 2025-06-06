@@ -74,10 +74,10 @@ async def store_content_in_vector_db(
             collection_name=collection_name_env
         )
 
-        # Get API key from environment (try both GEMINI_API_KEY and GOOGLE_API_KEY)
+        # Get API key from environment (prefer GEMINI_API_KEY for consistency)
         api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
         if not api_key:
-            raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required")
+            raise ValueError("GEMINI_API_KEY environment variable is required")
 
         embedding_service = GeminiEmbeddingService(api_key=api_key)
         

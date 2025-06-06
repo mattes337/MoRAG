@@ -274,7 +274,7 @@ pip install trafilatura readability newspaper3k
 ### Environment Configuration
 Create a `.env` file with required API keys:
 ```bash
-GOOGLE_API_KEY=your_gemini_api_key
+GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key  # Optional
 ANTHROPIC_API_KEY=your_anthropic_api_key  # Optional
 ```

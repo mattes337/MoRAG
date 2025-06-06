@@ -30,7 +30,7 @@ async def process_document(args: argparse.Namespace) -> None:
     if args.enable_embedding:
         config["enable_embedding"] = True
         config["embedding"] = {
-            "api_key": os.environ.get("GEMINI_API_KEY"),
+            "api_key": os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"),
             "model": args.embedding_model,
         }
 

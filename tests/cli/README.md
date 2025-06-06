@@ -2,7 +2,9 @@
 
 This directory contains command-line testing scripts for validating individual MoRAG components and the complete system.
 
-**✨ NEW: All CLI scripts now support both processing (immediate results) and ingestion (background + storage) modes!**
+**✨ NEW: All CLI scripts now support both processing (immediate results) and ingestion (direct processing + storage) modes!**
+
+**🚀 UPDATED: Ingestion mode now works independently without requiring a running API server!**
 
 ## 🔄 Operation Modes
 
@@ -12,12 +14,13 @@ This directory contains command-line testing scripts for validating individual M
 - **Output**: Direct results returned immediately
 - **Storage**: No vector database storage
 
-### **Ingestion Mode** (Background Processing + Storage)
+### **Ingestion Mode** (Direct Processing + Storage)
 - **Purpose**: Process content and store in vector database for later retrieval
 - **Use Case**: Building searchable knowledge base
-- **Output**: Task ID for monitoring progress
+- **Output**: Direct processing results with vector storage confirmation
 - **Storage**: Results stored in Qdrant vector database
-- **Searchable**: Yes, via `/search` endpoint
+- **Searchable**: Yes, via vector similarity search
+- **Independence**: Works without requiring API server to be running
 
 ## Quick Start
 
@@ -25,6 +28,9 @@ This directory contains command-line testing scripts for validating individual M
 ```bash
 # Quick system check (recommended first step)
 python tests/cli/test-simple.py
+
+# Validate standalone CLI functionality (new!)
+python tests/cli/validate-standalone-cli.py
 
 # Comprehensive system test with detailed report
 python tests/cli/test-all.py
@@ -40,7 +46,7 @@ python tests/cli/test-audio.py uploads/recording.wav --enable-diarization
 python tests/cli/test-audio.py uploads/video.mp4 --model-size large
 ```
 
-**Ingestion Mode (background + storage):**
+**Ingestion Mode (direct processing + storage):**
 ```bash
 python tests/cli/test-audio.py uploads/audio.mp3 --ingest
 python tests/cli/test-audio.py uploads/recording.wav --ingest --webhook-url https://my-app.com/webhook
@@ -55,7 +61,7 @@ python tests/cli/test-document.py uploads/presentation.pptx --chunking-strategy 
 python tests/cli/test-document.py uploads/document.docx --chunk-size 2000
 ```
 
-**Ingestion Mode (background + storage):**
+**Ingestion Mode (direct processing + storage):**
 ```bash
 python tests/cli/test-document.py uploads/document.pdf --ingest
 python tests/cli/test-document.py uploads/research.pdf --ingest --metadata '{"category": "research"}'
@@ -70,7 +76,7 @@ python tests/cli/test-web.py https://en.wikipedia.org/wiki/Python
 python tests/cli/test-web.py https://github.com/your-repo
 ```
 
-**Ingestion Mode (background + storage):**
+**Ingestion Mode (direct processing + storage):**
 ```bash
 python tests/cli/test-web.py https://example.com --ingest
 python tests/cli/test-web.py https://news-site.com/article --ingest --metadata '{"category": "news"}'
@@ -202,7 +208,7 @@ Some features require additional packages:
 ### Environment Configuration
 Create a `.env` file with required API keys:
 ```bash
-GOOGLE_API_KEY=your_gemini_api_key
+GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key  # Optional
 ANTHROPIC_API_KEY=your_anthropic_api_key  # Optional
 ```

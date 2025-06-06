@@ -13,8 +13,8 @@ from morag_image.service import ImageService
 
 # Skip tests if API key is not available
 pytestmark = pytest.mark.skipif(
-    os.environ.get("GOOGLE_API_KEY") is None,
-    reason="GOOGLE_API_KEY environment variable not set"
+    os.environ.get("GEMINI_API_KEY") is None and os.environ.get("GOOGLE_API_KEY") is None,
+    reason="GEMINI_API_KEY environment variable not set"
 )
 
 # Test argument parsing

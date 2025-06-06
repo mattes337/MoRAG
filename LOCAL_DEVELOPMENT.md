@@ -45,7 +45,7 @@ cp .env.example .env
 
 # Edit .env with your API keys
 # Required:
-GOOGLE_API_KEY=your_google_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 REDIS_URL=redis://localhost:6379
 QDRANT_HOST=localhost
 QDRANT_PORT=6333

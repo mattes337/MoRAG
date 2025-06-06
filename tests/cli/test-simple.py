@@ -8,7 +8,12 @@ This script runs basic tests to verify MoRAG components can be imported and init
 """
 
 import sys
+import os
 from pathlib import Path
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
@@ -141,10 +146,44 @@ def test_docker_files():
             print(f"❌ {file_path} not found")
 
 
+def test_environment():
+    """Test environment configuration."""
+    print_section("Checking Environment Configuration")
+
+    # Check for .env file
+    env_file = Path(".env")
+    if env_file.exists():
+        print("✅ .env file found")
+    else:
+        print("❌ .env file not found (copy from .env.example)")
+
+    # Check for required environment variables
+    required_vars = ["GEMINI_API_KEY"]
+    optional_vars = ["QDRANT_HOST", "QDRANT_PORT", "REDIS_URL"]
+
+    for var in required_vars:
+        value = os.getenv(var)
+        if value:
+            print(f"✅ {var} is set")
+        else:
+            # Check for backward compatibility
+            if var == "GEMINI_API_KEY" and os.getenv("GOOGLE_API_KEY"):
+                print(f"⚠️  {var} not set, but GOOGLE_API_KEY found (consider updating)")
+            else:
+                print(f"❌ {var} is not set")
+
+    for var in optional_vars:
+        value = os.getenv(var)
+        if value:
+            print(f"✅ {var} is set ({value})")
+        else:
+            print(f"ℹ️  {var} not set (using defaults)")
+
+
 def test_documentation():
     """Test for documentation files."""
     print_section("Checking Documentation")
-    
+
     doc_files = [
         "README.md",
         "docs/DOCKER_DEPLOYMENT.md",
@@ -153,7 +192,7 @@ def test_documentation():
         "TASKS.md",
         "COMPLETION_SUMMARY.md",
     ]
-    
+
     for file_path in doc_files:
         path = Path(file_path)
         if path.exists():
@@ -174,10 +213,13 @@ def main():
     
     # Check sample files
     sample_files = test_sample_files()
-    
+
+    # Check environment
+    test_environment()
+
     # Check Docker files
     test_docker_files()
-    
+
     # Check documentation
     test_documentation()
     
