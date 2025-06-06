@@ -124,9 +124,34 @@ attempt=5, delay=16.2s, max_delay=300.0s
 3. **Scalability**: Handles high-volume processing gracefully
 4. **Configurability**: Tune behavior for your specific needs
 
+## Celery Task Timeouts
+
+With indefinite retries, tasks may run much longer than before. MoRAG now includes configurable Celery timeouts:
+
+### Timeout Configuration
+
+```bash
+# Soft timeout: raises exception for graceful cleanup (2 hours default)
+MORAG_CELERY_TASK_SOFT_TIME_LIMIT=7200
+
+# Hard timeout: kills task process (2.5 hours default)
+MORAG_CELERY_TASK_TIME_LIMIT=9000
+
+# Worker configuration
+MORAG_CELERY_WORKER_PREFETCH_MULTIPLIER=1
+MORAG_CELERY_WORKER_MAX_TASKS_PER_CHILD=1000
+```
+
+### Recommended Timeouts by Use Case
+
+- **Development**: 30min soft / 1h hard
+- **Light Production**: 1h soft / 1.5h hard
+- **Heavy Production**: 2h soft / 2.5h hard (default)
+- **Batch Processing**: 4h soft / 5h hard
+
 ## Migration
 
-Existing installations automatically get the new retry logic with safe defaults. No configuration changes are required, but you can customize the behavior using the environment variables above.
+Existing installations automatically get the new retry logic and extended timeouts with safe defaults. No configuration changes are required, but you can customize the behavior using the environment variables above.
 
 ## Troubleshooting
 

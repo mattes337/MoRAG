@@ -546,6 +546,33 @@ For detailed information about completed tasks and implementation history, see [
   - `.env.example`: Added retry configuration documentation
 - **Status**: Rate limit errors now retry indefinitely with intelligent exponential backoff
 
+#### 28. **Configurable Celery Task Timeouts** ✅ IMPLEMENTED
+- **Issue**: Celery tasks hitting soft time limit (25 minutes) and being terminated, especially with indefinite retries
+- **Root Cause**: Hard-coded timeout values too short for long-running tasks with rate limit retries
+- **Solution**: Implemented configurable Celery timeouts with drastically increased defaults
+- **Changes Implemented**:
+  - Added Celery configuration to core settings with environment variable support
+  - Increased default soft limit from 25 minutes to 2 hours (7200 seconds)
+  - Increased default hard limit from 30 minutes to 2.5 hours (9000 seconds)
+  - Made worker prefetch multiplier and max tasks per child configurable
+  - Added logging to show configured timeouts when worker starts
+- **Configuration Options**:
+  - `MORAG_CELERY_TASK_SOFT_TIME_LIMIT=7200` (default): Soft timeout in seconds (2 hours)
+  - `MORAG_CELERY_TASK_TIME_LIMIT=9000` (default): Hard timeout in seconds (2.5 hours)
+  - `MORAG_CELERY_WORKER_PREFETCH_MULTIPLIER=1`: Tasks per worker process
+  - `MORAG_CELERY_WORKER_MAX_TASKS_PER_CHILD=1000`: Max tasks before worker restart
+- **Timeout Scenarios Supported**:
+  - Large PDF processing with docling + embedding generation + rate limit retries
+  - High-resolution video processing with audio transcription
+  - Large batch operations with multiple documents
+  - Web scraping with complex JavaScript rendering
+- **Files Modified**:
+  - `packages/morag-core/src/morag_core/config.py`: Added Celery timeout configuration
+  - `packages/morag/src/morag/worker.py`: Updated to use configurable timeouts
+  - `.env.example`: Added Celery timeout configuration documentation
+  - `scripts/test_celery_timeouts.py`: Created test script for timeout configuration
+- **Status**: Celery tasks now support configurable timeouts suitable for long-running operations
+
 ### 🧪 Testing and Validation
 - **Test Suite**: Created comprehensive test scripts for configuration and error handling fixes
 - **Test Coverage**: All configuration and error handling fixes tested with automated validation
@@ -559,8 +586,11 @@ For detailed information about completed tasks and implementation history, see [
   - Exception re-raising logic in Celery tasks
   - Indefinite retry configuration and delay calculation
   - Exponential backoff with jitter implementation
+  - Celery timeout configuration and environment variable override
+  - Worker timeout validation and scenario analysis
 - **Validation**: Each fix tested in isolation and integration scenarios
-- **Configuration Verification**: Retry settings properly loaded from environment variables
+- **Configuration Verification**: All settings properly loaded from environment variables
+- **Timeout Testing**: Verified worker loads correct timeout values (2h soft / 2.5h hard)
 
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents

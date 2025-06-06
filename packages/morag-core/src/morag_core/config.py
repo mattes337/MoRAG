@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     retry_exponential_base: float = 2.0  # Exponential backoff multiplier
     retry_jitter: bool = True  # Add random jitter to delays
 
+    # Celery Task Configuration
+    celery_task_soft_time_limit: int = 120 * 60  # 2 hours (7200 seconds) - soft limit
+    celery_task_time_limit: int = 150 * 60  # 2.5 hours (9000 seconds) - hard limit
+    celery_worker_prefetch_multiplier: int = 1  # Tasks per worker process
+    celery_worker_max_tasks_per_child: int = 1000  # Max tasks before worker restart
+
     # File Storage
     upload_dir: str = "./uploads"
     temp_dir: str = "./temp"
