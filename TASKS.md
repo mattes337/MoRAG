@@ -493,8 +493,9 @@ For detailed information about completed tasks and implementation history, see [
 - **Root Cause**: ExternalServiceError requires both message and service parameters but some calls only provided message
 - **Solution**: Added missing service parameter to all ExternalServiceError instantiations
 - **Files Modified**:
-  - `packages/morag-services/src/morag_services/embedding.py`: Fixed 6 ExternalServiceError calls
+  - `packages/morag-services/src/morag_services/embedding.py`: Fixed 10 ExternalServiceError calls
   - `packages/morag-embedding/src/morag_embedding/service.py`: Fixed 4 ExternalServiceError calls
+- **Additional Fix**: Found and fixed 4 more ExternalServiceError calls in embedding service that were causing vector storage errors
 - **Status**: All ExternalServiceError calls now properly initialized with service parameter
 
 #### 25. **Audio Processing Speaker Diarization** ✅ FIXED
@@ -510,9 +511,15 @@ For detailed information about completed tasks and implementation history, see [
 - **Status**: Speaker diarization now works correctly with proper attribute access
 
 ### 🧪 Testing and Validation
-- **Test Suite**: Created comprehensive test script `tests/cli/test-bug-fixes.py`
-- **Test Coverage**: All 9 critical bugs tested with automated validation
-- **Test Results**: ✅ 9/9 critical bug fixes passing
+- **Test Suite**: Created comprehensive test script `tests/test_configuration_and_error_fixes.py`
+- **Test Coverage**: All configuration and error handling fixes tested with automated validation
+- **Test Results**: ✅ 6/6 test categories passing:
+  - Vision model configuration via environment variables
+  - ExternalServiceError proper initialization
+  - Embedding service error handling with service parameter
+  - SpeakerSegment correct attributes (start_time, end_time, speaker_id)
+  - Audio processor metadata reference
+  - Core config vision model setting
 - **Validation**: Each fix tested in isolation and integration scenarios
 
 ## 🔄 Future Enhancement Opportunities:

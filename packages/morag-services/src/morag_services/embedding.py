@@ -127,7 +127,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
     ) -> List[float]:
         """Generate embedding for a single text."""
         if not self.client:
-            raise ExternalServiceError("Gemini client not initialized")
+            raise ExternalServiceError("Gemini client not initialized", "gemini")
 
         try:
             # Use asyncio.to_thread for CPU-bound operations
@@ -142,7 +142,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         except Exception as e:
             logger.error("Failed to generate embedding", error=str(e))
-            raise ExternalServiceError(f"Embedding generation failed: {str(e)}")
+            raise ExternalServiceError(f"Embedding generation failed: {str(e)}", "gemini")
 
     async def generate_embedding_with_result(
         self,
@@ -151,7 +151,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
     ) -> EmbeddingResult:
         """Generate embedding for a single text and return full result (backward compatibility)."""
         if not self.client:
-            raise ExternalServiceError("Gemini client not initialized")
+            raise ExternalServiceError("Gemini client not initialized", "gemini")
 
         try:
             # Use asyncio.to_thread for CPU-bound operations
@@ -166,7 +166,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         except Exception as e:
             logger.error("Failed to generate embedding", error=str(e))
-            raise ExternalServiceError(f"Embedding generation failed: {str(e)}")
+            raise ExternalServiceError(f"Embedding generation failed: {str(e)}", "gemini")
 
     async def generate_embeddings(
         self,
