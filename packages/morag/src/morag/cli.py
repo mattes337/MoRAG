@@ -64,16 +64,16 @@ def process_url(ctx: click.Context, url: str, content_type: Optional[str],
             if output_format == 'json':
                 output_data = {
                     'success': result.success,
-                    'content': result.content,
+                    'content': result.text_content or "",
                     'metadata': result.metadata,
                     'processing_time': result.processing_time,
                     'error_message': result.error_message
                 }
                 formatted_output = json.dumps(output_data, indent=2)
             elif output_format == 'text':
-                formatted_output = result.content
+                formatted_output = result.text_content or ""
             elif output_format == 'markdown':
-                formatted_output = result.content
+                formatted_output = result.text_content or ""
             else:
                 formatted_output = str(result)
             
@@ -113,16 +113,16 @@ def process_file(ctx: click.Context, file_path: str, content_type: Optional[str]
             if output_format == 'json':
                 output_data = {
                     'success': result.success,
-                    'content': result.content,
+                    'content': result.text_content or "",
                     'metadata': result.metadata,
                     'processing_time': result.processing_time,
                     'error_message': result.error_message
                 }
                 formatted_output = json.dumps(output_data, indent=2)
             elif output_format == 'text':
-                formatted_output = result.content
+                formatted_output = result.text_content or ""
             elif output_format == 'markdown':
-                formatted_output = result.content
+                formatted_output = result.text_content or ""
             else:
                 formatted_output = str(result)
             

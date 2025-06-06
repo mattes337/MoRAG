@@ -111,8 +111,11 @@ def normalize_processing_result(result: ProcessingResult) -> ProcessingResult:
     # Import here to avoid circular imports
     from morag_core.models.config import ProcessingResult as CoreProcessingResult
 
-    # If result already has content attribute, return as-is
-    if hasattr(result, 'content') and result.content is not None:
+    # If result already has content attribute and it's a proper string, return as-is
+    if (hasattr(result, 'content') and
+        result.content is not None and
+        isinstance(result.content, str) and
+        isinstance(result, CoreProcessingResult)):
         return result
 
     # Get content for API response (prefer JSON from raw_result, fallback to text_content)

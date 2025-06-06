@@ -249,7 +249,7 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
             
             return {
                 'success': result.success,
-                'content': result.content,
+                'content': result.text_content or "",
                 'metadata': result.metadata,
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
@@ -358,7 +358,7 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
             
             return {
                 'success': result.success,
-                'content': result.content,
+                'content': result.text_content or "",
                 'metadata': result.metadata,
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
@@ -478,7 +478,7 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
 
                     results.append({
                         'success': result.success,
-                        'content': result.content,
+                        'content': result.text_content or "",
                         'metadata': result.metadata,
                         'processing_time': result.processing_time,
                         'error_message': result.error_message

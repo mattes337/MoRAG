@@ -56,17 +56,19 @@ class TestProcessingResultNormalization:
     
     def test_normalize_result_without_text_content(self):
         """Test normalizing result without text_content."""
-        # Create a mock result without text_content
+        # Create a mock result without text_content or raw_result
         mock_result = Mock()
         mock_result.success = True
         mock_result.processing_time = 1.0
         mock_result.metadata = {}
         mock_result.error_message = None
-        # No text_content attribute
-        
+        # Explicitly set these to None to prevent Mock from creating them
+        mock_result.text_content = None
+        mock_result.raw_result = None
+
         # Normalize it
         normalized = normalize_processing_result(mock_result)
-        
+
         # Should create CoreProcessingResult with empty content
         assert isinstance(normalized, CoreProcessingResult)
         assert normalized.content == ""

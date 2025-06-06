@@ -60,7 +60,7 @@ def process_url_task(self, url: str, content_type: Optional[str] = None, options
             
             return {
                 'success': result.success,
-                'content': result.content,
+                'content': result.text_content or "",
                 'metadata': result.metadata,
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
@@ -85,7 +85,7 @@ def process_file_task(self, file_path: str, content_type: Optional[str] = None, 
             
             return {
                 'success': result.success,
-                'content': result.content,
+                'content': result.text_content or "",
                 'metadata': result.metadata,
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
@@ -110,7 +110,7 @@ def process_web_page_task(self, url: str, options: Optional[Dict[str, Any]] = No
             
             return {
                 'success': result.success,
-                'content': result.content,
+                'content': result.text_content or "",
                 'metadata': result.metadata,
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
@@ -135,7 +135,7 @@ def process_youtube_video_task(self, url: str, options: Optional[Dict[str, Any]]
             
             return {
                 'success': result.success,
-                'content': result.content,
+                'content': result.text_content or "",
                 'metadata': result.metadata,
                 'processing_time': result.processing_time,
                 'error_message': result.error_message
@@ -161,7 +161,7 @@ def process_batch_task(self, items: List[Dict[str, Any]], options: Optional[Dict
             return [
                 {
                     'success': result.success,
-                    'content': result.content,
+                    'content': result.text_content or "",
                     'metadata': result.metadata,
                     'processing_time': result.processing_time,
                     'error_message': result.error_message
