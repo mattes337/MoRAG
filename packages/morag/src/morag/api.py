@@ -42,8 +42,15 @@ class MoRAGAPI:
         # Auto-detect content type if not provided
         if content_type is None:
             content_type = self._detect_content_type(url)
-        
-        content_type_enum = ContentType(content_type)
+
+        # Validate and convert to ContentType enum
+        try:
+            content_type_enum = ContentType(content_type)
+        except ValueError:
+            # If content type is not valid, try to map it or default to unknown
+            content_type = self._normalize_content_type(content_type)
+            content_type_enum = ContentType(content_type)
+
         return await self.orchestrator.process_content(url, content_type_enum, options)
     
     async def process_file(
@@ -67,8 +74,15 @@ class MoRAGAPI:
         # Auto-detect content type if not provided
         if content_type is None:
             content_type = self._detect_content_type_from_file(file_path)
-        
-        content_type_enum = ContentType(content_type)
+
+        # Validate and convert to ContentType enum
+        try:
+            content_type_enum = ContentType(content_type)
+        except ValueError:
+            # If content type is not valid, try to map it or default to unknown
+            content_type = self._normalize_content_type(content_type)
+            content_type_enum = ContentType(content_type)
+
         return await self.orchestrator.process_content(file_path, content_type_enum, options)
     
     async def process_web_page(
@@ -264,6 +278,69 @@ class MoRAGAPI:
 
         # Default to document
         return 'document'
+
+    def _normalize_content_type(self, content_type: str) -> str:
+        """Normalize content type to valid ContentType enum value.
+
+        Args:
+            content_type: Raw content type string
+
+        Returns:
+            Normalized content type string that matches ContentType enum
+        """
+        content_type_lower = content_type.lower()
+
+        # Map common file extensions or formats to content types
+        format_mapping = {
+            'pdf': 'document',
+            'doc': 'document',
+            'docx': 'document',
+            'txt': 'document',
+            'md': 'document',
+            'rtf': 'document',
+            'pptx': 'document',
+            'ppt': 'document',
+            'xlsx': 'document',
+            'xls': 'document',
+            'csv': 'document',
+            'json': 'document',
+            'xml': 'document',
+            'html': 'web',
+            'htm': 'web',
+            'mp3': 'audio',
+            'wav': 'audio',
+            'flac': 'audio',
+            'm4a': 'audio',
+            'ogg': 'audio',
+            'aac': 'audio',
+            'mp4': 'video',
+            'avi': 'video',
+            'mkv': 'video',
+            'mov': 'video',
+            'wmv': 'video',
+            'flv': 'video',
+            'webm': 'video',
+            'jpg': 'image',
+            'jpeg': 'image',
+            'png': 'image',
+            'gif': 'image',
+            'bmp': 'image',
+            'webp': 'image',
+            'tiff': 'image',
+            'svg': 'image',
+        }
+
+        # Try to map the content type
+        if content_type_lower in format_mapping:
+            return format_mapping[content_type_lower]
+
+        # If it's already a valid content type, return as is
+        valid_types = ['document', 'audio', 'video', 'image', 'web', 'youtube', 'text', 'unknown']
+        if content_type_lower in valid_types:
+            return content_type_lower
+
+        # Default to unknown for unrecognized types
+        return 'unknown'
     
     async def cleanup(self) -> None:
         """Clean up resources."""

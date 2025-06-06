@@ -195,6 +195,22 @@ For detailed information about completed tasks and implementation history, see [
 - **Backward Compatibility**: Explicit `source_type` still supported and takes precedence over auto-detection
 - **Status**: Implemented across all ingestion endpoints with comprehensive logging
 
+#### 10. **ContentType Enum Validation & ProcessingConfig Parameter Errors** ✅ FIXED
+- **Issue**: Multiple critical errors in worker processes:
+  - `'pdf' is not a valid ContentType` - Content type detection returning file extensions instead of valid enum values
+  - `ProcessingConfig.__init__() got an unexpected keyword argument 'webhook_url'` - Task options being passed to ProcessingConfig
+  - Celery exception serialization errors causing task failures
+- **Root Causes**:
+  - Content type detection returning raw file extensions ('pdf', 'doc') instead of normalized types ('document')
+  - ProcessingConfig class not accepting additional parameters passed from task options
+  - Improper exception handling in Celery tasks causing serialization failures
+- **Solutions Implemented**:
+  - **Content Type Normalization**: Added `_normalize_content_type()` method to map file extensions to valid ContentType enum values
+  - **Enhanced ProcessingConfig**: Extended ProcessingConfig to accept additional parameters (webhook_url, metadata, use_docling, etc.)
+  - **Robust Exception Handling**: Fixed Celery task exception handling with proper error type information
+  - **Validation Layer**: Added ContentType enum validation with fallback to 'unknown' for unrecognized types
+- **Status**: All worker process errors resolved, comprehensive test suite validates fixes
+
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents
 - [ ] Enhanced chapter detection algorithms using ML

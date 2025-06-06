@@ -197,20 +197,28 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
             
         except Exception as e:
             logger.error("File ingestion task failed", file_path=file_path, error=str(e))
-            
+
             # Send failure webhook notification
             webhook_url = options.get('webhook_url')
             if webhook_url:
                 send_webhook_notification(webhook_url, self.request.id, 'FAILURE')
-            
+
             # Clean up temporary file on failure too
             try:
                 Path(file_path).unlink(missing_ok=True)
             except:
                 pass
-            
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+
+            # Create proper exception info for Celery
+            error_info = {
+                'error': str(e),
+                'error_type': e.__class__.__name__,
+                'file_path': file_path
+            }
+            self.update_state(state='FAILURE', meta=error_info)
+
+            # Re-raise with proper exception type information
+            raise type(e)(str(e))
     
     return asyncio.run(_ingest())
 
@@ -280,14 +288,22 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
             
         except Exception as e:
             logger.error("URL ingestion task failed", url=url, error=str(e))
-            
+
             # Send failure webhook notification
             webhook_url = options.get('webhook_url')
             if webhook_url:
                 send_webhook_notification(webhook_url, self.request.id, 'FAILURE')
-            
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+
+            # Create proper exception info for Celery
+            error_info = {
+                'error': str(e),
+                'error_type': e.__class__.__name__,
+                'url': url
+            }
+            self.update_state(state='FAILURE', meta=error_info)
+
+            # Re-raise with proper exception type information
+            raise type(e)(str(e))
 
     return asyncio.run(_ingest())
 
@@ -421,7 +437,15 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
             if webhook_url:
                 send_webhook_notification(webhook_url, self.request.id, 'FAILURE')
 
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+            # Create proper exception info for Celery
+            error_info = {
+                'error': str(e),
+                'error_type': e.__class__.__name__,
+                'item_count': len(items)
+            }
+            self.update_state(state='FAILURE', meta=error_info)
+
+            # Re-raise with proper exception type information
+            raise type(e)(str(e))
 
     return asyncio.run(_ingest())

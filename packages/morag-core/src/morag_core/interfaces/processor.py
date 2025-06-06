@@ -24,6 +24,19 @@ class ProcessingConfig:
     chunk_size: Optional[int] = None
     chunk_overlap: Optional[int] = None
 
+    # Additional options that may be passed but should be ignored by this config
+    # These are handled at higher levels (service/task level)
+    webhook_url: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    use_docling: Optional[bool] = None
+    store_in_vector_db: Optional[bool] = None
+    generate_embeddings: Optional[bool] = None
+
+    def __post_init__(self):
+        """Post-initialization to handle any additional unknown parameters."""
+        # This allows the config to accept additional parameters without failing
+        pass
+
 
 @dataclass
 class ProcessingResult:
