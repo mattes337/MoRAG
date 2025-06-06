@@ -12,7 +12,6 @@ import uuid
 import structlog
 
 from ..exceptions import ValidationError, StorageError
-from ..config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -73,19 +72,25 @@ def get_file_info(file_path: Union[str, Path]) -> Dict[str, Union[str, int]]:
 
 def generate_temp_path(prefix: str = "", suffix: str = "", directory: Optional[Union[str, Path]] = None) -> Path:
     """Generate temporary file path.
-    
+
     Args:
         prefix: Prefix for filename
         suffix: Suffix for filename (e.g., file extension)
         directory: Directory for temporary file (uses settings.temp_dir if None)
-        
+
     Returns:
         Path object for temporary file
     """
     # Use specified directory or default temp directory
-    temp_dir = Path(directory) if directory else Path(settings.temp_dir)
+    if directory:
+        temp_dir = Path(directory)
+    else:
+        # Import settings here to avoid module-level import issues
+        from ..config import settings
+        temp_dir = Path(settings.temp_dir)
+
     ensure_directory(temp_dir)
-    
+
     # Generate unique filename
     filename = f"{prefix}{uuid.uuid4().hex}{suffix}"
     return temp_dir / filename

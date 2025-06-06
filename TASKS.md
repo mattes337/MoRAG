@@ -521,6 +521,39 @@ For detailed information about completed tasks and implementation history, see [
   - Documentation updates: ✅ All examples updated
 - **Status**: All components now use unified collection name with fail-fast validation
 
+#### 30. **Docker Container Startup Failure** ✅ FIXED
+- **Issue**: Docker containers failing to start due to settings validation at import time
+- **Error**: `ValidationError: QDRANT_COLLECTION_NAME environment variable is required` during Celery worker startup
+- **Root Cause**: Settings were being instantiated at module import time (line 154 in config.py), triggering validation before environment variables were loaded
+- **Problem**: Module-level imports like `from morag_core.config import settings` caused immediate validation
+- **Solution**: Implemented lazy loading for settings to defer validation until actual access
+- **Changes Implemented**:
+  - **Lazy Settings Loading**: Replaced direct `Settings()` instantiation with lazy loading pattern
+  - **Settings Proxy**: Created `SettingsProxy` class for backward compatibility
+  - **Deferred Validation**: Settings validation now happens only when properties are accessed
+  - **Worker Import Fix**: Removed module-level settings import from `worker.py`
+  - **File Handling Fix**: Made settings import lazy in `file_handling.py`
+  - **Celery Configuration**: Moved timeout configuration to worker initialization handler
+- **Files Modified**:
+  - `packages/morag-core/src/morag_core/config.py`: Implemented lazy loading with SettingsProxy
+  - `packages/morag/src/morag/worker.py`: Removed module-level settings import, deferred Celery config
+  - `packages/morag-core/src/morag_core/utils/file_handling.py`: Made settings import lazy
+- **Files Added**:
+  - `test_lazy_settings.py`: Test suite for lazy loading functionality
+  - `test_worker_import.py`: Worker import tests
+  - `test_settings_fix.py`: Settings validation fix tests
+- **Validation Results**: ✅ All tests pass
+  - Modules can be imported without triggering validation
+  - Settings validation only happens when properties are accessed
+  - Worker modules import successfully without environment variables
+  - Lazy loading proxy provides backward compatibility
+- **Benefits**:
+  - **Docker Compatibility**: Containers can start without immediate validation failures
+  - **Import Safety**: Modules can be imported in any environment
+  - **Deferred Validation**: Environment variables checked only when needed
+  - **Backward Compatibility**: Existing code continues to work unchanged
+- **Status**: Docker containers should now start successfully with proper environment variable handling
+
 ### ✅ Configuration and Error Handling Fixes (January 2025)
 
 #### 23. **Vision Model Configuration** ✅ IMPLEMENTED

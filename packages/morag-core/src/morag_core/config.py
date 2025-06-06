@@ -150,5 +150,28 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-# Global settings instance
-settings = Settings()
+# Global settings instance - lazy loaded
+_settings_instance = None
+
+def get_settings() -> Settings:
+    """Get the global settings instance, creating it if necessary."""
+    global _settings_instance
+    if _settings_instance is None:
+        _settings_instance = Settings()
+    return _settings_instance
+
+# For backward compatibility, provide a property-like access
+class SettingsProxy:
+    """Proxy object that provides lazy access to settings."""
+
+    def __getattr__(self, name):
+        return getattr(get_settings(), name)
+
+    def __setattr__(self, name, value):
+        return setattr(get_settings(), name, value)
+
+    def __dir__(self):
+        return dir(get_settings())
+
+# Global settings proxy for backward compatibility
+settings = SettingsProxy()

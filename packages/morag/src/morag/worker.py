@@ -10,7 +10,6 @@ import structlog
 
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
-from morag_core.config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -20,7 +19,7 @@ celery_app = Celery('morag_worker')
 # Get Redis URL from environment or use default
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
-# Configure Celery with configurable timeouts
+# Configure Celery with basic settings (timeouts will be set in worker_init)
 celery_app.conf.update(
     broker_url=redis_url,
     result_backend=redis_url,
@@ -30,10 +29,6 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=settings.celery_task_time_limit,  # Configurable hard limit (default: 2.5 hours)
-    task_soft_time_limit=settings.celery_task_soft_time_limit,  # Configurable soft limit (default: 2 hours)
-    worker_prefetch_multiplier=settings.celery_worker_prefetch_multiplier,  # Configurable prefetch
-    worker_max_tasks_per_child=settings.celery_worker_max_tasks_per_child,  # Configurable max tasks
     broker_connection_retry_on_startup=True,  # Fix deprecation warning
 )
 
@@ -216,6 +211,17 @@ from celery.signals import worker_init, worker_ready, worker_shutdown
 @worker_init.connect
 def worker_init_handler(sender=None, conf=None, **kwargs):
     """Initialize worker."""
+    # Import settings here to avoid module-level import issues
+    from morag_core.config import settings
+
+    # Update Celery configuration with timeout settings now that environment is loaded
+    celery_app.conf.update(
+        task_time_limit=settings.celery_task_time_limit,  # Configurable hard limit (default: 2.5 hours)
+        task_soft_time_limit=settings.celery_task_soft_time_limit,  # Configurable soft limit (default: 2 hours)
+        worker_prefetch_multiplier=settings.celery_worker_prefetch_multiplier,  # Configurable prefetch
+        worker_max_tasks_per_child=settings.celery_worker_max_tasks_per_child,  # Configurable max tasks
+    )
+
     logger.info(
         "MoRAG worker initializing",
         task_soft_time_limit=f"{settings.celery_task_soft_time_limit}s ({settings.celery_task_soft_time_limit/60:.1f}min)",
