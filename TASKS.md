@@ -554,6 +554,36 @@ For detailed information about completed tasks and implementation history, see [
   - **Backward Compatibility**: Existing code continues to work unchanged
 - **Status**: Docker containers should now start successfully with proper environment variable handling
 
+#### 31. **API Service Docker Startup Failure** ✅ FIXED
+- **Issue**: API service (morag-api) still failing with ValidationError despite worker fix
+- **Error**: `ValidationError: QDRANT_COLLECTION_NAME environment variable is required` during API server startup
+- **Root Cause**: API server had different import path triggering settings validation at module import time
+- **Problem**: `MoRAGAPI` instantiation in `create_app()` function happened at module import time (line 261)
+- **Solution**: Implemented lazy initialization for MoRAG API in server startup
+- **Changes Implemented**:
+  - **Lazy API Initialization**: Replaced direct `MoRAGAPI(config)` with lazy loading pattern
+  - **API Factory Function**: Created `get_morag_api()` function for deferred instantiation
+  - **Route Handler Updates**: Updated all API route handlers to use `get_morag_api()`
+  - **Startup Sequence Fix**: API validation now happens only when endpoints are called
+- **Files Modified**:
+  - `packages/morag/src/morag/server.py`: Implemented lazy API initialization, updated all route handlers
+- **Files Added**:
+  - `test_api_server_import.py`: API server import tests
+  - `test_docker_startup_fix.py`: Comprehensive Docker startup tests
+  - `docker_verification_test.py`: Docker container verification script
+- **Validation Results**: ✅ All tests pass
+  - API server can be imported without triggering validation
+  - FastAPI app can be created without environment variables
+  - Settings validation deferred until actual API usage
+  - Both workers and API service start successfully
+- **Benefits**:
+  - **Complete Docker Compatibility**: Both API and workers start without validation errors
+  - **Consistent Behavior**: All services use same lazy loading pattern
+  - **Proper Error Handling**: Validation happens when services are actually used
+  - **Development Friendly**: Modules can be imported for testing without full environment
+- **Docker Testing**: Use `docker_verification_test.py` to verify container functionality
+- **Status**: All Docker services (API and workers) now start successfully with unified environment handling
+
 ### ✅ Configuration and Error Handling Fixes (January 2025)
 
 #### 23. **Vision Model Configuration** ✅ IMPLEMENTED

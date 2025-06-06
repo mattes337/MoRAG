@@ -51,7 +51,7 @@ def send_webhook_notification(webhook_url: str, task_id: str, status: str, resul
 
 
 async def store_content_in_vector_db(
-    content: str, 
+    content: str,
     metadata: Dict[str, Any],
     collection_name: str = "morag_vectors"
 ) -> List[str]:
@@ -59,7 +59,7 @@ async def store_content_in_vector_db(
     if not content.strip():
         logger.warning("Empty content provided for vector storage")
         return []
-    
+
     try:
         # Initialize services with environment configuration
         qdrant_host = os.getenv('QDRANT_HOST', 'localhost')

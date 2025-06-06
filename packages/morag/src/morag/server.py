@@ -257,8 +257,15 @@ class TaskStatus(BaseModel):
 def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     """Create FastAPI application."""
 
-    # Initialize MoRAG API outside of lifespan for access in routes
-    morag_api = MoRAGAPI(config)
+    # Initialize MoRAG API lazily to avoid settings validation at import time
+    morag_api = None
+
+    def get_morag_api() -> MoRAGAPI:
+        """Get or create MoRAG API instance."""
+        nonlocal morag_api
+        if morag_api is None:
+            morag_api = MoRAGAPI(config)
+        return morag_api
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -288,7 +295,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         logger.info("MoRAG API server shutting down")
         stop_cleanup_service()
         logger.info("Periodic cleanup service stopped")
-        await morag_api.cleanup()
+        await get_morag_api().cleanup()
         logger.info("MoRAG API server shut down")
 
     app = FastAPI(
@@ -332,7 +339,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def health_check():
         """Health check endpoint."""
         try:
-            status = await morag_api.health_check()
+            status = await get_morag_api().health_check()
             return JSONResponse(content=status)
         except Exception as e:
             logger.error("Health check failed", error=str(e))
@@ -342,7 +349,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_url(request: ProcessURLRequest):
         """Process content from a URL."""
         try:
-            result = await morag_api.process_url(
+            result = await get_morag_api().process_url(
                 request.url,
                 request.content_type,
                 request.options
@@ -397,7 +404,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 # Normalize content type from MIME type to MoRAG content type
                 normalized_content_type = normalize_content_type(content_type)
 
-                result = await morag_api.process_file(
+                result = await get_morag_api().process_file(
                     temp_path,
                     normalized_content_type,
                     parsed_options
@@ -471,7 +478,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_web_page(request: ProcessURLRequest):
         """Process a web page."""
         try:
-            result = await morag_api.process_web_page(request.url, request.options)
+            result = await get_morag_api().process_web_page(request.url, request.options)
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
@@ -488,7 +495,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_youtube_video(request: ProcessURLRequest):
         """Process a YouTube video."""
         try:
-            result = await morag_api.process_youtube_video(request.url, request.options)
+            result = await get_morag_api().process_youtube_video(request.url, request.options)
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
@@ -505,7 +512,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_batch(request: ProcessBatchRequest):
         """Process multiple items in batch."""
         try:
-            results = await morag_api.process_batch(request.items, request.options)
+            results = await get_morag_api().process_batch(request.items, request.options)
             return [
                 ProcessingResultResponse(
                     success=result.success,
@@ -523,7 +530,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def search_similar(request: SearchRequest):
         """Search for similar content."""
         try:
-            results = await morag_api.search(
+            results = await get_morag_api().search(
                 request.query,
                 request.limit,
                 request.filters
@@ -561,7 +568,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
                 # Auto-detect source type if not provided
                 if not source_type:
-                    source_type = morag_api._detect_content_type_from_file(temp_path)
+                    source_type = get_morag_api()._detect_content_type_from_file(temp_path)
                     logger.info("Auto-detected content type",
                                filename=file.filename,
                                detected_type=source_type)
@@ -622,7 +629,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             # Auto-detect source type if not provided
             source_type = request.source_type
             if not source_type:
-                source_type = morag_api._detect_content_type(request.url)
+                source_type = get_morag_api()._detect_content_type(request.url)
                 logger.info("Auto-detected content type for URL",
                            url=request.url,
                            detected_type=source_type)
