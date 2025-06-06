@@ -308,7 +308,75 @@ pip install -e packages/morag-audio
 # ... etc
 ```
 
+## Local Development (Without Docker)
+
+For detailed local development setup without Docker, see [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md).
+
+### Quick Local Setup
+
+```bash
+# 1. Install packages in development mode
+pip install -e packages/morag-core/
+pip install -e packages/morag-services/
+pip install -e packages/morag/
+
+# 2. Start infrastructure (Redis + Qdrant)
+docker run -d --name morag-redis -p 6379:6379 redis:alpine
+docker run -d --name morag-qdrant -p 6333:6333 qdrant/qdrant:latest
+
+# 3. Start services
+python scripts/start_worker.py  # Terminal 1 (REQUIRED)
+uvicorn morag.api.main:app --reload  # Terminal 2
+
+# 4. Test setup
+python debug_morag.py  # Comprehensive debugging
+python test_qdrant_fix.py  # Quick validation
+```
+
 ## Troubleshooting
+
+### Fixed: Abstract Class Errors
+
+✅ **FIXED**: Both abstract class instantiation errors have been resolved:
+
+1. **QdrantVectorStorage Error**: "Can't instantiate abstract class QdrantVectorStorage"
+2. **GeminiEmbeddingService Error**: "Can't instantiate abstract class GeminiEmbeddingService"
+
+**What was fixed:**
+
+**QdrantVectorStorage** - Implemented all missing abstract methods:
+- `initialize()`, `shutdown()`, `health_check()`
+- `put_object()`, `get_object()`, `delete_object()`, `list_objects()`, `get_object_metadata()`, `object_exists()`
+- `add_vectors()`, `search_vectors()`, `delete_vectors()`, `update_vector_metadata()`
+
+**GeminiEmbeddingService** - Implemented all missing abstract methods:
+- `health_check()`, `generate_embeddings()`
+- `get_embedding_dimension()`, `get_supported_models()`, `get_max_tokens()`
+- Fixed method signatures to match interface requirements
+
+**Test the fixes:**
+```bash
+python tests/cli/test-qdrant-fix.py        # Test QdrantVectorStorage
+python tests/cli/test-embedding-fix.py     # Test GeminiEmbeddingService
+python tests/cli/test-ingest-workflow.py   # Test complete workflow
+```
+
+### Debugging Issues
+
+If you encounter issues:
+
+1. **Run comprehensive debug script:**
+   ```bash
+   python debug_morag.py
+   ```
+
+2. **Check logs:** The debug script creates detailed log files with timestamps
+
+3. **Test individual components:**
+   ```bash
+   python tests/cli/test-simple.py  # Quick validation
+   python tests/cli/test-document.py sample.pdf  # Test document processing
+   ```
 
 ### Tasks Not Processing
 

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import requests
+import os
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import structlog
@@ -62,7 +63,13 @@ async def store_content_in_vector_db(
     try:
         # Initialize services
         vector_storage = QdrantVectorStorage()
-        embedding_service = GeminiEmbeddingService()
+
+        # Get API key from environment
+        api_key = os.getenv('GOOGLE_API_KEY')
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY environment variable is required")
+
+        embedding_service = GeminiEmbeddingService(api_key=api_key)
         
         # Connect to vector storage
         await vector_storage.connect()
@@ -88,11 +95,11 @@ async def store_content_in_vector_db(
         
         for i, chunk in enumerate(chunks):
             # Generate embedding
-            embedding_result = await embedding_service.generate_embedding(
-                chunk, 
+            embedding_result = await embedding_service.generate_embedding_with_result(
+                chunk,
                 task_type="retrieval_document"
             )
-            
+
             embeddings.append(embedding_result.embedding)
             
             # Prepare metadata for this chunk

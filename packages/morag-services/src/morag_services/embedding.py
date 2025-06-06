@@ -47,9 +47,11 @@ class GeminiEmbeddingService(BaseEmbeddingService):
             generation_model: Model for text generation
         """
         # Create a basic config for the parent class
-        from morag_core.interfaces.embedding import EmbeddingConfig
+        from morag_core.interfaces.embedding import EmbeddingConfig, EmbeddingProvider
         config = EmbeddingConfig(
-            model=embedding_model,
+            provider=EmbeddingProvider.GEMINI,
+            model_name=embedding_model,
+            api_key=api_key,
             max_tokens=8192,
             batch_size=10
         )
@@ -82,13 +84,72 @@ class GeminiEmbeddingService(BaseEmbeddingService):
     async def shutdown(self) -> None:
         """Shutdown the embedding service and release resources."""
         pass
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Check service health.
+
+        Returns:
+            Dictionary with health status information
+        """
+        try:
+            if not self.client:
+                return {
+                    "status": "unhealthy",
+                    "error": "Client not initialized",
+                    "embedding_model": self.embedding_model,
+                    "generation_model": self.generation_model
+                }
+
+            # Test with a simple embedding request
+            test_result = await self.generate_embedding("test", "retrieval_document")
+
+            return {
+                "status": "healthy",
+                "embedding_model": self.embedding_model,
+                "generation_model": self.generation_model,
+                "embedding_dimension": len(test_result.embedding),
+                "test_successful": True
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "embedding_model": self.embedding_model,
+                "generation_model": self.generation_model
+            }
     
     async def generate_embedding(
         self,
         text: str,
+        model: Optional[str] = None,
+        task_type: str = "retrieval_document",
+        **kwargs
+    ) -> List[float]:
+        """Generate embedding for a single text."""
+        if not self.client:
+            raise ExternalServiceError("Gemini client not initialized")
+
+        try:
+            # Use asyncio.to_thread for CPU-bound operations
+            result = await asyncio.to_thread(
+                self._generate_embedding_sync,
+                text,
+                task_type
+            )
+
+            logger.debug("Generated embedding", text_length=len(text), model=model or self.embedding_model)
+            return result.embedding  # Return just the embedding vector
+
+        except Exception as e:
+            logger.error("Failed to generate embedding", error=str(e))
+            raise ExternalServiceError(f"Embedding generation failed: {str(e)}")
+
+    async def generate_embedding_with_result(
+        self,
+        text: str,
         task_type: str = "retrieval_document"
     ) -> EmbeddingResult:
-        """Generate embedding for a single text."""
+        """Generate embedding for a single text and return full result (backward compatibility)."""
         if not self.client:
             raise ExternalServiceError("Gemini client not initialized")
 
@@ -102,10 +163,81 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
             logger.debug("Generated embedding", text_length=len(text), model=self.embedding_model)
             return result
-            
+
         except Exception as e:
             logger.error("Failed to generate embedding", error=str(e))
             raise ExternalServiceError(f"Embedding generation failed: {str(e)}")
+
+    async def generate_embeddings(
+        self,
+        texts: List[str],
+        model: Optional[str] = None,
+        **kwargs
+    ) -> "EmbeddingResult":
+        """Generate embeddings for multiple texts.
+
+        Args:
+            texts: List of texts to embed
+            model: Optional model override
+            **kwargs: Additional options
+
+        Returns:
+            Embedding result with multiple embeddings
+        """
+        from morag_core.interfaces.embedding import EmbeddingResult as CoreEmbeddingResult
+
+        # Use batch processing
+        results = await self.generate_embeddings_batch(texts, **kwargs)
+
+        # Convert to core format
+        embeddings = [result.embedding for result in results]
+
+        return CoreEmbeddingResult(
+            embeddings=embeddings,
+            model=model or self.embedding_model,
+            usage={"token_count": sum(result.token_count for result in results)},
+            metadata={"batch_size": len(texts)}
+        )
+
+    def get_embedding_dimension(self, model: Optional[str] = None) -> int:
+        """Get embedding dimension for model.
+
+        Args:
+            model: Optional model override
+
+        Returns:
+            Embedding dimension
+        """
+        # text-embedding-004 has 768 dimensions
+        if (model or self.embedding_model) == "text-embedding-004":
+            return 768
+        else:
+            # Default for most Gemini embedding models
+            return 768
+
+    def get_supported_models(self) -> List[str]:
+        """Get list of supported models.
+
+        Returns:
+            List of model names
+        """
+        return [
+            "text-embedding-004",
+            "text-embedding-preview-0409",
+            "embedding-001"
+        ]
+
+    def get_max_tokens(self, model: Optional[str] = None) -> int:
+        """Get maximum tokens for model.
+
+        Args:
+            model: Optional model override
+
+        Returns:
+            Maximum tokens
+        """
+        # Most Gemini embedding models support up to 2048 tokens
+        return 2048
 
     def _generate_embedding_sync(self, text: str, task_type: str) -> EmbeddingResult:
         """Synchronous embedding generation."""
