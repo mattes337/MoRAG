@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = "text-embedding-004"
     gemini_vision_model: str = "gemini-1.5-flash"
 
+    # Embedding Configuration
+    embedding_batch_size: int = 10
+    enable_batch_embedding: bool = True
+
     # Redis Configuration
     redis_url: str = "redis://localhost:6379/0"
 

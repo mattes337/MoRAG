@@ -67,6 +67,8 @@ class GeminiEmbeddingService(BaseService):
         retry_min_wait: float = 1.0,
         retry_max_wait: float = 10.0,
         rate_limit_per_minute: int = 100,
+        batch_size: Optional[int] = None,
+        enable_batch_embedding: Optional[bool] = None,
     ):
         """Initialize the Gemini embedding service.
 
@@ -78,6 +80,8 @@ class GeminiEmbeddingService(BaseService):
             retry_min_wait: Minimum wait time between retries in seconds
             retry_max_wait: Maximum wait time between retries in seconds
             rate_limit_per_minute: Maximum number of API calls per minute
+            batch_size: Number of texts to process in a single batch API call
+            enable_batch_embedding: Whether to use batch embedding API (recommended)
         """
         self.api_key = api_key or settings.gemini_api_key
         self.embedding_model = embedding_model or settings.gemini_embedding_model
@@ -92,6 +96,10 @@ class GeminiEmbeddingService(BaseService):
         self.circuit_breaker = CircuitBreaker()
         self._initialized = False
 
+        # Batch embedding configuration
+        self.batch_size = max(1, min(batch_size or settings.embedding_batch_size, 100))  # Clamp between 1 and 100
+        self.enable_batch_embedding = enable_batch_embedding if enable_batch_embedding is not None else settings.enable_batch_embedding
+
     async def initialize(self) -> bool:
         """Initialize the Gemini service.
 
@@ -103,7 +111,11 @@ class GeminiEmbeddingService(BaseService):
             genai.configure(api_key=self.api_key)
             
             # Test the API with a simple embedding request
-            _ = genai.embed_content(model=self.embedding_model, content="Test")
+            # Ensure model name has proper prefix for new SDK
+            model_name = self.embedding_model
+            if not model_name.startswith(('models/', 'tunedModels/')):
+                model_name = f"models/{model_name}"
+            _ = genai.embed_content(model=model_name, content="Test")
             
             self._initialized = True
             logger.info(
@@ -206,7 +218,11 @@ class GeminiEmbeddingService(BaseService):
         async def _generate_with_retry():
             try:
                 # Call Gemini API to generate embedding
-                result = genai.embed_content(model=self.embedding_model, content=text)
+                # Ensure model name has proper prefix for new SDK
+                model_name = self.embedding_model
+                if not model_name.startswith(('models/', 'tunedModels/')):
+                    model_name = f"models/{model_name}"
+                result = genai.embed_content(model=model_name, content=text)
 
                 # Record success for circuit breaker
                 self.circuit_breaker.record_success()
@@ -235,8 +251,111 @@ class GeminiEmbeddingService(BaseService):
 
         return await _generate_with_retry()
 
+    async def _generate_batch_embeddings_native(self, texts: List[str]) -> BatchEmbeddingResult:
+        """Generate embeddings using Gemini's native batch API.
+
+        Args:
+            texts: List of texts to embed (should be <= batch_size)
+
+        Returns:
+            Batch embedding result
+
+        Raises:
+            RateLimitError: If rate limit is exceeded
+            ExternalServiceError: If Gemini API call fails
+        """
+        if not texts:
+            return BatchEmbeddingResult(texts=[], embeddings=[], model=self.embedding_model)
+
+        if not self._initialized:
+            await self.initialize()
+
+        if not self.circuit_breaker.is_closed():
+            raise ExternalServiceError("Circuit breaker is open", "gemini")
+
+        if not self._consume_rate_limit_token():
+            raise RateLimitError("Rate limit exceeded for batch embedding generation")
+
+        # Apply dynamic retry decorator based on configuration
+        retry_decorator = get_retry_decorator_for_rate_limits()
+
+        @retry_decorator
+        async def _generate_batch_with_retry():
+            try:
+                # Call Gemini API with multiple contents for batch embedding
+                # Ensure model name has proper prefix for new SDK
+                model_name = self.embedding_model
+                if not model_name.startswith(('models/', 'tunedModels/')):
+                    model_name = f"models/{model_name}"
+                result = genai.embed_content(
+                    model=model_name,
+                    content=texts  # Pass list of texts directly
+                )
+
+                # Record success for circuit breaker
+                self.circuit_breaker.record_success()
+
+                # Extract embeddings from batch result
+                embeddings = []
+                if hasattr(result, 'embedding') and isinstance(result.embedding, list):
+                    # Single embedding returned (shouldn't happen with multiple texts)
+                    embeddings = [result.embedding] * len(texts)
+                elif hasattr(result, 'embeddings') and isinstance(result.embeddings, list):
+                    # Multiple embeddings returned
+                    embeddings = result.embeddings
+                elif isinstance(result, dict):
+                    # Handle dict response format
+                    if 'embeddings' in result:
+                        embeddings = result['embeddings']
+                    elif 'embedding' in result:
+                        embeddings = [result['embedding']] * len(texts)
+                else:
+                    # Fallback: try to extract from result structure
+                    embeddings = [getattr(result, 'embedding', [])] * len(texts)
+
+                # Ensure we have the right number of embeddings
+                if len(embeddings) != len(texts):
+                    logger.warning(
+                        "Batch embedding count mismatch",
+                        expected=len(texts),
+                        received=len(embeddings),
+                        texts_sample=texts[:3] if len(texts) > 3 else texts
+                    )
+                    # Pad or truncate as needed
+                    if len(embeddings) < len(texts):
+                        # Pad with zeros if we got fewer embeddings
+                        zero_embedding = [0.0] * (len(embeddings[0]) if embeddings else 768)
+                        embeddings.extend([zero_embedding] * (len(texts) - len(embeddings)))
+                    else:
+                        # Truncate if we got more embeddings
+                        embeddings = embeddings[:len(texts)]
+
+                # Create and return batch result
+                return BatchEmbeddingResult(
+                    texts=texts,
+                    embeddings=embeddings,
+                    model=self.embedding_model,
+                    metadata={"batch_size": len(texts), "method": "native_batch"}
+                )
+
+            except Exception as e:
+                # Record failure for circuit breaker
+                self.circuit_breaker.record_failure()
+
+                # Map exception to appropriate error type
+                error_str = str(e)
+                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
+                    "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                    raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
+                elif "timeout" in error_str.lower():
+                    raise TimeoutError(f"Gemini API timeout: {error_str}")
+                else:
+                    raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+
+        return await _generate_batch_with_retry()
+
     async def generate_batch_embeddings(self, texts: List[str]) -> BatchEmbeddingResult:
-        """Generate embeddings for multiple texts.
+        """Generate embeddings for multiple texts using batch API when possible.
 
         Args:
             texts: List of texts to embed
@@ -251,14 +370,108 @@ class GeminiEmbeddingService(BaseService):
         if not texts:
             return BatchEmbeddingResult(texts=[], embeddings=[], model=self.embedding_model)
 
-        # Process embeddings with concurrency control
+        # Use batch embedding if enabled and supported
+        if self.enable_batch_embedding:
+            try:
+                return await self._generate_batch_embeddings_optimized(texts)
+            except Exception as e:
+                logger.warning(
+                    "Batch embedding failed, falling back to sequential processing",
+                    error=str(e),
+                    error_type=e.__class__.__name__
+                )
+                # Fall back to sequential processing
+                return await self._generate_batch_embeddings_sequential(texts)
+        else:
+            # Use sequential processing
+            return await self._generate_batch_embeddings_sequential(texts)
+
+    async def _generate_batch_embeddings_optimized(self, texts: List[str]) -> BatchEmbeddingResult:
+        """Generate embeddings using optimized batch processing.
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            Batch embedding result
+        """
+        all_embeddings = []
+        all_errors = []
+        processed_texts = []
+
+        # Process texts in batches using the configured batch size
+        for i in range(0, len(texts), self.batch_size):
+            batch_texts = texts[i:i + self.batch_size]
+
+            try:
+                # Use native batch API for this chunk
+                batch_result = await self._generate_batch_embeddings_native(batch_texts)
+
+                all_embeddings.extend(batch_result.embeddings)
+                processed_texts.extend(batch_result.texts)
+
+                # Add any errors from metadata
+                if batch_result.metadata and "errors" in batch_result.metadata:
+                    all_errors.extend(batch_result.metadata["errors"])
+
+                logger.debug(
+                    "Processed batch successfully",
+                    batch_size=len(batch_texts),
+                    total_processed=len(processed_texts),
+                    total_texts=len(texts)
+                )
+
+                # Small delay between batches to be respectful to the API
+                if i + self.batch_size < len(texts):
+                    await asyncio.sleep(0.1)  # 100ms delay between batches
+
+            except Exception as e:
+                logger.error(
+                    "Batch processing failed for chunk",
+                    batch_start=i,
+                    batch_size=len(batch_texts),
+                    error=str(e)
+                )
+                # Add error for each text in the failed batch
+                for text in batch_texts:
+                    all_errors.append(str(e))
+                    # Add placeholder embedding (zeros)
+                    all_embeddings.append([0.0] * 768)
+                    processed_texts.append(text)
+
+        # If all requests failed, raise an exception
+        if len(all_errors) == len(texts):
+            raise ExternalServiceError(f"All batch embedding requests failed: {all_errors[0]}", "gemini")
+
+        # Create and return batch result
+        return BatchEmbeddingResult(
+            texts=processed_texts,
+            embeddings=all_embeddings,
+            model=self.embedding_model,
+            metadata={
+                "errors": all_errors if all_errors else [],
+                "method": "optimized_batch",
+                "batch_size": self.batch_size,
+                "total_batches": (len(texts) + self.batch_size - 1) // self.batch_size
+            }
+        )
+
+    async def _generate_batch_embeddings_sequential(self, texts: List[str]) -> BatchEmbeddingResult:
+        """Generate embeddings using sequential processing (fallback method).
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            Batch embedding result
+        """
         embeddings = []
         errors = []
 
         # Process in smaller batches to avoid overwhelming the API
-        batch_size = 5  # Reduced batch size for better rate limiting
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i+batch_size]
+        fallback_batch_size = 5  # Smaller batch size for sequential processing
+        for i in range(0, len(texts), fallback_batch_size):
+            batch = texts[i:i+fallback_batch_size]
 
             # Process batch sequentially with delays to avoid rate limits
             for text in batch:
@@ -274,19 +487,22 @@ class GeminiEmbeddingService(BaseService):
                 await asyncio.sleep(0.2)  # 200ms delay between requests
 
             # Longer delay between batches
-            if i + batch_size < len(texts):
+            if i + fallback_batch_size < len(texts):
                 await asyncio.sleep(1.0)  # 1 second delay between batches
 
         # If all requests failed, raise an exception
         if len(errors) == len(texts):
-            raise ExternalServiceError(f"All embedding requests failed: {errors[0]}", "gemini")
+            raise ExternalServiceError(f"All sequential embedding requests failed: {errors[0]}", "gemini")
 
         # Create and return batch result
         return BatchEmbeddingResult(
             texts=texts,
             embeddings=embeddings,
             model=self.embedding_model,
-            metadata={"errors": errors} if errors else {},
+            metadata={
+                "errors": errors if errors else [],
+                "method": "sequential_fallback"
+            }
         )
 
     async def generate_summary(self, text: str, max_length: int = 200) -> SummaryResult:

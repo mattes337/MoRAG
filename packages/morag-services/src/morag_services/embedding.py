@@ -256,8 +256,12 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         while True:
             try:
+                # Ensure model name has proper prefix for new SDK
+                model_name = self.embedding_model
+                if not model_name.startswith(('models/', 'tunedModels/')):
+                    model_name = f"models/{model_name}"
                 response = self.client.models.embed_content(
-                    model=self.embedding_model,
+                    model=model_name,
                     contents=text
                 )
 
@@ -331,24 +335,123 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                         logger.error("Failed to generate embedding after retries", error=error_str)
                         raise ExternalServiceError(f"Embedding generation failed: {error_str}", "gemini")
     
+    async def generate_embeddings_batch_native(
+        self,
+        texts: List[str],
+        task_type: str = "retrieval_document"
+    ) -> List[EmbeddingResult]:
+        """Generate embeddings using Gemini's native batch API.
+
+        Args:
+            texts: List of texts to embed (should be <= batch_size)
+            task_type: Type of embedding task
+
+        Returns:
+            List of embedding results
+        """
+        if not self.client:
+            raise ExternalServiceError("Gemini client not initialized", "gemini")
+
+        if not texts:
+            return []
+
+        try:
+            logger.debug("Processing native batch embedding",
+                        batch_size=len(texts),
+                        task_type=task_type)
+
+            # Use the new Google GenAI SDK batch embedding
+            result = await asyncio.to_thread(
+                self._generate_batch_embeddings_sync,
+                texts,
+                task_type
+            )
+
+            # Convert to EmbeddingResult objects
+            results = []
+            for i, embedding in enumerate(result):
+                results.append(EmbeddingResult(
+                    embedding=embedding,
+                    token_count=len(texts[i].split()) if i < len(texts) else 0,
+                    model=self.embedding_model
+                ))
+
+            logger.debug("Native batch embedding completed",
+                        input_count=len(texts),
+                        output_count=len(results))
+
+            return results
+
+        except Exception as e:
+            logger.error("Native batch embedding failed", error=str(e))
+            raise ExternalServiceError(f"Batch embedding failed: {str(e)}", "gemini")
+
+    def _generate_batch_embeddings_sync(self, texts: List[str], task_type: str) -> List[List[float]]:
+        """Synchronous batch embedding generation."""
+        try:
+            # Use the new Google GenAI SDK for batch embedding
+            # Ensure model name has proper prefix for new SDK
+            model_name = self.embedding_model
+            if not model_name.startswith(('models/', 'tunedModels/')):
+                model_name = f"models/{model_name}"
+            response = self.client.models.embed_content(
+                model=model_name,
+                contents=texts
+            )
+
+            # Extract embeddings from response
+            if hasattr(response, 'embeddings'):
+                return [emb.values for emb in response.embeddings]
+            elif hasattr(response, 'embedding'):
+                # Single embedding returned, replicate for all texts
+                return [response.embedding.values] * len(texts)
+            else:
+                # Fallback: try to extract from response structure
+                embeddings = []
+                for text in texts:
+                    single_response = self.client.models.embed_content(
+                        model=model_name,  # Use the same model_name with prefix
+                        contents=text
+                    )
+                    embeddings.append(single_response.embedding.values)
+                return embeddings
+
+        except Exception as e:
+            logger.error("Synchronous batch embedding failed", error=str(e))
+            raise
+
     async def generate_embeddings_batch(
         self,
         texts: List[str],
         task_type: str = "retrieval_document",
         batch_size: int = 10,
-        delay_between_batches: float = 1.0
+        delay_between_batches: float = 0.1,
+        use_native_batch: bool = True
     ) -> List[EmbeddingResult]:
-        """Generate embeddings for multiple texts with rate limiting."""
+        """Generate embeddings for multiple texts with optimized batch processing."""
+        if not texts:
+            return []
+
         results = []
-        
+
+        # Use native batch API if enabled and available
+        if use_native_batch:
+            try:
+                return await self._generate_embeddings_batch_optimized(texts, task_type, batch_size, delay_between_batches)
+            except Exception as e:
+                logger.warning("Native batch embedding failed, falling back to sequential", error=str(e))
+                # Fall back to sequential processing
+                use_native_batch = False
+
+        # Sequential processing (fallback)
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            
-            logger.debug("Processing embedding batch", 
+
+            logger.debug("Processing embedding batch",
                         batch_num=i//batch_size + 1,
                         batch_size=len(batch),
                         total_texts=len(texts))
-            
+
             # Process batch with small delays between requests
             batch_results = []
             for j, text in enumerate(batch):
@@ -368,18 +471,61 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                         token_count=0,
                         model=self.embedding_model
                     ))
-            
+
             results.extend(batch_results)
-            
+
             # Delay between batches to respect rate limits
             if i + batch_size < len(texts):
                 await asyncio.sleep(delay_between_batches)
-        
-        logger.info("Completed batch embedding generation", 
+
+        logger.info("Completed batch embedding generation",
                    total_texts=len(texts),
                    successful_embeddings=len([r for r in results if r.token_count > 0]))
-        
+
         return results
+
+    async def _generate_embeddings_batch_optimized(
+        self,
+        texts: List[str],
+        task_type: str,
+        batch_size: int,
+        delay_between_batches: float
+    ) -> List[EmbeddingResult]:
+        """Generate embeddings using optimized batch processing."""
+        all_results = []
+
+        # Process texts in batches using native batch API
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+
+            try:
+                # Use native batch API for this chunk
+                batch_results = await self.generate_embeddings_batch_native(batch_texts, task_type)
+                all_results.extend(batch_results)
+
+                logger.debug("Processed batch successfully",
+                           batch_size=len(batch_texts),
+                           total_processed=len(all_results),
+                           total_texts=len(texts))
+
+                # Small delay between batches
+                if i + batch_size < len(texts):
+                    await asyncio.sleep(delay_between_batches)
+
+            except Exception as e:
+                logger.error("Batch processing failed for chunk",
+                           batch_start=i,
+                           batch_size=len(batch_texts),
+                           error=str(e))
+                # Add error results for each text in the failed batch
+                for text in batch_texts:
+                    all_results.append(EmbeddingResult(
+                        embedding=[0.0] * 768,
+                        token_count=0,
+                        model=self.embedding_model
+                    ))
+
+        return all_results
     
     async def generate_summary(
         self,

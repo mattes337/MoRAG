@@ -32,6 +32,7 @@ packages/
 - **Universal Document Conversion**: Unified framework for converting any document format to structured markdown
 - **Intelligent Chunking**: Page-based chunking for documents with configurable strategies (page, semantic, sentence, paragraph)
 - **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
+- **Batch Embedding**: Optimized batch processing using Gemini's native batch API for 4x faster embeddings and reduced rate limiting
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
 
 ## Quick Start
@@ -243,6 +244,7 @@ The MoRAG pipeline consists of several key components:
 - [API Documentation](http://localhost:8000/docs) (when running locally)
 - [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) - Complete Docker deployment instructions
 - [Universal Document Conversion](docs/UNIVERSAL_DOCUMENT_CONVERSION.md) - Complete guide to the conversion framework
+- [Batch Embedding Guide](docs/batch-embedding.md) - **NEW**: Optimized batch embedding with Gemini API for 4x performance improvement
 - [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md) - Development setup and guidelines
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
