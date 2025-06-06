@@ -446,10 +446,37 @@ For detailed information about completed tasks and implementation history, see [
   - Applied to all yt-dlp operations: metadata extraction, video download, playlist processing
 - **Status**: YouTube processing now works reliably without bot detection errors
 
+#### 21. **Speaker Diarization Coroutine Error** ✅ FIXED
+- **Issue**: `AttributeError: 'coroutine' object has no attribute 'segments'` in audio processing speaker diarization
+- **Root Cause**: `_apply_diarization` method incorrectly wrapped async `diarize_audio()` method in `run_in_executor`
+- **Solution**: Removed `run_in_executor` wrapper and directly awaited the async `diarize_audio()` method
+- **Files Modified**: `packages/morag-audio/src/morag_audio/processor.py`
+- **Status**: Speaker diarization now works correctly without coroutine access errors
+
+#### 22. **Gemini API Rate Limiting** ✅ FIXED
+- **Issue**: `429 RESOURCE_EXHAUSTED` errors from Gemini API without proper retry logic and exponential backoff
+- **Root Cause**: Embedding services lacked specific handling for 429 errors and proper retry mechanisms
+- **Solution**: Implemented comprehensive rate limiting with exponential backoff and jitter
+- **Features Added**:
+  - Exponential backoff with jitter for rate limit errors
+  - Specific detection of 429, RESOURCE_EXHAUSTED, quota exceeded, and rate limit errors
+  - Configurable retry attempts (default: 3) with increasing delays
+  - Enhanced logging for rate limit events and retry attempts
+  - Small delays between batch requests to prevent overwhelming API
+- **Files Modified**:
+  - `packages/morag-services/src/morag_services/embedding.py`
+  - `packages/morag-embedding/src/morag_embedding/service.py`
+- **Technical Details**:
+  - Base delay: 1 second, exponential multiplier: 2x per attempt
+  - Jitter added using `time.time() % 1` to prevent thundering herd
+  - Reduced batch sizes and added inter-request delays
+  - Separate retry logic for embedding and text generation
+- **Status**: Rate limiting errors now handled gracefully with automatic retries
+
 ### 🧪 Testing and Validation
 - **Test Suite**: Created comprehensive test script `tests/cli/test-bug-fixes.py`
-- **Test Coverage**: All 4 critical bugs tested with automated validation
-- **Test Results**: ✅ 4/4 critical bug fixes passing
+- **Test Coverage**: All 6 critical bugs tested with automated validation
+- **Test Results**: ✅ 6/6 critical bug fixes passing
 - **Validation**: Each fix tested in isolation and integration scenarios
 
 ## 🔄 Future Enhancement Opportunities:

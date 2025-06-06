@@ -240,17 +240,52 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         return 2048
 
     def _generate_embedding_sync(self, text: str, task_type: str) -> EmbeddingResult:
-        """Synchronous embedding generation."""
-        response = self.client.models.embed_content(
-            model=self.embedding_model,
-            contents=text
-        )
+        """Synchronous embedding generation with retry logic."""
+        max_retries = 3
+        base_delay = 1.0
 
-        return EmbeddingResult(
-            embedding=response.embeddings[0].values,
-            token_count=len(text.split()),  # Approximate token count
-            model=self.embedding_model
-        )
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.client.models.embed_content(
+                    model=self.embedding_model,
+                    contents=text
+                )
+
+                return EmbeddingResult(
+                    embedding=response.embeddings[0].values,
+                    token_count=len(text.split()),  # Approximate token count
+                    model=self.embedding_model
+                )
+
+            except Exception as e:
+                error_str = str(e)
+
+                # Check for rate limiting errors
+                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
+                    "quota exceeded" in error_str.lower() or "rate limit" in error_str.lower()):
+
+                    if attempt < max_retries:
+                        # Exponential backoff with jitter
+                        delay = base_delay * (2 ** attempt) + (time.time() % 1)  # Add jitter
+                        logger.warning(
+                            "Rate limit hit, retrying after delay",
+                            attempt=attempt + 1,
+                            max_retries=max_retries,
+                            delay=delay,
+                            error=error_str
+                        )
+                        time.sleep(delay)
+                        continue
+                    else:
+                        logger.error("Rate limit exceeded after all retries", error=error_str)
+                        raise RateLimitError(f"Rate limit exceeded after {max_retries} retries: {error_str}")
+                else:
+                    # Non-rate-limit error, don't retry
+                    logger.error("Failed to generate embedding", error=error_str)
+                    raise ExternalServiceError(f"Embedding generation failed: {error_str}")
+
+        # Should never reach here
+        raise ExternalServiceError("Unexpected error in embedding generation")
     
     async def generate_embeddings_batch(
         self,
@@ -270,12 +305,17 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                         batch_size=len(batch),
                         total_texts=len(texts))
             
-            # Process batch
+            # Process batch with small delays between requests
             batch_results = []
-            for text in batch:
+            for j, text in enumerate(batch):
                 try:
                     result = await self.generate_embedding(text, task_type)
                     batch_results.append(result)
+
+                    # Small delay between individual requests to avoid hitting rate limits
+                    if j < len(batch) - 1:  # Don't delay after the last item
+                        await asyncio.sleep(0.1)  # 100ms delay between requests
+
                 except Exception as e:
                     logger.error("Failed to generate embedding in batch", error=str(e))
                     # Create a dummy result to maintain order
@@ -339,12 +379,47 @@ class GeminiEmbeddingService(BaseEmbeddingService):
             raise ExternalServiceError(f"Summary generation failed: {str(e)}")
     
     def _generate_text_sync(self, prompt: str) -> str:
-        """Synchronous text generation."""
-        response = self.client.models.generate_content(
-            model=self.generation_model,
-            contents=prompt
-        )
-        return response.text
+        """Synchronous text generation with retry logic."""
+        max_retries = 3
+        base_delay = 1.0
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.generation_model,
+                    contents=prompt
+                )
+                return response.text
+
+            except Exception as e:
+                error_str = str(e)
+
+                # Check for rate limiting errors
+                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
+                    "quota exceeded" in error_str.lower() or "rate limit" in error_str.lower()):
+
+                    if attempt < max_retries:
+                        # Exponential backoff with jitter
+                        delay = base_delay * (2 ** attempt) + (time.time() % 1)  # Add jitter
+                        logger.warning(
+                            "Rate limit hit in text generation, retrying after delay",
+                            attempt=attempt + 1,
+                            max_retries=max_retries,
+                            delay=delay,
+                            error=error_str
+                        )
+                        time.sleep(delay)
+                        continue
+                    else:
+                        logger.error("Rate limit exceeded after all retries in text generation", error=error_str)
+                        raise RateLimitError(f"Rate limit exceeded after {max_retries} retries: {error_str}")
+                else:
+                    # Non-rate-limit error, don't retry
+                    logger.error("Failed to generate text", error=error_str)
+                    raise ExternalServiceError(f"Text generation failed: {error_str}")
+
+        # Should never reach here
+        raise ExternalServiceError("Unexpected error in text generation")
 
     async def generate_text_from_prompt(self, prompt: str) -> str:
         """Generate text directly from a prompt."""

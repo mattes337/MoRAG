@@ -198,12 +198,14 @@ class GeminiEmbeddingService(BaseService):
             self.circuit_breaker.record_failure()
             
             # Map exception to appropriate error type
-            if "rate limit" in str(e).lower() or "quota" in str(e).lower():
-                raise RateLimitError(f"Gemini API rate limit exceeded: {str(e)}")
-            elif "timeout" in str(e).lower():
-                raise TimeoutError(f"Gemini API timeout: {str(e)}")
+            error_str = str(e)
+            if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
+                "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
+            elif "timeout" in error_str.lower():
+                raise TimeoutError(f"Gemini API timeout: {error_str}")
             else:
-                raise ExternalServiceError(f"Gemini API error: {str(e)}")
+                raise ExternalServiceError(f"Gemini API error: {error_str}")
 
     async def generate_batch_embeddings(self, texts: List[str]) -> BatchEmbeddingResult:
         """Generate embeddings for multiple texts.
@@ -226,21 +228,26 @@ class GeminiEmbeddingService(BaseService):
         errors = []
 
         # Process in smaller batches to avoid overwhelming the API
-        batch_size = 10
+        batch_size = 5  # Reduced batch size for better rate limiting
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i+batch_size]
-            tasks = [self.generate_embedding(text) for text in batch]
-            
-            # Wait for all tasks to complete
-            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            for result in batch_results:
-                if isinstance(result, Exception):
-                    errors.append(str(result))
+
+            # Process batch sequentially with delays to avoid rate limits
+            for text in batch:
+                try:
+                    result = await self.generate_embedding(text)
+                    embeddings.append(result.embedding)
+                except Exception as e:
+                    errors.append(str(e))
                     # Add a placeholder embedding (zeros)
                     embeddings.append([0.0] * 768)  # Assuming 768-dimensional embeddings
-                else:
-                    embeddings.append(result.embedding)
+
+                # Small delay between requests to avoid rate limits
+                await asyncio.sleep(0.2)  # 200ms delay between requests
+
+            # Longer delay between batches
+            if i + batch_size < len(texts):
+                await asyncio.sleep(1.0)  # 1 second delay between batches
 
         # If all requests failed, raise an exception
         if len(errors) == len(texts):
@@ -312,9 +319,11 @@ class GeminiEmbeddingService(BaseService):
             self.circuit_breaker.record_failure()
             
             # Map exception to appropriate error type
-            if "rate limit" in str(e).lower() or "quota" in str(e).lower():
-                raise RateLimitError(f"Gemini API rate limit exceeded: {str(e)}")
-            elif "timeout" in str(e).lower():
-                raise TimeoutError(f"Gemini API timeout: {str(e)}")
+            error_str = str(e)
+            if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
+                "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
+            elif "timeout" in error_str.lower():
+                raise TimeoutError(f"Gemini API timeout: {error_str}")
             else:
-                raise ExternalServiceError(f"Gemini API error: {str(e)}")
+                raise ExternalServiceError(f"Gemini API error: {error_str}")

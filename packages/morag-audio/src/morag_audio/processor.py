@@ -324,14 +324,11 @@ class AudioProcessor:
             return segments
         
         try:
-            # Run diarization in thread pool to avoid blocking
-            diarization_result = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                lambda: self.diarization_service.diarize_audio(
-                    str(file_path),
-                    min_speakers=self.config.min_speakers,
-                    max_speakers=self.config.max_speakers
-                )
+            # Call the async diarization service directly
+            diarization_result = await self.diarization_service.diarize_audio(
+                str(file_path),
+                min_speakers=self.config.min_speakers,
+                max_speakers=self.config.max_speakers
             )
             
             # Map diarization results to segments based on overlap
