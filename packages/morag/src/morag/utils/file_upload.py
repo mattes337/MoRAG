@@ -68,19 +68,29 @@ class FileUploadHandler:
     def __init__(self, config: Optional[FileUploadConfig] = None):
         self.config = config or FileUploadConfig()
 
-        # Try to create temp directory in a more persistent location first
-        # Fall back to system temp if that fails
+        # Try to create temp directory in shared location for Docker containers
+        # This ensures all containers (API and workers) can access the same files
         try:
-            # Try to use ./temp directory if it exists (Docker/app directory)
-            app_temp_dir = Path("./temp")
-            if app_temp_dir.exists() and app_temp_dir.is_dir():
+            # First try /app/temp (Docker shared volume)
+            app_temp_dir = Path("/app/temp")
+            if app_temp_dir.exists() or self._try_create_dir(app_temp_dir):
                 self.temp_dir = app_temp_dir / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
                 self.temp_dir.mkdir(parents=True, exist_ok=True)
+                logger.info("Using shared Docker temp directory", temp_dir=str(self.temp_dir))
             else:
-                # Fall back to system temp directory
-                self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
+                # Try ./temp directory (local development)
+                local_temp_dir = Path("./temp")
+                if local_temp_dir.exists() or self._try_create_dir(local_temp_dir):
+                    self.temp_dir = local_temp_dir / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
+                    self.temp_dir.mkdir(parents=True, exist_ok=True)
+                    logger.info("Using local temp directory", temp_dir=str(self.temp_dir))
+                else:
+                    # Fall back to system temp directory
+                    self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
+                    logger.warning("Using system temp directory - files may not be shared between containers",
+                                 temp_dir=str(self.temp_dir))
         except Exception as e:
-            logger.warning("Failed to create temp directory in app location, using system temp",
+            logger.warning("Failed to create temp directory in shared location, using system temp",
                          error=str(e))
             self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
 
@@ -93,6 +103,22 @@ class FileUploadHandler:
         logger.info("FileUploadHandler initialized",
                    temp_dir=str(self.temp_dir),
                    max_file_size=self.config.max_file_size)
+
+    def _try_create_dir(self, dir_path: Path) -> bool:
+        """Try to create a directory and return True if successful.
+
+        Args:
+            dir_path: Path to directory to create
+
+        Returns:
+            True if directory exists or was created successfully
+        """
+        try:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            return dir_path.exists() and dir_path.is_dir()
+        except Exception as e:
+            logger.debug("Failed to create directory", dir_path=str(dir_path), error=str(e))
+            return False
     
     async def save_upload(self, file: UploadFile) -> Path:
         """Save uploaded file to temporary location with validation.

@@ -215,11 +215,12 @@ For detailed information about completed tasks and implementation history, see [
 
 #### 11. **Temporary File Cleanup Race Condition** ✅ FIXED (Final Solution - January 2025)
 - **Issue**: `ValidationError: File not found: /tmp/morag_uploads_*/filename.pdf` during document processing
-- **Root Cause**: Race condition between file upload handler cleanup and background task processing
+- **Root Cause**: Multiple issues causing file access problems
   - FileUploadHandler.__del__() method aggressively removes entire temp directory when object is garbage collected
   - Background tasks receive file paths but files are deleted before processing starts
   - Premature cleanup occurs due to upload handler object lifecycle management
   - **Additional Issue Found**: AsyncIO cleanup tasks were being cancelled when HTTP request context ended
+  - **Critical Issue**: Worker containers couldn't access files because they weren't using shared volumes consistently
 - **Solution**: Completely eliminated individual file cleanup to prevent race conditions
   - **Removed Individual File Cleanup**: No longer scheduling cleanup for individual files
   - **Implemented Periodic Cleanup**: Hourly cleanup service that removes files based on age and disk usage
@@ -229,14 +230,17 @@ For detailed information about completed tasks and implementation history, see [
   - **Disk Space Management**: Cleanup prioritizes oldest files when disk usage exceeds limits
 - **Technical Details**:
   - **Root Problem**: Any immediate cleanup creates race conditions with background task processing
-  - **Final Solution**: Periodic cleanup service that runs hourly and only removes old files
+  - **Volume Sharing Issue**: Worker containers need access to same temp files as API container
+  - **Final Solution**: Periodic cleanup service + guaranteed shared volume usage
   - **Cleanup Strategy**: Files are only removed if they are >24 hours old OR if disk usage exceeds 1GB
-  - **Benefits**: Zero race conditions, intelligent disk space management, configurable cleanup policies
+  - **Volume Strategy**: Prioritize `/app/temp` (Docker shared volume) over system temp directories
+  - **Benefits**: Zero race conditions, guaranteed file access across containers, intelligent disk space management
   - **Fallback**: Manual cleanup endpoint available for emergency disk space management
 - **Files Modified**:
-  - `packages/morag/src/morag/utils/file_upload.py`: Removed individual file cleanup, added periodic cleanup method, improved temp directory location
+  - `packages/morag/src/morag/utils/file_upload.py`: Removed individual file cleanup, added periodic cleanup method, enforced shared volume usage
   - `packages/morag/src/morag/ingest_tasks.py`: Enhanced error handling and logging with detailed debugging
   - `packages/morag/src/morag/server.py`: Integrated periodic cleanup service into server lifecycle
+  - `docker-compose.yml`: Already had correct volume sharing configuration (`./temp:/app/temp`)
 - **Files Added**:
   - `packages/morag/src/morag/services/cleanup_service.py`: Periodic cleanup service implementation
   - `packages/morag/src/morag/services/__init__.py`: Services package initialization
@@ -245,6 +249,7 @@ For detailed information about completed tasks and implementation history, see [
   - `tests/test_race_condition_integration.py`: Integration tests simulating real race condition scenarios
   - `tests/test_enhanced_race_condition_fix.py`: Tests for enhanced temp directory handling and logging
   - `tests/test_periodic_cleanup_service.py`: Tests for periodic cleanup service functionality
+  - `tests/test_shared_volume_access.py`: Tests for shared volume access between containers
 - **Status**: Race condition eliminated, background tasks now process files reliably
 
 ### ✅ Docker Build Optimization (January 2025)
