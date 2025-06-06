@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     memory_threshold: float = 80.0  # percentage
     metrics_enabled: bool = True
 
+    # Retry Configuration
+    retry_indefinitely: bool = True  # Enable indefinite retries for rate limits
+    retry_base_delay: float = 1.0  # Base delay in seconds
+    retry_max_delay: float = 300.0  # Maximum delay in seconds (5 minutes)
+    retry_exponential_base: float = 2.0  # Exponential backoff multiplier
+    retry_jitter: bool = True  # Add random jitter to delays
+
     # File Storage
     upload_dir: str = "./uploads"
     temp_dir: str = "./temp"

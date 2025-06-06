@@ -240,11 +240,21 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         return 2048
 
     def _generate_embedding_sync(self, text: str, task_type: str) -> EmbeddingResult:
-        """Synchronous embedding generation with retry logic."""
-        max_retries = 3
-        base_delay = 1.0
+        """Synchronous embedding generation with indefinite retry logic for rate limits."""
+        from morag_core.config import settings
 
-        for attempt in range(max_retries + 1):
+        # Get retry configuration
+        retry_indefinitely = settings.retry_indefinitely
+        base_delay = settings.retry_base_delay
+        max_delay = settings.retry_max_delay
+        exponential_base = settings.retry_exponential_base
+        use_jitter = settings.retry_jitter
+
+        # For non-rate-limit errors, still use limited retries
+        max_retries_non_rate_limit = 3
+        attempt = 0
+
+        while True:
             try:
                 response = self.client.models.embed_content(
                     model=self.embedding_model,
@@ -259,33 +269,67 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
             except Exception as e:
                 error_str = str(e)
+                attempt += 1
 
                 # Check for rate limiting errors
                 if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
                     "quota exceeded" in error_str.lower() or "rate limit" in error_str.lower()):
 
-                    if attempt < max_retries:
-                        # Exponential backoff with jitter
-                        delay = base_delay * (2 ** attempt) + (time.time() % 1)  # Add jitter
+                    # For rate limit errors, retry indefinitely if configured
+                    if retry_indefinitely:
+                        # Calculate delay with exponential backoff
+                        delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
+
+                        # Add jitter if enabled
+                        if use_jitter:
+                            jitter = (time.time() % 1) * 0.1 * delay  # 10% jitter
+                            delay += jitter
+
                         logger.warning(
-                            "Rate limit hit, retrying after delay",
-                            attempt=attempt + 1,
-                            max_retries=max_retries,
+                            "Rate limit hit, retrying indefinitely with exponential backoff",
+                            attempt=attempt,
+                            delay=delay,
+                            max_delay=max_delay,
+                            error=error_str
+                        )
+                        time.sleep(delay)
+                        continue
+                    else:
+                        # Legacy behavior: limited retries
+                        if attempt <= max_retries_non_rate_limit:
+                            delay = base_delay * (exponential_base ** (attempt - 1))
+                            if use_jitter:
+                                delay += (time.time() % 1)
+                            logger.warning(
+                                "Rate limit hit, retrying with limited attempts",
+                                attempt=attempt,
+                                max_retries=max_retries_non_rate_limit,
+                                delay=delay,
+                                error=error_str
+                            )
+                            time.sleep(delay)
+                            continue
+                        else:
+                            logger.error("Rate limit exceeded after all retries", error=error_str)
+                            raise RateLimitError(f"Rate limit exceeded after {max_retries_non_rate_limit} retries: {error_str}")
+                else:
+                    # Non-rate-limit error, use limited retries
+                    if attempt <= max_retries_non_rate_limit:
+                        delay = base_delay * (exponential_base ** (attempt - 1))
+                        if use_jitter:
+                            delay += (time.time() % 1)
+                        logger.warning(
+                            "Non-rate-limit error, retrying",
+                            attempt=attempt,
+                            max_retries=max_retries_non_rate_limit,
                             delay=delay,
                             error=error_str
                         )
                         time.sleep(delay)
                         continue
                     else:
-                        logger.error("Rate limit exceeded after all retries", error=error_str)
-                        raise RateLimitError(f"Rate limit exceeded after {max_retries} retries: {error_str}")
-                else:
-                    # Non-rate-limit error, don't retry
-                    logger.error("Failed to generate embedding", error=error_str)
-                    raise ExternalServiceError(f"Embedding generation failed: {error_str}", "gemini")
-
-        # Should never reach here
-        raise ExternalServiceError("Unexpected error in embedding generation", "gemini")
+                        logger.error("Failed to generate embedding after retries", error=error_str)
+                        raise ExternalServiceError(f"Embedding generation failed: {error_str}", "gemini")
     
     async def generate_embeddings_batch(
         self,
@@ -379,11 +423,21 @@ class GeminiEmbeddingService(BaseEmbeddingService):
             raise ExternalServiceError(f"Summary generation failed: {str(e)}", "gemini")
     
     def _generate_text_sync(self, prompt: str) -> str:
-        """Synchronous text generation with retry logic."""
-        max_retries = 3
-        base_delay = 1.0
+        """Synchronous text generation with indefinite retry logic for rate limits."""
+        from morag_core.config import settings
 
-        for attempt in range(max_retries + 1):
+        # Get retry configuration
+        retry_indefinitely = settings.retry_indefinitely
+        base_delay = settings.retry_base_delay
+        max_delay = settings.retry_max_delay
+        exponential_base = settings.retry_exponential_base
+        use_jitter = settings.retry_jitter
+
+        # For non-rate-limit errors, still use limited retries
+        max_retries_non_rate_limit = 3
+        attempt = 0
+
+        while True:
             try:
                 response = self.client.models.generate_content(
                     model=self.generation_model,
@@ -393,33 +447,67 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
             except Exception as e:
                 error_str = str(e)
+                attempt += 1
 
                 # Check for rate limiting errors
                 if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
                     "quota exceeded" in error_str.lower() or "rate limit" in error_str.lower()):
 
-                    if attempt < max_retries:
-                        # Exponential backoff with jitter
-                        delay = base_delay * (2 ** attempt) + (time.time() % 1)  # Add jitter
+                    # For rate limit errors, retry indefinitely if configured
+                    if retry_indefinitely:
+                        # Calculate delay with exponential backoff
+                        delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
+
+                        # Add jitter if enabled
+                        if use_jitter:
+                            jitter = (time.time() % 1) * 0.1 * delay  # 10% jitter
+                            delay += jitter
+
                         logger.warning(
-                            "Rate limit hit in text generation, retrying after delay",
-                            attempt=attempt + 1,
-                            max_retries=max_retries,
+                            "Rate limit hit in text generation, retrying indefinitely with exponential backoff",
+                            attempt=attempt,
+                            delay=delay,
+                            max_delay=max_delay,
+                            error=error_str
+                        )
+                        time.sleep(delay)
+                        continue
+                    else:
+                        # Legacy behavior: limited retries
+                        if attempt <= max_retries_non_rate_limit:
+                            delay = base_delay * (exponential_base ** (attempt - 1))
+                            if use_jitter:
+                                delay += (time.time() % 1)
+                            logger.warning(
+                                "Rate limit hit in text generation, retrying with limited attempts",
+                                attempt=attempt,
+                                max_retries=max_retries_non_rate_limit,
+                                delay=delay,
+                                error=error_str
+                            )
+                            time.sleep(delay)
+                            continue
+                        else:
+                            logger.error("Rate limit exceeded after all retries in text generation", error=error_str)
+                            raise RateLimitError(f"Rate limit exceeded after {max_retries_non_rate_limit} retries: {error_str}")
+                else:
+                    # Non-rate-limit error, use limited retries
+                    if attempt <= max_retries_non_rate_limit:
+                        delay = base_delay * (exponential_base ** (attempt - 1))
+                        if use_jitter:
+                            delay += (time.time() % 1)
+                        logger.warning(
+                            "Non-rate-limit error in text generation, retrying",
+                            attempt=attempt,
+                            max_retries=max_retries_non_rate_limit,
                             delay=delay,
                             error=error_str
                         )
                         time.sleep(delay)
                         continue
                     else:
-                        logger.error("Rate limit exceeded after all retries in text generation", error=error_str)
-                        raise RateLimitError(f"Rate limit exceeded after {max_retries} retries: {error_str}")
-                else:
-                    # Non-rate-limit error, don't retry
-                    logger.error("Failed to generate text", error=error_str)
-                    raise ExternalServiceError(f"Text generation failed: {error_str}", "gemini")
-
-        # Should never reach here
-        raise ExternalServiceError("Unexpected error in text generation", "gemini")
+                        logger.error("Failed to generate text after retries", error=error_str)
+                        raise ExternalServiceError(f"Text generation failed: {error_str}", "gemini")
 
     async def generate_text_from_prompt(self, prompt: str) -> str:
         """Generate text directly from a prompt."""

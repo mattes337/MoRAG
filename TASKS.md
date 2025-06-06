@@ -522,10 +522,34 @@ For detailed information about completed tasks and implementation history, see [
 - **Files Modified**: `packages/morag/src/morag/ingest_tasks.py`
 - **Status**: Celery tasks now properly handle all exception types without constructor errors
 
+#### 27. **Indefinite Retry Logic for Rate Limits** ✅ IMPLEMENTED
+- **Issue**: Rate limit errors still fail after 3 retries instead of retrying indefinitely with exponential backoff
+- **Root Cause**: Multiple embedding services had hardcoded `max_retries = 3` for all error types including rate limits
+- **Solution**: Implemented configurable indefinite retry logic specifically for rate limit errors
+- **Changes Implemented**:
+  - Added retry configuration to core settings: `retry_indefinitely`, `retry_base_delay`, `retry_max_delay`, `retry_exponential_base`, `retry_jitter`
+  - Updated `morag-services/embedding.py`: Replaced fixed retry loops with configurable indefinite retries for rate limits
+  - Updated `morag-embedding/service.py`: Added dynamic retry decorator that switches between limited and indefinite retries
+  - Rate limit errors now retry indefinitely with exponential backoff (default: 1s base, 300s max, 2x multiplier)
+  - Non-rate-limit errors still use limited retries (3 attempts) to avoid infinite loops
+  - Added jitter to prevent thundering herd problems
+- **Configuration Options**:
+  - `MORAG_RETRY_INDEFINITELY=true` (default): Enable indefinite retries for rate limits
+  - `MORAG_RETRY_BASE_DELAY=1.0`: Base delay between retries in seconds
+  - `MORAG_RETRY_MAX_DELAY=300.0`: Maximum delay (5 minutes) to prevent excessive waits
+  - `MORAG_RETRY_EXPONENTIAL_BASE=2.0`: Exponential backoff multiplier
+  - `MORAG_RETRY_JITTER=true`: Add random jitter to delays
+- **Files Modified**:
+  - `packages/morag-core/src/morag_core/config.py`: Added retry configuration settings
+  - `packages/morag-services/src/morag_services/embedding.py`: Implemented indefinite retry logic
+  - `packages/morag-embedding/src/morag_embedding/service.py`: Added dynamic retry decorator
+  - `.env.example`: Added retry configuration documentation
+- **Status**: Rate limit errors now retry indefinitely with intelligent exponential backoff
+
 ### 🧪 Testing and Validation
-- **Test Suite**: Created comprehensive test script `tests/test_configuration_and_error_fixes.py`
+- **Test Suite**: Created comprehensive test scripts for configuration and error handling fixes
 - **Test Coverage**: All configuration and error handling fixes tested with automated validation
-- **Test Results**: ✅ 7/7 test categories passing:
+- **Test Results**: ✅ Multiple test categories passing:
   - Vision model configuration via environment variables
   - ExternalServiceError proper initialization
   - Embedding service error handling with service parameter
@@ -533,7 +557,10 @@ For detailed information about completed tasks and implementation history, see [
   - Audio processor metadata reference
   - Core config vision model setting
   - Exception re-raising logic in Celery tasks
+  - Indefinite retry configuration and delay calculation
+  - Exponential backoff with jitter implementation
 - **Validation**: Each fix tested in isolation and integration scenarios
+- **Configuration Verification**: Retry settings properly loaded from environment variables
 
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents

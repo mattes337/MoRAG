@@ -9,6 +9,7 @@ import numpy as np
 from tenacity import (
     retry,
     stop_after_attempt,
+    stop_never,
     wait_exponential,
     retry_if_exception_type,
     RetryError,
@@ -26,6 +27,32 @@ from morag_core.models.embedding import EmbeddingResult, BatchEmbeddingResult, S
 from morag_core.interfaces.service import BaseService, CircuitBreaker
 
 logger = structlog.get_logger(__name__)
+
+
+def get_retry_decorator_for_rate_limits():
+    """Get retry decorator based on configuration."""
+    from morag_core.config import settings
+
+    if settings.retry_indefinitely:
+        # Indefinite retries for rate limits with exponential backoff
+        return retry(
+            retry=retry_if_exception_type(RateLimitError),
+            stop=stop_never,  # Never stop retrying for rate limits
+            wait=wait_exponential(
+                multiplier=settings.retry_base_delay,
+                max=settings.retry_max_delay,
+                exp_base=settings.retry_exponential_base
+            ),
+            reraise=True,
+        )
+    else:
+        # Limited retries (legacy behavior)
+        return retry(
+            retry=retry_if_exception_type((ExternalServiceError, TimeoutError, RateLimitError)),
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=1, max=10),
+            reraise=True,
+        )
 
 
 class GeminiEmbeddingService(BaseService):
@@ -150,12 +177,6 @@ class GeminiEmbeddingService(BaseService):
         self.rate_limit_tokens -= 1
         return True
 
-    @retry(
-        retry=retry_if_exception_type((ExternalServiceError, TimeoutError)),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
-        reraise=True,
-    )
     async def generate_embedding(self, text: str) -> EmbeddingResult:
         """Generate embedding for text.
 
@@ -178,34 +199,41 @@ class GeminiEmbeddingService(BaseService):
         if not self._consume_rate_limit_token():
             raise RateLimitError("Rate limit exceeded for embedding generation")
 
-        try:
-            # Call Gemini API to generate embedding
-            result = genai.embed_content(model=self.embedding_model, content=text)
-            
-            # Record success for circuit breaker
-            self.circuit_breaker.record_success()
-            
-            # Create and return embedding result
-            embedding_result = EmbeddingResult(
-                text=text,
-                embedding=result["embedding"],
-                model=self.embedding_model,
-            )
-            
-            return embedding_result
-        except Exception as e:
-            # Record failure for circuit breaker
-            self.circuit_breaker.record_failure()
-            
-            # Map exception to appropriate error type
-            error_str = str(e)
-            if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
-                "rate limit" in error_str.lower() or "quota" in error_str.lower()):
-                raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
-            elif "timeout" in error_str.lower():
-                raise TimeoutError(f"Gemini API timeout: {error_str}")
-            else:
-                raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+        # Apply dynamic retry decorator based on configuration
+        retry_decorator = get_retry_decorator_for_rate_limits()
+
+        @retry_decorator
+        async def _generate_with_retry():
+            try:
+                # Call Gemini API to generate embedding
+                result = genai.embed_content(model=self.embedding_model, content=text)
+
+                # Record success for circuit breaker
+                self.circuit_breaker.record_success()
+
+                # Create and return embedding result
+                embedding_result = EmbeddingResult(
+                    text=text,
+                    embedding=result["embedding"],
+                    model=self.embedding_model,
+                )
+
+                return embedding_result
+            except Exception as e:
+                # Record failure for circuit breaker
+                self.circuit_breaker.record_failure()
+
+                # Map exception to appropriate error type
+                error_str = str(e)
+                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
+                    "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                    raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
+                elif "timeout" in error_str.lower():
+                    raise TimeoutError(f"Gemini API timeout: {error_str}")
+                else:
+                    raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+
+        return await _generate_with_retry()
 
     async def generate_batch_embeddings(self, texts: List[str]) -> BatchEmbeddingResult:
         """Generate embeddings for multiple texts.
@@ -261,12 +289,6 @@ class GeminiEmbeddingService(BaseService):
             metadata={"errors": errors} if errors else {},
         )
 
-    @retry(
-        retry=retry_if_exception_type((ExternalServiceError, TimeoutError)),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
-        reraise=True,
-    )
     async def generate_summary(self, text: str, max_length: int = 200) -> SummaryResult:
         """Generate summary for text.
 
@@ -290,40 +312,47 @@ class GeminiEmbeddingService(BaseService):
         if not self._consume_rate_limit_token():
             raise RateLimitError("Rate limit exceeded for summary generation")
 
-        try:
-            # Configure the model
-            model = genai.GenerativeModel(self.generation_model)
-            
-            # Create prompt for summarization
-            prompt = f"Summarize the following text in {max_length} characters or less:\n\n{text}"
-            
-            # Generate summary
-            response = model.generate_content(prompt)
-            summary = response.text
-            
-            # Ensure summary is within max length
-            if len(summary) > max_length:
-                summary = summary[:max_length-3] + "..."
-            
-            # Record success for circuit breaker
-            self.circuit_breaker.record_success()
-            
-            # Create and return summary result
-            return SummaryResult(
-                original_text=text,
-                summary=summary,
-                model=self.generation_model,
-            )
-        except Exception as e:
-            # Record failure for circuit breaker
-            self.circuit_breaker.record_failure()
-            
-            # Map exception to appropriate error type
-            error_str = str(e)
-            if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
-                "rate limit" in error_str.lower() or "quota" in error_str.lower()):
-                raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
-            elif "timeout" in error_str.lower():
-                raise TimeoutError(f"Gemini API timeout: {error_str}")
-            else:
-                raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+        # Apply dynamic retry decorator based on configuration
+        retry_decorator = get_retry_decorator_for_rate_limits()
+
+        @retry_decorator
+        async def _generate_summary_with_retry():
+            try:
+                # Configure the model
+                model = genai.GenerativeModel(self.generation_model)
+
+                # Create prompt for summarization
+                prompt = f"Summarize the following text in {max_length} characters or less:\n\n{text}"
+
+                # Generate summary
+                response = model.generate_content(prompt)
+                summary = response.text
+
+                # Ensure summary is within max length
+                if len(summary) > max_length:
+                    summary = summary[:max_length-3] + "..."
+
+                # Record success for circuit breaker
+                self.circuit_breaker.record_success()
+
+                # Create and return summary result
+                return SummaryResult(
+                    original_text=text,
+                    summary=summary,
+                    model=self.generation_model,
+                )
+            except Exception as e:
+                # Record failure for circuit breaker
+                self.circuit_breaker.record_failure()
+
+                # Map exception to appropriate error type
+                error_str = str(e)
+                if ("429" in error_str or "RESOURCE_EXHAUSTED" in error_str or
+                    "rate limit" in error_str.lower() or "quota" in error_str.lower()):
+                    raise RateLimitError(f"Gemini API rate limit exceeded: {error_str}")
+                elif "timeout" in error_str.lower():
+                    raise TimeoutError(f"Gemini API timeout: {error_str}")
+                else:
+                    raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
+
+        return await _generate_summary_with_retry()
