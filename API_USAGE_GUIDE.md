@@ -344,3 +344,118 @@ All fixes have been tested and verified:
 - ✅ Chapter detection patterns for various document formats
 - ✅ All content types properly routed through orchestrator
 - ✅ Comprehensive JSON output schemas for all content types
+
+## 🗄️ Ingestion API (Background Processing + Vector Storage)
+
+The ingestion endpoints process content in the background and store results in the vector database for retrieval. These are ideal for building a searchable knowledge base.
+
+### File Ingestion
+
+```bash
+# Ingest a document file
+curl -X POST "http://localhost:8000/api/v1/ingest/file" \
+  -F "source_type=document" \
+  -F "file=@document.pdf" \
+  -F "metadata={\"tags\": [\"important\"], \"category\": \"research\"}"
+
+# Response
+{
+  "task_id": "abc123-def456-ghi789",
+  "status": "pending",
+  "message": "File ingestion started for document.pdf",
+  "estimated_time": 60
+}
+```
+
+### URL Ingestion
+
+```bash
+# Ingest web content
+curl -X POST "http://localhost:8000/api/v1/ingest/url" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_type": "web",
+    "url": "https://example.com/article",
+    "metadata": {"category": "news", "priority": 1}
+  }'
+
+# Ingest YouTube video
+curl -X POST "http://localhost:8000/api/v1/ingest/url" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_type": "youtube",
+    "url": "https://youtube.com/watch?v=VIDEO_ID",
+    "webhook_url": "https://your-app.com/webhook"
+  }'
+```
+
+### Batch Ingestion
+
+```bash
+# Ingest multiple items
+curl -X POST "http://localhost:8000/api/v1/ingest/batch" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "source_type": "web",
+        "url": "https://example.com/page1"
+      },
+      {
+        "source_type": "youtube",
+        "url": "https://youtube.com/watch?v=VIDEO_ID"
+      }
+    ],
+    "webhook_url": "https://your-app.com/batch-webhook"
+  }'
+```
+
+### Task Status Monitoring
+
+```bash
+# Check task status
+curl "http://localhost:8000/api/v1/status/abc123-def456-ghi789"
+
+# Response
+{
+  "task_id": "abc123-def456-ghi789",
+  "status": "PROGRESS",
+  "progress": 0.75,
+  "message": "Processing chunks",
+  "result": null,
+  "error": null
+}
+
+# List active tasks
+curl "http://localhost:8000/api/v1/status/"
+
+# Get queue statistics
+curl "http://localhost:8000/api/v1/status/stats/queues"
+
+# Cancel a task
+curl -X DELETE "http://localhost:8000/api/v1/ingest/abc123-def456-ghi789"
+```
+
+### Search Stored Content
+
+```bash
+# Search the vector database
+curl -X POST "http://localhost:8000/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "machine learning algorithms",
+    "limit": 5,
+    "filters": {"category": "research"}
+  }'
+```
+
+## 🔄 Processing vs Ingestion
+
+| Feature | Processing (`/process/*`) | Ingestion (`/api/v1/ingest/*`) |
+|---------|---------------------------|--------------------------------|
+| **Response** | Immediate results | Task ID for tracking |
+| **Storage** | No storage | Stored in vector database |
+| **Use Case** | One-time processing | Building searchable knowledge base |
+| **Background** | Synchronous | Asynchronous with Celery |
+| **Webhooks** | Not supported | Supported |
+| **Search** | Not searchable | Searchable via `/search` |

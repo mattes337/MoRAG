@@ -13,18 +13,18 @@ services:
     # echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
   # Qdrant vector database
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: morag-qdrant
-    restart: unless-stopped
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    environment:
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__SERVICE__GRPC_PORT=6334
+#  qdrant:
+#    image: qdrant/qdrant:latest
+#    container_name: morag-qdrant
+#    restart: unless-stopped
+#    ports:
+#      - "6333:6333"
+#      - "6334:6334"
+#    volumes:
+#      - qdrant_data:/qdrant/storage
+#    environment:
+#      - QDRANT__SERVICE__HTTP_PORT=6333
+#      - QDRANT__SERVICE__GRPC_PORT=6334
 
   # MoRAG API Server
   morag-api:
@@ -35,19 +35,7 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_URL=http://qdrant:6333
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - HF_HOME=/app/.cache/huggingface
-      - TRANSFORMERS_CACHE=/app/.cache/huggingface
-      - WHISPER_CACHE_DIR=/app/.cache/whisper
-      - HUGGINGFACE_HUB_CACHE=/app/.cache/huggingface
-      - XDG_CACHE_HOME=/app/.cache
+    env_file: .env
     depends_on:
       - redis
       - qdrant
@@ -65,20 +53,7 @@ services:
       target: production
     container_name: morag-worker-1
     restart: unless-stopped
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_URL=http://qdrant:6333
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - WORKER_TYPE=celery
-      - HF_HOME=/app/.cache/huggingface
-      - TRANSFORMERS_CACHE=/app/.cache/huggingface
-      - WHISPER_CACHE_DIR=/app/.cache/whisper
-      - HUGGINGFACE_HUB_CACHE=/app/.cache/huggingface
-      - XDG_CACHE_HOME=/app/.cache
+    env_file: .env
     depends_on:
       - redis
     volumes:
@@ -94,18 +69,7 @@ services:
       target: production
     container_name: morag-worker-2
     restart: unless-stopped
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_URL=http://qdrant:6333
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - WORKER_TYPE=celery
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+    env_file: .env
     depends_on:
       - redis
     volumes:
@@ -122,10 +86,7 @@ services:
       target: production
     container_name: morag-beat
     restart: unless-stopped
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
+    env_file: .env
     depends_on:
       - redis
     volumes:

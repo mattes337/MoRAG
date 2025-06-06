@@ -12,11 +12,9 @@ http://localhost:8000
 
 ## Authentication
 
-All API endpoints require authentication using Bearer tokens:
+Currently, the API does not require authentication. This will be added in future versions.
 
-```bash
-Authorization: Bearer YOUR_API_KEY
-```
+For production deployments, authentication can be configured through the service configuration.
 
 ## Endpoints
 
@@ -55,7 +53,6 @@ POST /api/v1/ingest/file
 **Example:**
 ```bash
 curl -X POST "http://localhost:8000/api/v1/ingest/file" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
   -F "source_type=document" \
   -F "file=@document.pdf" \
   -F "metadata={\"tags\": [\"important\"], \"priority\": 1}"
@@ -95,7 +92,6 @@ POST /api/v1/ingest/url
 **Example:**
 ```bash
 curl -X POST "http://localhost:8000/api/v1/ingest/url" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "source_type": "web",

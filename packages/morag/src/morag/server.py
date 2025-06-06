@@ -4,6 +4,8 @@ import asyncio
 import base64
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
+import json
+import uuid
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
@@ -15,8 +17,13 @@ import structlog
 
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
-from morag_core.models import ProcessingResult
+from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
 from morag.utils.file_upload import get_upload_handler, FileUploadError
+from morag.worker import (
+    process_file_task, process_url_task, process_web_page_task,
+    process_youtube_video_task, process_batch_task, celery_app
+)
+from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
 
 logger = structlog.get_logger(__name__)
 
@@ -196,6 +203,53 @@ class ProcessingResultResponse(BaseModel):
     thumbnails: Optional[List[str]] = None  # Base64 encoded thumbnails
 
 
+# Ingest API models
+class IngestFileRequest(BaseModel):
+    source_type: str
+    webhook_url: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    use_docling: Optional[bool] = False
+
+
+class IngestURLRequest(BaseModel):
+    source_type: str
+    url: str
+    webhook_url: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class IngestBatchRequest(BaseModel):
+    items: List[Dict[str, Any]]
+    webhook_url: Optional[str] = None
+
+
+class IngestResponse(BaseModel):
+    task_id: str
+    status: str = "pending"
+    message: str
+    estimated_time: Optional[int] = None
+
+
+class BatchIngestResponse(BaseModel):
+    batch_id: str
+    task_ids: List[str]
+    total_items: int
+    message: str
+
+
+class TaskStatus(BaseModel):
+    task_id: str
+    status: str
+    progress: float = 0.0
+    message: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    estimated_time_remaining: Optional[int] = None
+
+
 def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     """Create FastAPI application."""
 
@@ -214,7 +268,21 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
     app = FastAPI(
         title="MoRAG API",
-        description="Modular Retrieval Augmented Generation System",
+        description="""
+        Modular Retrieval Augmented Generation System
+
+        ## Features
+        - **Processing Endpoints**: Process content and return results immediately
+        - **Ingestion Endpoints**: Process content and store in vector database for retrieval
+        - **Task Management**: Track processing status and manage background tasks
+        - **Search**: Query stored content using vector similarity
+
+        ## Endpoint Categories
+        - `/process/*` - Immediate processing (no storage)
+        - `/api/v1/ingest/*` - Background processing with vector storage
+        - `/api/v1/status/*` - Task status and management
+        - `/search` - Vector similarity search
+        """,
         version="0.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
@@ -245,7 +313,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Health check failed", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
     
-    @app.post("/process/url", response_model=ProcessingResultResponse)
+    @app.post("/process/url", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_url(request: ProcessURLRequest):
         """Process content from a URL."""
         try:
@@ -266,7 +334,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("URL processing failed", url=request.url, error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
     
-    @app.post("/process/file", response_model=ProcessingResultResponse)
+    @app.post("/process/file", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_file(
         file: UploadFile = File(...),
         content_type: Optional[str] = Form(None),
@@ -374,7 +442,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                                  temp_path=str(temp_path),
                                  error=str(e))
     
-    @app.post("/process/web", response_model=ProcessingResultResponse)
+    @app.post("/process/web", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_web_page(request: ProcessURLRequest):
         """Process a web page."""
         try:
@@ -391,7 +459,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Web page processing failed", url=request.url, error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
     
-    @app.post("/process/youtube", response_model=ProcessingResultResponse)
+    @app.post("/process/youtube", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_youtube_video(request: ProcessURLRequest):
         """Process a YouTube video."""
         try:
@@ -408,7 +476,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("YouTube processing failed", url=request.url, error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
     
-    @app.post("/process/batch")
+    @app.post("/process/batch", tags=["Processing"])
     async def process_batch(request: ProcessBatchRequest):
         """Process multiple items in batch."""
         try:
@@ -426,7 +494,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Batch processing failed", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
     
-    @app.post("/search")
+    @app.post("/search", tags=["Search"])
     async def search_similar(request: SearchRequest):
         """Search for similar content."""
         try:
@@ -439,7 +507,265 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         except Exception as e:
             logger.error("Search failed", query=request.query, error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
-    
+
+    # Ingest API endpoints
+    @app.post("/api/v1/ingest/file", response_model=IngestResponse, tags=["Ingestion"])
+    async def ingest_file(
+        source_type: str = Form(...),
+        file: UploadFile = File(...),
+        webhook_url: Optional[str] = Form(None),
+        metadata: Optional[str] = Form(None),  # JSON string
+        use_docling: Optional[bool] = Form(False)
+    ):
+        """Ingest and process a file, storing results in vector database."""
+        temp_path = None
+        try:
+            # Parse metadata if provided
+            parsed_metadata = None
+            if metadata:
+                try:
+                    parsed_metadata = json.loads(metadata)
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON in metadata", metadata=metadata, error=str(e))
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON in metadata: {str(e)}")
+
+            # Save uploaded file using secure file upload handler
+            upload_handler = get_upload_handler()
+            try:
+                temp_path = await upload_handler.save_upload(file)
+                logger.info("File uploaded for ingestion",
+                           filename=file.filename,
+                           temp_path=str(temp_path),
+                           source_type=source_type)
+            except FileUploadError as e:
+                logger.error("File upload validation failed",
+                           filename=file.filename,
+                           error=str(e))
+                raise HTTPException(status_code=400, detail=str(e))
+
+            # Create task options
+            options = {
+                "webhook_url": webhook_url,
+                "metadata": parsed_metadata,
+                "use_docling": use_docling,
+                "store_in_vector_db": True  # Key difference from process endpoints
+            }
+
+            # Submit to background task queue for processing and storage
+            task = ingest_file_task.delay(
+                str(temp_path),
+                source_type,
+                options
+            )
+
+            logger.info("File ingestion task created",
+                       task_id=task.id,
+                       filename=file.filename,
+                       source_type=source_type)
+
+            return IngestResponse(
+                task_id=task.id,
+                status="pending",
+                message=f"File ingestion started for {file.filename}",
+                estimated_time=60  # Estimate based on content type
+            )
+
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
+        except Exception as e:
+            logger.error("Unexpected error in file ingestion endpoint",
+                        filename=getattr(file, 'filename', 'unknown'),
+                        error=str(e))
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        finally:
+            # Note: Don't clean up temp file here - the background task needs it
+            pass
+
+    @app.post("/api/v1/ingest/url", response_model=IngestResponse, tags=["Ingestion"])
+    async def ingest_url(request: IngestURLRequest):
+        """Ingest and process content from URL, storing results in vector database."""
+        try:
+            # Create task options
+            options = {
+                "webhook_url": request.webhook_url,
+                "metadata": request.metadata,
+                "store_in_vector_db": True  # Key difference from process endpoints
+            }
+
+            # Submit to ingest URL task for processing and storage
+            task = ingest_url_task.delay(request.url, request.source_type, options)
+
+            logger.info("URL ingestion task created",
+                       task_id=task.id,
+                       url=request.url,
+                       source_type=request.source_type)
+
+            return IngestResponse(
+                task_id=task.id,
+                status="pending",
+                message=f"URL ingestion started for {request.url}",
+                estimated_time=120  # URLs typically take longer
+            )
+
+        except Exception as e:
+            logger.error("URL ingestion failed", url=request.url, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/ingest/batch", response_model=BatchIngestResponse, tags=["Ingestion"])
+    async def ingest_batch(request: IngestBatchRequest):
+        """Ingest and process multiple items in batch, storing results in vector database."""
+        try:
+            # Create batch options
+            options = {
+                "webhook_url": request.webhook_url,
+                "store_in_vector_db": True  # Key difference from process endpoints
+            }
+
+            # Submit batch ingest task
+            task = ingest_batch_task.delay(request.items, options)
+
+            batch_id = f"batch-{uuid.uuid4().hex[:8]}"
+
+            logger.info("Batch ingestion task created",
+                       task_id=task.id,
+                       batch_id=batch_id,
+                       item_count=len(request.items))
+
+            return BatchIngestResponse(
+                batch_id=batch_id,
+                task_ids=[task.id],  # Single task for the batch
+                total_items=len(request.items),
+                message=f"Batch ingestion started with {len(request.items)} items"
+            )
+
+        except Exception as e:
+            logger.error("Batch ingestion failed", item_count=len(request.items), error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Task status endpoints
+    @app.get("/api/v1/status/{task_id}", response_model=TaskStatus, tags=["Task Management"])
+    async def get_task_status(task_id: str):
+        """Get the status of a processing task."""
+        try:
+            # Get task result from Celery
+            task_result = celery_app.AsyncResult(task_id)
+
+            # Map Celery states to our API states
+            status_mapping = {
+                'PENDING': 'PENDING',
+                'STARTED': 'PROGRESS',
+                'PROGRESS': 'PROGRESS',
+                'SUCCESS': 'SUCCESS',
+                'FAILURE': 'FAILURE',
+                'REVOKED': 'REVOKED'
+            }
+
+            status = status_mapping.get(task_result.state, task_result.state)
+
+            # Get task info
+            task_info = task_result.info or {}
+
+            # Calculate progress
+            progress = 0.0
+            if status == 'SUCCESS':
+                progress = 1.0
+            elif status == 'PROGRESS' and isinstance(task_info, dict):
+                progress = task_info.get('progress', 0.0)
+
+            # Get result if completed successfully
+            result = None
+            error = None
+            if status == 'SUCCESS':
+                result = task_result.result
+            elif status == 'FAILURE':
+                error = str(task_result.info) if task_result.info else "Task failed"
+
+            return TaskStatus(
+                task_id=task_id,
+                status=status,
+                progress=progress,
+                message=task_info.get('message') if isinstance(task_info, dict) else None,
+                result=result,
+                error=error
+            )
+
+        except Exception as e:
+            logger.error("Failed to get task status", task_id=task_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/v1/status/", tags=["Task Management"])
+    async def list_active_tasks():
+        """Get all currently active tasks."""
+        try:
+            # Get active tasks from Celery
+            inspect = celery_app.control.inspect()
+            active_tasks = inspect.active()
+
+            if not active_tasks:
+                return {"active_tasks": [], "count": 0}
+
+            # Extract task IDs from all workers
+            task_ids = []
+            for worker, tasks in active_tasks.items():
+                for task in tasks:
+                    task_ids.append(task['id'])
+
+            return {
+                "active_tasks": task_ids,
+                "count": len(task_ids)
+            }
+
+        except Exception as e:
+            logger.error("Failed to list active tasks", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/v1/status/stats/queues", tags=["Task Management"])
+    async def get_queue_stats():
+        """Get processing queue statistics."""
+        try:
+            # Get queue stats from Celery
+            inspect = celery_app.control.inspect()
+
+            # Get active tasks
+            active_tasks = inspect.active() or {}
+            active_count = sum(len(tasks) for tasks in active_tasks.values())
+
+            # Get scheduled tasks
+            scheduled_tasks = inspect.scheduled() or {}
+            pending_count = sum(len(tasks) for tasks in scheduled_tasks.values())
+
+            # Note: Celery doesn't provide completed/failed counts directly
+            # These would need to be tracked separately in a database
+
+            return {
+                "pending": pending_count,
+                "active": active_count,
+                "completed": 0,  # Would need separate tracking
+                "failed": 0      # Would need separate tracking
+            }
+
+        except Exception as e:
+            logger.error("Failed to get queue stats", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/api/v1/ingest/{task_id}", tags=["Task Management"])
+    async def cancel_task(task_id: str):
+        """Cancel a running or pending task."""
+        try:
+            # Revoke the task
+            celery_app.control.revoke(task_id, terminate=True)
+
+            logger.info("Task cancelled", task_id=task_id)
+
+            return {
+                "message": f"Task {task_id} cancelled successfully"
+            }
+
+        except Exception as e:
+            logger.error("Failed to cancel task", task_id=task_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
     return app
 
 

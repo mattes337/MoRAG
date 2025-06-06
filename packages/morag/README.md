@@ -119,17 +119,30 @@ Create a configuration file (JSON format):
 
 ## API Endpoints
 
-### Process Content
+### Processing (Immediate Results)
 
-- `POST /process/url` - Process content from URL
-- `POST /process/file` - Process uploaded file
-- `POST /process/web` - Process web page
-- `POST /process/youtube` - Process YouTube video
-- `POST /process/batch` - Process multiple items
+- `POST /process/url` - Process content from URL (returns results immediately)
+- `POST /process/file` - Process uploaded file (returns results immediately)
+- `POST /process/web` - Process web page (returns results immediately)
+- `POST /process/youtube` - Process YouTube video (returns results immediately)
+- `POST /process/batch` - Process multiple items (returns results immediately)
+
+### Ingestion (Background Processing + Vector Storage)
+
+- `POST /api/v1/ingest/file` - Ingest file (background processing, stores in vector DB)
+- `POST /api/v1/ingest/url` - Ingest URL content (background processing, stores in vector DB)
+- `POST /api/v1/ingest/batch` - Ingest multiple items (background processing, stores in vector DB)
+
+### Task Management
+
+- `GET /api/v1/status/{task_id}` - Get task status
+- `GET /api/v1/status/` - List active tasks
+- `GET /api/v1/status/stats/queues` - Get queue statistics
+- `DELETE /api/v1/ingest/{task_id}` - Cancel task
 
 ### Search
 
-- `POST /search` - Search for similar content
+- `POST /search` - Search for similar content in vector database
 
 ### System
 
