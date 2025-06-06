@@ -2,20 +2,36 @@
 """
 MoRAG Web Processing Test Script
 
-Usage: python test-web.py <url>
+Supports both processing (immediate results) and ingestion (background + storage) modes.
 
-Examples:
+Usage:
+    python test-web.py <url> [options]
+
+Processing Mode (immediate results):
     python test-web.py https://example.com
     python test-web.py https://en.wikipedia.org/wiki/Python
     python test-web.py https://github.com/your-repo
+
+Ingestion Mode (background processing + storage):
+    python test-web.py https://example.com --ingest
+    python test-web.py https://news-site.com/article --ingest --metadata '{"category": "news"}'
+    python test-web.py https://docs.site.com --ingest --webhook-url https://my-app.com/webhook
+
+Options:
+    --ingest                    Enable ingestion mode (background processing + storage)
+    --webhook-url URL          Webhook URL for completion notifications (ingestion mode only)
+    --metadata JSON            Additional metadata as JSON string (ingestion mode only)
+    --help                     Show this help message
 """
 
 import sys
 import asyncio
 import json
+import argparse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 import urllib.parse
+import requests
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
@@ -151,6 +167,7 @@ async def test_web_processing(url: str) -> bool:
             output_file = Path(f"uploads/web_{safe_filename}_test_result.json")
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
+                    'mode': 'processing',
                     'url': result.url,
                     'success': result.success,
                     'processing_time': result.processing_time,
@@ -187,7 +204,7 @@ async def test_web_processing(url: str) -> bool:
             print("❌ Web processing failed!")
             print_result("Error", result.error_message or "Unknown error")
             return False
-            
+
     except Exception as e:
         print(f"❌ Error during web processing: {e}")
         import traceback
@@ -195,29 +212,148 @@ async def test_web_processing(url: str) -> bool:
         return False
 
 
+async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
+                            metadata: Optional[Dict[str, Any]] = None) -> bool:
+    """Test web ingestion functionality."""
+    print_header("MoRAG Web Ingestion Test")
+
+    if not validate_url(url):
+        print(f"❌ Error: Invalid URL format: {url}")
+        return False
+
+    print_result("Target URL", url)
+    print_result("Webhook URL", webhook_url or "None")
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+
+    try:
+        print_section("Submitting Ingestion Task")
+        print("🔄 Starting web ingestion...")
+
+        # Prepare request data
+        data = {
+            'source_type': 'web',
+            'url': url
+        }
+
+        if webhook_url:
+            data['webhook_url'] = webhook_url
+        if metadata:
+            data['metadata'] = metadata
+
+        # Submit to ingestion API
+        response = requests.post(
+            'http://localhost:8000/api/v1/ingest/url',
+            json=data,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            print("✅ Web ingestion task submitted successfully!")
+
+            print_section("Ingestion Results")
+            print_result("Status", "✅ Success")
+            print_result("Task ID", result.get('task_id', 'Unknown'))
+            print_result("Message", result.get('message', 'Task created'))
+            print_result("Estimated Time", f"{result.get('estimated_time', 'Unknown')} seconds")
+
+            # Create safe filename from URL
+            safe_filename = urllib.parse.quote(url, safe='').replace('%', '_')[:50]
+
+            # Save ingestion result
+            output_file = Path(f"uploads/web_{safe_filename}_ingest_result.json")
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'mode': 'ingestion',
+                    'task_id': result.get('task_id'),
+                    'status': result.get('status'),
+                    'message': result.get('message'),
+                    'estimated_time': result.get('estimated_time'),
+                    'webhook_url': webhook_url,
+                    'metadata': metadata,
+                    'url': url
+                }, f, indent=2, ensure_ascii=False)
+
+            print_section("Output")
+            print_result("Ingestion result saved to", str(output_file))
+            print_result("Monitor task status", f"curl http://localhost:8000/api/v1/status/{result.get('task_id')}")
+
+            return True
+        else:
+            print("❌ Web ingestion failed!")
+            print_result("Status Code", str(response.status_code))
+            print_result("Error", response.text)
+            return False
+
+    except Exception as e:
+        print(f"❌ Error during web ingestion: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def main():
     """Main function."""
-    if len(sys.argv) != 2:
-        print("Usage: python test-web.py <url>")
-        print()
-        print("Examples:")
-        print("  python test-web.py https://example.com")
-        print("  python test-web.py https://en.wikipedia.org/wiki/Python")
-        print("  python test-web.py https://github.com/your-repo")
-        print()
-        print("Note: Make sure the URL is accessible and includes the protocol (http:// or https://)")
-        sys.exit(1)
-    
-    url = sys.argv[1]
-    
-    try:
-        success = asyncio.run(test_web_processing(url))
-        if success:
-            print("\n🎉 Web processing test completed successfully!")
-            sys.exit(0)
-        else:
-            print("\n💥 Web processing test failed!")
+    parser = argparse.ArgumentParser(
+        description="MoRAG Web Processing Test Script",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  Processing Mode (immediate results):
+    python test-web.py https://example.com
+    python test-web.py https://en.wikipedia.org/wiki/Python
+    python test-web.py https://github.com/your-repo
+
+  Ingestion Mode (background processing + storage):
+    python test-web.py https://example.com --ingest
+    python test-web.py https://news-site.com/article --ingest --metadata '{"category": "news"}'
+    python test-web.py https://docs.site.com --ingest --webhook-url https://my-app.com/webhook
+
+Note: Make sure the URL is accessible and includes the protocol (http:// or https://)
+        """
+    )
+
+    parser.add_argument('url', help='URL to process')
+    parser.add_argument('--ingest', action='store_true',
+                       help='Enable ingestion mode (background processing + storage)')
+    parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
+    parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
+
+    args = parser.parse_args()
+
+    # Parse metadata if provided
+    metadata = None
+    if args.metadata:
+        try:
+            metadata = json.loads(args.metadata)
+        except json.JSONDecodeError as e:
+            print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    try:
+        if args.ingest:
+            # Ingestion mode
+            success = asyncio.run(test_web_ingestion(
+                args.url,
+                webhook_url=args.webhook_url,
+                metadata=metadata
+            ))
+            if success:
+                print("\n🎉 Web ingestion test completed successfully!")
+                print("💡 Use the task ID to monitor progress and retrieve results.")
+                sys.exit(0)
+            else:
+                print("\n💥 Web ingestion test failed!")
+                sys.exit(1)
+        else:
+            # Processing mode
+            success = asyncio.run(test_web_processing(args.url))
+            if success:
+                print("\n🎉 Web processing test completed successfully!")
+                sys.exit(0)
+            else:
+                print("\n💥 Web processing test failed!")
+                sys.exit(1)
     except KeyboardInterrupt:
         print("\n⏹️  Test interrupted by user")
         sys.exit(1)

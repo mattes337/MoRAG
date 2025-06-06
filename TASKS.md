@@ -139,7 +139,44 @@ For detailed information about completed tasks and implementation history, see [
   - Searchable via `/search` endpoint
 - **Status**: All endpoints implemented, documented, and tested
 
-### 🔄 Future Enhancement Opportunities:
+### 🧹 Repository Cleanup Tasks (January 2025)
+
+### ✅ Test File Organization
+- [x] **Moved Root Test Files**: Relocated all `test_*.py` files from root to `tests/` directory
+  - Moved: `test_all_fixes.py`, `test_api_endpoints.py`, `test_api_fixes.py`, `test_document_features.py`, `test_dual_format.py`, `test_ingest_endpoints.py`
+  - Root directory now clean of test files following Python best practices
+- [x] **Removed Unused Tests**: Cleaned up test files not used for recurring automated tests
+- [x] **Organized Test Structure**: Consolidated test files following Python testing best practices
+
+### ✅ CLI Testing Enhancement
+- [x] **Enhanced CLI Scripts**: Updated all CLI test scripts to support both ingestion AND processing operations
+  - Enhanced: `test-audio.py`, `test-document.py`, `test-video.py`, `test-image.py`, `test-web.py`, `test-youtube.py`
+  - Added dual-mode support with `--ingest` flag for background processing + vector storage
+  - Added `--webhook-url` and `--metadata` options for ingestion mode
+  - Added component-specific options (model size, chunking strategy, thumbnails, etc.)
+- [x] **Standardized Format**: Ensured all scripts follow format: `python test-{component}.py {file} [options]`
+- [x] **Dual Mode Support**: Added ingestion mode testing for vector storage validation
+- [x] **Enhanced Help System**: Added comprehensive argparse-based help with examples for both modes
+
+### ✅ Documentation Cleanup
+- [x] **Removed Redundant Files**: Eliminated duplicate and outdated documentation files
+  - Removed: `API_FIXES_SUMMARY.md`, `DOCKER_FIXES_SUMMARY.md`, `DOCKER_LOG_FIXES_SUMMARY.md`, `DOCKER_MODULE_IMPORT_FIX.md`, `DUAL_FORMAT_EXPLANATION.md`
+  - Removed: `docs/api_usage.md` (duplicate), `docs/docker-dependencies.md` (outdated)
+- [x] **Consolidated Information**: Merged relevant content into main documentation files
+- [x] **Created CLI.md**: Comprehensive CLI documentation with ingestion and processing examples
+- [x] **Updated README.md**: Added references to new CLI capabilities and dual-mode support
+- [x] **Updated CLI README**: Enhanced `tests/cli/README.md` with dual-mode examples and usage patterns
+
+### 📁 Files Removed During Cleanup
+- `API_FIXES_SUMMARY.md` (consolidated into TASKS.md)
+- `DOCKER_FIXES_SUMMARY.md` (consolidated into TASKS.md)
+- `DOCKER_LOG_FIXES_SUMMARY.md` (consolidated into TASKS.md)
+- `DOCKER_MODULE_IMPORT_FIX.md` (consolidated into TASKS.md)
+- `DUAL_FORMAT_EXPLANATION.md` (consolidated into TASKS.md)
+- `docs/api_usage.md` (duplicate of API_USAGE_GUIDE.md)
+- `docs/docker-dependencies.md` (outdated)
+
+## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents
 - [ ] Enhanced chapter detection algorithms using ML
 - [ ] Advanced error recovery mechanisms

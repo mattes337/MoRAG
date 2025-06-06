@@ -2,19 +2,35 @@
 """
 MoRAG YouTube Processing Test Script
 
-Usage: python test-youtube.py <youtube_url>
+Supports both processing (immediate results) and ingestion (background + storage) modes.
 
-Examples:
+Usage:
+    python test-youtube.py <youtube_url> [options]
+
+Processing Mode (immediate results):
     python test-youtube.py https://www.youtube.com/watch?v=dQw4w9WgXcQ
     python test-youtube.py https://youtu.be/dQw4w9WgXcQ
+
+Ingestion Mode (background processing + storage):
+    python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest
+    python test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-url https://my-app.com/webhook
+    python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest --metadata '{"category": "education"}'
+
+Options:
+    --ingest                    Enable ingestion mode (background processing + storage)
+    --webhook-url URL          Webhook URL for completion notifications (ingestion mode only)
+    --metadata JSON            Additional metadata as JSON string (ingestion mode only)
+    --help                     Show this help message
 """
 
 import sys
 import asyncio
 import json
+import argparse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 import re
+import requests
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
@@ -153,6 +169,7 @@ async def test_youtube_processing(url: str) -> bool:
             output_file = Path(f"uploads/youtube_{safe_filename}_test_result.json")
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
+                    'mode': 'processing',
                     'url': url,
                     'success': result.success,
                     'processing_time': result.processing_time,
@@ -184,7 +201,7 @@ async def test_youtube_processing(url: str) -> bool:
             print("❌ YouTube processing failed!")
             print_result("Error", result.error_message or "Unknown error")
             return False
-            
+
     except Exception as e:
         print(f"❌ Error during YouTube processing: {e}")
         import traceback
@@ -192,29 +209,153 @@ async def test_youtube_processing(url: str) -> bool:
         return False
 
 
+async def test_youtube_ingestion(url: str, webhook_url: Optional[str] = None,
+                                metadata: Optional[Dict[str, Any]] = None) -> bool:
+    """Test YouTube ingestion functionality."""
+    print_header("MoRAG YouTube Ingestion Test")
+
+    if not validate_youtube_url(url):
+        print(f"❌ Error: Invalid YouTube URL format: {url}")
+        print("Please provide a valid YouTube URL like:")
+        print("  https://www.youtube.com/watch?v=VIDEO_ID")
+        print("  https://youtu.be/VIDEO_ID")
+        return False
+
+    print_result("YouTube URL", url)
+    print_result("Webhook URL", webhook_url or "None")
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+
+    try:
+        print_section("Submitting Ingestion Task")
+        print("🔄 Starting YouTube ingestion...")
+        print("   This may take several minutes for long videos...")
+
+        # Prepare request data
+        data = {
+            'source_type': 'youtube',
+            'url': url
+        }
+
+        if webhook_url:
+            data['webhook_url'] = webhook_url
+        if metadata:
+            data['metadata'] = metadata
+
+        # Submit to ingestion API
+        response = requests.post(
+            'http://localhost:8000/api/v1/ingest/url',
+            json=data,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            print("✅ YouTube ingestion task submitted successfully!")
+
+            print_section("Ingestion Results")
+            print_result("Status", "✅ Success")
+            print_result("Task ID", result.get('task_id', 'Unknown'))
+            print_result("Message", result.get('message', 'Task created'))
+            print_result("Estimated Time", f"{result.get('estimated_time', 'Unknown')} seconds")
+
+            # Extract video ID for filename
+            video_id = re.search(r'(?:v=|youtu\.be/)([^&\n?#]+)', url)
+            safe_filename = video_id.group(1) if video_id else "youtube_video"
+
+            # Save ingestion result
+            output_file = Path(f"uploads/youtube_{safe_filename}_ingest_result.json")
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'mode': 'ingestion',
+                    'task_id': result.get('task_id'),
+                    'status': result.get('status'),
+                    'message': result.get('message'),
+                    'estimated_time': result.get('estimated_time'),
+                    'webhook_url': webhook_url,
+                    'metadata': metadata,
+                    'url': url
+                }, f, indent=2, ensure_ascii=False)
+
+            print_section("Output")
+            print_result("Ingestion result saved to", str(output_file))
+            print_result("Monitor task status", f"curl http://localhost:8000/api/v1/status/{result.get('task_id')}")
+
+            return True
+        else:
+            print("❌ YouTube ingestion failed!")
+            print_result("Status Code", str(response.status_code))
+            print_result("Error", response.text)
+            return False
+
+    except Exception as e:
+        print(f"❌ Error during YouTube ingestion: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def main():
     """Main function."""
-    if len(sys.argv) != 2:
-        print("Usage: python test-youtube.py <youtube_url>")
-        print()
-        print("Examples:")
-        print("  python test-youtube.py https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        print("  python test-youtube.py https://youtu.be/dQw4w9WgXcQ")
-        print()
-        print("Note: Processing may take several minutes for long videos.")
-        print("Make sure you have a stable internet connection.")
-        sys.exit(1)
-    
-    url = sys.argv[1]
-    
-    try:
-        success = asyncio.run(test_youtube_processing(url))
-        if success:
-            print("\n🎉 YouTube processing test completed successfully!")
-            sys.exit(0)
-        else:
-            print("\n💥 YouTube processing test failed!")
+    parser = argparse.ArgumentParser(
+        description="MoRAG YouTube Processing Test Script",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  Processing Mode (immediate results):
+    python test-youtube.py https://www.youtube.com/watch?v=dQw4w9WgXcQ
+    python test-youtube.py https://youtu.be/dQw4w9WgXcQ
+
+  Ingestion Mode (background processing + storage):
+    python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest
+    python test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-url https://my-app.com/webhook
+    python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest --metadata '{"category": "education"}'
+
+Note: Processing may take several minutes for long videos.
+Make sure you have a stable internet connection.
+        """
+    )
+
+    parser.add_argument('youtube_url', help='YouTube URL to process')
+    parser.add_argument('--ingest', action='store_true',
+                       help='Enable ingestion mode (background processing + storage)')
+    parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
+    parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
+
+    args = parser.parse_args()
+
+    # Parse metadata if provided
+    metadata = None
+    if args.metadata:
+        try:
+            metadata = json.loads(args.metadata)
+        except json.JSONDecodeError as e:
+            print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    try:
+        if args.ingest:
+            # Ingestion mode
+            success = asyncio.run(test_youtube_ingestion(
+                args.youtube_url,
+                webhook_url=args.webhook_url,
+                metadata=metadata
+            ))
+            if success:
+                print("\n🎉 YouTube ingestion test completed successfully!")
+                print("💡 Use the task ID to monitor progress and retrieve results.")
+                sys.exit(0)
+            else:
+                print("\n💥 YouTube ingestion test failed!")
+                sys.exit(1)
+        else:
+            # Processing mode
+            success = asyncio.run(test_youtube_processing(args.youtube_url))
+            if success:
+                print("\n🎉 YouTube processing test completed successfully!")
+                sys.exit(0)
+            else:
+                print("\n💥 YouTube processing test failed!")
+                sys.exit(1)
     except KeyboardInterrupt:
         print("\n⏹️  Test interrupted by user")
         sys.exit(1)

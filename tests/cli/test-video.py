@@ -2,19 +2,38 @@
 """
 MoRAG Video Processing Test Script
 
-Usage: python test-video.py <video_file>
+Supports both processing (immediate results) and ingestion (background + storage) modes.
 
-Examples:
+Usage:
+    python test-video.py <video_file> [options]
+
+Processing Mode (immediate results):
     python test-video.py my-video.mp4
-    python test-video.py recording.avi
-    python test-video.py presentation.mov
+    python test-video.py recording.avi --thumbnails
+    python test-video.py presentation.mov --enable-ocr
+
+Ingestion Mode (background processing + storage):
+    python test-video.py my-video.mp4 --ingest
+    python test-video.py recording.avi --ingest --metadata '{"type": "meeting"}'
+    python test-video.py presentation.mov --ingest --webhook-url https://my-app.com/webhook
+
+Options:
+    --ingest                    Enable ingestion mode (background processing + storage)
+    --webhook-url URL          Webhook URL for completion notifications (ingestion mode only)
+    --metadata JSON            Additional metadata as JSON string (ingestion mode only)
+    --thumbnails               Generate thumbnails (opt-in, default: false)
+    --thumbnail-count N        Number of thumbnails to generate (default: 3)
+    --enable-ocr               Enable OCR on video frames
+    --help                     Show this help message
 """
 
 import sys
 import asyncio
 import json
+import argparse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
+import requests
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
@@ -50,32 +69,36 @@ def print_result(key: str, value: str, indent: int = 0):
     print(f"{spaces}📋 {key}: {value}")
 
 
-async def test_video_processing(video_file: Path) -> bool:
+async def test_video_processing(video_file: Path, generate_thumbnails: bool = False,
+                               thumbnail_count: int = 3, enable_ocr: bool = False) -> bool:
     """Test video processing functionality."""
     print_header("MoRAG Video Processing Test")
-    
+
     if not video_file.exists():
         print(f"❌ Error: Video file not found: {video_file}")
         return False
-    
+
     print_result("Input File", str(video_file))
     print_result("File Size", f"{video_file.stat().st_size / 1024 / 1024:.2f} MB")
     print_result("File Extension", video_file.suffix.lower())
-    
+
     try:
         # Initialize video configuration
         config = VideoConfig(
             extract_audio=True,
-            generate_thumbnails=True,
-            thumbnail_count=3,  # Fewer thumbnails for faster processing
+            generate_thumbnails=generate_thumbnails,
+            thumbnail_count=thumbnail_count,
             extract_keyframes=False,  # Disable for faster processing
             enable_enhanced_audio=True,
             enable_speaker_diarization=False,  # Disable for faster processing
             enable_topic_segmentation=False,  # Disable for faster processing
             audio_model_size="base",  # Use base model for faster processing
-            enable_ocr=False  # Disable for faster processing
+            enable_ocr=enable_ocr
         )
         print_result("Video Configuration", "✅ Created successfully")
+        print_result("Generate Thumbnails", "✅ Enabled" if generate_thumbnails else "❌ Disabled")
+        print_result("Thumbnail Count", str(thumbnail_count) if generate_thumbnails else "N/A")
+        print_result("OCR Enabled", "✅ Enabled" if enable_ocr else "❌ Disabled")
 
         # Initialize video processor
         processor = VideoProcessor(config)
@@ -141,7 +164,11 @@ async def test_video_processing(video_file: Path) -> bool:
         output_file = video_file.parent / f"{video_file.stem}_test_result.json"
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump({
+                'mode': 'processing',
                 'processing_time': result.processing_time,
+                'generate_thumbnails': generate_thumbnails,
+                'thumbnail_count': thumbnail_count,
+                'enable_ocr': enable_ocr,
                 'metadata': {
                     'duration': metadata.duration,
                     'width': metadata.width,
@@ -167,7 +194,7 @@ async def test_video_processing(video_file: Path) -> bool:
         print_result("Results saved to", str(output_file))
 
         return True
-            
+
     except Exception as e:
         print(f"❌ Error during video processing: {e}")
         import traceback
@@ -175,29 +202,162 @@ async def test_video_processing(video_file: Path) -> bool:
         return False
 
 
+async def test_video_ingestion(video_file: Path, webhook_url: Optional[str] = None,
+                              metadata: Optional[Dict[str, Any]] = None) -> bool:
+    """Test video ingestion functionality."""
+    print_header("MoRAG Video Ingestion Test")
+
+    if not video_file.exists():
+        print(f"❌ Error: Video file not found: {video_file}")
+        return False
+
+    print_result("Input File", str(video_file))
+    print_result("File Size", f"{video_file.stat().st_size / 1024 / 1024:.2f} MB")
+    print_result("File Extension", video_file.suffix.lower())
+    print_result("Webhook URL", webhook_url or "None")
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+
+    try:
+        print_section("Submitting Ingestion Task")
+        print("🔄 Starting video ingestion...")
+        print("   This may take a while for large videos...")
+
+        # Prepare form data
+        files = {'file': open(video_file, 'rb')}
+        data = {'source_type': 'video'}
+
+        if webhook_url:
+            data['webhook_url'] = webhook_url
+        if metadata:
+            data['metadata'] = json.dumps(metadata)
+
+        # Submit to ingestion API
+        response = requests.post(
+            'http://localhost:8000/api/v1/ingest/file',
+            files=files,
+            data=data,
+            timeout=30
+        )
+
+        files['file'].close()
+
+        if response.status_code == 200:
+            result = response.json()
+            print("✅ Video ingestion task submitted successfully!")
+
+            print_section("Ingestion Results")
+            print_result("Status", "✅ Success")
+            print_result("Task ID", result.get('task_id', 'Unknown'))
+            print_result("Message", result.get('message', 'Task created'))
+            print_result("Estimated Time", f"{result.get('estimated_time', 'Unknown')} seconds")
+
+            # Save ingestion result
+            output_file = video_file.parent / f"{video_file.stem}_ingest_result.json"
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'mode': 'ingestion',
+                    'task_id': result.get('task_id'),
+                    'status': result.get('status'),
+                    'message': result.get('message'),
+                    'estimated_time': result.get('estimated_time'),
+                    'webhook_url': webhook_url,
+                    'metadata': metadata,
+                    'file_path': str(video_file)
+                }, f, indent=2, ensure_ascii=False)
+
+            print_section("Output")
+            print_result("Ingestion result saved to", str(output_file))
+            print_result("Monitor task status", f"curl http://localhost:8000/api/v1/status/{result.get('task_id')}")
+
+            return True
+        else:
+            print("❌ Video ingestion failed!")
+            print_result("Status Code", str(response.status_code))
+            print_result("Error", response.text)
+            return False
+
+    except Exception as e:
+        print(f"❌ Error during video ingestion: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def main():
     """Main function."""
-    if len(sys.argv) != 2:
-        print("Usage: python test-video.py <video_file>")
-        print()
-        print("Examples:")
-        print("  python test-video.py my-video.mp4")
-        print("  python test-video.py recording.avi")
-        print("  python test-video.py presentation.mov")
-        print()
-        print("Note: Video processing may take several minutes for large files.")
-        sys.exit(1)
-    
-    video_file = Path(sys.argv[1])
-    
-    try:
-        success = asyncio.run(test_video_processing(video_file))
-        if success:
-            print("\n🎉 Video processing test completed successfully!")
-            sys.exit(0)
-        else:
-            print("\n💥 Video processing test failed!")
+    parser = argparse.ArgumentParser(
+        description="MoRAG Video Processing Test Script",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  Processing Mode (immediate results):
+    python test-video.py my-video.mp4
+    python test-video.py recording.avi --thumbnails --thumbnail-count 5
+    python test-video.py presentation.mov --enable-ocr
+
+  Ingestion Mode (background processing + storage):
+    python test-video.py my-video.mp4 --ingest
+    python test-video.py recording.avi --ingest --metadata '{"type": "meeting"}'
+    python test-video.py presentation.mov --ingest --webhook-url https://my-app.com/webhook
+
+Note: Video processing may take several minutes for large files.
+        """
+    )
+
+    parser.add_argument('video_file', help='Path to video file')
+    parser.add_argument('--ingest', action='store_true',
+                       help='Enable ingestion mode (background processing + storage)')
+    parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
+    parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
+    parser.add_argument('--thumbnails', action='store_true',
+                       help='Generate thumbnails (opt-in, default: false)')
+    parser.add_argument('--thumbnail-count', type=int, default=3,
+                       help='Number of thumbnails to generate (default: 3)')
+    parser.add_argument('--enable-ocr', action='store_true',
+                       help='Enable OCR on video frames')
+
+    args = parser.parse_args()
+
+    video_file = Path(args.video_file)
+
+    # Parse metadata if provided
+    metadata = None
+    if args.metadata:
+        try:
+            metadata = json.loads(args.metadata)
+        except json.JSONDecodeError as e:
+            print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    try:
+        if args.ingest:
+            # Ingestion mode
+            success = asyncio.run(test_video_ingestion(
+                video_file,
+                webhook_url=args.webhook_url,
+                metadata=metadata
+            ))
+            if success:
+                print("\n🎉 Video ingestion test completed successfully!")
+                print("💡 Use the task ID to monitor progress and retrieve results.")
+                sys.exit(0)
+            else:
+                print("\n💥 Video ingestion test failed!")
+                sys.exit(1)
+        else:
+            # Processing mode
+            success = asyncio.run(test_video_processing(
+                video_file,
+                generate_thumbnails=args.thumbnails,
+                thumbnail_count=args.thumbnail_count,
+                enable_ocr=args.enable_ocr
+            ))
+            if success:
+                print("\n🎉 Video processing test completed successfully!")
+                sys.exit(0)
+            else:
+                print("\n💥 Video processing test failed!")
+                sys.exit(1)
     except KeyboardInterrupt:
         print("\n⏹️  Test interrupted by user")
         sys.exit(1)

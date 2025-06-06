@@ -2,6 +2,23 @@
 
 This directory contains command-line testing scripts for validating individual MoRAG components and the complete system.
 
+**✨ NEW: All CLI scripts now support both processing (immediate results) and ingestion (background + storage) modes!**
+
+## 🔄 Operation Modes
+
+### **Processing Mode** (Immediate Results)
+- **Purpose**: Get immediate processing results without storage
+- **Use Case**: One-time analysis, testing, development
+- **Output**: Direct results returned immediately
+- **Storage**: No vector database storage
+
+### **Ingestion Mode** (Background Processing + Storage)
+- **Purpose**: Process content and store in vector database for later retrieval
+- **Use Case**: Building searchable knowledge base
+- **Output**: Task ID for monitoring progress
+- **Storage**: Results stored in Qdrant vector database
+- **Searchable**: Yes, via `/search` endpoint
+
 ## Quick Start
 
 ### System Validation
@@ -16,45 +33,81 @@ python tests/cli/test-all.py
 ### Individual Component Testing
 
 #### Audio Processing
+**Processing Mode (immediate results):**
 ```bash
 python tests/cli/test-audio.py uploads/audio.mp3
-python tests/cli/test-audio.py uploads/recording.wav
-python tests/cli/test-audio.py uploads/video.mp4  # Extract audio from video
+python tests/cli/test-audio.py uploads/recording.wav --enable-diarization
+python tests/cli/test-audio.py uploads/video.mp4 --model-size large
+```
+
+**Ingestion Mode (background + storage):**
+```bash
+python tests/cli/test-audio.py uploads/audio.mp3 --ingest
+python tests/cli/test-audio.py uploads/recording.wav --ingest --webhook-url https://my-app.com/webhook
+python tests/cli/test-audio.py uploads/meeting.mp3 --ingest --metadata '{"category": "meeting"}'
 ```
 
 #### Document Processing
+**Processing Mode (immediate results):**
 ```bash
 python tests/cli/test-document.py uploads/document.pdf
-python tests/cli/test-document.py uploads/presentation.pptx
-python tests/cli/test-document.py uploads/spreadsheet.xlsx
-python tests/cli/test-document.py uploads/document.docx
+python tests/cli/test-document.py uploads/presentation.pptx --chunking-strategy chapter
+python tests/cli/test-document.py uploads/document.docx --chunk-size 2000
 ```
 
-#### Video Processing
+**Ingestion Mode (background + storage):**
 ```bash
-python tests/cli/test-video.py uploads/video.mp4
-python tests/cli/test-video.py uploads/recording.avi
-python tests/cli/test-video.py uploads/presentation.mov
-```
-
-#### Image Processing
-```bash
-python tests/cli/test-image.py uploads/image.jpg
-python tests/cli/test-image.py uploads/screenshot.png
-python tests/cli/test-image.py uploads/diagram.gif
+python tests/cli/test-document.py uploads/document.pdf --ingest
+python tests/cli/test-document.py uploads/research.pdf --ingest --metadata '{"category": "research"}'
+python tests/cli/test-document.py uploads/manual.pdf --ingest --webhook-url https://my-app.com/webhook
 ```
 
 #### Web Content Processing
+**Processing Mode (immediate results):**
 ```bash
 python tests/cli/test-web.py https://example.com
 python tests/cli/test-web.py https://en.wikipedia.org/wiki/Python
 python tests/cli/test-web.py https://github.com/your-repo
 ```
 
+**Ingestion Mode (background + storage):**
+```bash
+python tests/cli/test-web.py https://example.com --ingest
+python tests/cli/test-web.py https://news-site.com/article --ingest --metadata '{"category": "news"}'
+python tests/cli/test-web.py https://docs.site.com --ingest --webhook-url https://my-app.com/webhook
+```
+
+#### Video Processing
+```bash
+# Processing mode
+python tests/cli/test-video.py uploads/video.mp4
+python tests/cli/test-video.py uploads/recording.avi --thumbnails
+
+# Ingestion mode
+python tests/cli/test-video.py uploads/video.mp4 --ingest
+python tests/cli/test-video.py uploads/presentation.mov --ingest --metadata '{"type": "presentation"}'
+```
+
+#### Image Processing
+```bash
+# Processing mode
+python tests/cli/test-image.py uploads/image.jpg
+python tests/cli/test-image.py uploads/screenshot.png
+
+# Ingestion mode
+python tests/cli/test-image.py uploads/image.jpg --ingest
+python tests/cli/test-image.py uploads/diagram.png --ingest --metadata '{"type": "diagram"}'
+```
+
 #### YouTube Processing
 ```bash
+# Processing mode
 python tests/cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID
 python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID
+
+# Ingestion mode
+python tests/cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest
+python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-url https://my-app.com/webhook
 ```
 
 ## Available Scripts

@@ -203,16 +203,25 @@ For detailed usage examples including Python API, CLI commands, REST API endpoin
 
 ### Quick Examples
 
+**✨ NEW: All CLI scripts now support both processing (immediate results) and ingestion (background + storage) modes!**
+
 ```bash
-# Test individual components
+# System validation
+python tests/cli/test-simple.py  # Quick validation (recommended)
+python tests/cli/test-all.py     # Comprehensive test with detailed report
+
+# Processing Mode (immediate results)
 python tests/cli/test-audio.py my-audio.mp3
 python tests/cli/test-document.py my-document.pdf
 python tests/cli/test-web.py https://example.com
 
-# Complete system test
-python tests/cli/test-simple.py  # Quick validation (recommended)
-python tests/cli/test-all.py     # Comprehensive test with detailed report
+# Ingestion Mode (background processing + vector storage)
+python tests/cli/test-audio.py my-audio.mp3 --ingest
+python tests/cli/test-document.py my-document.pdf --ingest --metadata '{"category": "research"}'
+python tests/cli/test-web.py https://example.com --ingest --webhook-url https://my-app.com/webhook
 ```
+
+For comprehensive CLI documentation, see [CLI.md](CLI.md).
 
 ## Architecture
 
@@ -227,6 +236,7 @@ The MoRAG pipeline consists of several key components:
 
 ## Documentation
 
+- [CLI Documentation](CLI.md) - **NEW**: Comprehensive CLI commands for both processing and ingestion modes
 - [Usage Guide](USAGE.md) - Comprehensive usage examples and API reference
 - [API Documentation](http://localhost:8000/docs) (when running locally)
 - [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) - Complete Docker deployment instructions
@@ -254,10 +264,12 @@ pytest tests/manual/        # Manual tests
 # Run with coverage
 pytest --cov=src/morag --cov-report=html
 
-# Test individual components
+# Test individual components (NEW: dual-mode support)
 python tests/cli/test-all.py          # Complete system test
-python tests/cli/test-audio.py sample.mp3
-python tests/cli/test-document.py sample.pdf
+python tests/cli/test-audio.py sample.mp3                    # Processing mode
+python tests/cli/test-audio.py sample.mp3 --ingest           # Ingestion mode
+python tests/cli/test-document.py sample.pdf                 # Processing mode
+python tests/cli/test-document.py sample.pdf --ingest        # Ingestion mode
 ```
 
 ### Code Quality
