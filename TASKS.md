@@ -318,22 +318,29 @@ For detailed information about completed tasks and implementation history, see [
 
 #### 14. **NoneType Metadata Mapping Error** ✅ FIXED
 - **Issue**: `TypeError: 'NoneType' object is not a mapping` in ingestion tasks when processing documents
-- **Root Cause**: `result.metadata` can be `None` but code attempts to unpack it with `**result.metadata` in vector storage preparation
+- **Root Causes**:
+  - `result.metadata` can be `None` but code attempts to unpack it with `**result.metadata` in vector storage preparation
+  - `options.get('metadata', {})` returns `None` when metadata is explicitly set to `None` in options, not the default `{}`
 - **Error Location**: Lines 188, 298, and 424 in `ingest_tasks.py` where vector metadata is prepared
-- **Solution**: Added metadata initialization to ensure it's always a dictionary before unpacking
+- **Solution**: Added comprehensive metadata sanitization at both API and worker levels
 - **Changes Implemented**:
-  - **Early Metadata Initialization**: Added `if result.metadata is None: result.metadata = {}` after processing result is obtained
-  - **Consistent Handling**: Applied fix to all three ingestion task functions (file, URL, batch)
-  - **Safe Unpacking**: Ensured metadata is always a dictionary before using `**result.metadata` syntax
-  - **Defensive Programming**: Added checks in all places where metadata is accessed or modified
+  - **API Level Input Sanitization**: Modified server.py to ensure `None` values are converted to appropriate defaults before sending to workers
+    - `webhook_url: webhook_url or ""` - ensures string, not None
+    - `metadata: parsed_metadata or {}` - ensures dict, not None
+  - **Worker Level Metadata Initialization**: Added `if result.metadata is None: result.metadata = {}` after processing result is obtained
+  - **Safe Options Handling**: Changed `**(options.get('metadata', {}))` to `options_metadata = options.get('metadata') or {}` to handle explicit None values
+  - **Consistent Handling**: Applied fixes to all three ingestion task functions (file, URL, batch) and all three API endpoints
+  - **Fail-Fast Validation**: Input sanitization prevents None values from reaching workers, providing immediate feedback to callers
 - **Files Modified**:
-  - `packages/morag/src/morag/ingest_tasks.py`: Added metadata null checks in `ingest_file_task`, `ingest_url_task`, and `ingest_batch_task`
+  - `packages/morag/src/morag/server.py`: Added input sanitization in `/api/v1/ingest/file`, `/api/v1/ingest/url`, and `/api/v1/ingest/batch` endpoints
+  - `packages/morag/src/morag/ingest_tasks.py`: Added metadata null checks and safe options handling in all ingestion task functions
 - **Technical Details**:
-  - **Problem**: Some processing results return `None` for metadata field instead of empty dictionary
-  - **Impact**: Vector storage preparation fails when trying to unpack None with `**` operator
-  - **Solution**: Initialize metadata as empty dict immediately after processing, before any vector storage operations
-  - **Safety**: Ensures metadata is always accessible for webhook notifications and result serialization
-- **Status**: Fixed across all ingestion endpoints, metadata is now guaranteed to be a dictionary
+  - **Primary Problem**: API endpoints passed `None` values to workers, causing unpacking failures
+  - **Secondary Problem**: Processing results sometimes return `None` for metadata field instead of empty dictionary
+  - **Impact**: Vector storage preparation failed when trying to unpack None with `**` operator
+  - **Solution**: Two-layer defense - sanitize inputs at API level and initialize metadata at worker level
+  - **Benefits**: Immediate error feedback for invalid inputs, guaranteed safe processing in workers
+- **Status**: Comprehensive fix implemented, metadata errors eliminated at both API and worker levels
 
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents

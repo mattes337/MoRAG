@@ -185,12 +185,15 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
             # Store in vector database if requested
             if options.get('store_in_vector_db', True):
                 # Prepare metadata for vector storage
+                # Ensure options metadata is also a dictionary
+                options_metadata = options.get('metadata') or {}
+
                 vector_metadata = {
                     "source_type": content_type or "unknown",
                     "source_path": file_path,
                     "processing_time": result.processing_time,
                     **result.metadata,
-                    **(options.get('metadata', {}))
+                    **options_metadata
                 }
 
                 # Store content in vector database
@@ -299,12 +302,15 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
             # Store in vector database if requested
             if options.get('store_in_vector_db', True):
                 # Prepare metadata for vector storage
+                # Ensure options metadata is also a dictionary
+                options_metadata = options.get('metadata') or {}
+
                 vector_metadata = {
                     "source_type": content_type or "url",
                     "source_url": url,
                     "processing_time": result.processing_time,
                     **result.metadata,
-                    **(options.get('metadata', {}))
+                    **options_metadata
                 }
 
                 # Store content in vector database
@@ -428,13 +434,16 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
 
                     if result.success and options.get('store_in_vector_db', True):
                         # Store in vector database
+                        # Ensure options metadata is also a dictionary
+                        options_metadata = options.get('metadata') or {}
+
                         vector_metadata = {
                             "source_type": detected_source_type or item.get('source_type', 'unknown'),
                             "batch_index": i,
                             "batch_size": len(items),
                             "processing_time": result.processing_time,
                             **result.metadata,
-                            **(options.get('metadata', {}))
+                            **options_metadata
                         }
 
                         if 'url' in item:

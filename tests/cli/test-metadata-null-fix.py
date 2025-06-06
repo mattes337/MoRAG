@@ -183,24 +183,28 @@ def main():
     print_section("MoRAG Metadata Null Reference Fix Test")
     print("Testing fix for: TypeError: 'NoneType' object is not a mapping")
     print("This error occurred in ingest_tasks.py when result.metadata was None")
-    
+    print("Fix includes both API-level input sanitization and worker-level metadata initialization")
+
     # Test the fix
     task_id = test_metadata_null_fix()
-    
+
     if task_id:
         print_section("Monitoring Task for Metadata Errors")
         success = monitor_task_for_metadata_error(task_id)
-        
+
         print_section("Test Results")
         if success is True:
             print("✅ METADATA NULL REFERENCE FIX SUCCESSFUL!")
             print("   - No 'NoneType' object is not a mapping errors")
             print("   - Vector storage completed successfully")
             print("   - Metadata properly initialized as dictionary")
+            print("   - API input sanitization working correctly")
+            print("   - Worker-level defensive programming effective")
         elif success is False:
             print("❌ METADATA NULL REFERENCE FIX FAILED!")
             print("   - The original error still occurs")
             print("   - Additional debugging needed")
+            print("   - Check both API and worker level fixes")
         else:
             print("⏰ TEST INCONCLUSIVE")
             print("   - Task timed out or other issues occurred")
@@ -210,6 +214,7 @@ def main():
         print("❌ COULD NOT START TEST")
         print("   - File upload failed")
         print("   - Check if MoRAG server is running")
+        print("   - Ensure Docker containers are accessible on localhost:8000")
 
 
 if __name__ == "__main__":

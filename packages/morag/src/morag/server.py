@@ -573,10 +573,10 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            error=str(e))
                 raise HTTPException(status_code=400, detail=str(e))
 
-            # Create task options
+            # Create task options with sanitized inputs
             options = {
-                "webhook_url": webhook_url,
-                "metadata": parsed_metadata,
+                "webhook_url": webhook_url or "",  # Ensure string, not None
+                "metadata": parsed_metadata or {},  # Ensure dict, not None
                 "use_docling": use_docling,
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
@@ -624,10 +624,10 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            url=request.url,
                            detected_type=source_type)
 
-            # Create task options
+            # Create task options with sanitized inputs
             options = {
-                "webhook_url": request.webhook_url,
-                "metadata": request.metadata,
+                "webhook_url": request.webhook_url or "",  # Ensure string, not None
+                "metadata": request.metadata or {},  # Ensure dict, not None
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -654,9 +654,9 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def ingest_batch(request: IngestBatchRequest):
         """Ingest and process multiple items in batch, storing results in vector database."""
         try:
-            # Create batch options
+            # Create batch options with sanitized inputs
             options = {
-                "webhook_url": request.webhook_url,
+                "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
