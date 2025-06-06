@@ -61,13 +61,23 @@ async def store_content_in_vector_db(
         return []
     
     try:
-        # Initialize services
-        vector_storage = QdrantVectorStorage()
+        # Initialize services with environment configuration
+        qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+        qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+        qdrant_api_key = os.getenv('QDRANT_API_KEY')
+        collection_name_env = os.getenv('QDRANT_COLLECTION_NAME', 'morag_vectors')
 
-        # Get API key from environment
-        api_key = os.getenv('GOOGLE_API_KEY')
+        vector_storage = QdrantVectorStorage(
+            host=qdrant_host,
+            port=qdrant_port,
+            api_key=qdrant_api_key,
+            collection_name=collection_name_env
+        )
+
+        # Get API key from environment (try both GEMINI_API_KEY and GOOGLE_API_KEY)
+        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY environment variable is required")
+            raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required")
 
         embedding_service = GeminiEmbeddingService(api_key=api_key)
         

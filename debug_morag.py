@@ -32,7 +32,7 @@ async def test_imports():
     
     try:
         from morag_services.storage import QdrantVectorStorage
-        logger.info("✅ QdrantVectorStorage import successful")
+        logger.info("OK QdrantVectorStorage import successful")
     except Exception as e:
         logger.error(f"❌ QdrantVectorStorage import failed: {e}")
         traceback.print_exc()
@@ -40,7 +40,7 @@ async def test_imports():
     
     try:
         from morag_services.embedding import GeminiEmbeddingService
-        logger.info("✅ GeminiEmbeddingService import successful")
+        logger.info("OK GeminiEmbeddingService import successful")
     except Exception as e:
         logger.error(f"❌ GeminiEmbeddingService import failed: {e}")
         traceback.print_exc()
@@ -48,7 +48,7 @@ async def test_imports():
     
     try:
         from morag.ingest_tasks import store_content_in_vector_db
-        logger.info("✅ ingest_tasks import successful")
+        logger.info("OK ingest_tasks import successful")
     except Exception as e:
         logger.error(f"❌ ingest_tasks import failed: {e}")
         traceback.print_exc()
@@ -63,34 +63,40 @@ async def test_vector_storage():
     try:
         from morag_services.storage import QdrantVectorStorage
         
-        # Test instantiation
+        # Test instantiation with environment configuration
+        qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+        qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+        qdrant_api_key = os.getenv('QDRANT_API_KEY')
+        collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'debug_test')
+
         storage = QdrantVectorStorage(
-            host="localhost",
-            port=6333,
-            collection_name="debug_test"
+            host=qdrant_host,
+            port=qdrant_port,
+            api_key=qdrant_api_key,
+            collection_name=collection_name
         )
-        logger.info("✅ QdrantVectorStorage instantiated successfully")
+        logger.info("OK QdrantVectorStorage instantiated successfully")
         
         # Test health check
         health = await storage.health_check()
         logger.info(f"Health check result: {health}")
         
         if health.get('status') == 'healthy':
-            logger.info("✅ Qdrant connection successful")
-            
+            logger.info("OK Qdrant connection successful")
+
             # Test basic operations
             try:
                 await storage.initialize()
-                logger.info("✅ Storage initialization successful")
-                
+                logger.info("OK Storage initialization successful")
+
                 # Test creating collection
                 await storage.create_collection("debug_test", 384)
-                logger.info("✅ Collection creation successful")
-                
+                logger.info("OK Collection creation successful")
+
             except Exception as e:
-                logger.warning(f"⚠️ Storage operations failed (may be expected): {e}")
+                logger.warning(f"WARNING Storage operations failed (may be expected): {e}")
         else:
-            logger.warning("⚠️ Qdrant not available - this is expected if not running")
+            logger.warning("WARNING Qdrant not available - this is expected if not running")
         
         return True
         
@@ -107,20 +113,20 @@ async def test_embedding_service():
         from morag_services.embedding import GeminiEmbeddingService
         
         # Check if API key is available
-        api_key = os.getenv('GOOGLE_API_KEY')
+        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
         if not api_key:
-            logger.warning("⚠️ GOOGLE_API_KEY not set - embedding service will fail")
+            logger.warning("WARNING No API key found - embedding service will fail")
             return True
         
         service = GeminiEmbeddingService(api_key)
-        logger.info("✅ GeminiEmbeddingService instantiated successfully")
-        
+        logger.info("OK GeminiEmbeddingService instantiated successfully")
+
         # Test embedding generation (with a simple text)
         try:
-            result = await service.generate_embedding("test text", task_type="retrieval_document")
-            logger.info(f"✅ Embedding generation successful (dimension: {len(result.embedding)})")
+            result = await service.generate_embedding_with_result("test text", task_type="retrieval_document")
+            logger.info(f"OK Embedding generation successful (dimension: {len(result.embedding)})")
         except Exception as e:
-            logger.warning(f"⚠️ Embedding generation failed: {e}")
+            logger.warning(f"WARNING Embedding generation failed: {e}")
         
         return True
         
@@ -150,10 +156,10 @@ async def test_ingest_function():
         point_ids = await store_content_in_vector_db(test_content, test_metadata)
         
         if point_ids:
-            logger.info(f"✅ Content storage successful! Point IDs: {point_ids}")
+            logger.info(f"OK Content storage successful! Point IDs: {point_ids}")
             return True
         else:
-            logger.warning("⚠️ Content storage returned empty point IDs")
+            logger.warning("WARNING Content storage returned empty point IDs")
             return False
         
     except Exception as e:
@@ -164,23 +170,36 @@ async def test_ingest_function():
 async def check_environment():
     """Check environment configuration."""
     logger.info("Checking environment configuration...")
-    
-    required_vars = ['GOOGLE_API_KEY']
-    optional_vars = ['REDIS_URL', 'QDRANT_HOST', 'QDRANT_PORT']
+
+    required_vars = ['GOOGLE_API_KEY', 'GEMINI_API_KEY']
+    optional_vars = ['REDIS_URL', 'QDRANT_HOST', 'QDRANT_PORT', 'QDRANT_API_KEY', 'QDRANT_COLLECTION_NAME']
     
     for var in required_vars:
         value = os.getenv(var)
         if value:
-            logger.info(f"✅ {var} is set")
+            logger.info(f"OK {var} is set")
         else:
-            logger.warning(f"⚠️ {var} is not set")
+            logger.warning(f"WARNING {var} is not set")
+
+    # Check if at least one API key is set
+    google_key = os.getenv('GOOGLE_API_KEY')
+    gemini_key = os.getenv('GEMINI_API_KEY')
+    if google_key or gemini_key:
+        logger.info("OK At least one API key is available")
+    else:
+        logger.warning("WARNING No API keys found")
     
     for var in optional_vars:
         value = os.getenv(var)
         if value:
-            logger.info(f"✅ {var} = {value}")
+            # Mask API keys for security
+            if 'API_KEY' in var and len(value) > 10:
+                masked_value = value[:6] + "..." + value[-4:]
+                logger.info(f"OK {var} = {masked_value}")
+            else:
+                logger.info(f"OK {var} = {value}")
         else:
-            logger.info(f"ℹ️ {var} not set (using default)")
+            logger.info(f"INFO {var} not set (using default)")
 
 async def main():
     """Main debug function."""
@@ -188,8 +207,13 @@ async def main():
     logger.info("MoRAG Debug Session Started - Testing Abstract Class Fixes")
     logger.info("=" * 60)
 
-    # Set dummy API key for testing
-    os.environ['GOOGLE_API_KEY'] = 'dummy_key_for_testing'
+    # Load environment variables from .env file
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    # Use real API key from .env if available, otherwise use dummy
+    if not os.getenv('GOOGLE_API_KEY') and not os.getenv('GEMINI_API_KEY'):
+        os.environ['GOOGLE_API_KEY'] = 'dummy_key_for_testing'
     
     # Check environment
     await check_environment()
@@ -215,7 +239,7 @@ async def main():
         return False
     
     logger.info("=" * 60)
-    logger.info("✅ All debug tests completed successfully!")
+    logger.info("SUCCESS All debug tests completed successfully!")
     logger.info("=" * 60)
     
     return True
