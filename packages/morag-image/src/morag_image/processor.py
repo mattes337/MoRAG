@@ -25,8 +25,14 @@ class ImageConfig:
     extract_metadata: bool = True
     resize_max_dimension: Optional[int] = 1024
     ocr_engine: str = "tesseract"  # or "easyocr"
-    vision_model: str = "gemini-pro-vision"
+    vision_model: str = None  # Will be set from environment variable
     image_quality: int = 85  # JPEG quality for resizing
+
+    def __post_init__(self):
+        """Set default vision model from environment if not specified."""
+        if self.vision_model is None:
+            import os
+            self.vision_model = os.environ.get("GEMINI_VISION_MODEL", "gemini-1.5-flash")
 
 @dataclass
 class ImageMetadata:

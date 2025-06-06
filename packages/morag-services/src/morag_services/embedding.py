@@ -282,10 +282,10 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                 else:
                     # Non-rate-limit error, don't retry
                     logger.error("Failed to generate embedding", error=error_str)
-                    raise ExternalServiceError(f"Embedding generation failed: {error_str}")
+                    raise ExternalServiceError(f"Embedding generation failed: {error_str}", "gemini")
 
         # Should never reach here
-        raise ExternalServiceError("Unexpected error in embedding generation")
+        raise ExternalServiceError("Unexpected error in embedding generation", "gemini")
     
     async def generate_embeddings_batch(
         self,
@@ -345,7 +345,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
     ) -> SummaryResult:
         """Generate a summary of the given text."""
         if not self.client:
-            raise ExternalServiceError("Gemini client not initialized")
+            raise ExternalServiceError("Gemini client not initialized", "gemini")
 
         try:
             prompt = self._build_summary_prompt(text, max_length, style)
@@ -376,7 +376,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
             
         except Exception as e:
             logger.error("Failed to generate summary", error=str(e))
-            raise ExternalServiceError(f"Summary generation failed: {str(e)}")
+            raise ExternalServiceError(f"Summary generation failed: {str(e)}", "gemini")
     
     def _generate_text_sync(self, prompt: str) -> str:
         """Synchronous text generation with retry logic."""
@@ -416,15 +416,15 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                 else:
                     # Non-rate-limit error, don't retry
                     logger.error("Failed to generate text", error=error_str)
-                    raise ExternalServiceError(f"Text generation failed: {error_str}")
+                    raise ExternalServiceError(f"Text generation failed: {error_str}", "gemini")
 
         # Should never reach here
-        raise ExternalServiceError("Unexpected error in text generation")
+        raise ExternalServiceError("Unexpected error in text generation", "gemini")
 
     async def generate_text_from_prompt(self, prompt: str) -> str:
         """Generate text directly from a prompt."""
         if not self.client:
-            raise ExternalServiceError("Gemini client not initialized")
+            raise ExternalServiceError("Gemini client not initialized", "gemini")
 
         try:
             logger.info("Generating text from direct prompt",
@@ -446,7 +446,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
             
         except Exception as e:
             logger.error("Failed to generate text from prompt", error=str(e))
-            raise ExternalServiceError(f"Text generation failed: {str(e)}")
+            raise ExternalServiceError(f"Text generation failed: {str(e)}", "gemini")
     
     def _build_summary_prompt(self, text: str, max_length: int, style: str) -> str:
         """Build prompt for summary generation."""

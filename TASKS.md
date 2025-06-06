@@ -473,10 +473,46 @@ For detailed information about completed tasks and implementation history, see [
   - Separate retry logic for embedding and text generation
 - **Status**: Rate limiting errors now handled gracefully with automatic retries
 
+### ✅ Configuration and Error Handling Fixes (January 2025)
+
+#### 23. **Vision Model Configuration** ✅ IMPLEMENTED
+- **Issue**: Vision model hardcoded to deprecated `gemini-pro-vision` model
+- **Solution**: Made vision model configurable via `GEMINI_VISION_MODEL` environment variable
+- **Changes Implemented**:
+  - Added `GEMINI_VISION_MODEL=gemini-1.5-flash` to environment configuration files
+  - Updated `ImageConfig` to use environment variable with fallback to `gemini-1.5-flash`
+  - Added `gemini_vision_model` setting to core configuration
+- **Files Modified**:
+  - `.env.example`, `.env.prod.example`: Added `GEMINI_VISION_MODEL` configuration
+  - `packages/morag-core/src/morag_core/config.py`: Added vision model setting
+  - `packages/morag-image/src/morag_image/processor.py`: Updated to use environment variable
+- **Status**: Vision model now configurable and uses current Gemini model
+
+#### 24. **ExternalServiceError Initialization** ✅ FIXED
+- **Issue**: `ExternalServiceError.__init__() missing 1 required positional argument: 'service'`
+- **Root Cause**: ExternalServiceError requires both message and service parameters but some calls only provided message
+- **Solution**: Added missing service parameter to all ExternalServiceError instantiations
+- **Files Modified**:
+  - `packages/morag-services/src/morag_services/embedding.py`: Fixed 6 ExternalServiceError calls
+  - `packages/morag-embedding/src/morag_embedding/service.py`: Fixed 4 ExternalServiceError calls
+- **Status**: All ExternalServiceError calls now properly initialized with service parameter
+
+#### 25. **Audio Processing Speaker Diarization** ✅ FIXED
+- **Issue**: `'SpeakerSegment' object has no attribute 'start'` in speaker diarization
+- **Root Cause**: Code was accessing `speaker_segment.start` but SpeakerSegment uses `start_time` attribute
+- **Solution**: Updated audio processor to use correct attribute names
+- **Changes Implemented**:
+  - Changed `speaker_segment.start` to `speaker_segment.start_time`
+  - Changed `speaker_segment.end` to `speaker_segment.end_time`
+  - Changed `speaker_segment.speaker` to `speaker_segment.speaker_id`
+  - Fixed metadata variable reference from `metadata` to `self.metadata`
+- **Files Modified**: `packages/morag-audio/src/morag_audio/processor.py`
+- **Status**: Speaker diarization now works correctly with proper attribute access
+
 ### 🧪 Testing and Validation
 - **Test Suite**: Created comprehensive test script `tests/cli/test-bug-fixes.py`
-- **Test Coverage**: All 6 critical bugs tested with automated validation
-- **Test Results**: ✅ 6/6 critical bug fixes passing
+- **Test Coverage**: All 9 critical bugs tested with automated validation
+- **Test Results**: ✅ 9/9 critical bug fixes passing
 - **Validation**: Each fix tested in isolation and integration scenarios
 
 ## 🔄 Future Enhancement Opportunities:

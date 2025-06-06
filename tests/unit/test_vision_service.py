@@ -42,7 +42,7 @@ class TestVisionService:
             caption = await service.generate_caption(mock_image_file)
             
             assert caption == "A blue square image with vibrant colors"
-            mock_model_class.assert_called_once_with('gemini-pro-vision')
+            mock_model_class.assert_called_once_with('gemini-1.5-flash')
     
     @pytest.mark.asyncio
     @patch('morag.core.config.settings')

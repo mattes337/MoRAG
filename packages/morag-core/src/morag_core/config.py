@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.0-flash"
     gemini_generation_model: str = "gemini-2.0-flash"
     gemini_embedding_model: str = "text-embedding-004"
+    gemini_vision_model: str = "gemini-1.5-flash"
 
     # Redis Configuration
     redis_url: str = "redis://localhost:6379/0"

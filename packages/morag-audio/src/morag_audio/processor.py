@@ -199,12 +199,12 @@ class AudioProcessor:
             
             if self.config.enable_diarization:
                 speakers = set(segment.speaker for segment in segments if segment.speaker)
-                metadata["num_speakers"] = len(speakers)
-                metadata["speakers"] = list(speakers)
-            
+                self.metadata["num_speakers"] = len(speakers)
+                self.metadata["speakers"] = list(speakers)
+
             if self.config.enable_topic_segmentation:
                 topics = set(segment.topic_id for segment in segments if segment.topic_id is not None)
-                metadata["num_topics"] = len(topics)
+                self.metadata["num_topics"] = len(topics)
             
             logger.info("Audio processing completed",
                        file_path=str(file_path),
@@ -339,13 +339,13 @@ class AudioProcessor:
                 
                 for speaker_segment in diarization_result.segments:
                     # Calculate overlap between transcription segment and speaker segment
-                    overlap_start = max(segment.start, speaker_segment.start)
-                    overlap_end = min(segment.end, speaker_segment.end)
+                    overlap_start = max(segment.start, speaker_segment.start_time)
+                    overlap_end = min(segment.end, speaker_segment.end_time)
                     overlap = max(0, overlap_end - overlap_start)
-                    
+
                     if overlap > max_overlap:
                         max_overlap = overlap
-                        assigned_speaker = speaker_segment.speaker
+                        assigned_speaker = speaker_segment.speaker_id
                 
                 # Assign speaker to segment if found
                 if assigned_speaker:
@@ -354,7 +354,7 @@ class AudioProcessor:
             # Add speaker metadata
             self.metadata["num_speakers"] = len(diarization_result.speakers)
             self.metadata["speakers"] = [
-                {"id": s.id, "name": s.name or f"Speaker {s.id}"}
+                {"id": s.speaker_id, "name": f"Speaker {s.speaker_id}"}
                 for s in diarization_result.speakers
             ]
             

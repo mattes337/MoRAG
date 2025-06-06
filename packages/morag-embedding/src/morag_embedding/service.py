@@ -173,7 +173,7 @@ class GeminiEmbeddingService(BaseService):
             await self.initialize()
 
         if not self.circuit_breaker.is_closed():
-            raise ExternalServiceError("Circuit breaker is open")
+            raise ExternalServiceError("Circuit breaker is open", "gemini")
 
         if not self._consume_rate_limit_token():
             raise RateLimitError("Rate limit exceeded for embedding generation")
@@ -205,7 +205,7 @@ class GeminiEmbeddingService(BaseService):
             elif "timeout" in error_str.lower():
                 raise TimeoutError(f"Gemini API timeout: {error_str}")
             else:
-                raise ExternalServiceError(f"Gemini API error: {error_str}")
+                raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
 
     async def generate_batch_embeddings(self, texts: List[str]) -> BatchEmbeddingResult:
         """Generate embeddings for multiple texts.
@@ -251,7 +251,7 @@ class GeminiEmbeddingService(BaseService):
 
         # If all requests failed, raise an exception
         if len(errors) == len(texts):
-            raise ExternalServiceError(f"All embedding requests failed: {errors[0]}")
+            raise ExternalServiceError(f"All embedding requests failed: {errors[0]}", "gemini")
 
         # Create and return batch result
         return BatchEmbeddingResult(
@@ -285,7 +285,7 @@ class GeminiEmbeddingService(BaseService):
             await self.initialize()
 
         if not self.circuit_breaker.is_closed():
-            raise ExternalServiceError("Circuit breaker is open")
+            raise ExternalServiceError("Circuit breaker is open", "gemini")
 
         if not self._consume_rate_limit_token():
             raise RateLimitError("Rate limit exceeded for summary generation")
@@ -326,4 +326,4 @@ class GeminiEmbeddingService(BaseService):
             elif "timeout" in error_str.lower():
                 raise TimeoutError(f"Gemini API timeout: {error_str}")
             else:
-                raise ExternalServiceError(f"Gemini API error: {error_str}")
+                raise ExternalServiceError(f"Gemini API error: {error_str}", "gemini")
