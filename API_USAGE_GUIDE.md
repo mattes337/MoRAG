@@ -349,10 +349,31 @@ All fixes have been tested and verified:
 
 The ingestion endpoints process content in the background and store results in the vector database for retrieval. These are ideal for building a searchable knowledge base.
 
+#### Automatic Content Type Detection
+
+MoRAG can automatically detect content types based on file extensions and URL patterns:
+
+- **Files**: Detects based on file extension (.pdf → document, .mp3 → audio, .mp4 → video, etc.)
+- **URLs**: Detects YouTube URLs, web pages, and other URL patterns
+- **Fallback**: You can still specify `source_type` explicitly if needed
+
+Supported auto-detection:
+- Documents: `.pdf`, `.docx`, `.txt`, `.md`, `.html`, etc.
+- Audio: `.mp3`, `.wav`, `.flac`, `.m4a`, etc.
+- Video: `.mp4`, `.avi`, `.mov`, `.mkv`, etc.
+- Images: `.jpg`, `.png`, `.gif`, `.webp`, etc.
+- YouTube: `youtube.com` and `youtu.be` URLs
+- Web: Other HTTP/HTTPS URLs
+
 ### File Ingestion
 
 ```bash
-# Ingest a document file
+# Ingest a document file (auto-detect content type)
+curl -X POST "http://localhost:8000/api/v1/ingest/file" \
+  -F "file=@document.pdf" \
+  -F "metadata={\"tags\": [\"important\"], \"category\": \"research\"}"
+
+# Ingest with explicit source type
 curl -X POST "http://localhost:8000/api/v1/ingest/file" \
   -F "source_type=document" \
   -F "file=@document.pdf" \
@@ -370,7 +391,23 @@ curl -X POST "http://localhost:8000/api/v1/ingest/file" \
 ### URL Ingestion
 
 ```bash
-# Ingest web content
+# Ingest web content (auto-detect content type)
+curl -X POST "http://localhost:8000/api/v1/ingest/url" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/article",
+    "metadata": {"category": "news", "priority": 1}
+  }'
+
+# Ingest YouTube video (auto-detect)
+curl -X POST "http://localhost:8000/api/v1/ingest/url" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://youtube.com/watch?v=VIDEO_ID",
+    "webhook_url": "https://your-app.com/webhook"
+  }'
+
+# Ingest with explicit source type
 curl -X POST "http://localhost:8000/api/v1/ingest/url" \
   -H "Content-Type: application/json" \
   -d '{
@@ -378,21 +415,27 @@ curl -X POST "http://localhost:8000/api/v1/ingest/url" \
     "url": "https://example.com/article",
     "metadata": {"category": "news", "priority": 1}
   }'
-
-# Ingest YouTube video
-curl -X POST "http://localhost:8000/api/v1/ingest/url" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_type": "youtube",
-    "url": "https://youtube.com/watch?v=VIDEO_ID",
-    "webhook_url": "https://your-app.com/webhook"
-  }'
 ```
 
 ### Batch Ingestion
 
 ```bash
-# Ingest multiple items
+# Ingest multiple items (auto-detect content types)
+curl -X POST "http://localhost:8000/api/v1/ingest/batch" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "url": "https://example.com/page1"
+      },
+      {
+        "url": "https://youtube.com/watch?v=VIDEO_ID"
+      }
+    ],
+    "webhook_url": "https://your-app.com/batch-webhook"
+  }'
+
+# Ingest with explicit source types
 curl -X POST "http://localhost:8000/api/v1/ingest/batch" \
   -H "Content-Type: application/json" \
   -d '{

@@ -125,11 +125,11 @@ async def store_content_in_vector_db(
 
 
 @celery_app.task(bind=True)
-def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, options: Optional[Dict[str, Any]] = None):
+def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
     """Ingest file: process content and store in vector database."""
     async def _ingest():
         api = get_morag_api()
-        options = options or {}
+        options = task_options or {}
         
         try:
             self.update_state(state='PROGRESS', meta={'stage': 'processing', 'progress': 0.1})
@@ -216,11 +216,11 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, o
 
 
 @celery_app.task(bind=True)
-def ingest_url_task(self, url: str, content_type: Optional[str] = None, options: Optional[Dict[str, Any]] = None):
+def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
     """Ingest URL: process content and store in vector database."""
     async def _ingest():
         api = get_morag_api()
-        options = options or {}
+        options = task_options or {}
         
         try:
             self.update_state(state='PROGRESS', meta={'stage': 'processing', 'progress': 0.1})
@@ -293,11 +293,11 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, options:
 
 
 @celery_app.task(bind=True)
-def ingest_batch_task(self, items: List[Dict[str, Any]], options: Optional[Dict[str, Any]] = None):
+def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[Dict[str, Any]] = None):
     """Ingest batch: process multiple items and store in vector database."""
     async def _ingest():
         api = get_morag_api()
-        options = options or {}
+        options = task_options or {}
 
         try:
             self.update_state(state='PROGRESS', meta={'stage': 'batch_processing', 'total_items': len(items), 'progress': 0.1})
@@ -315,16 +315,37 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], options: Optional[Dict[
                     })
 
                     # Process item based on type
+                    detected_source_type = None
                     if 'url' in item:
+                        # Auto-detect source type if not provided
+                        source_type = item.get('source_type')
+                        if not source_type:
+                            source_type = api._detect_content_type(item['url'])
+                            detected_source_type = source_type
+                            logger.info("Auto-detected content type for batch URL",
+                                       batch_index=i,
+                                       url=item['url'],
+                                       detected_type=source_type)
+
                         result = await api.process_url(
                             item['url'],
-                            item.get('source_type'),
+                            source_type,
                             {**options, **item.get('options', {})}
                         )
                     elif 'file_path' in item:
+                        # Auto-detect source type if not provided
+                        source_type = item.get('source_type')
+                        if not source_type:
+                            source_type = api._detect_content_type_from_file(Path(item['file_path']))
+                            detected_source_type = source_type
+                            logger.info("Auto-detected content type for batch file",
+                                       batch_index=i,
+                                       file_path=item['file_path'],
+                                       detected_type=source_type)
+
                         result = await api.process_file(
                             item['file_path'],
-                            item.get('source_type'),
+                            source_type,
                             {**options, **item.get('options', {})}
                         )
                     else:
@@ -333,7 +354,7 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], options: Optional[Dict[
                     if result.success and options.get('store_in_vector_db', True):
                         # Store in vector database
                         vector_metadata = {
-                            "source_type": item.get('source_type', 'unknown'),
+                            "source_type": detected_source_type or item.get('source_type', 'unknown'),
                             "batch_index": i,
                             "batch_size": len(items),
                             "processing_time": result.processing_time,

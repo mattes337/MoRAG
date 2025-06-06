@@ -205,14 +205,14 @@ class ProcessingResultResponse(BaseModel):
 
 # Ingest API models
 class IngestFileRequest(BaseModel):
-    source_type: str
+    source_type: Optional[str] = None  # Auto-detect if not provided
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     use_docling: Optional[bool] = False
 
 
 class IngestURLRequest(BaseModel):
-    source_type: str
+    source_type: Optional[str] = None  # Auto-detect if not provided
     url: str
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
@@ -511,7 +511,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     # Ingest API endpoints
     @app.post("/api/v1/ingest/file", response_model=IngestResponse, tags=["Ingestion"])
     async def ingest_file(
-        source_type: str = Form(...),
+        source_type: Optional[str] = Form(None),  # Auto-detect if not provided
         file: UploadFile = File(...),
         webhook_url: Optional[str] = Form(None),
         metadata: Optional[str] = Form(None),  # JSON string
@@ -533,6 +533,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             upload_handler = get_upload_handler()
             try:
                 temp_path = await upload_handler.save_upload(file)
+
+                # Auto-detect source type if not provided
+                if not source_type:
+                    source_type = morag_api._detect_content_type_from_file(temp_path)
+                    logger.info("Auto-detected content type",
+                               filename=file.filename,
+                               detected_type=source_type)
+
                 logger.info("File uploaded for ingestion",
                            filename=file.filename,
                            temp_path=str(temp_path),
@@ -586,6 +594,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def ingest_url(request: IngestURLRequest):
         """Ingest and process content from URL, storing results in vector database."""
         try:
+            # Auto-detect source type if not provided
+            source_type = request.source_type
+            if not source_type:
+                source_type = morag_api._detect_content_type(request.url)
+                logger.info("Auto-detected content type for URL",
+                           url=request.url,
+                           detected_type=source_type)
+
             # Create task options
             options = {
                 "webhook_url": request.webhook_url,
@@ -594,7 +610,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             }
 
             # Submit to ingest URL task for processing and storage
-            task = ingest_url_task.delay(request.url, request.source_type, options)
+            task = ingest_url_task.delay(request.url, source_type, options)
 
             logger.info("URL ingestion task created",
                        task_id=task.id,

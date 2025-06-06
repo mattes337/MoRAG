@@ -176,6 +176,25 @@ For detailed information about completed tasks and implementation history, see [
 - `docs/api_usage.md` (duplicate of API_USAGE_GUIDE.md)
 - `docs/docker-dependencies.md` (outdated)
 
+### ✅ Ingestion System Fixes (January 2025)
+
+#### 8. **Options Variable Error** ✅ FIXED
+- **Issue**: `UnboundLocalError: cannot access local variable 'options' where it is not associated with a value` in PDF ingestion
+- **Root Cause**: Parameter shadowing in `ingest_file_task`, `ingest_url_task`, and `ingest_batch_task` functions
+- **Solution**: Renamed function parameters from `options` to `task_options` to avoid variable shadowing
+- **Status**: Fixed in all three ingestion task functions
+
+#### 9. **Automatic Content Type Detection** ✅ IMPLEMENTED
+- **Issue**: Users required to manually specify `source_type` even though system has robust auto-detection
+- **Solution**: Made `source_type` optional in all ingestion endpoints with automatic detection fallback
+- **Features Added**:
+  - File ingestion: Auto-detects based on file extension (.pdf → document, .mp3 → audio, etc.)
+  - URL ingestion: Auto-detects YouTube URLs, web pages, and other patterns
+  - Batch ingestion: Auto-detects each item individually with logging
+  - Comprehensive logging of detection process for debugging
+- **Backward Compatibility**: Explicit `source_type` still supported and takes precedence over auto-detection
+- **Status**: Implemented across all ingestion endpoints with comprehensive logging
+
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents
 - [ ] Enhanced chapter detection algorithms using ML
