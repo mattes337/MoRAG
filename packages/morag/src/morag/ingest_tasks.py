@@ -131,16 +131,41 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
         api = get_morag_api()
         options = task_options or {}
 
-        # Log task start and file existence check
+        # Log task start and file existence check with detailed timing
+        file_path_obj = Path(file_path)
+        file_exists = file_path_obj.exists()
+
         logger.info("Starting file ingestion task",
                    task_id=self.request.id,
                    file_path=file_path,
                    content_type=content_type,
-                   file_exists=Path(file_path).exists())
-        
+                   file_exists=file_exists)
+
         try:
             # Check if file still exists before processing
-            if not Path(file_path).exists():
+            if not file_exists:
+                # Get additional debugging information
+                parent_dir = file_path_obj.parent
+                parent_exists = parent_dir.exists() if parent_dir else False
+
+                if parent_exists:
+                    # List files in parent directory for debugging
+                    try:
+                        files_in_dir = list(parent_dir.glob("*")) if parent_dir.exists() else []
+                        logger.error("File not found but parent directory exists",
+                                   file_path=file_path,
+                                   parent_dir=str(parent_dir),
+                                   files_in_parent=len(files_in_dir),
+                                   sample_files=[str(f.name) for f in files_in_dir[:5]])
+                    except Exception as list_error:
+                        logger.warning("Could not list parent directory contents",
+                                     parent_dir=str(parent_dir),
+                                     error=str(list_error))
+                else:
+                    logger.error("File and parent directory do not exist",
+                               file_path=file_path,
+                               parent_dir=str(parent_dir) if parent_dir else "None")
+
                 raise FileNotFoundError(f"Temporary file was cleaned up before processing: {file_path}")
 
             self.update_state(state='PROGRESS', meta={'stage': 'processing', 'progress': 0.1})

@@ -213,20 +213,29 @@ For detailed information about completed tasks and implementation history, see [
 
 ### ✅ File Upload Race Condition Fix (January 2025)
 
-#### 11. **Temporary File Cleanup Race Condition** ✅ FIXED
+#### 11. **Temporary File Cleanup Race Condition** ✅ FIXED (Updated January 2025)
 - **Issue**: `ValidationError: File not found: /tmp/morag_uploads_*/filename.pdf` during document processing
 - **Root Cause**: Race condition between file upload handler cleanup and background task processing
   - FileUploadHandler.__del__() method aggressively removes entire temp directory when object is garbage collected
   - Background tasks receive file paths but files are deleted before processing starts
   - Premature cleanup occurs due to upload handler object lifecycle management
+  - **Additional Issue Found**: AsyncIO cleanup tasks were being cancelled when HTTP request context ended
 - **Solution**: Fixed file cleanup strategy to prevent race conditions
   - **Removed Aggressive Cleanup**: Eliminated temp directory removal in __del__ method
   - **Enhanced Logging**: Added detailed logging for file cleanup tracking and debugging
   - **Better Error Handling**: Added specific FileNotFoundError detection with helpful error messages
   - **File Existence Check**: Added pre-processing file existence validation in ingest tasks
+  - **Fixed AsyncIO Issue**: Replaced asyncio.create_task() with daemon threads for cleanup to prevent cancellation
+- **Technical Details**:
+  - **Problem**: `asyncio.create_task()` creates tasks in current event loop, which get cancelled when HTTP request completes
+  - **Solution**: Use daemon threads with `threading.Thread(daemon=True)` for cleanup operations
+  - **Benefits**: Cleanup threads survive HTTP request lifecycle and prevent blocking application shutdown
 - **Files Modified**:
-  - `packages/morag/src/morag/utils/file_upload.py`: Fixed cleanup strategy
-  - `packages/morag/src/morag/ingest_tasks.py`: Enhanced error handling and logging
+  - `packages/morag/src/morag/utils/file_upload.py`: Fixed cleanup strategy and replaced asyncio with threading
+  - `packages/morag/src/morag/ingest_tasks.py`: Enhanced error handling and logging with detailed debugging
+- **Tests Added**:
+  - `tests/test_file_upload_race_condition_fix_v2.py`: Unit tests for threading-based cleanup
+  - `tests/test_race_condition_integration.py`: Integration tests simulating real race condition scenarios
 - **Status**: Race condition eliminated, background tasks now process files reliably
 
 ### ✅ Docker Build Optimization (January 2025)

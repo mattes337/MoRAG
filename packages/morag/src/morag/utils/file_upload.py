@@ -67,9 +67,9 @@ class FileUploadHandler:
     def __init__(self, config: Optional[FileUploadConfig] = None):
         self.config = config or FileUploadConfig()
         self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
-        self._cleanup_tasks: List[asyncio.Task] = []
-        
-        logger.info("FileUploadHandler initialized", 
+        self._cleanup_threads: List = []  # Track cleanup threads instead of asyncio tasks
+
+        logger.info("FileUploadHandler initialized",
                    temp_dir=str(self.temp_dir),
                    max_file_size=self.config.max_file_size)
     
@@ -239,15 +239,22 @@ class FileUploadHandler:
     
     def _schedule_cleanup(self, file_path: Path) -> None:
         """Schedule cleanup of temporary file.
-        
+
         Args:
             file_path: Path to file to clean up
         """
-        async def cleanup_task():
+        import threading
+        import time
+
+        def cleanup_task():
+            """Background thread cleanup task to avoid asyncio event loop issues."""
             logger.debug("Scheduled cleanup task started",
                         file_path=str(file_path),
                         timeout_seconds=self.config.cleanup_timeout)
-            await asyncio.sleep(self.config.cleanup_timeout)
+
+            # Sleep in background thread to avoid event loop cancellation
+            time.sleep(self.config.cleanup_timeout)
+
             try:
                 if file_path.exists():
                     file_path.unlink()
@@ -260,9 +267,13 @@ class FileUploadHandler:
             except Exception as e:
                 logger.warning("Failed to clean up temporary file",
                              file_path=str(file_path), error=str(e))
-        
-        task = asyncio.create_task(cleanup_task())
-        self._cleanup_tasks.append(task)
+
+        # Use daemon thread to avoid blocking shutdown and prevent event loop cancellation
+        thread = threading.Thread(target=cleanup_task, daemon=True)
+        thread.start()
+
+        # Keep reference to prevent garbage collection
+        self._cleanup_threads.append(thread)
     
     def cleanup_temp_dir(self) -> None:
         """Clean up temporary directory and all files."""
