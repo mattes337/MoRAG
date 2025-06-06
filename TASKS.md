@@ -213,32 +213,38 @@ For detailed information about completed tasks and implementation history, see [
 
 ### ✅ File Upload Race Condition Fix (January 2025)
 
-#### 11. **Temporary File Cleanup Race Condition** ✅ FIXED (Updated January 2025)
+#### 11. **Temporary File Cleanup Race Condition** ✅ FIXED (Final Solution - January 2025)
 - **Issue**: `ValidationError: File not found: /tmp/morag_uploads_*/filename.pdf` during document processing
 - **Root Cause**: Race condition between file upload handler cleanup and background task processing
   - FileUploadHandler.__del__() method aggressively removes entire temp directory when object is garbage collected
   - Background tasks receive file paths but files are deleted before processing starts
   - Premature cleanup occurs due to upload handler object lifecycle management
   - **Additional Issue Found**: AsyncIO cleanup tasks were being cancelled when HTTP request context ended
-- **Solution**: Fixed file cleanup strategy to prevent race conditions
-  - **Removed Aggressive Cleanup**: Eliminated temp directory removal in __del__ method
+- **Solution**: Completely eliminated individual file cleanup to prevent race conditions
+  - **Removed Individual File Cleanup**: No longer scheduling cleanup for individual files
+  - **Implemented Periodic Cleanup**: Hourly cleanup service that removes files based on age and disk usage
   - **Enhanced Logging**: Added detailed logging for file cleanup tracking and debugging
   - **Better Error Handling**: Added specific FileNotFoundError detection with helpful error messages
   - **File Existence Check**: Added pre-processing file existence validation in ingest tasks
-  - **Fixed AsyncIO Issue**: Replaced asyncio.create_task() with daemon threads for cleanup to prevent cancellation
+  - **Disk Space Management**: Cleanup prioritizes oldest files when disk usage exceeds limits
 - **Technical Details**:
-  - **Problem 1**: `asyncio.create_task()` creates tasks in current event loop, which get cancelled when HTTP request completes
-  - **Solution 1**: Use daemon threads with `threading.Thread(daemon=True)` for cleanup operations
-  - **Problem 2**: System temp directories (`/tmp`) may have automatic cleanup that removes directories quickly
-  - **Solution 2**: Use application temp directory (`./temp`) when available, fall back to system temp
-  - **Benefits**: Cleanup threads survive HTTP request lifecycle, temp directories persist longer, enhanced debugging
+  - **Root Problem**: Any immediate cleanup creates race conditions with background task processing
+  - **Final Solution**: Periodic cleanup service that runs hourly and only removes old files
+  - **Cleanup Strategy**: Files are only removed if they are >24 hours old OR if disk usage exceeds 1GB
+  - **Benefits**: Zero race conditions, intelligent disk space management, configurable cleanup policies
+  - **Fallback**: Manual cleanup endpoint available for emergency disk space management
 - **Files Modified**:
-  - `packages/morag/src/morag/utils/file_upload.py`: Fixed cleanup strategy, replaced asyncio with threading, improved temp directory location, added comprehensive logging
+  - `packages/morag/src/morag/utils/file_upload.py`: Removed individual file cleanup, added periodic cleanup method, improved temp directory location
   - `packages/morag/src/morag/ingest_tasks.py`: Enhanced error handling and logging with detailed debugging
+  - `packages/morag/src/morag/server.py`: Integrated periodic cleanup service into server lifecycle
+- **Files Added**:
+  - `packages/morag/src/morag/services/cleanup_service.py`: Periodic cleanup service implementation
+  - `packages/morag/src/morag/services/__init__.py`: Services package initialization
 - **Tests Added**:
   - `tests/test_file_upload_race_condition_fix_v2.py`: Unit tests for threading-based cleanup
   - `tests/test_race_condition_integration.py`: Integration tests simulating real race condition scenarios
   - `tests/test_enhanced_race_condition_fix.py`: Tests for enhanced temp directory handling and logging
+  - `tests/test_periodic_cleanup_service.py`: Tests for periodic cleanup service functionality
 - **Status**: Race condition eliminated, background tasks now process files reliably
 
 ### ✅ Docker Build Optimization (January 2025)

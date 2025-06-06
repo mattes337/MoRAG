@@ -84,7 +84,7 @@ class FileUploadHandler:
                          error=str(e))
             self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
 
-        self._cleanup_threads: List = []  # Track cleanup threads instead of asyncio tasks
+        # No longer tracking individual cleanup threads - using periodic cleanup instead
 
         # Create a marker file to help track directory lifecycle
         marker_file = self.temp_dir / ".morag_upload_handler_active"
@@ -145,8 +145,8 @@ class FileUploadHandler:
                     
                     await f.write(chunk)
             
-            # Schedule cleanup
-            self._schedule_cleanup(temp_path)
+            # NOTE: No longer scheduling individual file cleanup to prevent race conditions
+            # Files will be cleaned up by periodic cleanup process based on age and disk space
             
             logger.info("File uploaded successfully", 
                        filename=file.filename,
@@ -258,43 +258,91 @@ class FileUploadHandler:
         unique_id = str(uuid.uuid4())[:8]
         return f"{unique_id}_{sanitized}"
     
-    def _schedule_cleanup(self, file_path: Path) -> None:
-        """Schedule cleanup of temporary file.
+    def cleanup_old_files(self, max_age_hours: int = 24, max_disk_usage_mb: int = 10000) -> int:
+        """Clean up old temporary files based on age and disk usage.
 
         Args:
-            file_path: Path to file to clean up
+            max_age_hours: Maximum age in hours before files are eligible for cleanup
+            max_disk_usage_mb: Maximum disk usage in MB before aggressive cleanup
+
+        Returns:
+            Number of files cleaned up
         """
-        import threading
-        import time
+        import shutil
 
-        def cleanup_task():
-            """Background thread cleanup task to avoid asyncio event loop issues."""
-            logger.debug("Scheduled cleanup task started",
-                        file_path=str(file_path),
-                        timeout_seconds=self.config.cleanup_timeout)
+        if not self.temp_dir.exists():
+            return 0
 
-            # Sleep in background thread to avoid event loop cancellation
-            time.sleep(self.config.cleanup_timeout)
+        current_time = time.time()
+        max_age_seconds = max_age_hours * 3600
+        deleted_count = 0
 
-            try:
-                if file_path.exists():
-                    file_path.unlink()
-                    logger.info("Cleaned up temporary file after timeout",
-                               file_path=str(file_path),
-                               timeout_seconds=self.config.cleanup_timeout)
-                else:
-                    logger.debug("Temporary file already cleaned up",
-                                file_path=str(file_path))
-            except Exception as e:
-                logger.warning("Failed to clean up temporary file",
-                             file_path=str(file_path), error=str(e))
+        try:
+            # Get all files in temp directory with their ages
+            files_with_ages = []
+            total_size_mb = 0
 
-        # Use daemon thread to avoid blocking shutdown and prevent event loop cancellation
-        thread = threading.Thread(target=cleanup_task, daemon=True)
-        thread.start()
+            for file_path in self.temp_dir.glob("*"):
+                if file_path.is_file() and not file_path.name.startswith('.'):
+                    try:
+                        file_age = current_time - file_path.stat().st_mtime
+                        file_size = file_path.stat().st_size
+                        files_with_ages.append((file_path, file_age, file_size))
+                        total_size_mb += file_size / (1024 * 1024)
+                    except Exception as e:
+                        logger.warning("Failed to get file stats", file_path=str(file_path), error=str(e))
 
-        # Keep reference to prevent garbage collection
-        self._cleanup_threads.append(thread)
+            # Sort by age (oldest first)
+            files_with_ages.sort(key=lambda x: x[1], reverse=True)
+
+            logger.debug("Cleanup scan results",
+                        temp_dir=str(self.temp_dir),
+                        total_files=len(files_with_ages),
+                        total_size_mb=round(total_size_mb, 2),
+                        max_age_hours=max_age_hours,
+                        max_disk_usage_mb=max_disk_usage_mb)
+
+            # Clean up files based on age and disk usage
+            for file_path, file_age, file_size in files_with_ages:
+                should_delete = False
+                reason = ""
+
+                # Always delete files older than max_age
+                if file_age > max_age_seconds:
+                    should_delete = True
+                    reason = f"age {file_age/3600:.1f}h > {max_age_hours}h"
+
+                # Delete oldest files if disk usage is too high
+                elif total_size_mb > max_disk_usage_mb:
+                    should_delete = True
+                    reason = f"disk usage {total_size_mb:.1f}MB > {max_disk_usage_mb}MB"
+                    total_size_mb -= file_size / (1024 * 1024)
+
+                if should_delete:
+                    try:
+                        file_path.unlink()
+                        deleted_count += 1
+                        logger.debug("Cleaned up temporary file",
+                                   file_path=str(file_path),
+                                   reason=reason,
+                                   age_hours=round(file_age/3600, 1))
+                    except Exception as e:
+                        logger.warning("Failed to delete temporary file",
+                                     file_path=str(file_path),
+                                     error=str(e))
+
+            if deleted_count > 0:
+                logger.info("Temporary file cleanup completed",
+                           temp_dir=str(self.temp_dir),
+                           files_deleted=deleted_count,
+                           remaining_files=len(files_with_ages) - deleted_count)
+
+        except Exception as e:
+            logger.error("Error during temporary file cleanup",
+                        temp_dir=str(self.temp_dir),
+                        error=str(e))
+
+        return deleted_count
     
     def cleanup_temp_dir(self) -> None:
         """Clean up temporary directory and all files."""

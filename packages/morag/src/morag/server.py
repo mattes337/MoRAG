@@ -19,6 +19,7 @@ from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
 from morag.utils.file_upload import get_upload_handler, FileUploadError
+from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
 from morag.worker import (
     process_file_task, process_url_task, process_web_page_task,
     process_youtube_video_task, process_batch_task, celery_app
@@ -261,8 +262,21 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Lifespan context manager for startup and shutdown."""
         # Startup
         logger.info("MoRAG API server starting up")
+
+        # Start periodic cleanup service
+        start_cleanup_service(
+            cleanup_interval_hours=1,    # Run cleanup every hour
+            max_file_age_hours=24,       # Files older than 24 hours are eligible for cleanup
+            max_disk_usage_mb=10000       # Aggressive cleanup if temp files exceed 10GB
+        )
+        logger.info("Periodic cleanup service started")
+
         yield
+
         # Shutdown
+        logger.info("MoRAG API server shutting down")
+        stop_cleanup_service()
+        logger.info("Periodic cleanup service stopped")
         await morag_api.cleanup()
         logger.info("MoRAG API server shut down")
 
@@ -780,6 +794,23 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
         except Exception as e:
             logger.error("Failed to cancel task", task_id=task_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/admin/cleanup", tags=["Administration"])
+    async def force_temp_cleanup():
+        """Force immediate cleanup of old temporary files."""
+        try:
+            deleted_count = force_cleanup()
+
+            logger.info("Manual cleanup completed", files_deleted=deleted_count)
+
+            return {
+                "message": f"Cleanup completed successfully",
+                "files_deleted": deleted_count
+            }
+
+        except Exception as e:
+            logger.error("Failed to perform manual cleanup", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
