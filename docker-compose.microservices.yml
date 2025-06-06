@@ -50,7 +50,6 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
-      - ./uploads:/app/uploads
 
   # Celery Workers for processing
   morag-worker-1:
@@ -102,7 +101,6 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
-      - ./uploads:/app/uploads
     command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
 
 volumes:

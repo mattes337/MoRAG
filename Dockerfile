@@ -150,7 +150,7 @@ COPY *.md ./
 COPY *.txt ./
 
 # Create necessary directories including cache directories
-RUN mkdir -p uploads temp logs data /home/morag/.cache/huggingface /home/morag/.cache/whisper && \
+RUN mkdir -p temp logs data /home/morag/.cache/huggingface /home/morag/.cache/whisper && \
     chown -R morag:morag /app /home/morag
 
 # Switch to app user

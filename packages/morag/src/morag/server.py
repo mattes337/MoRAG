@@ -18,7 +18,7 @@ import structlog
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
-from morag.utils.file_upload import get_upload_handler, FileUploadError
+from morag.utils.file_upload import get_upload_handler, FileUploadError, validate_temp_directory_access
 from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
 from morag.worker import (
     process_file_task, process_url_task, process_web_page_task,
@@ -262,6 +262,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Lifespan context manager for startup and shutdown."""
         # Startup
         logger.info("MoRAG API server starting up")
+
+        # Validate temp directory access early - fail fast if not accessible
+        try:
+            validate_temp_directory_access()
+            logger.info("Temp directory validation passed")
+        except RuntimeError as e:
+            logger.error("STARTUP FAILURE: Temp directory validation failed", error=str(e))
+            raise RuntimeError(f"Cannot start server: {str(e)}")
 
         # Start periodic cleanup service
         start_cleanup_service(

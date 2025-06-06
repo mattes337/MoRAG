@@ -18,7 +18,7 @@ fi
 
 # Create necessary directories
 echo "📁 Creating directories..."
-mkdir -p uploads temp logs logs/nginx
+mkdir -p temp logs logs/nginx
 
 # Build and start services
 echo "🔨 Building and starting services..."

@@ -273,6 +273,47 @@ For detailed information about completed tasks and implementation history, see [
 - **Testing**: Created `scripts/test-optimized-build.py` for build performance validation
 - **Status**: Significant build time improvements achieved, especially for development workflows
 
+### ✅ Volume Mapping and Temp Directory Fixes (January 2025)
+
+#### 13. **Volume Mapping and Temp Directory Consistency** ✅ IMPLEMENTED
+- **Issue**: Redundant volume mappings and inconsistent temp directory usage causing confusion and potential file access issues
+- **Problems Identified**:
+  - Both `/app/temp` and `/app/uploads` volumes mapped but only `/app/temp` used
+  - API falls back to system `/tmp` when `/app/temp` not accessible, but workers don't know this
+  - No early validation of temp directory permissions - system fails during runtime
+  - Inconsistent directory usage between API server and workers
+- **Solution**: Streamlined volume configuration and added startup validation
+- **Changes Implemented**:
+  - **Removed Redundant Uploads Volume**: Eliminated `/app/uploads` volume mapping from all Docker compose files
+  - **Enhanced Permission Testing**: Added write permission validation during temp directory creation
+  - **Startup Validation**: Added `validate_temp_directory_access()` function called during server startup
+  - **Fail-Fast Behavior**: Server now fails immediately on startup if temp directory is not accessible
+  - **Improved Error Messages**: Clear warnings when using system temp (problematic in containers)
+  - **Consistent Directory Usage**: All components now use `/app/temp` as primary temp directory
+- **Technical Details**:
+  - **Early Detection**: Temp directory issues detected at startup, not during first file upload
+  - **Write Permission Test**: Creates and deletes test file to verify write access
+  - **Container Awareness**: Warns when falling back to system temp in container environments
+  - **Shared Volume Priority**: Prioritizes `/app/temp` (shared volume) over local `./temp` over system `/tmp`
+- **Files Modified**:
+  - `packages/morag/src/morag/utils/file_upload.py`: Enhanced directory validation and error handling
+  - `packages/morag/src/morag/server.py`: Added startup temp directory validation
+  - `docker-compose.yml`: Removed redundant `/app/uploads` volume mappings
+  - `docker-compose.prod.yml`: Removed redundant `/app/uploads` volume mappings
+  - `docker-compose.microservices.yml`: Removed redundant `/app/uploads` volume mappings
+  - `Dockerfile`: Removed uploads directory creation
+  - `Dockerfile.worker`: Removed uploads directory creation
+  - `scripts/deploy.sh`: Removed uploads directory creation
+  - `docs/DOCKER_DEPLOYMENT.md`: Updated volume documentation
+- **Tests Added**:
+  - `tests/test_temp_directory_fixes.py`: Comprehensive tests for temp directory validation and fixes
+- **Benefits**:
+  - **Simplified Configuration**: Single temp volume instead of redundant mappings
+  - **Early Problem Detection**: Startup failures instead of runtime errors
+  - **Clear Error Messages**: Developers know immediately if temp directory is misconfigured
+  - **Consistent Behavior**: All containers use same temp directory location
+- **Status**: Volume mapping streamlined, startup validation implemented, early failure detection working
+
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents
 - [ ] Enhanced chapter detection algorithms using ML

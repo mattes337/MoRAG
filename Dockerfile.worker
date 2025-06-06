@@ -124,7 +124,7 @@ COPY packages/ ./packages/
 COPY scripts/ ./scripts/
 
 # Create necessary directories
-RUN mkdir -p uploads temp logs data && \
+RUN mkdir -p temp logs data && \
     chown -R morag:morag /app
 
 # Switch to app user

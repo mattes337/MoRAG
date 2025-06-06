@@ -129,8 +129,10 @@ DEBUG=false
 volumes:
   - ./data:/app/data          # Persistent data
   - ./logs:/app/logs          # Application logs
-  - ./temp:/app/temp          # Temporary files
+  - ./temp:/app/temp          # Temporary files (shared between API and workers)
 ```
+
+**Important**: The `/app/temp` volume is critical for proper operation as it allows file sharing between the API server and worker containers. All uploaded files are stored here temporarily during processing.
 
 ### Resource Limits
 

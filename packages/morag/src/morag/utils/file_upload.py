@@ -70,13 +70,16 @@ class FileUploadHandler:
 
         # Try to create temp directory in shared location for Docker containers
         # This ensures all containers (API and workers) can access the same files
+        temp_dir_created = False
+
         try:
-            # First try /app/temp (Docker shared volume)
+            # First try /app/temp (Docker shared volume) - REQUIRED for container deployments
             app_temp_dir = Path("/app/temp")
             if app_temp_dir.exists() or self._try_create_dir(app_temp_dir):
                 self.temp_dir = app_temp_dir / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
                 self.temp_dir.mkdir(parents=True, exist_ok=True)
                 logger.info("Using shared Docker temp directory", temp_dir=str(self.temp_dir))
+                temp_dir_created = True
             else:
                 # Try ./temp directory (local development)
                 local_temp_dir = Path("./temp")
@@ -84,15 +87,23 @@ class FileUploadHandler:
                     self.temp_dir = local_temp_dir / f"{self.config.temp_dir_prefix}{uuid.uuid4().hex[:8]}"
                     self.temp_dir.mkdir(parents=True, exist_ok=True)
                     logger.info("Using local temp directory", temp_dir=str(self.temp_dir))
+                    temp_dir_created = True
                 else:
-                    # Fall back to system temp directory
+                    # CRITICAL: System temp directory will NOT work in container environments
+                    # because workers won't have access to the same files
                     self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
-                    logger.warning("Using system temp directory - files may not be shared between containers",
-                                 temp_dir=str(self.temp_dir))
+                    logger.error("CRITICAL: Using system temp directory - files will NOT be shared between containers!",
+                               temp_dir=str(self.temp_dir),
+                               warning="This will cause file access errors in worker processes")
+                    temp_dir_created = True
+
         except Exception as e:
-            logger.warning("Failed to create temp directory in shared location, using system temp",
-                         error=str(e))
-            self.temp_dir = Path(tempfile.mkdtemp(prefix=self.config.temp_dir_prefix))
+            logger.error("CRITICAL: Failed to create any temp directory",
+                        error=str(e))
+            raise RuntimeError(f"Cannot create temporary directory for file uploads: {str(e)}")
+
+        if not temp_dir_created:
+            raise RuntimeError("Failed to create any usable temporary directory")
 
         # No longer tracking individual cleanup threads - using periodic cleanup instead
 
@@ -115,9 +126,14 @@ class FileUploadHandler:
         """
         try:
             dir_path.mkdir(parents=True, exist_ok=True)
+            # Test write permissions by creating a test file
+            test_file = dir_path / f".write_test_{uuid.uuid4().hex[:8]}"
+            test_file.write_text("test")
+            test_file.unlink()
             return dir_path.exists() and dir_path.is_dir()
         except Exception as e:
-            logger.debug("Failed to create directory", dir_path=str(dir_path), error=str(e))
+            logger.debug("Failed to create directory or test write permissions",
+                        dir_path=str(dir_path), error=str(e))
             return False
     
     async def save_upload(self, file: UploadFile) -> Path:
@@ -431,3 +447,47 @@ def configure_upload_handler(config: FileUploadConfig) -> None:
     # NOTE: Don't cleanup existing temp directory to avoid race conditions
     # with background tasks that might still be processing files
     _upload_handler = FileUploadHandler(config)
+
+
+def validate_temp_directory_access() -> bool:
+    """Validate that the temporary directory is accessible and writable.
+
+    This should be called during application startup to fail early if
+    the temp directory is not properly configured.
+
+    Returns:
+        True if temp directory is accessible and writable
+
+    Raises:
+        RuntimeError: If temp directory is not accessible or writable
+    """
+    try:
+        # Get the upload handler (this will create temp directory)
+        upload_handler = get_upload_handler()
+        temp_dir = upload_handler.temp_dir
+
+        # Test directory exists
+        if not temp_dir.exists():
+            raise RuntimeError(f"Temp directory does not exist: {temp_dir}")
+
+        # Test directory is writable
+        test_file = temp_dir / f".startup_test_{uuid.uuid4().hex[:8]}"
+        try:
+            test_file.write_text("startup test")
+            test_file.unlink()
+        except Exception as e:
+            raise RuntimeError(f"Temp directory is not writable: {temp_dir} - {str(e)}")
+
+        # Check if we're using system temp (which is problematic in containers)
+        if str(temp_dir).startswith('/tmp/'):
+            logger.warning("STARTUP WARNING: Using system temp directory - this may cause issues in container environments",
+                          temp_dir=str(temp_dir))
+
+        logger.info("Temp directory validation successful",
+                   temp_dir=str(temp_dir),
+                   is_shared_volume=str(temp_dir).startswith('/app/temp'))
+        return True
+
+    except Exception as e:
+        logger.error("STARTUP FAILURE: Temp directory validation failed", error=str(e))
+        raise RuntimeError(f"Temp directory validation failed: {str(e)}")
