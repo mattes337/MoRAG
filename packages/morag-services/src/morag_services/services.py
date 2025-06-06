@@ -87,11 +87,53 @@ class MoRAGServices:
         self.embedding_service = EmbeddingService()
         self.web_service = WebService()
         self.youtube_service = YouTubeService()
+
+        # Initialize AI services for search functionality
+        self._vector_storage = None
+        self._gemini_embedding_service = None
+        self._initialize_search_services()
         
         # Create semaphore for concurrent processing
         self.semaphore = asyncio.Semaphore(self.config.max_concurrent_tasks)
 
         logger.info("MoRAG Services initialized")
+
+    def _initialize_search_services(self):
+        """Initialize search-related services (embedding and vector storage)."""
+        try:
+            import os
+            from .storage import QdrantVectorStorage
+            from .embedding import GeminiEmbeddingService
+
+            # Initialize vector storage
+            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+            qdrant_api_key = os.getenv('QDRANT_API_KEY')
+            collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'morag_vectors')
+
+            self._vector_storage = QdrantVectorStorage(
+                host=qdrant_host,
+                port=qdrant_port,
+                api_key=qdrant_api_key,
+                collection_name=collection_name
+            )
+
+            # Initialize embedding service
+            gemini_api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+            if gemini_api_key:
+                self._gemini_embedding_service = GeminiEmbeddingService(
+                    api_key=gemini_api_key,
+                    embedding_model="text-embedding-004",
+                    generation_model="gemini-2.0-flash-001"
+                )
+                logger.info("Search services initialized successfully")
+            else:
+                logger.warning("Gemini API key not found - search functionality will be limited")
+
+        except Exception as e:
+            logger.error("Failed to initialize search services", error=str(e))
+            self._vector_storage = None
+            self._gemini_embedding_service = None
         
         # Register content type detectors
         self._content_type_detectors = {
@@ -456,7 +498,7 @@ class MoRAGServices:
         try:
             result = await self.web_service.process_url(
                 url,
-                config=self.config.web_config
+                config_options=self.config.web_config.to_dict() if hasattr(self.config.web_config, 'to_dict') else None
             )
             
             return ProcessingResult(
@@ -657,10 +699,58 @@ class MoRAGServices:
         Returns:
             List of similar content items
         """
-        # This would typically use the embedding service and vector storage
-        # For now, return empty list as placeholder
-        logger.warning("Search functionality not yet implemented")
-        return []
+        try:
+            # Check if search services are available
+            if not self._vector_storage or not self._gemini_embedding_service:
+                logger.warning("Search services not available - initializing embedding service or vector storage failed")
+                return []
+
+            # Initialize services if not already done
+            if not self._vector_storage._initialized:
+                await self._vector_storage.initialize()
+
+            if not await self._gemini_embedding_service.initialize():
+                logger.error("Failed to initialize Gemini embedding service")
+                return []
+
+            # Generate embedding for the query
+            logger.info("Generating embedding for search query", query=query[:100])
+            query_embedding = await self._gemini_embedding_service.generate_embedding(
+                query,
+                task_type="retrieval_query"
+            )
+
+            # Search for similar vectors
+            logger.info("Searching for similar vectors", limit=limit)
+            results = await self._vector_storage.search_similar(
+                query_vector=query_embedding,
+                limit=limit,
+                score_threshold=0.5,  # Minimum similarity threshold
+                filters=filters
+            )
+
+            # Format results for API response
+            formatted_results = []
+            for result in results:
+                formatted_result = {
+                    "id": result.get("id"),
+                    "score": result.get("score", 0.0),
+                    "text": result.get("metadata", {}).get("text", ""),
+                    "metadata": result.get("metadata", {}),
+                    "content_type": result.get("metadata", {}).get("content_type"),
+                    "source": result.get("metadata", {}).get("source")
+                }
+                formatted_results.append(formatted_result)
+
+            logger.info("Search completed successfully",
+                       query=query[:50],
+                       results_count=len(formatted_results))
+            return formatted_results
+
+        except Exception as e:
+            logger.error("Search failed", query=query, error=str(e))
+            # Return empty list instead of raising exception to maintain API stability
+            return []
 
     def cleanup(self):
         """Clean up resources used by services."""

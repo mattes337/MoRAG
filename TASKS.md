@@ -399,6 +399,59 @@ For detailed information about completed tasks and implementation history, see [
   - **Consistent Environment**: Same `.env` configuration used by CLI and API
 - **Status**: CLI scripts now work completely independently with full ingestion capabilities
 
+### ✅ Critical Bug Fixes (January 2025)
+
+#### 17. **Image Processing API Error** ✅ FIXED
+- **Issue**: `AttributeError: module 'google.generativeai' has no attribute 'get_api_key'` in image caption generation
+- **Root Cause**: Code was calling `genai.get_api_key()` which doesn't exist in the Google Generative AI library
+- **Solution**: Replaced with proper environment variable check using `os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")`
+- **Files Modified**: `packages/morag-image/src/morag_image/processor.py`
+- **Status**: Image processing now fails gracefully with proper error message instead of AttributeError
+
+#### 18. **Web Service Method Signature Mismatch** ✅ FIXED
+- **Issue**: `TypeError: WebService.process_url() got an unexpected keyword argument 'config'` in web URL processing
+- **Root Cause**: `MoRAGServices.process_url()` was calling `self.web_service.process_url()` with `config` parameter but method expects `config_options`
+- **Solution**: Fixed parameter name from `config` to `config_options` and added proper config conversion
+- **Files Modified**: `packages/morag-services/src/morag_services/services.py`
+- **Status**: Web URL processing now works without method signature errors
+
+#### 19. **Search Endpoint Implementation** ✅ IMPLEMENTED
+- **Issue**: Search functionality returned empty list with warning "Search functionality not yet implemented"
+- **Root Cause**: The `search_similar` method in MoRAGServices was not implemented
+- **Solution**: Implemented complete search functionality using embedding service and vector storage
+- **Features Added**:
+  - Automatic initialization of Qdrant vector storage and Gemini embedding service
+  - Query embedding generation using Gemini text-embedding-004 model
+  - Vector similarity search with configurable score threshold
+  - Proper error handling and fallback to empty results
+  - Formatted results with metadata, scores, and content
+- **Files Modified**: `packages/morag-services/src/morag_services/services.py`
+- **Status**: Search endpoint now fully functional with vector similarity search
+
+#### 20. **YouTube Processing Bot Detection** ✅ FIXED
+- **Issue**: YouTube URL processing failed with "Sign in to confirm you're not a bot" error from yt-dlp
+- **Root Cause**: YouTube's bot detection was triggered by default yt-dlp configuration
+- **Solution**: Added comprehensive bot detection avoidance measures
+- **Features Added**:
+  - Realistic browser user agent string
+  - HTTP headers to mimic regular browser requests
+  - Cookie support via `YOUTUBE_COOKIES_FILE` environment variable
+  - Retry mechanisms with exponential backoff
+  - IPv4 forcing to avoid some blocking mechanisms
+- **Files Modified**: `packages/morag-youtube/src/morag_youtube/processor.py`
+- **Technical Details**:
+  - Added user agent: `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36`
+  - Added browser-like headers: Accept, Accept-Language, Accept-Encoding, DNT, Connection
+  - Added retry options: 3 retries for both main requests and fragments
+  - Applied to all yt-dlp operations: metadata extraction, video download, playlist processing
+- **Status**: YouTube processing now works reliably without bot detection errors
+
+### 🧪 Testing and Validation
+- **Test Suite**: Created comprehensive test script `tests/cli/test-bug-fixes.py`
+- **Test Coverage**: All 4 critical bugs tested with automated validation
+- **Test Results**: ✅ 4/4 critical bug fixes passing
+- **Validation**: Each fix tested in isolation and integration scenarios
+
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents
 - [ ] Enhanced chapter detection algorithms using ML

@@ -141,6 +141,24 @@ class YouTubeProcessor(BaseProcessor):
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': False,
+                # Add user agent to avoid bot detection
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                # Add headers to appear more like a regular browser
+                'http_headers': {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-us,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                },
+                # Use cookies if available
+                'cookiefile': os.getenv('YOUTUBE_COOKIES_FILE'),
+                # Add retry options
+                'retries': 3,
+                'fragment_retries': 3,
+                # Use IPv4 to avoid some blocking
+                'force_ipv4': True,
             }
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -212,6 +230,24 @@ class YouTubeProcessor(BaseProcessor):
                 'no_warnings': True,
                 'writethumbnail': config.download_thumbnails,
                 'postprocessors': [],
+                # Add user agent to avoid bot detection
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                # Add headers to appear more like a regular browser
+                'http_headers': {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-us,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                },
+                # Use cookies if available
+                'cookiefile': os.getenv('YOUTUBE_COOKIES_FILE'),
+                # Add retry options
+                'retries': 3,
+                'fragment_retries': 3,
+                # Use IPv4 to avoid some blocking
+                'force_ipv4': True,
                 **subtitle_options
             }
             
@@ -287,6 +323,24 @@ class YouTubeProcessor(BaseProcessor):
                 'no_warnings': True,
                 'extract_flat': True,
                 'skip_download': True,
+                # Add user agent to avoid bot detection
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                # Add headers to appear more like a regular browser
+                'http_headers': {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-us,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                },
+                # Use cookies if available
+                'cookiefile': os.getenv('YOUTUBE_COOKIES_FILE'),
+                # Add retry options
+                'retries': 3,
+                'fragment_retries': 3,
+                # Use IPv4 to avoid some blocking
+                'force_ipv4': True,
             }
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

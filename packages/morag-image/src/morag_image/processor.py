@@ -321,8 +321,10 @@ class ImageProcessor(BaseProcessor):
         """Generate caption for image using vision model."""
         try:
             # Check if Gemini API is configured
-            if not genai.get_api_key():
-                raise ExternalServiceError("Gemini API key not configured", "gemini")
+            import os
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if not api_key:
+                raise ExternalServiceError("Gemini API key not configured. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.", "gemini")
             
             # Load image for Gemini
             with open(image_path, "rb") as f:
