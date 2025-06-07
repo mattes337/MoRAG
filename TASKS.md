@@ -715,11 +715,15 @@ For detailed information about completed tasks and implementation history, see [
 #### 33. **Docling Not Available in Docker** ✅ FIXED
 - **Issue**: Docker containers report "Docling not available, falling back to pypdf for PDF processing" despite docling being expected
 - **Root Cause**: docling was not included in requirements.txt or package dependencies
-- **Solution**: Added docling>=2.7.0 to both requirements.txt and morag-document package dependencies
+- **Additional Issue**: Dependency conflicts between docling and existing package versions (python-docx, openpyxl)
+- **Solution**:
+  - Added docling>=2.7.0 to both requirements.txt and morag-document package dependencies
+  - Updated python-docx from >=0.8.11,<1.0.0 to >=1.1.2,<2.0.0 (required by docling)
+  - Updated openpyxl from >=3.1.0,<4.0.0 to >=3.1.5,<4.0.0 (required by docling)
 - **Files Modified**:
-  - `requirements.txt`: Added docling>=2.7.0,<3.0.0 under PDF processing section
-  - `packages/morag-document/pyproject.toml`: Added docling>=2.7.0 to dependencies
-- **Status**: ✅ FIXED - docling will be available in next Docker build
+  - `requirements.txt`: Added docling>=2.7.0,<3.0.0 and updated dependency versions
+  - `packages/morag-document/pyproject.toml`: Added docling>=2.7.0 and updated dependency versions
+- **Status**: ✅ FIXED - dependency conflicts resolved, docling will be available in next Docker build
 
 #### 34. **AttributeError: 'dict' object has no attribute 'id'** ✅ FIXED
 - **Issue**: `AttributeError: 'dict' object has no attribute 'id'` in ingest_tasks.py line 167 during document ingestion
