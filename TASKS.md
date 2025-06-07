@@ -48,6 +48,32 @@ For detailed information about completed tasks and implementation history, see [
 - ✅ **High Test Coverage**: Comprehensive test suite with >95% coverage
 - ✅ **GPU/CPU Flexibility**: Automatic fallback system for hardware compatibility
 
+## 🚀 New Features (January 2025)
+
+### ✅ Remote GPU Workers - Simplified Implementation ✅ PLANNED
+- **Feature**: Add remote GPU worker support with simple `gpu` parameter in API endpoints
+- **Implementation**: Created comprehensive task breakdown for simplified approach
+- **Approach**: Simple boolean flag routing instead of complex priority queue system
+- **Tasks Created**:
+  - [Task 1: Queue Architecture Setup](./tasks/remote-gpu-workers-simple/task-01-queue-architecture-setup.md)
+  - [Task 2: API Parameter Addition](./tasks/remote-gpu-workers-simple/task-02-api-parameter-addition.md)
+  - [Task 3: GPU Worker Configuration](./tasks/remote-gpu-workers-simple/task-03-gpu-worker-configuration.md)
+  - [Task 4: Task Routing Logic](./tasks/remote-gpu-workers-simple/task-04-task-routing-logic.md)
+  - [Task 5: Network Configuration](./tasks/remote-gpu-workers-simple/task-05-network-configuration.md)
+  - [Task 6: Documentation & Testing](./tasks/remote-gpu-workers-simple/task-06-documentation-testing.md)
+- **Key Features**:
+  - Optional `gpu=true` parameter on all processing and ingestion endpoints
+  - Automatic fallback to CPU workers when GPU workers unavailable
+  - Support for both shared storage (NFS) and HTTP file transfer
+  - Comprehensive setup documentation and test scripts
+  - Docker and native deployment support
+- **Benefits**:
+  - 5-10x faster audio/video processing with GPU acceleration
+  - Simple setup process (< 30 minutes for new GPU worker)
+  - Backward compatible (existing API calls unchanged)
+  - Intelligent routing based on worker availability and queue load
+- **Status**: Task breakdown complete, ready for implementation
+
 ## 🔧 Recent Fixes (January 2025)
 
 ### ✅ Docker Health Check & Permission Fixes
