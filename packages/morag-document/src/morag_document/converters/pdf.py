@@ -33,20 +33,20 @@ class PDFConverter(DocumentConverter):
         Returns:
             True if docling can be safely used, False otherwise
         """
+        # Check if we should force CPU mode for safety
+        import os
+        force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
+        disable_docling = os.environ.get('MORAG_DISABLE_DOCLING', 'false').lower() == 'true'
+
+        if force_cpu:
+            logger.info("CPU mode forced, disabling docling to avoid PyTorch compatibility issues")
+            return False
+
+        if disable_docling:
+            logger.info("Docling explicitly disabled via MORAG_DISABLE_DOCLING")
+            return False
+
         try:
-            # Check if we should force CPU mode for safety
-            import os
-            force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
-            disable_docling = os.environ.get('MORAG_DISABLE_DOCLING', 'false').lower() == 'true'
-
-            if force_cpu:
-                logger.info("CPU mode forced, disabling docling to avoid PyTorch compatibility issues")
-                return False
-
-            if disable_docling:
-                logger.info("Docling explicitly disabled via MORAG_DISABLE_DOCLING")
-                return False
-
             # Try importing docling
             import docling
 

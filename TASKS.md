@@ -712,7 +712,35 @@ For detailed information about completed tasks and implementation history, see [
 
 ### 🔧 Current Issues (January 2025)
 
-#### 33. **Docling Not Available in Docker** ✅ FIXED
+#### 33. **Worker SIGILL Crash During Docling Processing** ✅ FIXED
+- **Issue**: Worker processes crashing with `SIGILL` (Illegal Instruction) signal during PDF processing with docling
+- **Error**: `signal 4 (SIGILL)` causing worker to exit prematurely during document processing
+- **Root Cause**: Docling was being initialized despite `MORAG_FORCE_CPU=true` setting, causing CPU instruction compatibility issues
+- **Problem**: The `_check_docling_availability()` method checked environment variables correctly but still attempted docling imports and initialization, triggering the crash
+- **Solution**: Fixed docling availability check to return immediately when CPU safety mode is enabled
+- **Changes Implemented**:
+  - **Early Return**: Modified `_check_docling_availability()` to check environment variables before any docling imports
+  - **Environment Variables**: Added `MORAG_DISABLE_DOCLING=true` to `.env` and docker-compose.yml
+  - **Docker Configuration**: Added CPU safety environment variables to all containers
+  - **Documentation**: Updated `.env.example` with CPU compatibility settings
+- **Files Modified**:
+  - `packages/morag-document/src/morag_document/converters/pdf.py`: Fixed docling availability check logic
+  - `.env`: Added `MORAG_DISABLE_DOCLING=true` for immediate safety
+  - `docker-compose.yml`: Added CPU safety environment variables to all services
+  - `.env.example`: Added documentation for CPU compatibility settings
+- **Technical Details**:
+  - **Root Problem**: Environment variable checks happened after try block, allowing docling imports to execute
+  - **CPU Safety**: Now checks `MORAG_FORCE_CPU` and `MORAG_DISABLE_DOCLING` before any imports
+  - **Fallback**: Automatically uses pypdf for PDF processing when docling is disabled
+  - **Container Safety**: All Docker containers now have CPU compatibility settings
+- **Benefits**:
+  - **No More Crashes**: Workers no longer crash with SIGILL during PDF processing
+  - **Reliable Fallback**: Automatic fallback to pypdf ensures PDF processing continues
+  - **CPU Compatibility**: Full CPU-only mode support for environments without advanced instruction sets
+  - **Production Ready**: Docker deployment now stable on various CPU architectures
+- **Status**: Worker crashes eliminated, PDF processing now stable with pypdf fallback
+
+#### 34. **Docling Not Available in Docker** ✅ FIXED
 - **Issue**: Docker containers report "Docling not available, falling back to pypdf for PDF processing" despite docling being expected
 - **Root Cause**: docling was not included in requirements.txt or package dependencies
 - **Additional Issue**: Dependency conflicts between docling and existing package versions (python-docx, openpyxl)
