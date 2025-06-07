@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  gpu-worker:
+    build: .
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - REDIS_URL=redis://host.docker.internal:6379/0
+      - QDRANT_URL=http://host.docker.internal:6333
+      - QDRANT_COLLECTION_NAME=morag_documents
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - WORKER_QUEUES=gpu-tasks
+      - WORKER_CONCURRENCY=2
+      - TEMP_DIR=/app/temp
+      - WHISPER_MODEL_SIZE=large-v3
+      - ENABLE_GPU_ACCELERATION=true
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - /path/to/shared/storage:/app/temp  # Adjust path as needed
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped

@@ -578,3 +578,40 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
                     raise Exception(str(e))
 
     return asyncio.run(_ingest())
+
+
+# GPU Task Variants - Route to gpu-tasks queue
+@celery_app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 1})
+def ingest_file_task_gpu(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
+    """GPU variant of ingest_file_task - routes to gpu-tasks queue with CPU fallback."""
+    try:
+        return ingest_file_task(self, file_path, content_type, task_options)
+    except Exception as e:
+        # GPU worker failed, fallback to CPU queue
+        logger.warning("GPU worker failed, falling back to CPU queue", file_path=file_path, error=str(e))
+        cpu_task = ingest_file_task.delay(file_path, content_type, task_options)
+        return cpu_task.get()  # Wait for CPU task to complete
+
+
+@celery_app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 1})
+def ingest_url_task_gpu(self, url: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
+    """GPU variant of ingest_url_task - routes to gpu-tasks queue with CPU fallback."""
+    try:
+        return ingest_url_task(self, url, content_type, task_options)
+    except Exception as e:
+        # GPU worker failed, fallback to CPU queue
+        logger.warning("GPU worker failed, falling back to CPU queue", url=url, error=str(e))
+        cpu_task = ingest_url_task.delay(url, content_type, task_options)
+        return cpu_task.get()  # Wait for CPU task to complete
+
+
+@celery_app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 1})
+def ingest_batch_task_gpu(self, items: List[Dict[str, Any]], task_options: Optional[Dict[str, Any]] = None):
+    """GPU variant of ingest_batch_task - routes to gpu-tasks queue with CPU fallback."""
+    try:
+        return ingest_batch_task(self, items, task_options)
+    except Exception as e:
+        # GPU worker failed, fallback to CPU queue
+        logger.warning("GPU worker failed, falling back to CPU queue", item_count=len(items), error=str(e))
+        cpu_task = ingest_batch_task.delay(items, task_options)
+        return cpu_task.get()  # Wait for CPU task to complete

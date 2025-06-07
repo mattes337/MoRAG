@@ -34,6 +34,7 @@ packages/
 - **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
 - **Batch Embedding**: Optimized batch processing using Gemini's native batch API for 4x faster embeddings and reduced rate limiting
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
+- **GPU Workers**: Remote GPU worker support for accelerated audio/video processing with automatic fallback
 
 ## Quick Start
 
@@ -200,6 +201,53 @@ python tests/cli/test-docker-fixes.py
 
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
+## GPU Workers
+
+MoRAG supports remote GPU workers for accelerated processing of audio, video, and image content. GPU workers provide 5-10x faster processing for these content types.
+
+### Quick GPU Worker Setup
+
+```bash
+# 1. Setup main server (if using shared storage)
+./scripts/setup-nfs-server.sh
+
+# 2. Setup GPU worker machine
+git clone https://github.com/your-org/morag.git
+cd morag
+pip install -e packages/morag/  # Install all packages
+
+# 3. Configure GPU worker
+cp configs/gpu-worker.env configs/my-gpu-worker.env
+# Edit configs/my-gpu-worker.env with your settings
+
+# 4. Start GPU worker
+./scripts/start-gpu-worker.sh configs/my-gpu-worker.env
+```
+
+### Using GPU Processing
+
+Add `gpu=true` parameter to any API endpoint:
+
+```bash
+# Process audio with GPU acceleration
+curl -X POST "http://localhost:8000/api/v1/ingest/file" \
+  -F "file=@audio.mp3" \
+  -F "gpu=true"
+
+# Check GPU worker status
+curl http://localhost:8000/api/v1/status/workers
+```
+
+### Features
+
+- **Automatic Routing**: Tasks automatically route to GPU workers when available
+- **Intelligent Fallback**: Falls back to CPU workers if GPU workers are unavailable
+- **Content-Type Aware**: Only routes GPU-beneficial content (audio/video/image) to GPU workers
+- **Load Balancing**: Distributes tasks across multiple GPU workers
+- **Network Flexibility**: Supports both shared storage (NFS) and HTTP file transfer
+
+For complete setup instructions, see [GPU Worker Setup Guide](docs/GPU_WORKER_SETUP.md).
+
 ## Usage
 
 For detailed usage examples including Python API, CLI commands, REST API endpoints, and configuration options, see [USAGE.md](USAGE.md).
@@ -248,6 +296,8 @@ The MoRAG pipeline consists of several key components:
 - [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md) - Development setup and guidelines
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
+- [GPU Worker Setup Guide](docs/GPU_WORKER_SETUP.md) - **NEW**: Remote GPU workers for accelerated processing
+- [Network Requirements](docs/network-requirements.md) - Network configuration for GPU workers
 
 ## Development
 

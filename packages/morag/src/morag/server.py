@@ -10,7 +10,7 @@ import uuid
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import structlog
@@ -20,11 +20,19 @@ from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
 from morag.utils.file_upload import get_upload_handler, FileUploadError, validate_temp_directory_access
 from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
+from morag.services.task_router import get_task_router, WorkerType
 from morag.worker import (
     process_file_task, process_url_task, process_web_page_task,
-    process_youtube_video_task, process_batch_task, celery_app
+    process_youtube_video_task, process_batch_task, celery_app,
+    # Add GPU variants
+    process_file_task_gpu, process_url_task_gpu, process_web_page_task_gpu,
+    process_youtube_video_task_gpu, process_batch_task_gpu
 )
-from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
+from morag.ingest_tasks import (
+    ingest_file_task, ingest_url_task, ingest_batch_task,
+    # Add GPU variants
+    ingest_file_task_gpu, ingest_url_task_gpu, ingest_batch_task_gpu
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -185,11 +193,13 @@ class ProcessURLRequest(BaseModel):
     url: str
     content_type: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
+    gpu: Optional[bool] = False  # NEW FIELD
 
 
 class ProcessBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     options: Optional[Dict[str, Any]] = None
+    gpu: Optional[bool] = False  # NEW FIELD
 
 
 class SearchRequest(BaseModel):
@@ -220,11 +230,13 @@ class IngestURLRequest(BaseModel):
     url: str
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    gpu: Optional[bool] = False  # NEW FIELD
 
 
 class IngestBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     webhook_url: Optional[str] = None
+    gpu: Optional[bool] = False  # NEW FIELD
 
 
 class IngestResponse(BaseModel):
@@ -306,8 +318,15 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         ## Features
         - **Processing Endpoints**: Process content and return results immediately
         - **Ingestion Endpoints**: Process content and store in vector database for retrieval
+        - **GPU Processing**: Add `gpu=true` parameter to use GPU workers for faster processing
         - **Task Management**: Track processing status and manage background tasks
         - **Search**: Query stored content using vector similarity
+
+        ## GPU Processing
+        Add `gpu=true` parameter to any processing or ingestion endpoint to route tasks to GPU workers:
+        - Faster audio transcription with GPU-accelerated Whisper
+        - Faster video processing with GPU-accelerated FFmpeg
+        - Automatic fallback to CPU workers if GPU workers unavailable
 
         ## Endpoint Categories
         - `/process/*` - Immediate processing (no storage)
@@ -370,7 +389,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_file(
         file: UploadFile = File(...),
         content_type: Optional[str] = Form(None),
-        options: Optional[str] = Form(None)  # JSON string
+        options: Optional[str] = Form(None),  # JSON string
+        gpu: Optional[bool] = Form(False)  # NEW PARAMETER
     ):
         """Process content from an uploaded file."""
         temp_path = None
@@ -547,7 +567,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         file: UploadFile = File(...),
         webhook_url: Optional[str] = Form(None),
         metadata: Optional[str] = Form(None),  # JSON string
-        use_docling: Optional[bool] = Form(False)
+        use_docling: Optional[bool] = Form(False),
+        gpu: Optional[bool] = Form(False)  # NEW PARAMETER
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -592,11 +613,26 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             }
 
             # Submit to background task queue for processing and storage
-            task = ingest_file_task.delay(
-                str(temp_path),
-                source_type,
-                options
-            )
+            # Use intelligent task routing
+            task_router = get_task_router()
+            use_gpu = task_router.should_use_gpu_worker(gpu, source_type)
+
+            # Select task based on routing decision
+            if use_gpu:
+                task = ingest_file_task_gpu.delay(
+                    str(temp_path),
+                    source_type,
+                    options
+                )
+            else:
+                task = ingest_file_task.delay(
+                    str(temp_path),
+                    source_type,
+                    options
+                )
+
+            # Log routing decision
+            task_router.log_task_routing('ingest_file', use_gpu, source_type, task.id)
 
             logger.info("File ingestion task created",
                        task_id=task.id,
@@ -642,7 +678,18 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             }
 
             # Submit to ingest URL task for processing and storage
-            task = ingest_url_task.delay(request.url, source_type, options)
+            # Use intelligent task routing
+            task_router = get_task_router()
+            use_gpu = task_router.should_use_gpu_worker(request.gpu, source_type)
+
+            # Select task based on routing decision
+            if use_gpu:
+                task = ingest_url_task_gpu.delay(request.url, source_type, options)
+            else:
+                task = ingest_url_task.delay(request.url, source_type, options)
+
+            # Log routing decision
+            task_router.log_task_routing('ingest_url', use_gpu, source_type, task.id)
 
             logger.info("URL ingestion task created",
                        task_id=task.id,
@@ -671,7 +718,18 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             }
 
             # Submit batch ingest task
-            task = ingest_batch_task.delay(request.items, options)
+            # Use intelligent task routing (batch tasks use mixed content types)
+            task_router = get_task_router()
+            use_gpu = task_router.should_use_gpu_worker(request.gpu, 'mixed')
+
+            # Select task based on routing decision
+            if use_gpu:
+                task = ingest_batch_task_gpu.delay(request.items, options)
+            else:
+                task = ingest_batch_task.delay(request.items, options)
+
+            # Log routing decision
+            task_router.log_task_routing('ingest_batch', use_gpu, 'mixed', task.id)
 
             batch_id = f"batch-{uuid.uuid4().hex[:8]}"
 
@@ -797,6 +855,53 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Failed to get queue stats", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
+    @app.get("/api/v1/status/workers", tags=["Task Management"])
+    async def get_worker_status():
+        """Get current worker and queue status."""
+        try:
+            task_router = get_task_router()
+
+            # Get worker information
+            all_workers = task_router.get_available_workers()
+            gpu_workers = task_router.get_available_workers(WorkerType.GPU)
+            cpu_workers = task_router.get_available_workers(WorkerType.CPU)
+
+            # Get queue lengths
+            gpu_queue_length = task_router.get_queue_length('gpu-tasks')
+            cpu_queue_length = task_router.get_queue_length('celery')
+
+            return {
+                "workers": {
+                    "total": len(all_workers),
+                    "gpu": len(gpu_workers),
+                    "cpu": len(cpu_workers),
+                    "details": {
+                        worker_id: {
+                            "type": worker.worker_type.value,
+                            "active_tasks": worker.active_tasks,
+                            "max_tasks": worker.max_tasks,
+                            "queues": worker.queues
+                        }
+                        for worker_id, worker in all_workers.items()
+                    }
+                },
+                "queues": {
+                    "gpu-tasks": {
+                        "length": gpu_queue_length,
+                        "workers": len(gpu_workers)
+                    },
+                    "celery": {
+                        "length": cpu_queue_length,
+                        "workers": len(cpu_workers)
+                    }
+                },
+                "gpu_available": task_router.has_gpu_workers_available()
+            }
+
+        except Exception as e:
+            logger.error("Failed to get worker status", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.delete("/api/v1/ingest/{task_id}", tags=["Task Management"])
     async def cancel_task(task_id: str):
         """Cancel a running or pending task."""
@@ -812,6 +917,63 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
         except Exception as e:
             logger.error("Failed to cancel task", task_id=task_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/files/download", tags=["File Transfer"])
+    async def download_file(request: Dict[str, str]):
+        """Download file for remote worker processing."""
+        try:
+            file_path = request.get('file_path')
+            if not file_path:
+                raise HTTPException(status_code=400, detail="file_path required")
+
+            # Validate file exists and is accessible
+            if not os.path.exists(file_path):
+                raise HTTPException(status_code=404, detail="File not found")
+
+            # Security check - ensure file is in allowed directories
+            allowed_dirs = ['/app/temp', '/app/uploads', '/tmp', '/mnt/morag-shared']
+            if not any(file_path.startswith(d) for d in allowed_dirs):
+                raise HTTPException(status_code=403, detail="File access denied")
+
+            return FileResponse(
+                path=file_path,
+                filename=os.path.basename(file_path),
+                media_type='application/octet-stream'
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("File download failed", file_path=file_path, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/files/upload-result", tags=["File Transfer"])
+    async def upload_result(
+        file: Optional[UploadFile] = File(None),
+        result_data: str = Form(...)
+    ):
+        """Upload processing result from remote worker."""
+        try:
+            import json
+            result = json.loads(result_data)
+
+            # Handle file upload if provided
+            if file:
+                # Save uploaded file to temp directory
+                temp_path = f"/tmp/result_{uuid.uuid4().hex}_{file.filename}"
+                with open(temp_path, "wb") as buffer:
+                    import shutil
+                    shutil.copyfileobj(file.file, buffer)
+                result['uploaded_file'] = temp_path
+
+            # Process result (store in database, trigger webhooks, etc.)
+            logger.info("Result uploaded from remote worker", result=result)
+
+            return {"status": "success", "message": "Result uploaded successfully"}
+
+        except Exception as e:
+            logger.error("Result upload failed", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.post("/api/v1/admin/cleanup", tags=["Administration"])
