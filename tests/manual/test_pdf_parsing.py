@@ -53,7 +53,7 @@ def test_document_processor():
     print("=" * 32)
     
     try:
-        from morag.processors.document import document_processor, UNSTRUCTURED_AVAILABLE
+        from morag_document import document_processor, UNSTRUCTURED_AVAILABLE
         print(f"✅ Document processor imported")
         print(f"   - Unstructured available: {UNSTRUCTURED_AVAILABLE}")
         print(f"   - Supported types: {list(document_processor.supported_types.keys())}")
@@ -97,7 +97,7 @@ def test_pdf_parsing_with_file(pdf_file):
     print("=" * 50)
     
     try:
-        from morag.processors.document import document_processor
+        from morag_document import document_processor
         import asyncio
         
         async def parse_test():

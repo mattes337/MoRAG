@@ -1,17 +1,38 @@
-# MoRAG - Multimodal RAG Ingestion Pipeline
+# MoRAG - Multimodal Retrieval Augmented Generation
 
-A comprehensive, production-ready multimodal RAG (Retrieval Augmented Generation) ingestion pipeline that processes documents, audio, video, web content, and YouTube videos into a searchable vector database.
+A comprehensive, modular system for processing and indexing various types of content for retrieval-augmented generation (RAG) applications.
+
+## 🎉 Modular Architecture Complete!
+
+MoRAG has been successfully transformed into a modular architecture with separate, independently deployable packages:
+
+### Package Structure
+```
+packages/
+├── morag-core/          # Core interfaces and models
+├── morag-services/      # AI and storage services
+├── morag-audio/         # Audio processing
+├── morag-document/      # Document processing
+├── morag-video/         # Video processing
+├── morag-image/         # Image processing
+├── morag-web/          # Web content processing
+├── morag-youtube/      # YouTube video processing
+└── morag/              # Main integration package
+```
 
 ## Features
 
+- **Modular Design**: Independent packages for different content types
+- **Multi-format Support**: Process PDFs, audio, video, web pages, YouTube videos, and more
+- **Advanced AI Integration**: Gemini API for embeddings and summarization
+- **Vector Storage**: Qdrant integration for similarity search
+- **Background Processing**: Celery-based task queue for scalable processing
+- **Docker Support**: Complete containerization with docker-compose
+- **Multiple Interfaces**: REST API, CLI, and Python API
 - **Universal Document Conversion**: Unified framework for converting any document format to structured markdown
-- **Multimodal Processing**: Support for documents (PDF, DOCX, MD), audio, video, images, web content, and YouTube videos
 - **Intelligent Chunking**: Page-based chunking for documents with configurable strategies (page, semantic, sentence, paragraph)
 - **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
-- **Vector Storage**: Qdrant vector database integration for efficient similarity search
-- **Async Processing**: Celery-based task queue for scalable background processing
-- **API-First**: FastAPI-based REST API with comprehensive documentation
-- **Monitoring**: Built-in progress tracking and webhook notifications
+- **Batch Embedding**: Optimized batch processing using Gemini's native batch API for 4x faster embeddings and reduced rate limiting
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
 
 ## Quick Start
@@ -23,7 +44,34 @@ A comprehensive, production-ready multimodal RAG (Retrieval Augmented Generation
 - Qdrant (vector database)
 - Gemini API key
 
-### Installation
+### Option 1: Using the Main Package (Recommended)
+
+```bash
+# Install the main package (includes all components)
+pip install packages/morag/
+
+# Or install from source
+cd packages/morag
+pip install -e .
+
+# Start services with Docker
+docker-compose up -d
+
+# Use the CLI
+morag process-url https://example.com
+morag health
+```
+
+### Option 2: Individual Packages
+
+```bash
+# Install only what you need
+pip install packages/morag-core/
+pip install packages/morag-web/
+pip install packages/morag-youtube/
+```
+
+### Option 3: Traditional Installation
 
 1. Clone the repository:
 ```bash
@@ -67,6 +115,117 @@ uvicorn morag.api.main:app --reload
 
 **Important**: The Celery worker is required for processing ingestion tasks. Without it, submitted tasks will remain in "pending" status and never complete.
 
+## Docker Deployment
+
+### Quick Docker Start
+
+```bash
+# Start all services with Docker Compose
+docker-compose up -d
+
+# Check service health
+curl http://localhost:8000/health
+
+# View logs
+docker-compose logs -f
+```
+
+### Docker Deployment Options
+
+1. **Monolithic (Development)**:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Development with Hot-Reload**:
+   ```bash
+   docker-compose -f docker-compose.dev.yml up -d
+   ```
+
+3. **Microservices (Production)**:
+   ```bash
+   docker-compose -f docker-compose.microservices.yml up -d
+   ```
+
+### Environment Setup
+
+Create a `.env` file from the template:
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+Required variables:
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here  # Optional
+ANTHROPIC_API_KEY=your_anthropic_api_key_here  # Optional
+```
+
+**Note**: Use `GEMINI_API_KEY` for consistency. The deprecated `GOOGLE_API_KEY` is still supported for backward compatibility.
+
+### Testing Docker Setup
+
+Test infrastructure services:
+```bash
+# Test Redis
+docker exec morag-redis-dev redis-cli ping
+
+# Test Qdrant
+curl http://localhost:6333/health
+
+# Check all services
+docker-compose -f docker-compose.dev.yml ps
+```
+
+### Troubleshooting Docker
+
+- **Port conflicts**: Stop existing services on ports 6379 (Redis), 6333/6334 (Qdrant), 8000 (API)
+- **Build issues**: Run `docker-compose build --no-cache` to rebuild images
+- **Permission issues**: Ensure Docker has access to the project directory
+
+### Recent Docker Fixes (January 2025)
+
+✅ **Fixed Qdrant Health Checks**: Updated all docker-compose files to use the correct `/healthz` endpoint
+✅ **Fixed Whisper Model Permissions**: Resolved permission errors when loading AI models in containers
+- Proper home directory setup for the `morag` user
+- Configured cache directories for Hugging Face and Whisper models
+- Added environment variables: `HF_HOME`, `TRANSFORMERS_CACHE`, `WHISPER_CACHE_DIR`
+
+Test the fixes:
+```bash
+# Test Docker health checks and permissions
+python tests/cli/test-docker-fixes.py
+```
+
+For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
+
+## Usage
+
+For detailed usage examples including Python API, CLI commands, REST API endpoints, and configuration options, see [USAGE.md](USAGE.md).
+
+### Quick Examples
+
+**✨ NEW: All CLI scripts now support both processing (immediate results) and ingestion (background + storage) modes!**
+
+```bash
+# System validation
+python tests/cli/test-simple.py  # Quick validation (recommended)
+python tests/cli/test-all.py     # Comprehensive test with detailed report
+
+# Processing Mode (immediate results)
+python tests/cli/test-audio.py my-audio.mp3
+python tests/cli/test-document.py my-document.pdf
+python tests/cli/test-web.py https://example.com
+
+# Ingestion Mode (background processing + vector storage)
+python tests/cli/test-audio.py my-audio.mp3 --ingest
+python tests/cli/test-document.py my-document.pdf --ingest --metadata '{"category": "research"}'
+python tests/cli/test-web.py https://example.com --ingest --webhook-url https://my-app.com/webhook
+```
+
+For comprehensive CLI documentation, see [CLI.md](CLI.md).
+
 ## Architecture
 
 The MoRAG pipeline consists of several key components:
@@ -76,14 +235,19 @@ The MoRAG pipeline consists of several key components:
 - **Embedding Layer**: Gemini API integration for text embeddings
 - **Storage Layer**: Qdrant vector database for similarity search
 - **Task Queue**: Celery for async processing and scalability
+- **Modular Packages**: Independent packages for each content type
 
 ## Documentation
 
+- [CLI Documentation](CLI.md) - **NEW**: Comprehensive CLI commands for both processing and ingestion modes
+- [Usage Guide](USAGE.md) - Comprehensive usage examples and API reference
 - [API Documentation](http://localhost:8000/docs) (when running locally)
+- [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) - Complete Docker deployment instructions
 - [Universal Document Conversion](docs/UNIVERSAL_DOCUMENT_CONVERSION.md) - Complete guide to the conversion framework
+- [Batch Embedding Guide](docs/batch-embedding.md) - **NEW**: Optimized batch embedding with Gemini API for 4x performance improvement
+- [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
+- [Development Guide](docs/DEVELOPMENT_GUIDE.md) - Development setup and guidelines
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
-- [Task Implementation Guide](tasks/README.md)
-- [Deployment Guide](docs/deployment.md)
 
 ## Development
 
@@ -93,11 +257,23 @@ The MoRAG pipeline consists of several key components:
 # Install development dependencies
 pip install -e ".[dev]"
 
-# Run tests
+# Run all tests
 pytest
+
+# Run specific test categories
+pytest tests/unit/          # Unit tests
+pytest tests/integration/   # Integration tests
+pytest tests/manual/        # Manual tests
 
 # Run with coverage
 pytest --cov=src/morag --cov-report=html
+
+# Test individual components (NEW: dual-mode support)
+python tests/cli/test-all.py          # Complete system test
+python tests/cli/test-audio.py sample.mp3                    # Processing mode
+python tests/cli/test-audio.py sample.mp3 --ingest           # Ingestion mode
+python tests/cli/test-document.py sample.pdf                 # Processing mode
+python tests/cli/test-document.py sample.pdf --ingest        # Ingestion mode
 ```
 
 ### Code Quality
@@ -112,7 +288,99 @@ flake8 src/ tests/
 mypy src/
 ```
 
+### Package Development
+
+Each MoRAG component is a separate package in the `packages/` directory:
+
+```
+packages/
+├── morag-core/          # Core functionality and models
+├── morag-audio/         # Audio processing
+├── morag-document/      # Document processing
+├── morag-video/         # Video processing
+├── morag-image/         # Image processing
+├── morag-web/           # Web scraping
+├── morag-youtube/       # YouTube processing
+├── morag-services/      # Shared services
+└── morag-embedding/     # Embedding services
+```
+
+Install packages individually for development:
+```bash
+pip install -e packages/morag-core
+pip install -e packages/morag-audio
+# ... etc
+```
+
+## Local Development (Without Docker)
+
+For detailed local development setup without Docker, see [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md).
+
+### Quick Local Setup
+
+```bash
+# 1. Install packages in development mode
+pip install -e packages/morag-core/
+pip install -e packages/morag-services/
+pip install -e packages/morag/
+
+# 2. Start infrastructure (Redis + Qdrant)
+docker run -d --name morag-redis -p 6379:6379 redis:alpine
+docker run -d --name morag-qdrant -p 6333:6333 qdrant/qdrant:latest
+
+# 3. Start services
+python scripts/start_worker.py  # Terminal 1 (REQUIRED)
+uvicorn morag.api.main:app --reload  # Terminal 2
+
+# 4. Test setup
+python debug_morag.py  # Comprehensive debugging
+python test_qdrant_fix.py  # Quick validation
+```
+
 ## Troubleshooting
+
+### Fixed: Abstract Class Errors
+
+✅ **FIXED**: Both abstract class instantiation errors have been resolved:
+
+1. **QdrantVectorStorage Error**: "Can't instantiate abstract class QdrantVectorStorage"
+2. **GeminiEmbeddingService Error**: "Can't instantiate abstract class GeminiEmbeddingService"
+
+**What was fixed:**
+
+**QdrantVectorStorage** - Implemented all missing abstract methods:
+- `initialize()`, `shutdown()`, `health_check()`
+- `put_object()`, `get_object()`, `delete_object()`, `list_objects()`, `get_object_metadata()`, `object_exists()`
+- `add_vectors()`, `search_vectors()`, `delete_vectors()`, `update_vector_metadata()`
+
+**GeminiEmbeddingService** - Implemented all missing abstract methods:
+- `health_check()`, `generate_embeddings()`
+- `get_embedding_dimension()`, `get_supported_models()`, `get_max_tokens()`
+- Fixed method signatures to match interface requirements
+
+**Test the fixes:**
+```bash
+python tests/cli/test-qdrant-fix.py        # Test QdrantVectorStorage
+python tests/cli/test-embedding-fix.py     # Test GeminiEmbeddingService
+python tests/cli/test-ingest-workflow.py   # Test complete workflow
+```
+
+### Debugging Issues
+
+If you encounter issues:
+
+1. **Run comprehensive debug script:**
+   ```bash
+   python debug_morag.py
+   ```
+
+2. **Check logs:** The debug script creates detailed log files with timestamps
+
+3. **Test individual components:**
+   ```bash
+   python tests/cli/test-simple.py  # Quick validation
+   python tests/cli/test-document.py sample.pdf  # Test document processing
+   ```
 
 ### Tasks Not Processing
 

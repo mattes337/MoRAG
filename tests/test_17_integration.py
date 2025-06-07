@@ -188,7 +188,7 @@ class TestIngestionAPIIntegration:
     @patch('morag.services.task_manager.task_manager.get_task_status')
     def test_task_status_retrieval(self, mock_get_status, client, auth_headers):
         """Test task status retrieval."""
-        from morag.services.task_manager import TaskInfo, TaskStatus
+        from src.morag.services.task_manager import TaskInfo, TaskStatus
         from datetime import datetime
         
         # Mock task status

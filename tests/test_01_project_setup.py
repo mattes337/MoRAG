@@ -47,7 +47,7 @@ def test_config_import():
         if str(src_path) not in sys.path:
             sys.path.insert(0, str(src_path))
         
-        from morag.core.config import settings
+        from morag_core.config import settings
         assert settings is not None
         assert hasattr(settings, 'api_host')
         assert hasattr(settings, 'gemini_api_key')
@@ -60,22 +60,22 @@ def test_environment_variables():
     src_path = Path("src").resolve()
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
-    
-    from morag.core.config import Settings
-    
+
+    from morag_core.config import Settings
+
     # Test with minimal required env vars
     import os
-    original_key = os.environ.get('GEMINI_API_KEY')
-    
+    original_key = os.environ.get('MORAG_GEMINI_API_KEY')
+
     try:
-        os.environ['GEMINI_API_KEY'] = 'test_key_123'
+        os.environ['MORAG_GEMINI_API_KEY'] = 'test_key_123'
         test_settings = Settings()
         assert test_settings.gemini_api_key == 'test_key_123'
     finally:
         if original_key:
-            os.environ['GEMINI_API_KEY'] = original_key
+            os.environ['MORAG_GEMINI_API_KEY'] = original_key
         else:
-            os.environ.pop('GEMINI_API_KEY', None)
+            os.environ.pop('MORAG_GEMINI_API_KEY', None)
 
 def test_dependencies_installed():
     """Test that all required dependencies are installed."""

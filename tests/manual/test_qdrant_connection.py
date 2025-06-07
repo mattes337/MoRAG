@@ -11,8 +11,8 @@ from pathlib import Path
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.core.config import settings
-from morag.services.storage import qdrant_service
+from morag_core.config import settings
+from morag_services.storage import qdrant_service
 import structlog
 
 # Configure logging

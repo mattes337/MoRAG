@@ -1,17 +1,81 @@
-FROM python:3.11-slim
+# Multi-stage build for MoRAG worker
+FROM python:3.11-slim AS base
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies (these rarely change, so cache them early)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip first
+RUN pip install --upgrade pip
+
+
+# Dependencies stage - install Python packages before copying code
+FROM base AS dependencies
+
+# Set working directory for consistent paths
+WORKDIR /build
+
+# Copy only requirements.txt first (this layer will be cached unless requirements.txt changes)
+COPY requirements.txt ./
+
+# Install base requirements first - this is the heavy lifting that we want to cache
+RUN pip install -r requirements.txt
+
+# Download spaCy model (optional, will fallback if not available)
+RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
+
+
+# Builder stage - install MoRAG packages with full source code
+FROM dependencies AS builder
+
+# Copy package files and install MoRAG packages
+COPY packages/ ./packages/
+
+# Install MoRAG packages in dependency order (editable for worker development)
+RUN pip install -e /build/packages/morag-core && \
+    pip install -e /build/packages/morag-embedding && \
+    pip install -e /build/packages/morag-audio && \
+    pip install -e /build/packages/morag-video && \
+    pip install -e /build/packages/morag-document && \
+    pip install -e /build/packages/morag-image && \
+    pip install -e /build/packages/morag-web && \
+    pip install -e /build/packages/morag-youtube && \
+    pip install -e /build/packages/morag-services && \
+    pip install -e /build/packages/morag
+
+
+# Runtime base - install system runtime dependencies
+FROM python:3.11-slim AS runtime-base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# Install system dependencies
+# Install runtime dependencies for worker (this layer is cached unless system deps change)
 RUN apt-get update && apt-get install -y \
-    build-essential \
     curl \
     ffmpeg \
     tesseract-ocr \
     tesseract-ocr-eng \
+    tesseract-ocr-deu \
+    libreoffice \
+    poppler-utils \
+    chromium \
+    chromium-driver \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
@@ -31,42 +95,40 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     libasound2 \
     libpangocairo-1.0-0 \
-    libatk1.0-0 \
     libcairo-gobject2 \
-    libgtk-3-0 \
     libgdk-pixbuf2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
+# Set Chrome/Chromium path for web scraping
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
 
-# Copy requirements and install dependencies
-COPY pyproject.toml ./
-RUN pip install --upgrade pip && \
-    pip install -e .
-
-# Download spaCy model (optional, will fallback if not available)
-RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
+# Copy virtual environment from builder (contains all dependencies)
+COPY --from=builder /opt/venv /opt/venv
 
 # Install Playwright browsers (optional, for web scraping with dynamic content)
 RUN python -m playwright install chromium || echo "Playwright browser installation failed, will use fallback"
 
+
+# Production worker stage
+FROM runtime-base AS production
+
 # Create app user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r morag && useradd -r -g morag morag
 
 # Create app directory
 WORKDIR /app
 
-# Copy application code
-COPY src/ ./src/
+# Copy application code and configuration (this layer changes frequently)
+COPY packages/ ./packages/
 COPY scripts/ ./scripts/
 
 # Create necessary directories
-RUN mkdir -p uploads temp logs && \
-    chown -R appuser:appuser /app
+RUN mkdir -p temp logs data && \
+    chown -R morag:morag /app
 
 # Switch to app user
-USER appuser
+USER morag
 
 # Default command for worker
-CMD ["celery", "-A", "src.morag.core.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+CMD ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]

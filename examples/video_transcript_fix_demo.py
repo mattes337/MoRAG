@@ -16,10 +16,10 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from morag.converters.video import VideoConverter
-from morag.processors.audio import AudioProcessingResult, AudioTranscriptSegment
-from morag.services.speaker_diarization import DiarizationResult, SpeakerSegment, SpeakerInfo
-from morag.services.topic_segmentation import TopicSegmentationResult, TopicSegment
+from morag_video import VideoConverter
+from morag_audio import AudioProcessingResult, AudioTranscriptSegment
+from morag_audio.services import DiarizationResult, SpeakerSegment, SpeakerInfo
+from morag_audio.services import TopicSegmentationResult, TopicSegment
 
 
 def create_mock_audio_result():

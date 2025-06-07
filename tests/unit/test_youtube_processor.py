@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
 import tempfile
 
-from morag.processors.youtube import YouTubeProcessor, YouTubeConfig, YouTubeMetadata, YouTubeDownloadResult
-from morag.core.exceptions import ProcessingError, ExternalServiceError
+from morag_youtube import YouTubeProcessor, YouTubeConfig, YouTubeMetadata, YouTubeDownloadResult
+from morag_core.exceptions import ProcessingError, ExternalServiceError
 
 class TestYouTubeProcessor:
     """Test cases for YouTubeProcessor."""

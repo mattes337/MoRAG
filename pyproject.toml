@@ -21,45 +21,52 @@ classifiers = [
 ]
 
 dependencies = [
-    "fastapi[standard]>=0.115.0",
-    "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.5.0",
-    "pydantic-settings>=2.1.0",
-    "celery>=5.3.0",
-    "redis>=5.0.0",
-    "qdrant-client>=1.7.0",
-    "google-genai>=0.3.0",
-    "unstructured>=0.11.0",
-    "spacy>=3.7.0",
-    "yt-dlp>=2023.12.30",
-    "beautifulsoup4>=4.12.0",
-    "markdownify>=0.11.6",
-    "html2text>=2024.2.26",
-    "lxml>=4.9.3",
-    "bleach>=6.1.0",
-    "markdown>=3.5.1",
-    "python-multipart>=0.0.6",
-    "aiofiles>=23.2.1",
-    "httpx>=0.25.0",
-    "python-dotenv>=1.0.0",
-    "structlog>=23.2.0",
-    "psutil>=5.9.0",
+    "fastapi==0.115.4",
+    "uvicorn==0.32.1",
+    "pydantic==2.10.3",
+    "pydantic-settings==2.7.0",
+    "celery==5.3.6",
+    "kombu==5.3.7",
+    "redis==5.2.1",
+    "qdrant-client==1.12.1",
+    "google-genai==1.18.0",
+    "yt-dlp==2024.12.13",
+    "beautifulsoup4==4.12.3",
+    "markdownify==0.14.1",
+    "html2text==2024.2.26",
+    "lxml==5.3.0",
+    "bleach==6.2.0",
+    "markdown==3.7",
+    "python-multipart==0.0.17",
+    "aiofiles==24.1.0",
+    "httpx==0.28.1",
+    "python-dotenv==1.0.1",
+    "structlog==24.4.0",
+    "psutil==6.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.7.0",
-    "pre-commit>=3.5.0",
+    "pytest>=7.4.0,<8.0.0",
+    "pytest-asyncio>=0.21.0,<1.0.0",
+    "pytest-cov>=4.1.0,<5.0.0",
+    "black>=23.0.0,<24.0.0",
+    "isort>=5.12.0,<6.0.0",
+    "flake8>=6.0.0,<7.0.0",
+    "mypy>=1.7.0,<2.0.0",
+    "pre-commit>=3.5.0,<4.0.0",
 ]
 
 docling = [
-    "docling>=1.0.0",
+    "docling>=2.36.0",
+    "deepsearch-glm>=1.0.0",
+]
+
+nlp = [
+    "spacy>=3.7.0,<4.0.0",
+    "unstructured>=0.11.0,<1.0.0",
+    "cloudpathlib>=0.20.0,<1.0.0",
+    "weasel>=0.1.0,<0.5.0",
 ]
 
 audio = [
@@ -83,37 +90,34 @@ video = [
 ]
 
 image = [
-    "Pillow>=10.0.0",
-    "pytesseract>=0.3.10",
-    "easyocr>=1.7.0",
-    "opencv-python>=4.8.0",
+    "Pillow>=10.0.0,<11.0.0",
+    "pytesseract>=0.3.10,<1.0.0",
+    "easyocr>=1.7.0,<2.0.0",
+    "opencv-python>=4.8.0,<5.0.0",
 ]
 
 office = [
-    "python-docx>=0.8.11",
-    "openpyxl>=3.1.0",
-    "python-pptx>=0.6.21",
-    "xlrd>=2.0.1",
-    "xlwt>=1.3.0",
+    "python-docx>=0.8.11,<1.0.0",
+    "openpyxl>=3.1.0,<4.0.0",
+    "python-pptx>=0.6.21,<1.0.0",
+    "xlrd>=2.0.1,<3.0.0",
+    "xlwt>=1.3.0,<2.0.0",
 ]
 
 web = [
-    "playwright>=1.40.0",
-    "trafilatura>=1.6.0",
-    "readability-lxml>=0.8.1",
-    "newspaper3k>=0.2.8",
-]
-
-morphik = [
-    "morphik>=0.1.0",
-]
-
-milvus = [
-    "pymilvus>=2.3.0",
+    "playwright>=1.40.0,<2.0.0",
+    "trafilatura>=1.6.0,<2.0.0",
+    "readability-lxml>=0.8.1,<1.0.0",
+    "newspaper3k>=0.2.8,<1.0.0",
 ]
 
 all-extras = [
-    "docling>=1.0.0",
+    "docling>=2.36.0",
+    "deepsearch-glm>=1.0.0",
+    "spacy>=3.7.0,<4.0.0",
+    "unstructured>=0.11.0,<1.0.0",
+    "cloudpathlib>=0.20.0,<1.0.0",
+    "weasel>=0.1.0,<0.5.0",
     "faster-whisper>=1.0.0",
     "pydub>=0.25.1",
     "librosa>=0.10.0",
@@ -139,8 +143,6 @@ all-extras = [
     "trafilatura>=1.6.0",
     "readability-lxml>=0.8.1",
     "newspaper3k>=0.2.8",
-    "morphik>=0.1.0",
-    "pymilvus>=2.3.0",
     "unstructured[all-docs]>=0.11.0",
 ]
 
@@ -171,4 +173,4 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=src/morag --cov-report=html --cov-report=term-missing"
+addopts = "-v --tb=short"

@@ -5,9 +5,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
 
-from morag.services.whisper_service import WhisperService
-from morag.processors.audio import AudioConfig, AudioProcessingResult
-from morag.core.exceptions import ExternalServiceError
+from morag_audio.services import WhisperService
+from morag_audio import AudioConfig, AudioProcessingResult
+from morag_core.exceptions import ExternalServiceError
 
 class TestWhisperService:
     """Test cases for WhisperService."""

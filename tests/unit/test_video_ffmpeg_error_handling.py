@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
 import tempfile
 
-from morag.processors.video import VideoProcessor, VideoConfig
-from morag.core.exceptions import ProcessingError, ExternalServiceError
+from morag_video import VideoProcessor, VideoConfig
+from morag_core.exceptions import ProcessingError, ExternalServiceError
 
 
 class TestVideoFFmpegErrorHandling:

@@ -11,8 +11,8 @@ from pathlib import Path
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from morag.services.embedding import gemini_service
-from morag.services.summarization import enhanced_summarization_service, SummaryConfig, SummaryStrategy
+from morag_services.embedding import gemini_service
+from morag_services.processing import enhanced_summarization_service, SummaryConfig, SummaryStrategy
 
 async def test_summarization_fix():
     """Test that summarization produces proper summaries instead of truncated text."""

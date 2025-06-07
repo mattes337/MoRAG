@@ -5,13 +5,13 @@ import time
 from typing import Dict, Any
 import structlog
 
-from morag.core.ai_error_handlers import (
+from src.morag.core.ai_error_handlers import (
     execute_with_ai_resilience, 
     get_ai_service_health,
     universal_ai_handler
 )
-from morag.services.embedding import gemini_service
-from morag.core.exceptions import RateLimitError, ExternalServiceError
+from morag_services.embedding import gemini_service
+from morag_core.exceptions import RateLimitError, ExternalServiceError
 
 # Configure logging for demo
 structlog.configure(

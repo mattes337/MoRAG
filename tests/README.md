@@ -101,6 +101,23 @@ python test_qdrant_connection.py
 python test_audio_transcription_fixes.py /path/to/audio.mp3
 ```
 
+### CLI Tests
+```bash
+# Quick system validation
+python tests/cli/test-simple.py
+
+# Individual component tests
+python tests/cli/test-audio.py uploads/audio.mp3
+python tests/cli/test-document.py uploads/document.pdf
+python tests/cli/test-video.py uploads/video.mp4
+python tests/cli/test-image.py uploads/image.jpg
+python tests/cli/test-web.py https://example.com
+python tests/cli/test-youtube.py https://youtube.com/watch?v=VIDEO_ID
+
+# Comprehensive system test
+python tests/cli/test-all.py
+```
+
 ## Test Configuration
 
 ### Environment Variables

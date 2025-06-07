@@ -8,8 +8,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from morag.processors.youtube import YouTubeConfig, YouTubeDownloadResult
-from morag.core.exceptions import ProcessingError
+from morag_youtube import YouTubeConfig, YouTubeDownloadResult
+from morag_core.exceptions import ProcessingError
 
 
 class TestYouTubeVideoTask:

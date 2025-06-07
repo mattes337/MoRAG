@@ -135,7 +135,7 @@ from morag.processors.audio import AudioProcessor, AudioConfig
 config = AudioConfig(
     model_size="base",
     enable_diarization=True,
-    device="cpu"
+    device="auto"  # Auto-detect best available device (GPU/CPU)
 )
 
 processor = AudioProcessor(config)

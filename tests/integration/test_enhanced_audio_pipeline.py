@@ -9,12 +9,12 @@ import wave
 import struct
 import numpy as np
 
-from morag.processors.audio import AudioProcessor, AudioConfig
-from morag.services.speaker_diarization import speaker_diarization_service
-from morag.services.topic_segmentation import topic_segmentation_service
-from morag.converters.audio import AudioConverter
-from morag.converters.base import ConversionOptions
-from morag.core.config import settings
+from morag_audio import AudioProcessor, AudioConfig
+from morag_audio.services import speaker_diarization_service
+from morag_audio.services import topic_segmentation_service
+from morag_audio import AudioConverter
+from morag_core.interfaces.converter import ConversionOptions
+from morag_core.config import settings
 
 
 class TestEnhancedAudioPipeline:

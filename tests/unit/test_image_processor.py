@@ -6,8 +6,8 @@ from pathlib import Path
 import tempfile
 from PIL import Image
 
-from morag.processors.image import ImageProcessor, ImageConfig, ImageMetadata, ImageProcessingResult
-from morag.core.exceptions import ProcessingError
+from morag_image import ImageProcessor, ImageConfig, ImageMetadata, ImageProcessingResult
+from morag_core.exceptions import ProcessingError
 
 class TestImageProcessor:
     """Test cases for ImageProcessor."""
@@ -152,7 +152,10 @@ class TestImageProcessor:
         mock_model_class.return_value = mock_model
         
         with patch('asyncio.to_thread', return_value=mock_response):
-            caption, confidence = await image_processor._generate_caption(mock_image_file, "gemini-pro-vision")
+            # Create a config with the new model
+            from morag_image.processor import ImageConfig
+            config = ImageConfig()
+            caption, confidence = await image_processor._generate_caption(mock_image_file, config)
             
             assert caption == "A red square image"
             assert confidence > 0
@@ -161,7 +164,10 @@ class TestImageProcessor:
     async def test_generate_caption_failure(self, image_processor, mock_image_file):
         """Test caption generation failure."""
         with patch('google.generativeai.GenerativeModel', side_effect=Exception("API error")):
-            caption, confidence = await image_processor._generate_caption(mock_image_file, "gemini-pro-vision")
+            # Create a config with the new model
+            from morag_image.processor import ImageConfig
+            config = ImageConfig()
+            caption, confidence = await image_processor._generate_caption(mock_image_file, config)
             
             assert caption == ""
             assert confidence == 0.0

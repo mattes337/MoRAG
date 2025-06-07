@@ -1,19 +1,14 @@
-version: '3.8'
-
 services:
   # Redis for task queue
   redis:
     image: redis:7.2-alpine
     container_name: morag-redis-prod
     restart: unless-stopped
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - morag-network
 
@@ -29,150 +24,93 @@ services:
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - morag-network
 
   # Main API service
-  api:
+  morag-api:
     build:
       context: .
-      dockerfile: Dockerfile
+      target: production
     container_name: morag-api-prod
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - API_WORKERS=4
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENVIRONMENT=production
       - LOG_LEVEL=INFO
-    env_file:
-      - .env.prod
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     volumes:
-      - ./uploads:/app/uploads
+      - ./data:/app/data
       - ./logs:/app/logs
+      - ./temp:/app/temp
     depends_on:
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - redis
+      - qdrant
     networks:
       - morag-network
 
   # Celery workers
-  worker-documents:
+  morag-worker-1:
     build:
       context: .
-      dockerfile: Dockerfile.worker
-    container_name: morag-worker-docs-prod
+      target: production
+    container_name: morag-worker-1-prod
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-    env_file:
-      - .env.prod
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     volumes:
       - ./uploads:/app/uploads
+      - ./data:/app/data
       - ./temp:/app/temp
       - ./logs:/app/logs
     depends_on:
       - redis
-      - qdrant
-    command: ["celery", "-A", "src.morag.core.celery_app", "worker", "--loglevel=info", "--queues=document_processing", "--concurrency=2"]
+    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
     networks:
       - morag-network
 
-  worker-media:
+  morag-worker-2:
     build:
       context: .
-      dockerfile: Dockerfile.worker
-    container_name: morag-worker-media-prod
+      target: production
+    container_name: morag-worker-2-prod
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-    env_file:
-      - .env.prod
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     volumes:
       - ./uploads:/app/uploads
+      - ./data:/app/data
       - ./temp:/app/temp
       - ./logs:/app/logs
     depends_on:
       - redis
-      - qdrant
-    command: ["celery", "-A", "src.morag.core.celery_app", "worker", "--loglevel=info", "--queues=audio_processing,video_processing", "--concurrency=1"]
-    networks:
-      - morag-network
-
-  worker-web:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: morag-worker-web-prod
-    restart: unless-stopped
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-    env_file:
-      - .env.prod
-    volumes:
-      - ./uploads:/app/uploads
-      - ./temp:/app/temp
-      - ./logs:/app/logs
-    depends_on:
-      - redis
-      - qdrant
-    command: ["celery", "-A", "src.morag.core.celery_app", "worker", "--loglevel=info", "--queues=web_processing", "--concurrency=2"]
-    networks:
-      - morag-network
-
-  # Nginx reverse proxy
-  nginx:
-    image: nginx:alpine
-    container_name: morag-nginx-prod
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./logs/nginx:/var/log/nginx
-    depends_on:
-      - api
-    networks:
-      - morag-network
-
-  # Monitoring with Flower (Celery monitoring)
-  flower:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: morag-flower-prod
-    restart: unless-stopped
-    ports:
-      - "5555:5555"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    env_file:
-      - .env.prod
-    depends_on:
-      - redis
-    command: ["celery", "-A", "src.morag.core.celery_app", "flower", "--port=5555"]
+    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
     networks:
       - morag-network
 

@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from morag.services.summarization import (
+from morag_services.processing import (
     EnhancedSummarizationService,
     SummaryConfig,
     SummaryStrategy,
@@ -11,7 +11,7 @@ from morag.services.summarization import (
     SummaryQuality,
     EnhancedSummaryResult
 )
-from morag.services.embedding import SummaryResult
+from morag_services.embedding import SummaryResult
 
 @pytest.fixture
 def content_analyzer():

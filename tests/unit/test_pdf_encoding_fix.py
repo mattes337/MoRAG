@@ -1,7 +1,7 @@
 """Tests for PDF text encoding fixes."""
 
 import pytest
-from morag.utils.text_processing import clean_pdf_text_encoding, normalize_text_encoding
+from morag_core.utils import clean_pdf_text_encoding, normalize_text_encoding
 
 
 class TestPDFEncodingFix:

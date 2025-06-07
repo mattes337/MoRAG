@@ -4,12 +4,12 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
 
-from morag.tasks.video_tasks import (
+from morag_video.tasks import (
     process_video_file,
     extract_video_audio,
     generate_video_thumbnails
 )
-from morag.processors.video import VideoConfig, VideoMetadata, VideoProcessingResult
+from morag_video import VideoConfig, VideoMetadata, VideoProcessingResult
 
 class TestVideoTasks:
     """Test cases for video processing tasks."""

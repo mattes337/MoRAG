@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  morag-image:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data:/data
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    # Default command can be overridden when running docker-compose
+    command: python -m morag_image.cli --help
+
+# Usage instructions:
+# 1. Create a .env file with your Google API key:
+#    GOOGLE_API_KEY=your-api-key-here
+#
+# 2. Create a data directory in the same folder as this docker-compose.yml file
+#    mkdir -p data
+#
+# 3. Place your images in the data directory
+#
+# 4. Run with custom command:
+#    docker-compose run --rm morag-image python -m morag_image.cli /data/image.jpg -o /data/output.json --caption --ocr
+#
+# 5. Process a directory of images:
+#    docker-compose run --rm morag-image python -m morag_image.cli /data/images -o /data/results.json --caption --ocr

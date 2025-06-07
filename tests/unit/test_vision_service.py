@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
 from PIL import Image
 
-from morag.services.vision_service import VisionService, vision_service
-from morag.core.exceptions import ExternalServiceError
+from morag_image.services import VisionService, vision_service
+from morag_core.exceptions import ExternalServiceError
 
 class TestVisionService:
     """Test cases for VisionService."""
@@ -42,7 +42,7 @@ class TestVisionService:
             caption = await service.generate_caption(mock_image_file)
             
             assert caption == "A blue square image with vibrant colors"
-            mock_model_class.assert_called_once_with('gemini-pro-vision')
+            mock_model_class.assert_called_once_with('gemini-1.5-flash')
     
     @pytest.mark.asyncio
     @patch('morag.core.config.settings')

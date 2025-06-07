@@ -9,7 +9,7 @@ src_path = Path("src").resolve()
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from morag.core.config import Settings
+from morag_core.config import Settings
 
 class TestConfigValidation:
     """Test configuration validation and defaults."""
@@ -22,7 +22,7 @@ class TestConfigValidation:
 
             assert settings.api_host == "0.0.0.0"
             assert settings.api_port == 8000
-            assert settings.gemini_model == "gemini-pro"
+            assert settings.gemini_model == "gemini-2.0-flash"  # Default in morag-core
             assert settings.gemini_embedding_model == "text-embedding-004"
             assert settings.qdrant_host == "localhost"
             assert settings.qdrant_port == 6333
@@ -38,14 +38,15 @@ class TestConfigValidation:
     def test_env_override(self):
         """Test that environment variables override defaults."""
         test_env = {
-            'GEMINI_API_KEY': 'test_key',
-            'API_PORT': '9000',
-            'QDRANT_HOST': 'custom-host',
-            'LOG_LEVEL': 'DEBUG'
+            'MORAG_GEMINI_API_KEY': 'test_key',
+            'MORAG_API_PORT': '9000',
+            'MORAG_QDRANT_HOST': 'custom-host',
+            'MORAG_LOG_LEVEL': 'DEBUG'
         }
 
         with patch.dict(os.environ, test_env, clear=True):
-            settings = Settings()
+            # Disable .env file loading to test pure environment variables
+            settings = Settings(_env_file=None)
 
             assert settings.api_port == 9000
             assert settings.qdrant_host == "custom-host"
@@ -55,11 +56,12 @@ class TestConfigValidation:
     def test_list_parsing(self):
         """Test that list environment variables are parsed correctly."""
         test_env = {
-            'ALLOWED_ORIGINS': '["http://localhost:3000", "http://localhost:8080"]'
+            'MORAG_ALLOWED_ORIGINS': '["http://localhost:3000", "http://localhost:8080"]'
         }
 
         with patch.dict(os.environ, test_env, clear=True):
-            settings = Settings()
+            # Disable .env file loading to test pure environment variables
+            settings = Settings(_env_file=None)
             # Note: pydantic-settings may not parse JSON strings automatically
             # This test verifies the current behavior
             assert isinstance(settings.allowed_origins, list)
@@ -67,17 +69,18 @@ class TestConfigValidation:
     def test_integer_parsing(self):
         """Test that integer environment variables are parsed correctly."""
         test_env = {
-            'API_PORT': '8080',
-            'MAX_CHUNK_SIZE': '2000',
-            'WEBHOOK_TIMEOUT': '60'
+            'MORAG_API_PORT': '8080',
+            'MORAG_MAX_DOCUMENT_SIZE': '209715200',  # 200MB in bytes
+            'MORAG_SLOW_QUERY_THRESHOLD': '10.0'
         }
 
         with patch.dict(os.environ, test_env, clear=True):
-            settings = Settings()
+            # Disable .env file loading to test pure environment variables
+            settings = Settings(_env_file=None)
 
             assert settings.api_port == 8080
-            assert settings.max_chunk_size == 2000
-            assert settings.webhook_timeout == 60
+            assert settings.max_document_size == 209715200
+            assert settings.slow_query_threshold == 10.0
 
     def test_optional_fields(self):
         """Test that optional fields work correctly."""
@@ -92,13 +95,14 @@ class TestConfigValidation:
     def test_case_insensitive(self):
         """Test that environment variables are case insensitive."""
         test_env = {
-            'gemini_api_key': 'test_key',  # lowercase
-            'API_PORT': '9000',  # uppercase
-            'Log_Level': 'DEBUG'  # mixed case
+            'morag_gemini_api_key': 'test_key',  # lowercase
+            'MORAG_API_PORT': '9000',  # uppercase
+            'Morag_Log_Level': 'DEBUG'  # mixed case
         }
 
         with patch.dict(os.environ, test_env, clear=True):
-            settings = Settings()
+            # Disable .env file loading to test pure environment variables
+            settings = Settings(_env_file=None)
 
             assert settings.gemini_api_key == 'test_key'
             assert settings.api_port == 9000

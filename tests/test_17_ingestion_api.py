@@ -10,7 +10,7 @@ from fastapi import UploadFile
 import io
 
 from morag.api.main import create_app
-from morag.utils.file_handling import file_handler
+from morag_core.utils import file_handler
 from morag.api.models import SourceType
 
 class TestFileHandling:
@@ -292,7 +292,7 @@ class TestStatusAPI:
     def test_task_status_endpoint(self, client, auth_headers):
         """Test task status endpoint."""
         with patch('morag.services.task_manager.task_manager.get_task_status') as mock_status:
-            from morag.services.task_manager import TaskInfo, TaskStatus
+            from src.morag.services.task_manager import TaskInfo, TaskStatus
             from datetime import datetime
             
             mock_task_info = TaskInfo(

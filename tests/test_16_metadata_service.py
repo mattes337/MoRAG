@@ -6,8 +6,8 @@ from pathlib import Path
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
-from morag.services.metadata_service import metadata_service
-from morag.models.metadata import (
+from morag_services import metadata_service
+from morag_core.models import (
     FileMetadata, ContentMetadata, ProcessingMetadata, 
     UserMetadata, SystemMetadata, ComprehensiveMetadata
 )

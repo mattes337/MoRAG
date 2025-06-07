@@ -6,9 +6,9 @@ import json
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
 
-from morag.services.webhook import webhook_service
-from morag.services.status_history import status_history, StatusEvent
-from morag.services.task_manager import task_manager
+from morag_services import webhook_service
+from src.morag.services.status_history import status_history, StatusEvent
+from src.morag.services.task_manager import task_manager
 
 
 @pytest.mark.asyncio

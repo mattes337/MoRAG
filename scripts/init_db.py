@@ -8,8 +8,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.services.storage import qdrant_service
-from morag.core.config import settings
+from morag_services.storage import qdrant_service
+from morag_core.config import settings
 import structlog
 
 logger = structlog.get_logger()

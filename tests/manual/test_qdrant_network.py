@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.core.config import settings
+from morag_core.config import settings
 
 def test_dns_resolution(hostname):
     """Test DNS resolution for the hostname."""

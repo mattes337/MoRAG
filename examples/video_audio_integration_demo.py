@@ -17,10 +17,10 @@ import structlog
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.processors.video import VideoProcessor, VideoConfig
-from morag.converters.video import VideoConverter
-from morag.converters.base import ConversionOptions
-from morag.tasks.video_tasks import process_video_file
+from morag_video import VideoProcessor, VideoConfig
+from morag_video import VideoConverter
+from morag_core.interfaces.converter import ConversionOptions
+from morag_video.tasks import process_video_file
 
 logger = structlog.get_logger()
 

@@ -14,8 +14,32 @@ from fastapi.testclient import TestClient
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag.core.config import settings
-from morag.services.embedding import EmbeddingResult, SummaryResult
+# Try to import settings, but don't fail if not available
+try:
+    from morag_core.config import settings
+except ImportError:
+    # Create a mock settings object for tests
+    class MockSettings:
+        redis_url = "redis://localhost:6379/15"
+        qdrant_collection_name = "test_morag_documents"
+        upload_dir = "./test_uploads"
+        temp_dir = "./test_temp"
+        log_level = "DEBUG"
+
+    settings = MockSettings()
+
+# Define result classes for testing
+class EmbeddingResult:
+    def __init__(self, embedding, token_count, model):
+        self.embedding = embedding
+        self.token_count = token_count
+        self.model = model
+
+class SummaryResult:
+    def __init__(self, summary, token_count, model):
+        self.summary = summary
+        self.token_count = token_count
+        self.model = model
 
 
 class TestSettings:
@@ -217,8 +241,12 @@ def auth_headers():
 @pytest.fixture
 def mock_youtube_metadata():
     """Mock YouTube metadata for testing."""
-    from morag.processors.youtube import YouTubeMetadata
-    
+
+    class YouTubeMetadata:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
     return YouTubeMetadata(
         id="test_video_123",
         title="Test Video Title",

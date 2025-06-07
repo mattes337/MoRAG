@@ -5,10 +5,10 @@ import asyncio
 from unittest.mock import patch, AsyncMock
 import time
 
-from morag.services.embedding import gemini_service
-from morag.services.whisper_service import whisper_service
-from morag.core.ai_error_handlers import execute_with_ai_resilience, get_ai_service_health
-from morag.core.exceptions import RateLimitError, ExternalServiceError
+from morag_services.embedding import gemini_service
+from morag_audio.services import whisper_service
+from src.morag.core.ai_error_handlers import execute_with_ai_resilience, get_ai_service_health
+from morag_core.exceptions import RateLimitError, ExternalServiceError
 
 
 @pytest.mark.asyncio
@@ -166,7 +166,7 @@ class TestWhisperServiceResilience:
         # Test with mocked model
         with patch.object(whisper_service, '_models', {"base_cpu_int8": mock_model_instance}):
             try:
-                from morag.processors.audio import AudioConfig
+                from morag_audio import AudioConfig
                 config = AudioConfig(model_size="base")
                 
                 # This should use the resilience framework
