@@ -248,12 +248,21 @@ class DocumentConverter(BaseConverter):
         import re
 
         # Get settings for default chunk configuration
-        settings = get_settings()
+        from morag_core.config import validate_configuration_and_log
+        settings = validate_configuration_and_log()
 
         text = document.raw_text
         strategy = options.chunking_strategy
         chunk_size = options.chunk_size or settings.default_chunk_size
         chunk_overlap = options.chunk_overlap or settings.default_chunk_overlap
+
+        # Log chunking operation details
+        logger.info("Starting document chunking",
+                   strategy=strategy,
+                   chunk_size=chunk_size,
+                   chunk_overlap=chunk_overlap,
+                   text_length=len(text) if text else 0,
+                   enable_page_based_chunking=settings.enable_page_based_chunking)
 
         # Apply chunking strategy
         if strategy == ChunkingStrategy.PAGE:
@@ -468,29 +477,36 @@ class DocumentConverter(BaseConverter):
         if position >= len(text):
             return len(text)
 
-        # Word boundary pattern - matches spaces, punctuation, or start/end of string
-        word_boundary_pattern = r'\s+|[.!?;:,\-\(\)\[\]{}"\']'
-
+        # Enhanced word boundary detection to prevent mid-word splits
         if direction == "backward":
-            # Search backward from position
-            search_text = text[:position]
-            matches = list(re.finditer(word_boundary_pattern, search_text))
-            if matches:
-                # Return position after the last boundary found
-                return matches[-1].end()
-            else:
-                # No boundary found, return start
-                return 0
+            # Search backward from position to find a safe word boundary
+            # Start from the position and move backward until we find whitespace or punctuation
+            for i in range(position, -1, -1):
+                if i == 0:
+                    return 0
+                char = text[i]
+                # Check if current character is whitespace or punctuation
+                if re.match(r'[\s.!?;:,\-\(\)\[\]{}"\'\n\r\t]', char):
+                    # Found a boundary, but make sure we're not in the middle of punctuation
+                    # Move to the end of the whitespace/punctuation sequence
+                    while i < len(text) and re.match(r'[\s\n\r\t]', text[i]):
+                        i += 1
+                    return i
+                # Also check for word boundaries using regex
+                if i > 0 and re.match(r'\w', text[i-1]) and not re.match(r'\w', char):
+                    return i
+            return 0
         else:  # forward
-            # Search forward from position
-            search_text = text[position:]
-            match = re.search(word_boundary_pattern, search_text)
-            if match:
-                # Return position of the boundary
-                return position + match.start()
-            else:
-                # No boundary found, return end
-                return len(text)
+            # Search forward from position to find a safe word boundary
+            for i in range(position, len(text)):
+                char = text[i]
+                # Check if current character is whitespace or punctuation
+                if re.match(r'[\s.!?;:,\-\(\)\[\]{}"\'\n\r\t]', char):
+                    return i
+                # Also check for word boundaries using regex
+                if i > 0 and re.match(r'\w', text[i-1]) and not re.match(r'\w', char):
+                    return i
+            return len(text)
 
     def _detect_sentence_boundaries(self, text: str) -> List[int]:
         """Detect sentence boundaries using improved regex patterns.

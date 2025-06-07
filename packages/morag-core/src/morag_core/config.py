@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     gemini_vision_model: str = Field(default="gemini-1.5-flash", alias="MORAG_GEMINI_VISION_MODEL")
 
     # Embedding Configuration
-    embedding_batch_size: int = Field(default=10, alias="MORAG_EMBEDDING_BATCH_SIZE")
+    embedding_batch_size: int = Field(default=100, alias="MORAG_EMBEDDING_BATCH_SIZE")
     enable_batch_embedding: bool = Field(default=True, alias="MORAG_ENABLE_BATCH_EMBEDDING")
 
     # Redis Configuration
@@ -222,6 +222,39 @@ def get_settings() -> Settings:
     if _settings_instance is None:
         _settings_instance = Settings()
     return _settings_instance
+
+
+def log_configuration_debug(settings: Settings) -> None:
+    """Log current configuration values for debugging.
+
+    Args:
+        settings: Settings instance to log
+    """
+    logger.info("=== MoRAG Document Processing Configuration ===")
+    logger.info("Chunking Configuration:",
+                default_chunk_size=settings.default_chunk_size,
+                max_page_chunk_size=settings.max_page_chunk_size,
+                enable_page_based_chunking=settings.enable_page_based_chunking,
+                default_chunking_strategy=settings.default_chunking_strategy,
+                default_chunk_overlap=settings.default_chunk_overlap,
+                max_tokens_per_chunk=settings.max_tokens_per_chunk)
+    logger.info("Environment Variables Check:",
+                MORAG_DEFAULT_CHUNK_SIZE=os.getenv("MORAG_DEFAULT_CHUNK_SIZE", "NOT SET"),
+                MORAG_MAX_PAGE_CHUNK_SIZE=os.getenv("MORAG_MAX_PAGE_CHUNK_SIZE", "NOT SET"),
+                MORAG_ENABLE_PAGE_BASED_CHUNKING=os.getenv("MORAG_ENABLE_PAGE_BASED_CHUNKING", "NOT SET"),
+                MORAG_DEFAULT_CHUNKING_STRATEGY=os.getenv("MORAG_DEFAULT_CHUNKING_STRATEGY", "NOT SET"))
+    logger.info("=== End Configuration Debug ===")
+
+
+def validate_configuration_and_log() -> Settings:
+    """Validate configuration and log debug information.
+
+    Returns:
+        Validated settings instance
+    """
+    settings = get_settings()
+    log_configuration_debug(settings)
+    return settings
 
 
 def reset_settings() -> None:
