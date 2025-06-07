@@ -690,6 +690,26 @@ For detailed information about completed tasks and implementation history, see [
 - **Docker Testing**: Use `docker_verification_test.py` to verify container functionality
 - **Status**: All Docker services (API and workers) now start successfully with unified environment handling
 
+#### 32. **ProcessingConfig Document ID Parameter Error** ✅ FIXED
+- **Issue**: `ProcessingConfig.__init__() got an unexpected keyword argument 'document_id'` in document processing workers
+- **Error**: Document processing failed when API passed `document_id` and `replace_existing` parameters to ProcessingConfig
+- **Root Cause**: ProcessingConfig class in `morag_core.interfaces.processor` didn't accept document management parameters
+- **Problem**: API endpoints pass document management options to workers, but ProcessingConfig rejected unknown parameters
+- **Solution**: Extended ProcessingConfig to accept document management parameters
+- **Changes Implemented**:
+  - **Added Document Management Fields**: Added `document_id` and `replace_existing` optional fields to ProcessingConfig
+  - **Service Level Handling**: Document management parameters handled at service/task level, not processor level
+  - **Backward Compatibility**: Existing ProcessingConfig usage continues to work unchanged
+  - **Parameter Acceptance**: ProcessingConfig now accepts all API parameters without errors
+- **Files Modified**:
+  - `packages/morag-core/src/morag_core/interfaces/processor.py`: Added document_id and replace_existing fields
+- **Technical Details**:
+  - **Parameter Flow**: API → Task → Service → Processor (ProcessingConfig)
+  - **Separation of Concerns**: Document management handled at higher levels, processing config focuses on processing options
+  - **Error Prevention**: ProcessingConfig now accepts additional parameters without TypeError
+- **Validation**: Created test script confirming ProcessingConfig accepts document_id and other parameters
+- **Status**: Document processing workers now handle document management parameters without errors
+
 ### ✅ Configuration and Error Handling Fixes (January 2025)
 
 #### 23. **Vision Model Configuration** ✅ IMPLEMENTED
