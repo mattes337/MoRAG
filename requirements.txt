@@ -39,6 +39,9 @@ trafilatura>=1.6.0,<2.0.0
 python-docx>=0.8.11,<1.0.0
 openpyxl>=3.1.0,<4.0.0
 
+# PDF processing (enhanced)
+docling>=2.7.0,<3.0.0
+
 # NLP (basic)
 spacy>=3.7.0,<4.0.0
 

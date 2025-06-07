@@ -164,8 +164,8 @@ async def store_content_in_vector_db(
                 if existing_points:
                     logger.info("Document with same content checksum already exists, skipping",
                                content_checksum=content_checksum[:16],
-                               existing_point_id=existing_points[0].id)
-                    return [existing_points[0].id]
+                               existing_point_id=existing_points[0]["id"])
+                    return [existing_points[0]["id"]]
 
         # Create document chunks for better retrieval
         chunks = []

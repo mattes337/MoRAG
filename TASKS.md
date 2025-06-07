@@ -710,6 +710,26 @@ For detailed information about completed tasks and implementation history, see [
 - **Validation**: Created test script confirming ProcessingConfig accepts document_id and other parameters
 - **Status**: Document processing workers now handle document management parameters without errors
 
+### 🔧 Current Issues (January 2025)
+
+#### 33. **Docling Not Available in Docker** ✅ FIXED
+- **Issue**: Docker containers report "Docling not available, falling back to pypdf for PDF processing" despite docling being expected
+- **Root Cause**: docling was not included in requirements.txt or package dependencies
+- **Solution**: Added docling>=2.7.0 to both requirements.txt and morag-document package dependencies
+- **Files Modified**:
+  - `requirements.txt`: Added docling>=2.7.0,<3.0.0 under PDF processing section
+  - `packages/morag-document/pyproject.toml`: Added docling>=2.7.0 to dependencies
+- **Status**: ✅ FIXED - docling will be available in next Docker build
+
+#### 34. **AttributeError: 'dict' object has no attribute 'id'** ✅ FIXED
+- **Issue**: `AttributeError: 'dict' object has no attribute 'id'` in ingest_tasks.py line 167 during document ingestion
+- **Root Cause**: `search_by_metadata` method returns dictionaries with structure `{"id": point.id, ...}` but code tried to access `existing_points[0].id` as object attribute
+- **Error Location**: Line 167 in `packages/morag/src/morag/ingest_tasks.py` in content checksum duplicate detection
+- **Solution**: Fixed dictionary access from `existing_points[0].id` to `existing_points[0]["id"]`
+- **Files Modified**:
+  - `packages/morag/src/morag/ingest_tasks.py`: Fixed dictionary access in duplicate detection logic
+- **Status**: ✅ FIXED - document ingestion now handles existing point detection correctly
+
 ### ✅ Configuration and Error Handling Fixes (January 2025)
 
 #### 23. **Configuration and Implementation Issues** ✅ FIXED
