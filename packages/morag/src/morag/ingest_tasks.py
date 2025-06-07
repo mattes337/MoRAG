@@ -101,7 +101,8 @@ async def store_content_in_vector_db(
     chunk_size: Optional[int] = None,
     chunk_overlap: Optional[int] = None,
     document_id: Optional[str] = None,
-    replace_existing: bool = False
+    replace_existing: bool = False,
+    use_content_checksum: bool = True
 ) -> List[str]:
     """Store processed content in vector database with document replacement support."""
     if not content.strip():
@@ -148,6 +149,24 @@ async def store_content_in_vector_db(
         # Connect to vector storage
         await vector_storage.connect()
 
+        # Generate content checksum for duplicate detection
+        content_checksum = None
+        if use_content_checksum:
+            import hashlib
+            content_checksum = hashlib.sha256(content.encode()).hexdigest()
+
+            # Check if document with same checksum already exists
+            if not replace_existing:
+                existing_points = await vector_storage.search_by_metadata(
+                    {"content_checksum": content_checksum},
+                    limit=1
+                )
+                if existing_points:
+                    logger.info("Document with same content checksum already exists, skipping",
+                               content_checksum=content_checksum[:16],
+                               existing_point_id=existing_points[0].id)
+                    return [existing_points[0].id]
+
         # Create document chunks for better retrieval
         chunks = []
 
@@ -160,20 +179,21 @@ async def store_content_in_vector_db(
                 if chunk.strip():
                     chunks.append(chunk)
         
-        # Generate embeddings for each chunk
-        embeddings = []
+        # Generate embeddings for all chunks using batch processing
+        logger.info("Generating embeddings for chunks", chunk_count=len(chunks))
+
+        # Use batch embedding for better performance
+        batch_result = await embedding_service.generate_embeddings_batch(
+            chunks,
+            task_type="retrieval_document"
+        )
+
+        # Extract embeddings from batch result
+        embeddings = [result.embedding for result in batch_result]
+
+        # Prepare metadata for each chunk
         chunk_metadata = []
-        
         for i, chunk in enumerate(chunks):
-            # Generate embedding
-            embedding_result = await embedding_service.generate_embedding_with_result(
-                chunk,
-                task_type="retrieval_document"
-            )
-
-            embeddings.append(embedding_result.embedding)
-
-            # Prepare metadata for this chunk
             chunk_meta = {
                 **metadata,
                 "chunk_index": i,
@@ -185,6 +205,10 @@ async def store_content_in_vector_db(
             # Add document_id if provided
             if document_id:
                 chunk_meta["document_id"] = document_id
+
+            # Add content checksum if generated
+            if content_checksum:
+                chunk_meta["content_checksum"] = content_checksum
 
             chunk_metadata.append(chunk_meta)
 
@@ -303,7 +327,8 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     chunk_size=options.get('chunk_size'),
                     chunk_overlap=options.get('chunk_overlap'),
                     document_id=document_id,
-                    replace_existing=options.get('replace_existing', False)
+                    replace_existing=options.get('replace_existing', False),
+                    use_content_checksum=options.get('use_content_checksum', True)
                 )
 
                 # Add vector storage info to result
@@ -443,7 +468,8 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                     chunk_size=options.get('chunk_size'),
                     chunk_overlap=options.get('chunk_overlap'),
                     document_id=document_id,
-                    replace_existing=options.get('replace_existing', False)
+                    replace_existing=options.get('replace_existing', False),
+                    use_content_checksum=options.get('use_content_checksum', True)
                 )
 
                 # Add vector storage info to result

@@ -256,6 +256,15 @@ class DocumentConverter(BaseConverter):
         chunk_overlap = options.chunk_overlap or settings.default_chunk_overlap
 
         # Apply chunking strategy
+        if strategy == ChunkingStrategy.PAGE:
+            # Page-based chunking - use configuration settings
+            if settings.enable_page_based_chunking:
+                await self._chunk_by_pages(document, options)
+                return document
+            else:
+                # Fall back to paragraph chunking if page-based is disabled
+                strategy = ChunkingStrategy.PARAGRAPH
+
         if strategy == ChunkingStrategy.CHARACTER:
             # Character-based chunking with word boundary preservation
             for i in range(0, len(text), chunk_size - chunk_overlap):
@@ -384,9 +393,15 @@ class DocumentConverter(BaseConverter):
                         current_chunk = []
                         current_size = 0
 
-                    # Split the long paragraph into smaller chunks
+                    # Split the long paragraph into smaller chunks with word boundary preservation
                     for i in range(0, len(paragraph), chunk_size - chunk_overlap):
-                        chunk_text = paragraph[i:i + chunk_size]
+                        end_pos = min(i + chunk_size, len(paragraph))
+
+                        # Find word boundary near the end position
+                        if end_pos < len(paragraph):
+                            end_pos = self._find_word_boundary(paragraph, end_pos, direction="backward")
+
+                        chunk_text = paragraph[i:end_pos]
                         if chunk_text.strip():
                             document.add_chunk(chunk_text)
                     continue
@@ -585,3 +600,254 @@ class DocumentConverter(BaseConverter):
             )
 
         logger.info(f"Created {chapter_count} chapters using fallback method")
+
+    async def _chunk_by_pages(self, document: Document, options: ConversionOptions) -> None:
+        """Chunk document by pages using configuration settings.
+
+        Args:
+            document: Document to chunk
+            options: Conversion options
+        """
+        from morag_core.config import get_settings
+
+        settings = get_settings()
+        max_page_size = settings.max_page_chunk_size
+
+        if not document.raw_text:
+            return
+
+        # For documents without page information, fall back to paragraph chunking
+        if not hasattr(document, 'pages') or not document.pages:
+            logger.info("No page information available, falling back to paragraph chunking")
+            await self._chunk_by_paragraphs_with_page_config(document, options, max_page_size)
+            return
+
+        # Process each page
+        for page_num, page_content in enumerate(document.pages, 1):
+            if not page_content.strip():
+                continue
+
+            # If page content is within size limit, create single chunk
+            if len(page_content) <= max_page_size:
+                document.add_chunk(
+                    content=page_content,
+                    page_number=page_num,
+                    metadata={
+                        "page_based_chunking": True,
+                        "chunk_type": "page",
+                        "page_number": page_num
+                    }
+                )
+            else:
+                # Split large pages while preserving page context
+                await self._split_large_page(document, page_content, page_num, max_page_size)
+
+    async def _chunk_by_paragraphs_with_page_config(self, document: Document, options: ConversionOptions, max_chunk_size: int) -> None:
+        """Fallback chunking by paragraphs when page information is not available.
+
+        Args:
+            document: Document to chunk
+            options: Conversion options
+            max_chunk_size: Maximum chunk size from page configuration
+        """
+        text = document.raw_text
+        paragraphs = [p for p in text.split('\n\n') if p.strip()]
+
+        current_chunk = []
+        current_size = 0
+        chunk_overlap = options.chunk_overlap or 200
+
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+
+            if len(paragraph) > max_chunk_size:
+                # Add current chunk if exists
+                if current_chunk:
+                    chunk_text = "\n\n".join(current_chunk)
+                    document.add_chunk(
+                        content=chunk_text,
+                        metadata={
+                            "page_based_chunking": True,
+                            "chunk_type": "paragraph_group",
+                            "fallback_chunking": True
+                        }
+                    )
+                    current_chunk = []
+                    current_size = 0
+
+                # Split the long paragraph with word boundary preservation
+                await self._split_long_text(document, paragraph, max_chunk_size, chunk_overlap)
+                continue
+
+            current_chunk.append(paragraph)
+            current_size += len(paragraph) + 2  # +2 for newlines
+
+            if current_size >= max_chunk_size:
+                chunk_text = "\n\n".join(current_chunk)
+                document.add_chunk(
+                    content=chunk_text,
+                    metadata={
+                        "page_based_chunking": True,
+                        "chunk_type": "paragraph_group",
+                        "fallback_chunking": True
+                    }
+                )
+                current_chunk = []
+                current_size = 0
+
+        # Add final chunk if not empty
+        if current_chunk:
+            chunk_text = "\n\n".join(current_chunk)
+            document.add_chunk(
+                content=chunk_text,
+                metadata={
+                    "page_based_chunking": True,
+                    "chunk_type": "paragraph_group",
+                    "fallback_chunking": True
+                }
+            )
+
+    async def _split_large_page(self, document: Document, page_content: str, page_num: int, max_size: int) -> None:
+        """Split a large page into smaller chunks while preserving page context.
+
+        Args:
+            document: Document to add chunks to
+            page_content: Content of the page
+            page_num: Page number
+            max_size: Maximum size per chunk
+        """
+        # Try to split by paragraphs first
+        paragraphs = [p for p in page_content.split('\n\n') if p.strip()]
+
+        current_chunk = []
+        current_size = 0
+        chunk_index = 0
+
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+
+            # If single paragraph is too large, split it
+            if len(paragraph) > max_size:
+                # Add current chunk if exists
+                if current_chunk:
+                    chunk_text = "\n\n".join(current_chunk)
+                    document.add_chunk(
+                        content=chunk_text,
+                        page_number=page_num,
+                        metadata={
+                            "page_based_chunking": True,
+                            "chunk_type": "page_split",
+                            "page_number": page_num,
+                            "chunk_index_on_page": chunk_index,
+                            "is_partial_page": True
+                        }
+                    )
+                    current_chunk = []
+                    current_size = 0
+                    chunk_index += 1
+
+                # Split the long paragraph
+                await self._split_long_text_with_page_context(document, paragraph, page_num, max_size, chunk_index)
+                continue
+
+            # Check if adding this paragraph would exceed size
+            if current_size + len(paragraph) + 2 > max_size and current_chunk:
+                chunk_text = "\n\n".join(current_chunk)
+                document.add_chunk(
+                    content=chunk_text,
+                    page_number=page_num,
+                    metadata={
+                        "page_based_chunking": True,
+                        "chunk_type": "page_split",
+                        "page_number": page_num,
+                        "chunk_index_on_page": chunk_index,
+                        "is_partial_page": True
+                    }
+                )
+                current_chunk = []
+                current_size = 0
+                chunk_index += 1
+
+            current_chunk.append(paragraph)
+            current_size += len(paragraph) + 2
+
+        # Add final chunk if not empty
+        if current_chunk:
+            chunk_text = "\n\n".join(current_chunk)
+            document.add_chunk(
+                content=chunk_text,
+                page_number=page_num,
+                metadata={
+                    "page_based_chunking": True,
+                    "chunk_type": "page_split",
+                    "page_number": page_num,
+                    "chunk_index_on_page": chunk_index,
+                    "is_partial_page": True
+                }
+            )
+
+    async def _split_long_text(self, document: Document, text: str, max_size: int, overlap: int) -> None:
+        """Split long text with word boundary preservation.
+
+        Args:
+            document: Document to add chunks to
+            text: Text to split
+            max_size: Maximum chunk size
+            overlap: Overlap between chunks
+        """
+        for i in range(0, len(text), max_size - overlap):
+            end_pos = min(i + max_size, len(text))
+
+            # Find word boundary near the end position
+            if end_pos < len(text):
+                end_pos = self._find_word_boundary(text, end_pos, direction="backward")
+
+            chunk_text = text[i:end_pos]
+            if chunk_text.strip():
+                document.add_chunk(
+                    content=chunk_text,
+                    metadata={
+                        "page_based_chunking": True,
+                        "chunk_type": "split_text",
+                        "fallback_chunking": True
+                    }
+                )
+
+    async def _split_long_text_with_page_context(self, document: Document, text: str, page_num: int, max_size: int, start_chunk_index: int) -> None:
+        """Split long text with page context preservation.
+
+        Args:
+            document: Document to add chunks to
+            text: Text to split
+            page_num: Page number
+            max_size: Maximum chunk size
+            start_chunk_index: Starting chunk index for this page
+        """
+        chunk_index = start_chunk_index
+        overlap = 200  # Fixed overlap for page splitting
+
+        for i in range(0, len(text), max_size - overlap):
+            end_pos = min(i + max_size, len(text))
+
+            # Find word boundary near the end position
+            if end_pos < len(text):
+                end_pos = self._find_word_boundary(text, end_pos, direction="backward")
+
+            chunk_text = text[i:end_pos]
+            if chunk_text.strip():
+                document.add_chunk(
+                    content=chunk_text,
+                    page_number=page_num,
+                    metadata={
+                        "page_based_chunking": True,
+                        "chunk_type": "page_split",
+                        "page_number": page_num,
+                        "chunk_index_on_page": chunk_index,
+                        "is_partial_page": True
+                    }
+                )
+                chunk_index += 1

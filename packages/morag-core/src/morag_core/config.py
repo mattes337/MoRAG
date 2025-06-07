@@ -161,6 +161,27 @@ class Settings(BaseSettings):
         description="Maximum tokens per chunk for embedding models"
     )
 
+    # Page-based chunking configuration
+    default_chunking_strategy: str = Field(
+        default="page",
+        alias="MORAG_DEFAULT_CHUNKING_STRATEGY",
+        description="Default chunking strategy for document processing"
+    )
+
+    enable_page_based_chunking: bool = Field(
+        default=True,
+        alias="MORAG_ENABLE_PAGE_BASED_CHUNKING",
+        description="Enable page-based chunking for documents"
+    )
+
+    max_page_chunk_size: int = Field(
+        default=8000,
+        alias="MORAG_MAX_PAGE_CHUNK_SIZE",
+        ge=1000,  # Minimum 1000 characters
+        le=32000,  # Maximum 32000 characters
+        description="Maximum size for page-based chunks"
+    )
+
     @field_validator('allowed_origins', mode='before')
     @classmethod
     def parse_allowed_origins(cls, v):

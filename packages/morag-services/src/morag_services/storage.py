@@ -318,6 +318,68 @@ class QdrantVectorStorage(BaseVectorStorage):
         except Exception as e:
             logger.error("Search failed", error=str(e))
             raise StorageError(f"Search failed: {str(e)}")
+
+    async def search_by_metadata(
+        self,
+        filters: Dict[str, Any],
+        limit: int = 10,
+        collection_name: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Search for vectors by metadata only (no vector similarity).
+
+        Args:
+            filters: Metadata filters
+            limit: Maximum number of results
+            collection_name: Optional collection name
+
+        Returns:
+            List of matching points with metadata
+        """
+        if not self.client:
+            await self.connect()
+
+        target_collection = collection_name or self.collection_name
+
+        try:
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+            # Build filter conditions
+            conditions = []
+            for key, value in filters.items():
+                conditions.append(FieldCondition(
+                    key=key,
+                    match=MatchValue(value=value)
+                ))
+
+            search_filter = Filter(must=conditions) if conditions else None
+
+            # Use scroll to find matching points
+            points, _ = await asyncio.to_thread(
+                self.client.scroll,
+                collection_name=target_collection,
+                scroll_filter=search_filter,
+                limit=limit,
+                with_payload=True
+            )
+
+            # Format results
+            formatted_results = []
+            for point in points:
+                formatted_results.append({
+                    "id": point.id,
+                    "metadata": point.payload,
+                    "text": point.payload.get("text", ""),
+                    "score": 1.0  # No similarity score for metadata-only search
+                })
+
+            logger.info("Metadata search completed",
+                       results_count=len(formatted_results),
+                       collection=target_collection)
+            return formatted_results
+
+        except Exception as e:
+            logger.error("Metadata search failed", error=str(e))
+            raise StorageError(f"Metadata search failed: {str(e)}")
     
     async def find_document_points(
         self,
