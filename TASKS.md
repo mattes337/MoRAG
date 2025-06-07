@@ -50,6 +50,30 @@ For detailed information about completed tasks and implementation history, see [
 
 ## 🚀 New Features (January 2025)
 
+### ✅ Document Processing Improvements ✅ PLANNED
+- **Feature**: Comprehensive improvements to document processing and search functionality
+- **Implementation**: Created detailed task breakdown for five major improvements
+- **Overview**: [Document Processing Improvements Overview](./tasks/document-processing-improvements/document-processing-improvements-overview.md)
+- **Tasks Created**:
+  - [Task 1: Fix PDF Chunking Word Integrity](./tasks/document-processing-improvements/task-01-fix-pdf-chunking-word-integrity.md)
+  - [Task 2: Optimize Search Embedding Strategy](./tasks/document-processing-improvements/task-02-optimize-search-embedding-strategy.md)
+  - [Task 3: Fix Text Duplication in Search Results](./tasks/document-processing-improvements/task-03-fix-text-duplication-search-results.md)
+  - [Task 4: Increase Default Chunk Size](./tasks/document-processing-improvements/task-04-increase-default-chunk-size.md)
+  - [Task 5: Implement Document Replacement](./tasks/document-processing-improvements/task-05-implement-document-replacement.md)
+- **Key Improvements**:
+  - **Word Integrity**: Never split words mid-character, intelligent sentence boundaries
+  - **Search Optimization**: Streamlined embedding for single queries, performance monitoring
+  - **Deduplication**: Eliminate text duplication in search responses and storage
+  - **Better Context**: Increase default chunk size from 1000 to 4000 characters
+  - **Document Management**: Replace/update documents without duplicates
+- **Benefits**:
+  - Better chunk coherence and search accuracy
+  - 20%+ faster search response times
+  - 20-40% reduced response payload sizes
+  - Proper document lifecycle management
+  - Configurable chunking for different use cases
+- **Status**: Task breakdown complete, ready for implementation
+
 ### ✅ Remote GPU Workers - Simplified Implementation ✅ PLANNED
 - **Feature**: Add remote GPU worker support with simple `gpu` parameter in API endpoints
 - **Implementation**: Created comprehensive task breakdown for simplified approach
