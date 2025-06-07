@@ -369,8 +369,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     @app.post("/process/file", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_file(
         file: UploadFile = File(...),
-        content_type: Optional[str] = Form(None),
-        options: Optional[str] = Form(None)  # JSON string
+        content_type: Optional[str] = Form(default=None),
+        options: Optional[str] = Form(default=None)  # JSON string
     ):
         """Process content from an uploaded file."""
         temp_path = None
@@ -543,16 +543,16 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     # Ingest API endpoints
     @app.post("/api/v1/ingest/file", response_model=IngestResponse, tags=["Ingestion"])
     async def ingest_file(
-        source_type: Optional[str] = Form(None),  # Auto-detect if not provided
+        source_type: Optional[str] = Form(default=None),  # Auto-detect if not provided
         file: UploadFile = File(...),
-        document_id: Optional[str] = Form(None),  # Custom document identifier
-        replace_existing: bool = Form(False),  # Whether to replace existing document
-        webhook_url: Optional[str] = Form(None),
-        metadata: Optional[str] = Form(None),  # JSON string
-        use_docling: Optional[bool] = Form(False),
-        chunk_size: Optional[int] = Form(None),  # Use default from settings if not provided
-        chunk_overlap: Optional[int] = Form(None),  # Use default from settings if not provided
-        chunking_strategy: Optional[str] = Form(None)  # paragraph, sentence, word, character, etc.
+        document_id: Optional[str] = Form(default=None),  # Custom document identifier
+        replace_existing: bool = Form(default=False),  # Whether to replace existing document
+        webhook_url: Optional[str] = Form(default=None),
+        metadata: Optional[str] = Form(default=None),  # JSON string
+        use_docling: Optional[bool] = Form(default=False),
+        chunk_size: Optional[int] = Form(default=None),  # Use default from settings if not provided
+        chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
+        chunking_strategy: Optional[str] = Form(default=None)  # paragraph, sentence, word, character, etc.
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None

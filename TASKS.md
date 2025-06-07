@@ -498,6 +498,32 @@ For detailed information about completed tasks and implementation history, see [
 #### 19. **Search Endpoint Implementation** ✅ IMPLEMENTED
 - **Issue**: Search functionality returned empty list with warning "Search functionality not yet implemented"
 - **Root Cause**: The `search_similar` method in MoRAGServices was not implemented
+
+#### 20. **API Parameter Defaults and Qdrant Collection Validation** ✅ FIXED
+- **Issue**: Two critical API usability issues:
+  1. Optional API parameters required manual "send empty value" clicks in Swagger UI
+  2. Qdrant collection environment variable validation error on startup due to `env_prefix="MORAG_"` conflict
+- **Root Causes**:
+  1. FastAPI Form() parameters used `Form(None)` instead of `Form(default=None)` causing Swagger UI to require manual empty value selection
+  2. Settings used `env_prefix="MORAG_"` which made Pydantic look for `MORAG_QDRANT_COLLECTION_NAME` instead of `QDRANT_COLLECTION_NAME`
+- **Solutions Implemented**:
+  1. **API Parameter Defaults**: Updated all optional Form parameters to use `Form(default=None)` for automatic empty value handling
+     - Fixed parameters: `source_type`, `document_id`, `webhook_url`, `metadata`, `chunk_size`, `chunk_overlap`, `chunking_strategy`
+     - Updated endpoints: `/api/v1/ingest/file`, `/process/file`
+  2. **Environment Variable Prefix Fix**: Completely removed `env_prefix="MORAG_"` and added explicit aliases for each field
+     - **QDRANT Variables**: Use direct names without prefix (`QDRANT_COLLECTION_NAME`, `QDRANT_HOST`, `QDRANT_PORT`, `QDRANT_API_KEY`)
+     - **GEMINI Variables**: Use direct name without prefix (`GEMINI_API_KEY`)
+     - **MORAG Variables**: Use explicit `MORAG_` prefix in aliases for all other settings
+     - **Field Definitions**: All fields now use `Field(default=value, alias="ENV_VAR_NAME")` pattern
+- **Files Modified**:
+  - `packages/morag/src/morag/server.py`: Updated Form parameter defaults
+  - `packages/morag-core/src/morag_core/config.py`: Removed env_prefix and added explicit aliases for all fields
+- **Benefits**:
+  - **Better UX**: Swagger UI automatically sends empty values for optional parameters
+  - **Reliable Startup**: Environment variables work exactly as expected without prefix conflicts
+  - **Clear Configuration**: Explicit environment variable names prevent confusion
+  - **Backward Compatibility**: Existing environment variable names continue to work
+- **Status**: Both issues resolved, API now more user-friendly and reliable with clear environment variable mapping
 - **Solution**: Implemented complete search functionality using embedding service and vector storage
 - **Features Added**:
   - Automatic initialization of Qdrant vector storage and Gemini embedding service
