@@ -18,6 +18,7 @@ from morag_core.interfaces.converter import (
 )
 from morag_core.models.document import Document, DocumentMetadata, DocumentType
 from morag_core.utils.file_handling import get_file_info, detect_format
+from morag_core.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -245,10 +246,14 @@ class DocumentConverter(BaseConverter):
             return document
 
         import re
+
+        # Get settings for default chunk configuration
+        settings = get_settings()
+
         text = document.raw_text
         strategy = options.chunking_strategy
-        chunk_size = options.chunk_size or 1000
-        chunk_overlap = options.chunk_overlap or 100
+        chunk_size = options.chunk_size or settings.default_chunk_size
+        chunk_overlap = options.chunk_overlap or settings.default_chunk_overlap
 
         # Apply chunking strategy
         if strategy == ChunkingStrategy.CHARACTER:

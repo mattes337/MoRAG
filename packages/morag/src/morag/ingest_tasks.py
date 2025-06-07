@@ -11,6 +11,7 @@ import structlog
 from morag.worker import celery_app, get_morag_api
 from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 from morag_core.models import Document, DocumentChunk
+from morag_core.config import get_settings, validate_chunk_size
 
 logger = structlog.get_logger(__name__)
 
@@ -53,7 +54,9 @@ def send_webhook_notification(webhook_url: str, task_id: str, status: str, resul
 async def store_content_in_vector_db(
     content: str,
     metadata: Dict[str, Any],
-    collection_name: str = "morag_vectors"
+    collection_name: str = "morag_vectors",
+    chunk_size: Optional[int] = None,
+    chunk_overlap: Optional[int] = None
 ) -> List[str]:
     """Store processed content in vector database."""
     if not content.strip():
@@ -61,6 +64,20 @@ async def store_content_in_vector_db(
         return []
 
     try:
+        # Get settings for chunk configuration
+        settings = get_settings()
+
+        # Use provided chunk size or default from settings
+        chunk_size = chunk_size or settings.default_chunk_size
+        chunk_overlap = chunk_overlap or settings.default_chunk_overlap
+
+        # Validate chunk size
+        is_valid, validation_message = validate_chunk_size(chunk_size, content)
+        if not is_valid:
+            logger.warning("Chunk size validation warning",
+                         chunk_size=chunk_size,
+                         message=validation_message)
+
         # Initialize services with environment configuration
         qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
         qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
@@ -82,21 +99,18 @@ async def store_content_in_vector_db(
             raise ValueError("GEMINI_API_KEY environment variable is required")
 
         embedding_service = GeminiEmbeddingService(api_key=api_key)
-        
+
         # Connect to vector storage
         await vector_storage.connect()
-        
+
         # Create document chunks for better retrieval
-        # Split content into chunks (simple implementation)
-        chunk_size = 1000  # characters
         chunks = []
-        
+
         if len(content) <= chunk_size:
             chunks = [content]
         else:
-            # Split into overlapping chunks
-            overlap = 200
-            for i in range(0, len(content), chunk_size - overlap):
+            # Split into overlapping chunks with configured sizes
+            for i in range(0, len(content), chunk_size - chunk_overlap):
                 chunk = content[i:i + chunk_size]
                 if chunk.strip():
                     chunks.append(chunk)
@@ -133,6 +147,8 @@ async def store_content_in_vector_db(
         
         logger.info("Content stored in vector database successfully",
                    chunk_count=len(chunks),
+                   chunk_size=chunk_size,
+                   chunk_overlap=chunk_overlap,
                    point_ids_count=len(point_ids),
                    collection=collection_name)
         
@@ -215,10 +231,12 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     **options_metadata
                 }
 
-                # Store content in vector database
+                # Store content in vector database with chunk configuration
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
-                    vector_metadata
+                    vector_metadata,
+                    chunk_size=options.get('chunk_size'),
+                    chunk_overlap=options.get('chunk_overlap')
                 )
 
                 # Add vector storage info to result
@@ -346,10 +364,12 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                     **options_metadata
                 }
 
-                # Store content in vector database
+                # Store content in vector database with chunk configuration
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
-                    vector_metadata
+                    vector_metadata,
+                    chunk_size=options.get('chunk_size'),
+                    chunk_overlap=options.get('chunk_overlap')
                 )
 
                 # Add vector storage info to result
@@ -500,7 +520,9 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
 
                         point_ids = await store_content_in_vector_db(
                             result.text_content or result.content,
-                            vector_metadata
+                            vector_metadata,
+                            chunk_size=options.get('chunk_size'),
+                            chunk_overlap=options.get('chunk_overlap')
                         )
 
                         result.metadata['vector_point_ids'] = point_ids

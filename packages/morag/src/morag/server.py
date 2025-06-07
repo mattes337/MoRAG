@@ -547,7 +547,10 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         file: UploadFile = File(...),
         webhook_url: Optional[str] = Form(None),
         metadata: Optional[str] = Form(None),  # JSON string
-        use_docling: Optional[bool] = Form(False)
+        use_docling: Optional[bool] = Form(False),
+        chunk_size: Optional[int] = Form(None),  # Use default from settings if not provided
+        chunk_overlap: Optional[int] = Form(None),  # Use default from settings if not provided
+        chunking_strategy: Optional[str] = Form(None)  # paragraph, sentence, word, character, etc.
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -583,11 +586,27 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            error=str(e))
                 raise HTTPException(status_code=400, detail=str(e))
 
+            # Validate chunk size parameters
+            if chunk_size is not None and (chunk_size < 500 or chunk_size > 16000):
+                raise HTTPException(
+                    status_code=400,
+                    detail="chunk_size must be between 500 and 16000 characters"
+                )
+
+            if chunk_overlap is not None and (chunk_overlap < 0 or chunk_overlap > 1000):
+                raise HTTPException(
+                    status_code=400,
+                    detail="chunk_overlap must be between 0 and 1000 characters"
+                )
+
             # Create task options with sanitized inputs
             options = {
                 "webhook_url": webhook_url or "",  # Ensure string, not None
                 "metadata": parsed_metadata or {},  # Ensure dict, not None
                 "use_docling": use_docling,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "chunking_strategy": chunking_strategy,
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 

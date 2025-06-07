@@ -1,7 +1,7 @@
 """Configuration management for MoRAG."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import field_validator, Field
 from typing import List, Optional, Union
 import os
 import json
@@ -47,6 +47,25 @@ def get_safe_device(preferred_device: Optional[str] = None) -> str:
 
     # Auto-detect if no preference specified
     return detect_device()
+
+
+def validate_chunk_size(chunk_size: int, content: str = "") -> tuple[bool, str]:
+    """Validate chunk size against content and model limits."""
+
+    # Estimate token count (rough approximation: 1 token ≈ 4 characters)
+    if content:
+        estimated_tokens = len(content) // 4
+        if estimated_tokens > 8000:  # Conservative token limit
+            return False, f"Chunk too large: ~{estimated_tokens} tokens (max: 8000)"
+
+    if chunk_size < 500:
+        return False, "Chunk size too small: minimum 500 characters recommended"
+
+    if chunk_size > 16000:
+        return False, "Chunk size too large: maximum 16000 characters recommended"
+
+    return True, "Chunk size valid"
+
 
 class Settings(BaseSettings):
     """Core settings for MoRAG."""
@@ -118,6 +137,27 @@ class Settings(BaseSettings):
     environment: str = "development"  # development, testing, production
     debug: bool = True
 
+    # Document Processing Configuration
+    default_chunk_size: int = Field(
+        default=4000,
+        ge=500,  # Minimum 500 characters
+        le=16000,  # Maximum 16000 characters (safe for most models)
+        description="Default chunk size for document processing"
+    )
+
+    default_chunk_overlap: int = Field(
+        default=200,
+        ge=0,
+        le=1000,
+        description="Default overlap between chunks"
+    )
+
+    # Token limit validation
+    max_tokens_per_chunk: int = Field(
+        default=8000,
+        description="Maximum tokens per chunk for embedding models"
+    )
+
     @field_validator('allowed_origins', mode='before')
     @classmethod
     def parse_allowed_origins(cls, v):
@@ -145,6 +185,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        env_prefix="MORAG_",
         case_sensitive=False,
         extra="ignore"
     )
@@ -158,6 +199,12 @@ def get_settings() -> Settings:
     if _settings_instance is None:
         _settings_instance = Settings()
     return _settings_instance
+
+
+def reset_settings() -> None:
+    """Reset the global settings instance to force reload from environment."""
+    global _settings_instance
+    _settings_instance = None
 
 # For backward compatibility, provide a property-like access
 class SettingsProxy:
