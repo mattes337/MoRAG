@@ -319,6 +319,101 @@ class QdrantVectorStorage(BaseVectorStorage):
             logger.error("Search failed", error=str(e))
             raise StorageError(f"Search failed: {str(e)}")
     
+    async def find_document_points(
+        self,
+        document_id: str,
+        collection_name: Optional[str] = None
+    ) -> List[str]:
+        """Find all vector points for a document by document ID.
+
+        Args:
+            document_id: Document identifier
+            collection_name: Optional collection name
+
+        Returns:
+            List of point IDs for the document
+        """
+        if not self.client:
+            await self.connect()
+
+        target_collection = collection_name or self.collection_name
+
+        try:
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+            # Search for points with matching document_id
+            search_filter = Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id)
+                    )
+                ]
+            )
+
+            # Scroll through all matching points
+            points = []
+            offset = None
+
+            while True:
+                result = await asyncio.to_thread(
+                    self.client.scroll,
+                    collection_name=target_collection,
+                    scroll_filter=search_filter,
+                    limit=100,
+                    offset=offset,
+                    with_payload=False  # We only need IDs
+                )
+
+                batch_points = result[0]
+                if not batch_points:
+                    break
+
+                points.extend([point.id for point in batch_points])
+                offset = result[1]  # Next offset
+
+                if offset is None:
+                    break
+
+            logger.info("Found document points",
+                       document_id=document_id,
+                       points_count=len(points))
+            return points
+
+        except Exception as e:
+            logger.error("Failed to find document points",
+                        document_id=document_id,
+                        error=str(e))
+            return []
+
+    async def delete_document_points(
+        self,
+        document_id: str,
+        collection_name: Optional[str] = None
+    ) -> int:
+        """Delete all vector points for a document.
+
+        Args:
+            document_id: Document identifier
+            collection_name: Optional collection name
+
+        Returns:
+            Number of points deleted
+        """
+        # Find all points for the document
+        point_ids = await self.find_document_points(document_id, collection_name)
+
+        if not point_ids:
+            return 0
+
+        # Delete the points
+        deleted_count = await self.delete_vectors_legacy(point_ids, collection_name)
+
+        logger.info("Deleted document points",
+                   document_id=document_id,
+                   deleted_count=deleted_count)
+        return deleted_count
+
     async def delete_vectors_legacy(
         self,
         vector_ids: List[str],
@@ -345,7 +440,63 @@ class QdrantVectorStorage(BaseVectorStorage):
         except Exception as e:
             logger.error("Failed to delete vectors", error=str(e))
             raise StorageError(f"Failed to delete vectors: {str(e)}")
-    
+
+    async def replace_document(
+        self,
+        document_id: str,
+        new_vectors: List[List[float]],
+        new_metadata: List[Dict[str, Any]],
+        collection_name: Optional[str] = None
+    ) -> List[str]:
+        """Replace existing document with new vectors.
+
+        Args:
+            document_id: Document identifier
+            new_vectors: New vector embeddings
+            new_metadata: New metadata for each vector
+            collection_name: Optional collection name
+
+        Returns:
+            List of new point IDs
+        """
+        target_collection = collection_name or self.collection_name
+
+        try:
+            # Find existing document chunks
+            existing_points = await self.find_document_points(document_id, target_collection)
+
+            # Delete existing points if any
+            if existing_points:
+                await self.delete_document_points(document_id, target_collection)
+                logger.info("Deleted existing document points",
+                           document_id=document_id,
+                           points_deleted=len(existing_points))
+
+            # Add document_id to all metadata entries
+            for metadata in new_metadata:
+                metadata['document_id'] = document_id
+                metadata['replaced_at'] = datetime.now(timezone.utc).isoformat()
+
+            # Store new vectors
+            new_point_ids = await self.store_vectors(
+                new_vectors,
+                new_metadata,
+                target_collection
+            )
+
+            logger.info("Document replaced successfully",
+                       document_id=document_id,
+                       old_points=len(existing_points) if existing_points else 0,
+                       new_points=len(new_point_ids))
+
+            return new_point_ids
+
+        except Exception as e:
+            logger.error("Failed to replace document",
+                        document_id=document_id,
+                        error=str(e))
+            raise StorageError(f"Failed to replace document: {str(e)}")
+
     async def get_collection_info(self, collection_name: Optional[str] = None) -> Dict[str, Any]:
         """Get collection information."""
         if not self.client:

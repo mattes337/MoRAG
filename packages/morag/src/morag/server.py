@@ -545,6 +545,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def ingest_file(
         source_type: Optional[str] = Form(None),  # Auto-detect if not provided
         file: UploadFile = File(...),
+        document_id: Optional[str] = Form(None),  # Custom document identifier
+        replace_existing: bool = Form(False),  # Whether to replace existing document
         webhook_url: Optional[str] = Form(None),
         metadata: Optional[str] = Form(None),  # JSON string
         use_docling: Optional[bool] = Form(False),
@@ -599,8 +601,19 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                     detail="chunk_overlap must be between 0 and 1000 characters"
                 )
 
+            # Validate document ID if provided
+            if document_id:
+                import re
+                if not re.match(r'^[a-zA-Z0-9_-]+$', document_id):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Document ID must contain only alphanumeric characters, hyphens, and underscores"
+                    )
+
             # Create task options with sanitized inputs
             options = {
+                "document_id": document_id,
+                "replace_existing": replace_existing,
                 "webhook_url": webhook_url or "",  # Ensure string, not None
                 "metadata": parsed_metadata or {},  # Ensure dict, not None
                 "use_docling": use_docling,

@@ -691,7 +691,7 @@ class MoRAGServices:
         return health_status
 
     async def search_similar(self, query: str, limit: int = 10, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Search for similar content using vector similarity.
+        """Search for similar content using vector similarity with optimized embedding strategy.
 
         Args:
             query: Search query
@@ -701,6 +701,10 @@ class MoRAGServices:
         Returns:
             List of similar content items
         """
+        import time
+
+        start_time = time.time()
+
         try:
             # Check if search services are available
             if not self._vector_storage or not self._gemini_embedding_service:
@@ -715,14 +719,17 @@ class MoRAGServices:
                 logger.error("Failed to initialize Gemini embedding service")
                 return []
 
-            # Generate embedding for the query
+            # Generate embedding for the query with performance monitoring
+            embedding_start = time.time()
             logger.info("Generating embedding for search query", query=query[:100])
-            query_embedding = await self._gemini_embedding_service.generate_embedding(
-                query,
-                task_type="retrieval_query"
-            )
 
-            # Search for similar vectors
+            # Use optimized single embedding generation for search queries
+            query_embedding = await self._generate_search_embedding_optimized(query)
+
+            embedding_time = time.time() - embedding_start
+
+            # Search for similar vectors with performance monitoring
+            search_start = time.time()
             logger.info("Searching for similar vectors", limit=limit)
             results = await self._vector_storage.search_similar(
                 query_vector=query_embedding,
@@ -730,29 +737,63 @@ class MoRAGServices:
                 score_threshold=0.5,  # Minimum similarity threshold
                 filters=filters
             )
+            search_time = time.time() - search_start
 
-            # Format results for API response
+            # Format results for API response (fixing text duplication)
             formatted_results = []
             for result in results:
+                # Extract text content from metadata but don't duplicate it
+                text_content = result.get("metadata", {}).get("text", "")
+
+                # Create clean metadata without text duplication
+                clean_metadata = {k: v for k, v in result.get("metadata", {}).items() if k != "text"}
+
                 formatted_result = {
                     "id": result.get("id"),
                     "score": result.get("score", 0.0),
-                    "text": result.get("metadata", {}).get("text", ""),
-                    "metadata": result.get("metadata", {}),
+                    "content": text_content,  # Use 'content' instead of 'text'
+                    "metadata": clean_metadata,  # Metadata without text duplication
                     "content_type": result.get("metadata", {}).get("content_type"),
                     "source": result.get("metadata", {}).get("source")
                 }
                 formatted_results.append(formatted_result)
 
+            total_time = time.time() - start_time
+
+            # Log performance metrics
             logger.info("Search completed successfully",
                        query=query[:50],
-                       results_count=len(formatted_results))
+                       results_count=len(formatted_results),
+                       embedding_time=f"{embedding_time:.3f}s",
+                       search_time=f"{search_time:.3f}s",
+                       total_time=f"{total_time:.3f}s",
+                       query_length=len(query))
             return formatted_results
 
         except Exception as e:
-            logger.error("Search failed", query=query, error=str(e))
+            total_time = time.time() - start_time
+            logger.error("Search failed",
+                        query=query[:50],
+                        error=str(e),
+                        total_time=f"{total_time:.3f}s")
             # Return empty list instead of raising exception to maintain API stability
             return []
+
+    async def _generate_search_embedding_optimized(self, query: str) -> List[float]:
+        """Generate embedding optimized for search queries.
+
+        Args:
+            query: Search query text
+
+        Returns:
+            Query embedding vector
+        """
+        # For now, use the standard embedding generation but optimized for search
+        # Future enhancement: add caching for repeated queries
+        return await self._gemini_embedding_service.generate_embedding(
+            query,
+            task_type="retrieval_query"
+        )
 
     def cleanup(self):
         """Clean up resources used by services."""

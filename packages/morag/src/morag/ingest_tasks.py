@@ -51,14 +51,59 @@ def send_webhook_notification(webhook_url: str, task_id: str, status: str, resul
                     error=str(e))
 
 
+def generate_document_id(source: str, content: Optional[str] = None) -> str:
+    """Generate consistent document ID from source and optionally content.
+
+    Args:
+        source: Source identifier (filename, URL, etc.)
+        content: Optional content for hash generation
+
+    Returns:
+        Generated document ID
+    """
+    import hashlib
+    import os
+    from urllib.parse import urlparse, urlunparse
+
+    # For URLs, use normalized URL as base
+    if source.startswith(('http://', 'https://')):
+        parsed = urlparse(source)
+        normalized = urlunparse((
+            parsed.scheme.lower(),
+            parsed.netloc.lower(),
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            ''  # Remove fragment
+        ))
+        return hashlib.sha256(normalized.encode()).hexdigest()[:16]
+
+    # For files, use filename and optionally content hash
+    elif ('/' in source or '\\' in source or '.' in source) and not source.startswith(('http://', 'https://')):
+        filename = os.path.basename(source)
+        # Remove extension and replace special characters
+        base_name = os.path.splitext(filename)[0].replace('.', '_').replace(' ', '_')
+        extension = os.path.splitext(filename)[1].replace('.', '').replace(' ', '_')
+
+        if content:
+            content_hash = hashlib.sha256(content.encode()).hexdigest()[:8]
+            return f"{base_name}_{extension}_{content_hash}"
+        return f"{base_name}_{extension}" if extension else base_name
+
+    # For other sources, use direct hash
+    else:
+        return hashlib.sha256(source.encode()).hexdigest()[:16]
+
 async def store_content_in_vector_db(
     content: str,
     metadata: Dict[str, Any],
     collection_name: str = "morag_vectors",
     chunk_size: Optional[int] = None,
-    chunk_overlap: Optional[int] = None
+    chunk_overlap: Optional[int] = None,
+    document_id: Optional[str] = None,
+    replace_existing: bool = False
 ) -> List[str]:
-    """Store processed content in vector database."""
+    """Store processed content in vector database with document replacement support."""
     if not content.strip():
         logger.warning("Empty content provided for vector storage")
         return []
@@ -127,7 +172,7 @@ async def store_content_in_vector_db(
             )
 
             embeddings.append(embedding_result.embedding)
-            
+
             # Prepare metadata for this chunk
             chunk_meta = {
                 **metadata,
@@ -136,14 +181,29 @@ async def store_content_in_vector_db(
                 "text": chunk,  # Store the actual text for retrieval
                 "text_length": len(chunk)
             }
+
+            # Add document_id if provided
+            if document_id:
+                chunk_meta["document_id"] = document_id
+
             chunk_metadata.append(chunk_meta)
-        
-        # Store vectors in Qdrant
-        point_ids = await vector_storage.store_vectors(
-            embeddings, 
-            chunk_metadata, 
-            collection_name
-        )
+
+        # Store vectors in Qdrant with replacement support
+        if document_id and replace_existing:
+            # Use document replacement
+            point_ids = await vector_storage.replace_document(
+                document_id,
+                embeddings,
+                chunk_metadata,
+                collection_name
+            )
+        else:
+            # Regular storage
+            point_ids = await vector_storage.store_vectors(
+                embeddings,
+                chunk_metadata,
+                collection_name
+            )
         
         logger.info("Content stored in vector database successfully",
                    chunk_count=len(chunks),
@@ -231,12 +291,19 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     **options_metadata
                 }
 
-                # Store content in vector database with chunk configuration
+                # Generate document ID if not provided
+                document_id = options.get('document_id')
+                if not document_id:
+                    document_id = generate_document_id(file_path, result.text_content or result.content)
+
+                # Store content in vector database with chunk configuration and document replacement
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
                     vector_metadata,
                     chunk_size=options.get('chunk_size'),
-                    chunk_overlap=options.get('chunk_overlap')
+                    chunk_overlap=options.get('chunk_overlap'),
+                    document_id=document_id,
+                    replace_existing=options.get('replace_existing', False)
                 )
 
                 # Add vector storage info to result
@@ -364,12 +431,19 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                     **options_metadata
                 }
 
-                # Store content in vector database with chunk configuration
+                # Generate document ID if not provided
+                document_id = options.get('document_id')
+                if not document_id:
+                    document_id = generate_document_id(url, result.text_content or result.content)
+
+                # Store content in vector database with chunk configuration and document replacement
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
                     vector_metadata,
                     chunk_size=options.get('chunk_size'),
-                    chunk_overlap=options.get('chunk_overlap')
+                    chunk_overlap=options.get('chunk_overlap'),
+                    document_id=document_id,
+                    replace_existing=options.get('replace_existing', False)
                 )
 
                 # Add vector storage info to result

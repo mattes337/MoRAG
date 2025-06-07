@@ -257,30 +257,52 @@ class DocumentConverter(BaseConverter):
 
         # Apply chunking strategy
         if strategy == ChunkingStrategy.CHARACTER:
-            # Simple character-based chunking with overlap
+            # Character-based chunking with word boundary preservation
             for i in range(0, len(text), chunk_size - chunk_overlap):
-                chunk_text = text[i:i + chunk_size]
+                end_pos = min(i + chunk_size, len(text))
+
+                # Find word boundary near the end position
+                if end_pos < len(text):
+                    end_pos = self._find_word_boundary(text, end_pos, direction="backward")
+
+                chunk_text = text[i:end_pos]
                 if chunk_text.strip():
                     document.add_chunk(chunk_text)
 
         elif strategy == ChunkingStrategy.WORD:
-            # Word-based chunking
+            # Enhanced word-based chunking with better overlap
             words = text.split()
             current_chunk = []
             current_size = 0
 
             for word in words:
-                current_chunk.append(word)
-                current_size += len(word) + 1  # +1 for space
+                word_length = len(word) + 1  # +1 for space
 
-                if current_size >= chunk_size:
+                # Check if adding this word would exceed chunk size
+                if current_size + word_length > chunk_size and current_chunk:
+                    # Create chunk from current words
                     chunk_text = " ".join(current_chunk)
                     document.add_chunk(chunk_text)
 
-                    # Keep overlap words for next chunk
-                    overlap_words = int(chunk_overlap / 5)  # Approximate words in overlap
-                    current_chunk = current_chunk[-overlap_words:] if overlap_words > 0 else []
-                    current_size = sum(len(word) + 1 for word in current_chunk)
+                    # Calculate overlap in words (more intelligent)
+                    overlap_chars = min(chunk_overlap, current_size)
+                    overlap_words = []
+                    overlap_size = 0
+
+                    # Add words from the end until we reach overlap size
+                    for overlap_word in reversed(current_chunk):
+                        word_size = len(overlap_word) + 1
+                        if overlap_size + word_size <= overlap_chars:
+                            overlap_words.insert(0, overlap_word)
+                            overlap_size += word_size
+                        else:
+                            break
+
+                    current_chunk = overlap_words
+                    current_size = overlap_size
+
+                current_chunk.append(word)
+                current_size += word_length
 
             # Add final chunk if not empty
             if current_chunk:
@@ -288,37 +310,55 @@ class DocumentConverter(BaseConverter):
                 document.add_chunk(chunk_text)
 
         elif strategy == ChunkingStrategy.SENTENCE:
-            # Sentence-based chunking (simplified)
-            sentences = re.split(r'(?<=[.!?])\s+', text)
-            current_chunk = []
+            # Enhanced sentence-based chunking with improved boundary detection
+            sentence_boundaries = self._detect_sentence_boundaries(text)
+            current_chunk = ""
             current_size = 0
 
-            for sentence in sentences:
-                if len(sentence) > chunk_size:
-                    # If a single sentence is too long, split it
-                    if current_chunk:
-                        chunk_text = " ".join(current_chunk)
-                        document.add_chunk(chunk_text)
-                        current_chunk = []
-                        current_size = 0
+            for i in range(len(sentence_boundaries) - 1):
+                start_pos = sentence_boundaries[i]
+                end_pos = sentence_boundaries[i + 1]
+                sentence = text[start_pos:end_pos].strip()
 
-                    # Add the long sentence as its own chunk
-                    document.add_chunk(sentence)
+                if not sentence:
                     continue
 
-                current_chunk.append(sentence)
-                current_size += len(sentence) + 1  # +1 for space
+                sentence_size = len(sentence) + (1 if current_chunk else 0)  # +1 for space if not first
 
-                if current_size >= chunk_size:
-                    chunk_text = " ".join(current_chunk)
-                    document.add_chunk(chunk_text)
-                    current_chunk = []
-                    current_size = 0
+                # If single sentence is too long, split it at word boundaries
+                if len(sentence) > chunk_size:
+                    if current_chunk:
+                        document.add_chunk(current_chunk.strip())
+                        current_chunk = ""
+                        current_size = 0
+
+                    # Split long sentence at word boundaries
+                    for j in range(0, len(sentence), chunk_size - chunk_overlap):
+                        end_pos = min(j + chunk_size, len(sentence))
+                        if end_pos < len(sentence):
+                            end_pos = self._find_word_boundary(sentence, end_pos, direction="backward")
+
+                        sentence_chunk = sentence[j:end_pos].strip()
+                        if sentence_chunk:
+                            document.add_chunk(sentence_chunk)
+                    continue
+
+                # Check if adding this sentence would exceed chunk size
+                if current_size + sentence_size > chunk_size and current_chunk:
+                    document.add_chunk(current_chunk.strip())
+                    current_chunk = sentence
+                    current_size = len(sentence)
+                else:
+                    if current_chunk:
+                        current_chunk += " " + sentence
+                        current_size += sentence_size
+                    else:
+                        current_chunk = sentence
+                        current_size = len(sentence)
 
             # Add final chunk if not empty
             if current_chunk:
-                chunk_text = " ".join(current_chunk)
-                document.add_chunk(chunk_text)
+                document.add_chunk(current_chunk.strip())
 
         elif strategy == ChunkingStrategy.CHAPTER:
             # Chapter-based chunking (fallback for non-PDF documents)
@@ -394,6 +434,77 @@ class DocumentConverter(BaseConverter):
         }
 
         return format_map.get(format_type.lower(), DocumentType.UNKNOWN)
+
+    def _find_word_boundary(self, text: str, position: int, direction: str = "backward") -> int:
+        """Find the nearest word boundary from a given position.
+
+        Args:
+            text: Text to search in
+            position: Starting position
+            direction: Search direction ("backward" or "forward")
+
+        Returns:
+            Position of nearest word boundary
+        """
+        import re
+
+        if position <= 0:
+            return 0
+        if position >= len(text):
+            return len(text)
+
+        # Word boundary pattern - matches spaces, punctuation, or start/end of string
+        word_boundary_pattern = r'\s+|[.!?;:,\-\(\)\[\]{}"\']'
+
+        if direction == "backward":
+            # Search backward from position
+            search_text = text[:position]
+            matches = list(re.finditer(word_boundary_pattern, search_text))
+            if matches:
+                # Return position after the last boundary found
+                return matches[-1].end()
+            else:
+                # No boundary found, return start
+                return 0
+        else:  # forward
+            # Search forward from position
+            search_text = text[position:]
+            match = re.search(word_boundary_pattern, search_text)
+            if match:
+                # Return position of the boundary
+                return position + match.start()
+            else:
+                # No boundary found, return end
+                return len(text)
+
+    def _detect_sentence_boundaries(self, text: str) -> List[int]:
+        """Detect sentence boundaries using improved regex patterns.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            List of sentence boundary positions
+        """
+        import re
+
+        # Enhanced sentence boundary detection
+        # Handles abbreviations, decimal numbers, and complex punctuation
+        sentence_pattern = r'''
+            (?<!\w\.\w.)           # Not preceded by word.word.
+            (?<![A-Z][a-z]\.)      # Not preceded by abbreviation like Mr.
+            (?<!\d\.\d)            # Not preceded by decimal number
+            (?<=\.|\!|\?)          # Preceded by sentence ending punctuation
+            \s+                    # Followed by whitespace
+            (?=[A-Z])              # Followed by capital letter
+        '''
+
+        boundaries = [0]  # Start of text
+        for match in re.finditer(sentence_pattern, text, re.VERBOSE):
+            boundaries.append(match.start())
+        boundaries.append(len(text))  # End of text
+
+        return boundaries
 
     async def _chunk_by_chapters_fallback(self, document: Document, options: ConversionOptions) -> None:
         """Fallback chapter chunking for non-PDF documents.
