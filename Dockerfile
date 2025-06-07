@@ -31,6 +31,9 @@ WORKDIR /build
 # Copy only requirements.txt first (this layer will be cached unless requirements.txt changes)
 COPY requirements.txt ./
 
+# Install PyTorch CPU-only version first for compatibility
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
 # Install base requirements first - this is the heavy lifting that we want to cache
 RUN pip install -r requirements.txt
 
@@ -152,10 +155,12 @@ COPY *.txt ./
 # Create necessary directories including cache directories
 RUN mkdir -p temp logs data /home/morag/.cache/huggingface /home/morag/.cache/whisper /home/morag/.cache/transformers && \
     chmod -R 755 /home/morag/.cache && \
+    chmod +x scripts/check_cpu_compatibility.py && \
+    chmod +x scripts/start_worker_safe.sh && \
     chown -R morag:morag /app /home/morag
 
 # Switch to app user
 USER morag
 
-# Default command - run MoRAG API server
-CMD ["python", "-m", "morag.server", "--host", "0.0.0.0", "--port", "8000"]
+# Run CPU compatibility check and then start the server
+CMD ["sh", "-c", "python scripts/check_cpu_compatibility.py && python -m morag.server --host 0.0.0.0 --port 8000"]

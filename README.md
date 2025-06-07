@@ -200,6 +200,24 @@ python tests/cli/test-docker-fixes.py
 
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
+### CPU Compatibility (NEW)
+
+✅ **Fixed CPU Compatibility Issues**: MoRAG now includes comprehensive CPU compatibility fixes to prevent crashes on systems with limited instruction set support.
+
+**What was fixed:**
+- **SIGILL crashes**: Workers no longer crash with "Illegal Instruction" errors
+- **PyTorch compatibility**: CPU-only PyTorch installation with safety settings
+- **Docling fallback**: Automatic fallback to pypdf when docling/PyTorch fails
+- **Environment safety**: Automatic CPU safety configuration
+
+**Features:**
+- Automatic CPU feature detection and compatibility checking
+- Safe startup scripts that configure environment for maximum compatibility
+- Fallback mechanisms for ML libraries that require advanced CPU features
+- Comprehensive logging and debugging for CPU-related issues
+
+For detailed information, see [CPU Compatibility Guide](docs/CPU_COMPATIBILITY.md).
+
 ## Usage
 
 For detailed usage examples including Python API, CLI commands, REST API endpoints, and configuration options, see [USAGE.md](USAGE.md).

@@ -28,12 +28,50 @@ class PDFConverter(DocumentConverter):
         self._docling_available = self._check_docling_availability()
 
     def _check_docling_availability(self) -> bool:
-        """Check if docling is available for enhanced PDF processing."""
+        """Check if docling is available and safe to use.
+
+        Returns:
+            True if docling can be safely used, False otherwise
+        """
         try:
+            # Check if we should force CPU mode for safety
+            import os
+            force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
+            disable_docling = os.environ.get('MORAG_DISABLE_DOCLING', 'false').lower() == 'true'
+
+            if force_cpu:
+                logger.info("CPU mode forced, disabling docling to avoid PyTorch compatibility issues")
+                return False
+
+            if disable_docling:
+                logger.info("Docling explicitly disabled via MORAG_DISABLE_DOCLING")
+                return False
+
+            # Try importing docling
             import docling
+
+            # Try a basic docling operation to ensure it works
+            from docling.document_converter import DocumentConverter
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+            # Test basic initialization without processing
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.do_ocr = False  # Disable OCR for test
+            pipeline_options.do_table_structure = False  # Disable table structure for test
+
+            # This should not crash if PyTorch is compatible
+            test_converter = DocumentConverter()
+
+            logger.info("Docling is available and compatible for enhanced PDF processing")
             return True
-        except ImportError:
-            logger.info("Docling not available, falling back to pypdf for PDF processing")
+
+        except ImportError as e:
+            logger.info("Docling not available, falling back to pypdf for PDF processing", error=str(e))
+            return False
+        except Exception as e:
+            logger.warning("Docling initialization failed, falling back to pypdf for PDF processing",
+                         error=str(e), error_type=e.__class__.__name__)
             return False
 
     async def _extract_text_with_docling(self, file_path: Path, document: Document, options: ConversionOptions) -> Document:
@@ -55,10 +93,21 @@ class PDFConverter(DocumentConverter):
             from docling.datamodel.base_models import InputFormat
             from docling.datamodel.pipeline_options import PdfPipelineOptions
 
-            # Configure docling for optimal markdown conversion
+            # Configure docling for optimal markdown conversion with CPU safety
             pipeline_options = PdfPipelineOptions()
-            pipeline_options.do_ocr = True  # Enable OCR for scanned PDFs
-            pipeline_options.do_table_structure = True  # Preserve table structure
+
+            # Check if we should use safer settings for CPU compatibility
+            import os
+            force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
+
+            if force_cpu:
+                # Use safer settings for CPU-only mode
+                pipeline_options.do_ocr = False  # Disable OCR to avoid GPU dependencies
+                pipeline_options.do_table_structure = False  # Disable table structure to reduce complexity
+                logger.info("Using CPU-safe docling configuration")
+            else:
+                pipeline_options.do_ocr = True  # Enable OCR for scanned PDFs
+                pipeline_options.do_table_structure = True  # Preserve table structure
 
             doc_converter = DocumentConverter(
                 format_options={
