@@ -98,10 +98,12 @@ Unused ML/processing libraries:
 - ✅ Removed from web section: `readability-lxml`, `newspaper3k`
 - ✅ Removed from all-extras: `deepsearch-glm`, `weasel`, and other unused packages
 - ✅ Removed `librosa` from morag-audio package (0 usages)
+- ✅ Removed `python-multipart` from morag package (0 usages)
+- ✅ Removed `scikit-image` from morag-video package (0 usages)
 
 ### 📊 Current Results
-- **Dependencies Reduced**: 88 → 72 packages (**16 packages removed, 18% reduction**)
-- **Core Dependencies**: 49 → 44 packages (5 removed)
+- **Dependencies Reduced**: 88 → 70 packages (**18 packages removed, 20.5% reduction**)
+- **Core Dependencies**: 49 → 42 packages (7 removed)
 - **Optional Dependencies**: 39 → 28 packages (11 removed)
 - **Development Tools**: Properly organized in dev-only section
 
@@ -142,7 +144,7 @@ Unused ML/processing libraries:
 ## Expected Results
 
 **Before**: 88 dependencies (49 core + 39 optional)
-**Current Progress**: 72 dependencies (44 core + 28 optional) - **16 packages removed (18% reduction)**
+**Final Results**: 70 dependencies (42 core + 28 optional) - **18 packages removed (20.5% reduction)**
 **Target**: ~60 dependencies (35 core + 25 optional)
 **Total Target Reduction**: 28 packages (32% decrease)
 

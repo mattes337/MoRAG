@@ -1,25 +1,25 @@
 {
   "summary": {
-    "total_dependencies": 72,
-    "core_dependencies": 44,
+    "total_dependencies": 70,
+    "core_dependencies": 42,
     "optional_dependencies": 28,
     "categories": [
-      "office documents (basic)",
-      "nlp (basic)",
-      "pdf processing (enhanced)",
-      "image processing (basic)",
-      "morag-youtube",
-      "morag-document",
-      "morag-video",
-      "morag-web",
       "optional-dependencies",
-      "morag-image",
+      "image processing (basic)",
+      "nlp (basic)",
+      "morag-video",
       "morag",
-      "morag-services",
-      "morag-embedding",
-      "core",
       "web scraping (basic)",
-      "audio processing (basic)"
+      "morag-image",
+      "audio processing (basic)",
+      "morag-web",
+      "core",
+      "morag-youtube",
+      "morag-services",
+      "office documents (basic)",
+      "morag-document",
+      "morag-embedding",
+      "pdf processing (enhanced)"
     ]
   },
   "dependencies": {
@@ -113,10 +113,10 @@
       "required": true,
       "usage_count": 4,
       "usage_locations": [
-        "./packages/morag-document/src/morag_document/converters/text.py",
-        "./packages/morag-web/src/morag_web/processor.py",
         "./tests/unit/test_content_converter.py",
-        "./tests/test_web_processor.py"
+        "./tests/test_web_processor.py",
+        "./packages/morag-web/src/morag_web/processor.py",
+        "./packages/morag-document/src/morag_document/converters/text.py"
       ],
       "import_name": "bs4"
     },
@@ -136,10 +136,10 @@
       "required": true,
       "usage_count": 4,
       "usage_locations": [
-        "./scripts/start_worker.py",
-        "./packages/morag/src/morag/worker.py",
         "./scripts/test-docker-build.py",
-        "./packages/morag/src/morag/ingest_tasks.py"
+        "./packages/morag/src/morag/ingest_tasks.py",
+        "./scripts/start_worker.py",
+        "./packages/morag/src/morag/worker.py"
       ],
       "import_name": "celery"
     },
@@ -170,9 +170,9 @@
       "required": false,
       "usage_count": 3,
       "usage_locations": [
+        "./tests/manual/test_pdf_parsing.py",
         "./scripts/test_docling_docker.py",
-        "./packages/morag-document/src/morag_document/converters/pdf.py",
-        "./tests/manual/test_pdf_parsing.py"
+        "./packages/morag-document/src/morag_document/converters/pdf.py"
       ],
       "import_name": "docling"
     },
@@ -183,9 +183,9 @@
       "required": false,
       "usage_count": 3,
       "usage_locations": [
-        "./packages/morag-image/src/morag_image/processor.py",
+        "./packages/morag-video/src/morag_video/processor.py",
         "./packages/morag-image/tests/conftest.py",
-        "./packages/morag-video/src/morag_video/processor.py"
+        "./packages/morag-image/src/morag_image/processor.py"
       ],
       "import_name": "easyocr"
     },
@@ -196,16 +196,16 @@
       "required": true,
       "usage_count": 13,
       "usage_locations": [
-        "./tests/test_file_upload_race_condition_fix.py",
-        "./tests/test_02_health_checks.py",
-        "./tests/test_monitoring.py",
         "./tests/test_api_chunk_size.py",
-        "./tests/test_17_integration.py",
-        "./packages/morag/src/morag/utils/file_upload.py",
         "./packages/morag/src/morag/server.py",
-        "./tests/conftest.py",
+        "./tests/test_processing_result_fixes.py",
         "./tests/test_02_api_framework.py",
-        "./tests/test_processing_result_fixes.py"
+        "./tests/conftest.py",
+        "./tests/test_monitoring.py",
+        "./tests/test_file_upload_race_condition_fix.py",
+        "./tests/test_03_integration.py",
+        "./tests/test_02_health_checks.py",
+        "./tests/test_17_ingestion_api.py"
       ],
       "import_name": "fastapi"
     },
@@ -266,12 +266,12 @@
       "usage_count": 7,
       "usage_locations": [
         "./tests/integration/test_webhooks.py",
+        "./tests/manual/test_webhook_demo.py",
+        "./tests/test_web_processor.py",
         "./tests/test_web_integration.py",
-        "./tests/manual/test_qdrant_network.py",
         "./packages/morag-web/src/morag_web/processor.py",
         "./tests/manual/test_qdrant_auth.py",
-        "./tests/test_web_processor.py",
-        "./tests/manual/test_webhook_demo.py"
+        "./tests/manual/test_qdrant_network.py"
       ],
       "import_name": "httpx"
     },
@@ -320,9 +320,9 @@
       "required": true,
       "usage_count": 3,
       "usage_locations": [
-        "./packages/morag-document/src/morag_document/converters/text.py",
+        "./packages/morag-document/src/morag_document/converters/pdf.py",
         "./packages/morag-web/src/morag_web/processor.py",
-        "./packages/morag-document/src/morag_document/converters/pdf.py"
+        "./packages/morag-document/src/morag_document/converters/text.py"
       ],
       "import_name": "markdown"
     },
@@ -456,15 +456,15 @@
       "required": true,
       "usage_count": 9,
       "usage_locations": [
+        "./packages/morag-image/src/morag_image/processor.py",
+        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
+        "./packages/morag-audio/src/morag_audio/services/topic_segmentation.py",
+        "./tests/integration/test_audio_pipeline.py",
+        "./scripts/generate_test_audio.py",
+        "./tests/unit/test_audio_processor.py",
         "./packages/morag-embedding/src/morag_embedding/service.py",
         "./packages/morag-video/src/morag_video/processor.py",
-        "./tests/integration/test_audio_pipeline.py",
-        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
-        "./scripts/generate_test_audio.py",
-        "./tests/integration/test_enhanced_audio_pipeline.py",
-        "./packages/morag-image/src/morag_image/processor.py",
-        "./packages/morag-audio/src/morag_audio/services/topic_segmentation.py",
-        "./tests/unit/test_audio_processor.py"
+        "./tests/integration/test_enhanced_audio_pipeline.py"
       ],
       "import_name": "numpy"
     },
@@ -475,8 +475,8 @@
       "required": false,
       "usage_count": 2,
       "usage_locations": [
-        "./packages/morag-image/src/morag_image/processor.py",
-        "./packages/morag-video/src/morag_video/processor.py"
+        "./packages/morag-video/src/morag_video/processor.py",
+        "./packages/morag-image/src/morag_image/processor.py"
       ],
       "import_name": "cv2"
     },
@@ -544,9 +544,9 @@
       "required": true,
       "usage_count": 3,
       "usage_locations": [
-        "./packages/morag/src/morag/server.py",
+        "./packages/morag-core/src/morag_core/config.py",
         "./packages/morag-services/src/morag_services/services.py",
-        "./packages/morag-core/src/morag_core/config.py"
+        "./packages/morag/src/morag/server.py"
       ],
       "import_name": "pydantic"
     },
@@ -589,9 +589,9 @@
       "required": false,
       "usage_count": 3,
       "usage_locations": [
-        "./packages/morag-image/src/morag_image/processor.py",
+        "./packages/morag-video/src/morag_video/processor.py",
         "./packages/morag-image/tests/conftest.py",
-        "./packages/morag-video/src/morag_video/processor.py"
+        "./packages/morag-image/src/morag_image/processor.py"
       ],
       "import_name": "pytesseract"
     },
@@ -602,16 +602,16 @@
       "required": false,
       "usage_count": 90,
       "usage_locations": [
-        "./tests/integration/test_architecture_compliance.py",
-        "./tests/conftest.py",
+        "./tests/test_15_vector_storage.py",
+        "./tests/unit/test_ai_error_handling.py",
+        "./tests/test_race_condition_integration.py",
         "./tests/unit/test_document_processor.py",
-        "./tests/integration/test_celery.py",
-        "./packages/morag-image/tests/test_processor.py",
         "./tests/unit/test_youtube_tasks.py",
-        "./tests/unit/test_semantic_chunking.py",
-        "./tests/integration/test_gemini.py",
-        "./tests/test_docling_pdf_fix.py",
-        "./tests/test_01_config_validation.py"
+        "./tests/test_file_upload_race_condition_fix_v2.py",
+        "./tests/conftest.py",
+        "./tests/test_basic_enhanced_converters.py",
+        "./tests/test_enhanced_race_condition_fix.py",
+        "./packages/morag-document/tests/test_service.py"
       ],
       "import_name": "pytest"
     },
@@ -651,21 +651,12 @@
       "required": true,
       "usage_count": 4,
       "usage_locations": [
-        "./tests/cli/test-simple.py",
-        "./tests/cli/test-document.py",
         "./tests/cli/validate-standalone-cli.py",
-        "./tests/cli/test-audio.py"
+        "./tests/cli/test-document.py",
+        "./tests/cli/test-audio.py",
+        "./tests/cli/test-simple.py"
       ],
       "import_name": "dotenv"
-    },
-    "python-multipart": {
-      "version": ">=0.0.6",
-      "source": "morag/pyproject.toml",
-      "category": "morag",
-      "required": true,
-      "usage_count": 0,
-      "usage_locations": [],
-      "import_name": "multipart"
     },
     "python-pptx": {
       "version": ">=0.6.21,<1.0.0",
@@ -685,8 +676,8 @@
       "required": true,
       "usage_count": 3,
       "usage_locations": [
-        "./tests/manual/test_qdrant_auth.py",
         "./packages/morag-services/src/morag_services/storage.py",
+        "./tests/manual/test_qdrant_auth.py",
         "./scripts/test-docker.py"
       ],
       "import_name": "qdrant_client"
@@ -699,19 +690,10 @@
       "usage_count": 3,
       "usage_locations": [
         "./tests/cli/test-ingest-workflow.py",
-        "./tests/conftest.py",
-        "./scripts/test-docker.py"
+        "./scripts/test-docker.py",
+        "./tests/conftest.py"
       ],
       "import_name": "redis"
-    },
-    "scikit-image": {
-      "version": ">=0.19.0",
-      "source": "morag-video/pyproject.toml",
-      "category": "morag-video",
-      "required": true,
-      "usage_count": 0,
-      "usage_locations": [],
-      "import_name": "scikit-image"
     },
     "sentence-transformers": {
       "version": ">=2.2.0",
@@ -742,16 +724,16 @@
       "required": true,
       "usage_count": 60,
       "usage_locations": [
-        "./packages/morag-document/src/morag_document/converters/word.py",
+        "./packages/morag-web/src/morag_web/converter.py",
+        "./tests/test_speaker_diarization_and_rate_limiting_fixes.py",
+        "./packages/morag/src/morag/api.py",
+        "./packages/morag/src/morag/server.py",
+        "./packages/morag-audio/src/morag_audio/cli.py",
+        "./packages/morag-core/src/morag_core/utils/logging.py",
+        "./packages/morag/src/morag/ingest_tasks.py",
+        "./tests/test_03_database_init.py",
         "./packages/morag-document/src/morag_document/converters/pdf.py",
-        "./packages/morag-document/src/morag_document/processor.py",
-        "./packages/morag-embedding/src/morag_embedding/service.py",
-        "./packages/morag-web/src/morag_web/tasks.py",
-        "./tests/manual/test_transcription_fixes.py",
-        "./examples/video_audio_integration_demo.py",
-        "./examples/ai_error_handling_demo.py",
-        "./packages/morag-audio/src/morag_audio/processor.py",
-        "./packages/morag/src/morag/ingest_tasks.py"
+        "./packages/morag-services/src/morag_services/contextual_retrieval.py"
       ],
       "import_name": "structlog"
     },
@@ -774,9 +756,9 @@
       "usage_count": 5,
       "usage_locations": [
         "./packages/morag-core/src/morag_core/config.py",
-        "./scripts/check_cpu_compatibility.py",
-        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
         "./scripts/test_docling_docker.py",
+        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
+        "./scripts/check_cpu_compatibility.py",
         "./packages/morag-core/src/morag_core/utils/device.py"
       ],
       "import_name": "torch"
