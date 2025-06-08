@@ -733,7 +733,8 @@ For detailed information about completed tasks and implementation history, see [
   - **Consolidated Overlapping Dependencies**: Removed `aiohttp` (replaced with `httpx`), standardized `Pillow`
   - **Organized Development Tools**: Moved all dev tools to proper dev-only section
   - **Removed More Unused Optional Dependencies**: Eliminated `librosa`, `soundfile`, `speechbrain`, `moviepy`, `transformers`, `readability-lxml`, `newspaper3k` (7+ packages)
-- **Final Results**: **Reduced from 88 to 70 dependencies (18 packages removed, 20.5% reduction)**
+- **Final Results**: **Reduced from 88 to 71 dependencies (17 packages removed, 19.3% reduction)**
+- **Correction**: Re-added `python-multipart` (required by FastAPI for file uploads)
 - **Files Created**: `DEPENDENCY_OPTIMIZATION_PLAN.md`, `scripts/analyze_dependencies.py`
 - **Target**: Continue optimization to reach ~60 dependencies (32% total reduction)
 

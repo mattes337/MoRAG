@@ -80,7 +80,7 @@ Unused ML/processing libraries:
 - ✅ Removed `bleach==6.2.0` - HTML sanitization (0 usages)
 - ✅ Removed `html2text==2024.2.26` - HTML to text conversion (0 usages)
 - ✅ Removed `lxml==5.3.0` - XML/HTML parsing (0 usages in main code)
-- ✅ Removed `python-multipart==0.0.17` - File upload handling (0 usages)
+- ❌ **Reverted** `python-multipart==0.0.17` - Required by FastAPI for file uploads (indirect usage)
 - ✅ Removed `kombu==5.3.7` - Celery transitive dependency (0 direct usages)
 
 #### Phase 2: Consolidate Overlapping Dependencies ✅ COMPLETED
@@ -102,8 +102,8 @@ Unused ML/processing libraries:
 - ✅ Removed `scikit-image` from morag-video package (0 usages)
 
 ### 📊 Current Results
-- **Dependencies Reduced**: 88 → 70 packages (**18 packages removed, 20.5% reduction**)
-- **Core Dependencies**: 49 → 42 packages (7 removed)
+- **Dependencies Reduced**: 88 → 71 packages (**17 packages removed, 19.3% reduction**)
+- **Core Dependencies**: 49 → 43 packages (6 removed)
 - **Optional Dependencies**: 39 → 28 packages (11 removed)
 - **Development Tools**: Properly organized in dev-only section
 
@@ -144,7 +144,7 @@ Unused ML/processing libraries:
 ## Expected Results
 
 **Before**: 88 dependencies (49 core + 39 optional)
-**Final Results**: 70 dependencies (42 core + 28 optional) - **18 packages removed (20.5% reduction)**
+**Final Results**: 71 dependencies (43 core + 28 optional) - **17 packages removed (19.3% reduction)**
 **Target**: ~60 dependencies (35 core + 25 optional)
 **Total Target Reduction**: 28 packages (32% decrease)
 
