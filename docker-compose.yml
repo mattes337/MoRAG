@@ -42,7 +42,7 @@ services:
       - WHISPER_CACHE_DIR=/app/temp/cache/whisper
       # CPU Compatibility Settings
       - MORAG_FORCE_CPU=true
-      - MORAG_DISABLE_DOCLING=true
+      - MORAG_DISABLE_DOCLING=false
       - OMP_NUM_THREADS=1
       - MKL_NUM_THREADS=1
       - OPENBLAS_NUM_THREADS=1
@@ -74,7 +74,7 @@ services:
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
       # CPU Compatibility Settings
       - MORAG_FORCE_CPU=true
-      - MORAG_DISABLE_DOCLING=true
+      - MORAG_DISABLE_DOCLING=false
       - OMP_NUM_THREADS=1
       - MKL_NUM_THREADS=1
       - OPENBLAS_NUM_THREADS=1
@@ -105,7 +105,7 @@ services:
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
       # CPU Compatibility Settings
       - MORAG_FORCE_CPU=true
-      - MORAG_DISABLE_DOCLING=true
+      - MORAG_DISABLE_DOCLING=false
       - OMP_NUM_THREADS=1
       - MKL_NUM_THREADS=1
       - OPENBLAS_NUM_THREADS=1
@@ -137,7 +137,7 @@ services:
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
       # CPU Compatibility Settings
       - MORAG_FORCE_CPU=true
-      - MORAG_DISABLE_DOCLING=true
+      - MORAG_DISABLE_DOCLING=false
       - OMP_NUM_THREADS=1
       - MKL_NUM_THREADS=1
       - OPENBLAS_NUM_THREADS=1

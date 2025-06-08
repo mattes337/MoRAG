@@ -11,11 +11,10 @@ google-genai==1.18.0
 yt-dlp==2024.12.13
 beautifulsoup4==4.12.3
 markdownify==0.14.1
-html2text==2024.2.26
-lxml==5.3.0
-bleach==6.2.0
+
+
 markdown==3.7
-python-multipart==0.0.17
+
 aiofiles==24.1.0
 httpx==0.28.1
 python-dotenv==1.0.1
