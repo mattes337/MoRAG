@@ -72,6 +72,39 @@ Unused ML/processing libraries:
 - `trafilatura` - Content extraction ✅
 - `markdownify` - HTML to Markdown ✅
 
+## Progress Update (Current Implementation)
+
+### ✅ Completed Optimizations
+
+#### Phase 1: Remove Unused Core Dependencies ✅ COMPLETED
+- ✅ Removed `bleach==6.2.0` - HTML sanitization (0 usages)
+- ✅ Removed `html2text==2024.2.26` - HTML to text conversion (0 usages)
+- ✅ Removed `lxml==5.3.0` - XML/HTML parsing (0 usages in main code)
+- ✅ Removed `python-multipart==0.0.17` - File upload handling (0 usages)
+- ✅ Removed `kombu==5.3.7` - Celery transitive dependency (0 direct usages)
+
+#### Phase 2: Consolidate Overlapping Dependencies ✅ COMPLETED
+- ✅ Removed `aiohttp` from morag-document and morag-embedding (replaced with httpx)
+- ✅ Standardized on `Pillow` (fixed `pillow` inconsistency in morag-video)
+
+#### Phase 3: Move Development Tools to dev-only ✅ COMPLETED
+- ✅ Moved to `[project.optional-dependencies.dev]`: black, flake8, isort, mypy, pre-commit
+- ✅ Consolidated all development tools in one section
+
+#### Phase 4: Remove Unused Optional Dependencies ✅ PARTIALLY COMPLETED
+- ✅ Removed from audio section: `librosa`, `soundfile`, `speechbrain`
+- ✅ Removed from video section: `moviepy`, `transformers`
+- ✅ Removed from office section: `xlrd`, `xlwt`
+- ✅ Removed from web section: `readability-lxml`, `newspaper3k`
+- ✅ Removed from all-extras: `deepsearch-glm`, `weasel`, and other unused packages
+- ✅ Removed `librosa` from morag-audio package (0 usages)
+
+### 📊 Current Results
+- **Dependencies Reduced**: 88 → 72 packages (**16 packages removed, 18% reduction**)
+- **Core Dependencies**: 49 → 44 packages (5 removed)
+- **Optional Dependencies**: 39 → 28 packages (11 removed)
+- **Development Tools**: Properly organized in dev-only section
+
 ## Optimization Recommendations
 
 ### Phase 1: Remove Unused Core Dependencies (Save ~7 packages)
@@ -109,8 +142,9 @@ Unused ML/processing libraries:
 ## Expected Results
 
 **Before**: 88 dependencies (49 core + 39 optional)
-**After**: ~60 dependencies (35 core + 25 optional)
-**Reduction**: 28 packages (32% decrease)
+**Current Progress**: 72 dependencies (44 core + 28 optional) - **16 packages removed (18% reduction)**
+**Target**: ~60 dependencies (35 core + 25 optional)
+**Total Target Reduction**: 28 packages (32% decrease)
 
 ### Benefits
 1. **Faster Installation**: Fewer packages to download and install

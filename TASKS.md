@@ -722,15 +722,20 @@ For detailed information about completed tasks and implementation history, see [
   - **Validation Script**: Added `scripts/test_docling_docker.py` for testing
 - **Benefits**: Better PDF processing with advanced features while maintaining CPU compatibility
 
-#### 36. **Task 2: Dependency Analysis and Optimization** ✅ COMPLETED
+#### 36. **Task 2: Dependency Analysis and Optimization** ✅ ENHANCED
 - **Issue**: 88 total dependencies with many unused packages increasing complexity
 - **Analysis**: Created comprehensive dependency analysis with usage tracking
-- **Optimizations Implemented**:
+- **Phase 1 - Initial Optimizations**:
   - **Removed Unused Core Dependencies**: Eliminated `bleach`, `html2text`, `lxml`, `python-multipart` (4 packages)
   - **Removed Unused Optional Dependencies**: Eliminated `deepsearch-glm`, `weasel`, `xlrd`, `xlwt`, `newspaper3k` (5 packages)
-  - **Created Optimization Plan**: Documented strategy for further reductions
-- **Results**: Reduced from 88 to 79 dependencies (10% reduction)
+- **Phase 2 - Continued Implementation**:
+  - **Removed Additional Core Dependencies**: Eliminated `kombu` (transitive dependency)
+  - **Consolidated Overlapping Dependencies**: Removed `aiohttp` (replaced with `httpx`), standardized `Pillow`
+  - **Organized Development Tools**: Moved all dev tools to proper dev-only section
+  - **Removed More Unused Optional Dependencies**: Eliminated `librosa`, `soundfile`, `speechbrain`, `moviepy`, `transformers`, `readability-lxml`, `newspaper3k` (7+ packages)
+- **Results**: **Reduced from 88 to 72 dependencies (16 packages removed, 18% reduction)**
 - **Files Created**: `DEPENDENCY_OPTIMIZATION_PLAN.md`, `scripts/analyze_dependencies.py`
+- **Target**: Continue optimization to reach ~60 dependencies (32% total reduction)
 
 #### 37. **Task 3: Repository Cleanup** ✅ COMPLETED
 - **Issue**: Root directory cluttered with outdated documentation and test files
