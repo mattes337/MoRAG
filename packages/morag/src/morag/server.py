@@ -24,6 +24,7 @@ from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_s
 from morag.worker import submit_task_for_user
 from morag.services.auth_service import APIKeyService
 from morag.middleware.auth import APIKeyAuth
+from morag.task_queue import task_queue, TaskStatus as QueueTaskStatus
 
 logger = structlog.get_logger(__name__)
 
@@ -618,6 +619,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     # Ingest API endpoints
     @app.post("/api/v1/ingest/file", response_model=IngestResponse, tags=["Ingestion"])
     async def ingest_file(
+        http_request: Request,
         source_type: Optional[str] = Form(default=None),  # Auto-detect if not provided
         file: UploadFile = File(...),
         document_id: Optional[str] = Form(default=None),  # Custom document identifier
@@ -632,6 +634,9 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
         try:
+            # Check for authentication to determine worker routing
+            user_id = await auth.get_user_id(http_request)
+
             # Parse metadata if provided
             parsed_metadata = None
             if metadata:
@@ -685,55 +690,43 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                         detail="Document ID must contain only alphanumeric characters, hyphens, and underscores"
                     )
 
-            # Create task options with sanitized inputs
-            options = {
-                "document_id": document_id,
-                "replace_existing": replace_existing,
-                "webhook_url": webhook_url or "",  # Ensure string, not None
-                "metadata": parsed_metadata or {},  # Ensure dict, not None
-                "use_docling": use_docling,
-                "chunk_size": chunk_size,
-                "chunk_overlap": chunk_overlap,
-                "chunking_strategy": chunking_strategy,
-                "store_in_vector_db": True  # Key difference from process endpoints
+            # Create task parameters
+            parameters = {
+                "file_path": str(temp_path),
+                "content_type": source_type,
+                "options": {
+                    "document_id": document_id,
+                    "replace_existing": replace_existing,
+                    "webhook_url": webhook_url or "",
+                    "metadata": parsed_metadata or {},
+                    "use_docling": use_docling,
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
+                    "chunking_strategy": chunking_strategy,
+                    "store_in_vector_db": True
+                }
             }
 
-            # Process directly (no background tasks)
-            import uuid
-            task_id = str(uuid.uuid4())
-
-            logger.info("Starting direct file ingestion",
-                       task_id=task_id,
-                       filename=file.filename,
-                       source_type=source_type)
-
-            # Process the file directly
-            result = await get_morag_api().process_file(
-                temp_path,
-                source_type,
-                options
+            # Submit task to queue for async processing
+            task_id = await task_queue.submit_task(
+                task_type="process_file",
+                parameters=parameters,
+                user_id=user_id
             )
 
-            # Clean up temp file
-            try:
-                Path(temp_path).unlink(missing_ok=True)
-                logger.debug("Cleaned up temporary file", file_path=str(temp_path))
-            except Exception as e:
-                logger.warning("Failed to clean up temporary file",
-                             file_path=str(temp_path), error=str(e))
+            logger.info("File ingestion task submitted",
+                       task_id=task_id,
+                       filename=file.filename,
+                       source_type=source_type,
+                       user_id=user_id)
 
-            if result.success:
-                return IngestResponse(
-                    task_id=task_id,
-                    status="completed",
-                    message=f"File ingestion completed for {file.filename}",
-                    estimated_time=0
-                )
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Processing failed: {result.error_message}"
-                )
+            # Note: temp file will be cleaned up by the worker after processing
+            return IngestResponse(
+                task_id=task_id,
+                status="pending",
+                message=f"File ingestion task submitted for {file.filename}",
+                estimated_time=120  # Estimated processing time in seconds
+            )
 
         except HTTPException:
             # Re-raise HTTP exceptions as-is
@@ -748,9 +741,12 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             pass
 
     @app.post("/api/v1/ingest/url", response_model=IngestResponse, tags=["Ingestion"])
-    async def ingest_url(request: IngestURLRequest):
+    async def ingest_url(http_request: Request, request: IngestURLRequest):
         """Ingest and process content from URL, storing results in vector database."""
         try:
+            # Check for authentication to determine worker routing
+            user_id = await auth.get_user_id(http_request)
+
             # Auto-detect source type if not provided
             source_type = request.source_type
             if not source_type:
@@ -759,41 +755,36 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            url=request.url,
                            detected_type=source_type)
 
-            # Create task options with sanitized inputs
-            options = {
-                "webhook_url": request.webhook_url or "",  # Ensure string, not None
-                "metadata": request.metadata or {},  # Ensure dict, not None
-                "store_in_vector_db": True  # Key difference from process endpoints
+            # Create task parameters
+            parameters = {
+                "url": request.url,
+                "content_type": source_type,
+                "options": {
+                    "webhook_url": request.webhook_url or "",
+                    "metadata": request.metadata or {},
+                    "store_in_vector_db": True
+                }
             }
 
-            # Process directly (no background tasks)
-            import uuid
-            task_id = str(uuid.uuid4())
-
-            logger.info("Starting direct URL ingestion",
-                       task_id=task_id,
-                       url=request.url,
-                       source_type=source_type)
-
-            # Process the URL directly
-            result = await get_morag_api().process_url(
-                request.url,
-                source_type,
-                options
+            # Submit task to queue for async processing
+            task_id = await task_queue.submit_task(
+                task_type="process_url",
+                parameters=parameters,
+                user_id=user_id
             )
 
-            if result.success:
-                return IngestResponse(
-                    task_id=task_id,
-                    status="completed",
-                    message=f"URL ingestion completed for {request.url}",
-                    estimated_time=0
-                )
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Processing failed: {result.error_message}"
-                )
+            logger.info("URL ingestion task submitted",
+                       task_id=task_id,
+                       url=request.url,
+                       source_type=source_type,
+                       user_id=user_id)
+
+            return IngestResponse(
+                task_id=task_id,
+                status="pending",
+                message=f"URL ingestion task submitted for {request.url}",
+                estimated_time=60  # Estimated processing time in seconds
+            )
 
         except Exception as e:
             logger.error("URL ingestion failed", url=request.url, error=str(e))
@@ -841,24 +832,33 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Batch ingestion failed", item_count=len(request.items), error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Task status endpoints (simplified for HTTP-only mode)
+    # Task status endpoints
     @app.get("/api/v1/status/{task_id}", response_model=TaskStatus, tags=["Task Management"])
     async def get_task_status(task_id: str):
-        """Get the status of a processing task (HTTP-only mode)."""
+        """Get the status of a processing task."""
         try:
-            # In HTTP-only mode, tasks are processed immediately
-            # This endpoint is kept for API compatibility but returns completed status
-            logger.info("Task status requested (HTTP-only mode)", task_id=task_id)
+            logger.info("Task status requested", task_id=task_id)
+
+            # Get task status from queue
+            task_status = await task_queue.get_task_status(task_id)
+
+            if not task_status:
+                raise HTTPException(status_code=404, detail="Task not found")
 
             return TaskStatus(
-                task_id=task_id,
-                status="SUCCESS",
-                progress=1.0,
-                message="Task completed (HTTP-only mode)",
-                result={"message": "Task processed immediately in HTTP-only mode"},
-                error=None
+                task_id=task_status["task_id"],
+                status=task_status["status"],
+                progress=task_status["progress"],
+                message=task_status["message"],
+                result=task_status["result"],
+                error=task_status["error"],
+                created_at=task_status["created_at"],
+                started_at=task_status["started_at"],
+                completed_at=task_status["completed_at"]
             )
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error("Failed to get task status", task_id=task_id, error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
@@ -1112,6 +1112,143 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
         except Exception as e:
             logger.error("Failed to get worker status", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # HTTP Worker Management endpoints
+    @app.post("/api/v1/workers/register", tags=["Worker Management"])
+    async def register_worker(
+        request: Request,
+        worker_id: str = Form(...),
+        worker_type: str = Form(...),
+        max_concurrent_tasks: int = Form(default=1)
+    ):
+        """Register a new HTTP worker."""
+        try:
+            # Require authentication for worker registration
+            user_data = await auth.require_authentication(request)
+            user_id = user_data.get("user_id")
+            api_key = request.headers.get("Authorization", "").replace("Bearer ", "")
+
+            success = await task_queue.register_worker(
+                worker_id=worker_id,
+                worker_type=worker_type,
+                api_key=api_key,
+                user_id=user_id,
+                max_concurrent_tasks=max_concurrent_tasks
+            )
+
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"Worker {worker_id} registered successfully",
+                    "worker_id": worker_id,
+                    "user_id": user_id
+                }
+            else:
+                raise HTTPException(status_code=400, detail="Failed to register worker")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Worker registration failed", worker_id=worker_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/api/v1/workers/{worker_id}", tags=["Worker Management"])
+    async def unregister_worker(worker_id: str, request: Request):
+        """Unregister an HTTP worker."""
+        try:
+            # Require authentication for worker unregistration
+            await auth.require_authentication(request)
+
+            success = await task_queue.unregister_worker(worker_id)
+
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"Worker {worker_id} unregistered successfully"
+                }
+            else:
+                raise HTTPException(status_code=404, detail="Worker not found")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Worker unregistration failed", worker_id=worker_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/v1/workers/{worker_id}/tasks/next", tags=["Worker Management"])
+    async def get_next_task(worker_id: str, request: Request):
+        """Get next available task for a worker."""
+        try:
+            # Require authentication for task retrieval
+            await auth.require_authentication(request)
+
+            task = await task_queue.get_next_task(worker_id)
+
+            if task:
+                return task
+            else:
+                # No tasks available - return 204 No Content
+                from fastapi import Response
+                return Response(status_code=204)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Failed to get next task", worker_id=worker_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/workers/{worker_id}/tasks/{task_id}/status", tags=["Worker Management"])
+    async def update_task_status(
+        worker_id: str,
+        task_id: str,
+        request: Request,
+        status: str = Form(...),
+        result: Optional[str] = Form(default=None),  # JSON string
+        error_message: Optional[str] = Form(default=None)
+    ):
+        """Update task status from worker."""
+        try:
+            # Require authentication for status updates
+            await auth.require_authentication(request)
+
+            # Parse result if provided
+            parsed_result = None
+            if result:
+                import json
+                try:
+                    parsed_result = json.loads(result)
+                except json.JSONDecodeError as e:
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON in result: {str(e)}")
+
+            # Convert string status to enum
+            try:
+                task_status = QueueTaskStatus(status)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+            success = await task_queue.update_task_status(
+                task_id=task_id,
+                status=task_status,
+                result=parsed_result,
+                error_message=error_message
+            )
+
+            if success:
+                return {
+                    "status": "success",
+                    "message": f"Task {task_id} status updated to {status}"
+                }
+            else:
+                raise HTTPException(status_code=404, detail="Task not found")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Failed to update task status",
+                        worker_id=worker_id,
+                        task_id=task_id,
+                        error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
     return app

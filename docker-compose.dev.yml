@@ -1,14 +1,4 @@
 services:
-  # Redis for development
-  redis:
-    image: redis:7-alpine
-    container_name: morag-redis-dev
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_dev_data:/data
-    command: redis-server --appendonly yes
 
   # Qdrant vector database for development
   qdrant:
@@ -53,7 +43,6 @@ services:
       - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
       - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
     depends_on:
-      - redis
       - qdrant
     command: ["python", "-m", "morag.server", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
@@ -62,8 +51,6 @@ services:
   # Or run: python scripts/start_http_remote_worker.py --server-url http://localhost:8000 --api-key your-key
 
 volumes:
-  redis_dev_data:
-    driver: local
   qdrant_dev_data:
     driver: local
 

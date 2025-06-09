@@ -1,16 +1,4 @@
 services:
-  # Redis for task queue and caching
-  redis:
-    image: redis:7-alpine
-    container_name: morag-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    # Note: To fix memory overcommit warning, run on host:
-    # echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
   # Qdrant vector database
 #  qdrant:
@@ -52,8 +40,7 @@ services:
       - PYTORCH_DISABLE_NNPACK=1
       - PYTORCH_DISABLE_AVX=1
       - PYTORCH_DISABLE_AVX2=1
-    depends_on:
-      - redis
+
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -65,8 +52,6 @@ services:
   # Or run: python scripts/start_http_remote_worker.py
 
 volumes:
-  redis_data:
-    driver: local
   qdrant_data:
     driver: local
 

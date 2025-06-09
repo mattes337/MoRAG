@@ -53,12 +53,14 @@ For setup instructions, see [HTTP Remote Workers Guide](docs/HTTP_REMOTE_WORKERS
 - **Performance**: Optimized chunking, embedding, and search operations
 - **HTTP Remote Workers**: Replaced Redis/Celery workers with HTTP-based workers for simplified deployment
 - **Code Cleanup**: Removed all backwards compatibility code and legacy imports for cleaner architecture
+- **Redis Removal**: Completely removed Redis dependency from Docker Compose files
+- **Async Processing**: Implemented proper async task queue for ingest endpoints using HTTP workers
 
 ## Core Features
 
 - **Universal Processing**: Support for documents, audio, video, images, web pages, and YouTube content
 - **Vector Storage**: Qdrant integration with optimized chunking and search
-- **Background Processing**: Celery-based task queue with comprehensive monitoring
+- **Background Processing**: HTTP-based task queue with remote worker support
 - **API Endpoints**: Complete REST API with both processing and ingestion modes
 - **Remote Workers**: User-specific GPU workers for accelerated processing
 - **Docker Support**: Production-ready containerization with optimized builds

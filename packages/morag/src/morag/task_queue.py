@@ -1,0 +1,285 @@
+"""HTTP-based task queue for remote workers - No Redis Required.
+
+This module provides a simple in-memory task queue that HTTP workers can poll
+for tasks. It eliminates the need for Redis/Celery infrastructure.
+"""
+
+import asyncio
+import uuid
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional, Set
+from dataclasses import dataclass, field
+from enum import Enum
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+
+class TaskStatus(str, Enum):
+    """Task status enum."""
+    PENDING = "pending"
+    ASSIGNED = "assigned"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class Task:
+    """Task data structure."""
+    task_id: str
+    task_type: str
+    user_id: Optional[str]
+    parameters: Dict[str, Any]
+    status: TaskStatus = TaskStatus.PENDING
+    created_at: datetime = field(default_factory=datetime.now)
+    assigned_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    worker_id: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    retry_count: int = 0
+    max_retries: int = 3
+
+
+@dataclass
+class Worker:
+    """Worker registration data."""
+    worker_id: str
+    worker_type: str
+    api_key: str
+    user_id: Optional[str]
+    last_seen: datetime = field(default_factory=datetime.now)
+    active_tasks: Set[str] = field(default_factory=set)
+    max_concurrent_tasks: int = 1
+
+
+class HTTPTaskQueue:
+    """HTTP-based task queue manager."""
+    
+    def __init__(self):
+        self.tasks: Dict[str, Task] = {}
+        self.workers: Dict[str, Worker] = {}
+        self.user_queues: Dict[str, List[str]] = {}  # user_id -> task_ids
+        self.general_queue: List[str] = []  # For tasks without specific user
+        self._lock = asyncio.Lock()
+        
+        # Start cleanup task
+        asyncio.create_task(self._cleanup_loop())
+    
+    async def register_worker(self, worker_id: str, worker_type: str, api_key: str, 
+                            user_id: Optional[str] = None, max_concurrent_tasks: int = 1) -> bool:
+        """Register a worker."""
+        async with self._lock:
+            self.workers[worker_id] = Worker(
+                worker_id=worker_id,
+                worker_type=worker_type,
+                api_key=api_key,
+                user_id=user_id,
+                max_concurrent_tasks=max_concurrent_tasks
+            )
+            logger.info("Worker registered", 
+                       worker_id=worker_id, 
+                       worker_type=worker_type,
+                       user_id=user_id)
+            return True
+    
+    async def unregister_worker(self, worker_id: str) -> bool:
+        """Unregister a worker."""
+        async with self._lock:
+            if worker_id in self.workers:
+                worker = self.workers[worker_id]
+                
+                # Reassign active tasks back to queue
+                for task_id in worker.active_tasks:
+                    if task_id in self.tasks:
+                        task = self.tasks[task_id]
+                        task.status = TaskStatus.PENDING
+                        task.worker_id = None
+                        task.assigned_at = None
+                        await self._add_to_queue(task)
+                
+                del self.workers[worker_id]
+                logger.info("Worker unregistered", worker_id=worker_id)
+                return True
+            return False
+    
+    async def submit_task(self, task_type: str, parameters: Dict[str, Any], 
+                         user_id: Optional[str] = None) -> str:
+        """Submit a new task."""
+        task_id = str(uuid.uuid4())
+        
+        async with self._lock:
+            task = Task(
+                task_id=task_id,
+                task_type=task_type,
+                user_id=user_id,
+                parameters=parameters
+            )
+            
+            self.tasks[task_id] = task
+            await self._add_to_queue(task)
+            
+            logger.info("Task submitted", 
+                       task_id=task_id, 
+                       task_type=task_type,
+                       user_id=user_id)
+            
+            return task_id
+    
+    async def _add_to_queue(self, task: Task):
+        """Add task to appropriate queue."""
+        if task.user_id:
+            if task.user_id not in self.user_queues:
+                self.user_queues[task.user_id] = []
+            self.user_queues[task.user_id].append(task.task_id)
+        else:
+            self.general_queue.append(task.task_id)
+    
+    async def get_next_task(self, worker_id: str) -> Optional[Dict[str, Any]]:
+        """Get next available task for a worker."""
+        async with self._lock:
+            if worker_id not in self.workers:
+                return None
+            
+            worker = self.workers[worker_id]
+            worker.last_seen = datetime.now()
+            
+            # Check if worker can take more tasks
+            if len(worker.active_tasks) >= worker.max_concurrent_tasks:
+                return None
+            
+            # Find appropriate task
+            task = None
+            
+            # First, check user-specific queue if worker is assigned to a user
+            if worker.user_id and worker.user_id in self.user_queues:
+                queue = self.user_queues[worker.user_id]
+                for task_id in queue[:]:
+                    if task_id in self.tasks and self.tasks[task_id].status == TaskStatus.PENDING:
+                        task = self.tasks[task_id]
+                        queue.remove(task_id)
+                        break
+            
+            # If no user-specific task, check general queue
+            if not task:
+                for task_id in self.general_queue[:]:
+                    if task_id in self.tasks and self.tasks[task_id].status == TaskStatus.PENDING:
+                        task = self.tasks[task_id]
+                        self.general_queue.remove(task_id)
+                        break
+            
+            if task:
+                # Assign task to worker
+                task.status = TaskStatus.ASSIGNED
+                task.worker_id = worker_id
+                task.assigned_at = datetime.now()
+                worker.active_tasks.add(task.task_id)
+                
+                logger.info("Task assigned to worker", 
+                           task_id=task.task_id,
+                           worker_id=worker_id)
+                
+                return {
+                    "task_id": task.task_id,
+                    "task_type": task.task_type,
+                    "parameters": task.parameters,
+                    "user_id": task.user_id
+                }
+            
+            return None
+    
+    async def update_task_status(self, task_id: str, status: TaskStatus, 
+                               result: Optional[Dict[str, Any]] = None,
+                               error_message: Optional[str] = None) -> bool:
+        """Update task status."""
+        async with self._lock:
+            if task_id not in self.tasks:
+                return False
+            
+            task = self.tasks[task_id]
+            old_status = task.status
+            task.status = status
+            
+            if status == TaskStatus.PROCESSING and not task.started_at:
+                task.started_at = datetime.now()
+            elif status in [TaskStatus.COMPLETED, TaskStatus.FAILED]:
+                task.completed_at = datetime.now()
+                if task.worker_id and task.worker_id in self.workers:
+                    self.workers[task.worker_id].active_tasks.discard(task_id)
+            
+            if result:
+                task.result = result
+            if error_message:
+                task.error_message = error_message
+            
+            logger.info("Task status updated", 
+                       task_id=task_id,
+                       old_status=old_status,
+                       new_status=status)
+            
+            return True
+    
+    async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get task status."""
+        async with self._lock:
+            if task_id not in self.tasks:
+                return None
+            
+            task = self.tasks[task_id]
+            return {
+                "task_id": task.task_id,
+                "status": task.status.value,
+                "progress": 1.0 if task.status == TaskStatus.COMPLETED else 0.0,
+                "message": f"Task {task.status.value}",
+                "result": task.result,
+                "error": task.error_message,
+                "created_at": task.created_at.isoformat(),
+                "started_at": task.started_at.isoformat() if task.started_at else None,
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None
+            }
+    
+    async def _cleanup_loop(self):
+        """Cleanup old tasks and inactive workers."""
+        while True:
+            try:
+                await asyncio.sleep(300)  # Run every 5 minutes
+                await self._cleanup_old_tasks()
+                await self._cleanup_inactive_workers()
+            except Exception as e:
+                logger.error("Error in cleanup loop", error=str(e))
+    
+    async def _cleanup_old_tasks(self):
+        """Remove old completed/failed tasks."""
+        async with self._lock:
+            cutoff_time = datetime.now() - timedelta(hours=24)
+            tasks_to_remove = []
+            
+            for task_id, task in self.tasks.items():
+                if (task.status in [TaskStatus.COMPLETED, TaskStatus.FAILED] and 
+                    task.completed_at and task.completed_at < cutoff_time):
+                    tasks_to_remove.append(task_id)
+            
+            for task_id in tasks_to_remove:
+                del self.tasks[task_id]
+                logger.debug("Cleaned up old task", task_id=task_id)
+    
+    async def _cleanup_inactive_workers(self):
+        """Remove inactive workers and reassign their tasks."""
+        async with self._lock:
+            cutoff_time = datetime.now() - timedelta(minutes=10)
+            workers_to_remove = []
+            
+            for worker_id, worker in self.workers.items():
+                if worker.last_seen < cutoff_time:
+                    workers_to_remove.append(worker_id)
+            
+            for worker_id in workers_to_remove:
+                await self.unregister_worker(worker_id)
+                logger.info("Removed inactive worker", worker_id=worker_id)
+
+
+# Global task queue instance
+task_queue = HTTPTaskQueue()
