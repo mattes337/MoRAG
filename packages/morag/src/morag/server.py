@@ -22,12 +22,7 @@ from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
 from morag.utils.file_upload import get_upload_handler, FileUploadError, validate_temp_directory_access
 from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
-from morag.worker import (
-    process_file_task, process_url_task, process_web_page_task,
-    process_youtube_video_task, process_batch_task, celery_app,
-    submit_task_for_user
-)
-from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
+from morag.worker import submit_task_for_user
 from morag.services.auth_service import APIKeyService
 from morag.middleware.auth import APIKeyAuth
 
@@ -706,24 +701,42 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
-            # Submit to background task queue for processing and storage
-            task = ingest_file_task.delay(
-                str(temp_path),
+            # Process directly (no background tasks)
+            import uuid
+            task_id = str(uuid.uuid4())
+
+            logger.info("Starting direct file ingestion",
+                       task_id=task_id,
+                       filename=file.filename,
+                       source_type=source_type)
+
+            # Process the file directly
+            result = await get_morag_api().process_file(
+                temp_path,
                 source_type,
                 options
             )
 
-            logger.info("File ingestion task created",
-                       task_id=task.id,
-                       filename=file.filename,
-                       source_type=source_type)
+            # Clean up temp file
+            try:
+                Path(temp_path).unlink(missing_ok=True)
+                logger.debug("Cleaned up temporary file", file_path=str(temp_path))
+            except Exception as e:
+                logger.warning("Failed to clean up temporary file",
+                             file_path=str(temp_path), error=str(e))
 
-            return IngestResponse(
-                task_id=task.id,
-                status="pending",
-                message=f"File ingestion started for {file.filename}",
-                estimated_time=60  # Estimate based on content type
-            )
+            if result.success:
+                return IngestResponse(
+                    task_id=task_id,
+                    status="completed",
+                    message=f"File ingestion completed for {file.filename}",
+                    estimated_time=0
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Processing failed: {result.error_message}"
+                )
 
         except HTTPException:
             # Re-raise HTTP exceptions as-is
@@ -734,7 +747,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                         error=str(e))
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
         finally:
-            # Note: Don't clean up temp file here - the background task needs it
+            # Cleanup is handled in the main processing block
             pass
 
     @app.post("/api/v1/ingest/url", response_model=IngestResponse, tags=["Ingestion"])
@@ -756,20 +769,34 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
-            # Submit to ingest URL task for processing and storage
-            task = ingest_url_task.delay(request.url, source_type, options)
+            # Process directly (no background tasks)
+            import uuid
+            task_id = str(uuid.uuid4())
 
-            logger.info("URL ingestion task created",
-                       task_id=task.id,
+            logger.info("Starting direct URL ingestion",
+                       task_id=task_id,
                        url=request.url,
-                       source_type=request.source_type)
+                       source_type=source_type)
 
-            return IngestResponse(
-                task_id=task.id,
-                status="pending",
-                message=f"URL ingestion started for {request.url}",
-                estimated_time=120  # URLs typically take longer
+            # Process the URL directly
+            result = await get_morag_api().process_url(
+                request.url,
+                source_type,
+                options
             )
+
+            if result.success:
+                return IngestResponse(
+                    task_id=task_id,
+                    status="completed",
+                    message=f"URL ingestion completed for {request.url}",
+                    estimated_time=0
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Processing failed: {result.error_message}"
+                )
 
         except Exception as e:
             logger.error("URL ingestion failed", url=request.url, error=str(e))
@@ -785,72 +812,54 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
-            # Submit batch ingest task
-            task = ingest_batch_task.delay(request.items, options)
-
+            # Process directly (no background tasks)
+            import uuid
             batch_id = f"batch-{uuid.uuid4().hex[:8]}"
+            task_id = str(uuid.uuid4())
 
-            logger.info("Batch ingestion task created",
-                       task_id=task.id,
+            logger.info("Starting direct batch ingestion",
+                       task_id=task_id,
                        batch_id=batch_id,
                        item_count=len(request.items))
 
-            return BatchIngestResponse(
-                batch_id=batch_id,
-                task_ids=[task.id],  # Single task for the batch
-                total_items=len(request.items),
-                message=f"Batch ingestion started with {len(request.items)} items"
-            )
+            # Process the batch directly
+            results = await get_morag_api().process_batch(request.items, options)
+
+            successful_items = sum(1 for r in results if r.success)
+
+            if successful_items > 0:
+                return BatchIngestResponse(
+                    batch_id=batch_id,
+                    task_ids=[task_id],
+                    total_items=len(request.items),
+                    message=f"Batch ingestion completed: {successful_items}/{len(request.items)} items successful"
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="All batch items failed to process"
+                )
 
         except Exception as e:
             logger.error("Batch ingestion failed", item_count=len(request.items), error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Task status endpoints
+    # Task status endpoints (simplified for HTTP-only mode)
     @app.get("/api/v1/status/{task_id}", response_model=TaskStatus, tags=["Task Management"])
     async def get_task_status(task_id: str):
-        """Get the status of a processing task."""
+        """Get the status of a processing task (HTTP-only mode)."""
         try:
-            # Get task result from Celery
-            task_result = celery_app.AsyncResult(task_id)
-
-            # Map Celery states to our API states
-            status_mapping = {
-                'PENDING': 'PENDING',
-                'STARTED': 'PROGRESS',
-                'PROGRESS': 'PROGRESS',
-                'SUCCESS': 'SUCCESS',
-                'FAILURE': 'FAILURE',
-                'REVOKED': 'REVOKED'
-            }
-
-            status = status_mapping.get(task_result.state, task_result.state)
-
-            # Get task info
-            task_info = task_result.info or {}
-
-            # Calculate progress
-            progress = 0.0
-            if status == 'SUCCESS':
-                progress = 1.0
-            elif status == 'PROGRESS' and isinstance(task_info, dict):
-                progress = task_info.get('progress', 0.0)
-
-            # Get result if completed successfully
-            result = None
-            error = None
-            if status == 'SUCCESS':
-                result = task_result.result
-            elif status == 'FAILURE':
-                error = str(task_result.info) if task_result.info else "Task failed"
+            # In HTTP-only mode, tasks are processed immediately
+            # This endpoint is kept for API compatibility but returns completed status
+            logger.info("Task status requested (HTTP-only mode)", task_id=task_id)
 
             return TaskStatus(
                 task_id=task_id,
-                status=status,
-                progress=progress,
-                message=task_info.get('message') if isinstance(task_info, dict) else None,
-                result=result,
-                error=error
+                status="SUCCESS",
+                progress=1.0,
+                message="Task completed (HTTP-only mode)",
+                result={"message": "Task processed immediately in HTTP-only mode"},
+                error=None
             )
 
         except Exception as e:
@@ -859,24 +868,15 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
     @app.get("/api/v1/status/", tags=["Task Management"])
     async def list_active_tasks():
-        """Get all currently active tasks."""
+        """Get all currently active tasks (HTTP-only mode)."""
         try:
-            # Get active tasks from Celery
-            inspect = celery_app.control.inspect()
-            active_tasks = inspect.active()
-
-            if not active_tasks:
-                return {"active_tasks": [], "count": 0}
-
-            # Extract task IDs from all workers
-            task_ids = []
-            for worker, tasks in active_tasks.items():
-                for task in tasks:
-                    task_ids.append(task['id'])
+            # In HTTP-only mode, tasks are processed immediately
+            logger.info("Active tasks requested (HTTP-only mode)")
 
             return {
-                "active_tasks": task_ids,
-                "count": len(task_ids)
+                "active_tasks": [],
+                "count": 0,
+                "message": "HTTP-only mode: tasks are processed immediately"
             }
 
         except Exception as e:
@@ -885,27 +885,17 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
     @app.get("/api/v1/status/stats/queues", tags=["Task Management"])
     async def get_queue_stats():
-        """Get processing queue statistics."""
+        """Get processing queue statistics (HTTP-only mode)."""
         try:
-            # Get queue stats from Celery
-            inspect = celery_app.control.inspect()
-
-            # Get active tasks
-            active_tasks = inspect.active() or {}
-            active_count = sum(len(tasks) for tasks in active_tasks.values())
-
-            # Get scheduled tasks
-            scheduled_tasks = inspect.scheduled() or {}
-            pending_count = sum(len(tasks) for tasks in scheduled_tasks.values())
-
-            # Note: Celery doesn't provide completed/failed counts directly
-            # These would need to be tracked separately in a database
+            # In HTTP-only mode, no queues exist
+            logger.info("Queue stats requested (HTTP-only mode)")
 
             return {
-                "pending": pending_count,
-                "active": active_count,
-                "completed": 0,  # Would need separate tracking
-                "failed": 0      # Would need separate tracking
+                "pending": 0,
+                "active": 0,
+                "completed": 0,
+                "failed": 0,
+                "message": "HTTP-only mode: no queues, tasks processed immediately"
             }
 
         except Exception as e:
@@ -914,15 +904,13 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
     @app.delete("/api/v1/ingest/{task_id}", tags=["Task Management"])
     async def cancel_task(task_id: str):
-        """Cancel a running or pending task."""
+        """Cancel a running or pending task (HTTP-only mode)."""
         try:
-            # Revoke the task
-            celery_app.control.revoke(task_id, terminate=True)
-
-            logger.info("Task cancelled", task_id=task_id)
+            # In HTTP-only mode, tasks are processed immediately and cannot be cancelled
+            logger.info("Task cancellation requested (HTTP-only mode)", task_id=task_id)
 
             return {
-                "message": f"Task {task_id} cancelled successfully"
+                "message": f"Task {task_id} cannot be cancelled (HTTP-only mode: tasks complete immediately)"
             }
 
         except Exception as e:
@@ -1093,72 +1081,36 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Result upload failed", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Worker status monitoring endpoint
+    # Worker status monitoring endpoint (HTTP-only mode)
     @app.get("/api/v1/status/workers", tags=["Task Management"])
     async def get_worker_status():
-        """Get current worker and queue status."""
+        """Get current worker and queue status (HTTP-only mode)."""
         try:
-            from morag.services.user_task_router import get_task_router
-            task_router = get_task_router()
-
-            # Get basic queue information
-            gpu_queue_length = task_router.get_queue_length('gpu-tasks')
-            cpu_queue_length = task_router.get_queue_length('celery')
-
-            # Get worker information from Celery
-            inspect = celery_app.control.inspect()
-            active_workers = inspect.active() or {}
-            stats = inspect.stats() or {}
-
-            worker_details = {}
-            gpu_workers = 0
-            cpu_workers = 0
-
-            for worker_name, tasks in active_workers.items():
-                worker_stats = stats.get(worker_name, {})
-                worker_queues = []
-
-                # Try to get worker queues
-                try:
-                    queue_inspect = inspect.active_queues()
-                    if queue_inspect and worker_name in queue_inspect:
-                        worker_queues = [q['name'] for q in queue_inspect[worker_name]]
-                except:
-                    pass
-
-                # Determine worker type based on queues
-                worker_type = "cpu"
-                if any("gpu-tasks" in queue for queue in worker_queues):
-                    worker_type = "gpu"
-                    gpu_workers += 1
-                else:
-                    cpu_workers += 1
-
-                worker_details[worker_name] = {
-                    "type": worker_type,
-                    "active_tasks": len(tasks),
-                    "max_tasks": worker_stats.get('pool', {}).get('max-concurrency', 1),
-                    "queues": worker_queues
-                }
+            # In HTTP-only mode, there are no background workers or queues
+            logger.info("Worker status requested (HTTP-only mode)")
 
             return {
                 "workers": {
-                    "total": len(active_workers),
-                    "gpu": gpu_workers,
-                    "cpu": cpu_workers,
-                    "details": worker_details
-                },
-                "queues": {
-                    "gpu-tasks": {
-                        "length": gpu_queue_length,
-                        "workers": gpu_workers
-                    },
-                    "celery": {
-                        "length": cpu_queue_length,
-                        "workers": cpu_workers
+                    "total": 1,
+                    "gpu": 0,
+                    "cpu": 1,
+                    "details": {
+                        "http-server": {
+                            "type": "http",
+                            "active_tasks": 0,
+                            "max_tasks": 1,
+                            "queues": []
+                        }
                     }
                 },
-                "gpu_available": gpu_workers > 0
+                "queues": {
+                    "http": {
+                        "length": 0,
+                        "workers": 1
+                    }
+                },
+                "gpu_available": False,
+                "message": "HTTP-only mode: tasks processed immediately by server"
             }
 
         except Exception as e:
