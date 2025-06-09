@@ -1,0 +1,162 @@
+# Docker Compose for HTTP Remote Worker - No Redis Required
+# This setup creates remote workers that connect directly to MoRAG server via HTTP
+
+version: '3.8'
+
+services:
+  # HTTP Remote Worker - GPU optimized
+  morag-http-worker-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: morag-http-worker-gpu
+    restart: unless-stopped
+    environment:
+      # Required: Main server connection
+      - MORAG_SERVER_URL=${MORAG_SERVER_URL:-http://main-server:8000}
+      - MORAG_API_KEY=${MORAG_API_KEY}
+      
+      # Worker configuration
+      - WORKER_TYPE=gpu
+      - POLL_INTERVAL=${POLL_INTERVAL:-5}
+      - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-1}
+      
+      # Cache directories
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      
+      # GPU settings (if available)
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - MORAG_FORCE_CPU=${MORAG_FORCE_CPU:-false}
+      
+      # Performance tuning
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
+      - MKL_NUM_THREADS=${MKL_NUM_THREADS:-4}
+      - OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-4}
+      
+      # Optional: YouTube cookie configuration
+      - YOUTUBE_COOKIES_FILE=${YOUTUBE_COOKIES_FILE:-}
+    
+    volumes:
+      # Cache directories for models
+      - worker_cache:/home/morag/.cache
+      - worker_temp:/app/temp
+      - worker_logs:/app/logs
+      
+      # Optional: Mount YouTube cookies
+      - ${YOUTUBE_COOKIES_PATH:-./cookies}:/app/cookies:ro
+    
+    # GPU support (uncomment if you have NVIDIA GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    
+    # Network configuration
+    networks:
+      - morag-worker-network
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # HTTP Remote Worker - CPU only
+  morag-http-worker-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: morag-http-worker-cpu
+    restart: unless-stopped
+    environment:
+      # Required: Main server connection
+      - MORAG_SERVER_URL=${MORAG_SERVER_URL:-http://main-server:8000}
+      - MORAG_API_KEY=${MORAG_API_KEY}
+      
+      # Worker configuration
+      - WORKER_TYPE=cpu
+      - POLL_INTERVAL=${POLL_INTERVAL:-10}
+      - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-2}
+      
+      # Force CPU processing
+      - MORAG_FORCE_CPU=true
+      
+      # Cache directories
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      
+      # CPU optimization
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS:-2}
+      - MKL_NUM_THREADS=${MKL_NUM_THREADS:-2}
+      - OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-2}
+      - VECLIB_MAXIMUM_THREADS=${VECLIB_MAXIMUM_THREADS:-2}
+      - NUMEXPR_NUM_THREADS=${NUMEXPR_NUM_THREADS:-2}
+      
+      # PyTorch CPU compatibility
+      - PYTORCH_DISABLE_NNPACK=1
+      - PYTORCH_DISABLE_AVX=1
+      - PYTORCH_DISABLE_AVX2=1
+    
+    volumes:
+      # Cache directories for models
+      - worker_cpu_cache:/home/morag/.cache
+      - worker_cpu_temp:/app/temp
+      - worker_cpu_logs:/app/logs
+    
+    # Network configuration
+    networks:
+      - morag-worker-network
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: Worker monitoring dashboard
+  morag-worker-monitor:
+    image: nginx:alpine
+    container_name: morag-worker-monitor
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx/worker-monitor.conf:/etc/nginx/nginx.conf:ro
+      - worker_logs:/var/log/morag:ro
+      - worker_cpu_logs:/var/log/morag-cpu:ro
+    networks:
+      - morag-worker-network
+    depends_on:
+      - morag-http-worker-gpu
+      - morag-http-worker-cpu
+
+# Volumes for persistent data
+volumes:
+  worker_cache:
+    driver: local
+  worker_temp:
+    driver: local
+  worker_logs:
+    driver: local
+  worker_cpu_cache:
+    driver: local
+  worker_cpu_temp:
+    driver: local
+  worker_cpu_logs:
+    driver: local
+
+# Network for worker communication
+networks:
+  morag-worker-network:
+    driver: bridge
+    name: morag-worker-network

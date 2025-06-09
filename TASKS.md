@@ -30,18 +30,19 @@ http://localhost:8000/docs
 - **Production Ready**: Docker containers, monitoring, logging, and comprehensive testing
 - **High Performance**: Batch embedding, optimized search, and intelligent fallback systems
 
-## Remote GPU Workers
+## HTTP Remote Workers
 
-MoRAG includes a complete remote GPU worker implementation:
+MoRAG includes HTTP-based remote workers that eliminate Redis dependency:
 
+- **No Redis required** - Direct HTTP communication with main server
 - **User-specific authentication** with API keys
 - **5-10x faster processing** for audio/video content
-- **Automatic fallback** to local processing when remote workers unavailable
-- **Simple integration** - just add `gpu=true` parameter with API key
-- **Complete isolation** - each user's tasks are processed only by their workers
-- **HTTP file transfer** - no shared storage required
+- **Simple deployment** - Just run a Python script or Docker container
+- **Easy debugging** - Direct HTTP communication is easier to troubleshoot
+- **Flexible scaling** - Add/remove workers without configuration
+- **Complete isolation** - Each user's tasks are processed only by their workers
 
-For setup instructions, see [Remote Workers Setup Guide](docs/remote-workers-setup.md).
+For setup instructions, see [HTTP Remote Workers Guide](docs/HTTP_REMOTE_WORKERS.md).
 
 ## Recent Improvements
 
@@ -50,6 +51,7 @@ For setup instructions, see [Remote Workers Setup Guide](docs/remote-workers-set
 - **Search Functionality**: Full vector similarity search implementation
 - **Error Handling**: Comprehensive fixes for processing and ingestion workflows
 - **Performance**: Optimized chunking, embedding, and search operations
+- **HTTP Remote Workers**: Replaced Redis/Celery workers with HTTP-based workers for simplified deployment
 
 ## Core Features
 

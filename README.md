@@ -41,8 +41,7 @@ packages/
 ### Prerequisites
 
 - Python 3.9+
-- Redis (for task queue)
-- Qdrant (vector database)
+- Qdrant (vector database) - optional for vector storage
 - Gemini API key
 
 ### Option 1: Using the Main Package (Recommended)
@@ -99,22 +98,15 @@ cp .env.example .env
 
 5. Start the services:
 ```bash
-# Start Redis
-redis-server
-
-# Start Qdrant
+# Start Qdrant (optional, for vector storage)
 docker run -d -p 6333:6333 --name morag-qdrant qdrant/qdrant:latest
 
-# Start Celery worker (REQUIRED for task processing)
-python scripts/start_worker.py
-# OR alternatively:
-# celery -A src.morag.core.celery_app worker --loglevel=info --concurrency=4
-
-# Start the API (in a separate terminal)
+# Start the API server
 uvicorn morag.api.main:app --reload
-```
 
-**Important**: The Celery worker is required for processing ingestion tasks. Without it, submitted tasks will remain in "pending" status and never complete.
+# For remote processing, start HTTP workers (optional)
+python scripts/start_http_remote_worker.py --server-url http://localhost:8000 --api-key your-key
+```
 
 ## Docker Deployment
 
@@ -249,20 +241,22 @@ For comprehensive CLI documentation, see [CLI.md](CLI.md).
 
 ## Remote GPU Workers
 
-MoRAG supports user-specific remote GPU workers for accelerated processing:
+MoRAG supports HTTP-based remote GPU workers for accelerated processing:
 
 ```bash
 # 1. Create API key for remote worker
 curl -X POST "http://localhost:8000/api/v1/auth/create-key" \
   -F "user_id=gpu_user_01" \
-  -F "description=GPU Worker"
+  -F "description=HTTP GPU Worker"
 
-# 2. Configure remote worker
-cp configs/gpu-worker.env.example configs/remote-worker.env
-# Edit with your API key and server details
+# 2. Start HTTP worker (no Redis needed)
+python scripts/start_http_remote_worker.py \
+  --server-url http://your-server:8000 \
+  --api-key YOUR_API_KEY \
+  --worker-type gpu
 
-# 3. Start remote worker
-./scripts/start-remote-worker.sh configs/remote-worker.env
+# 3. Or use Docker
+docker-compose -f docker-compose.workers.yml up
 
 # 4. Process with GPU acceleration
 curl -X POST "http://localhost:8000/process/file" \
@@ -274,10 +268,11 @@ curl -X POST "http://localhost:8000/process/file" \
 **Benefits:**
 - **5-10x faster** audio/video processing with GPU acceleration
 - **User isolation** - each user's tasks are completely isolated
-- **Automatic fallback** to local processing when remote workers unavailable
-- **Simple integration** - just add `gpu=true` parameter with API key
+- **Simple deployment** - no Redis infrastructure required
+- **Easy debugging** - direct HTTP communication
+- **Flexible scaling** - add/remove workers without configuration
 
-For detailed setup instructions, see [Remote Workers Setup Guide](docs/remote-workers-setup.md).
+For detailed setup instructions, see [HTTP Remote Workers Guide](docs/HTTP_REMOTE_WORKERS.md).
 
 ## Architecture
 
@@ -378,13 +373,14 @@ pip install -e packages/morag-core/
 pip install -e packages/morag-services/
 pip install -e packages/morag/
 
-# 2. Start infrastructure (Redis + Qdrant)
-docker run -d --name morag-redis -p 6379:6379 redis:alpine
+# 2. Start infrastructure (Qdrant for vector storage - optional)
 docker run -d --name morag-qdrant -p 6333:6333 qdrant/qdrant:latest
 
 # 3. Start services
-python scripts/start_worker.py  # Terminal 1 (REQUIRED)
-uvicorn morag.api.main:app --reload  # Terminal 2
+uvicorn morag.api.main:app --reload  # Main API server
+
+# 4. Optional: Start HTTP workers for remote processing
+python scripts/start_http_remote_worker.py --server-url http://localhost:8000 --api-key your-key
 
 # 4. Test setup
 python debug_morag.py  # Comprehensive debugging
@@ -436,50 +432,39 @@ If you encounter issues:
    python tests/cli/test-document.py sample.pdf  # Test document processing
    ```
 
-### Tasks Not Processing
+### HTTP Worker Issues
 
-If you submit tasks but they remain in "pending" status:
+If you're using HTTP remote workers:
 
-1. **Check if Celery worker is running:**
+1. **Check worker connectivity:**
    ```bash
-   # Check for running worker processes
-   ps aux | grep celery
+   # Test worker health
+   curl http://worker-host:8080/health
    ```
 
-2. **Start the Celery worker:**
+2. **Check server connectivity:**
    ```bash
-   # Using the provided script
-   python scripts/start_worker.py
-
-   # Or directly with celery command
-   celery -A src.morag.core.celery_app worker --loglevel=info --concurrency=4
+   # Test main server
+   curl http://main-server:8000/health
    ```
 
-3. **Check Redis connection:**
+3. **Verify API key:**
    ```bash
-   # Test Redis connectivity
-   redis-cli ping
-   # Should return "PONG"
+   # Test API key authentication
+   curl -H "Authorization: Bearer your-api-key" http://main-server:8000/api/v1/workers/test
    ```
 
-4. **Check Qdrant connection:**
-   ```bash
-   # Test Qdrant connectivity
-   curl http://localhost:6333/health
-   # Should return health status
-   ```
-
-5. **Monitor worker logs:**
+4. **Check worker logs:**
    ```bash
    # Run worker with debug logging
-   celery -A src.morag.core.celery_app worker --loglevel=debug
+   LOG_LEVEL=DEBUG python scripts/start_http_remote_worker.py --server-url http://localhost:8000 --api-key your-key
    ```
 
 ### Common Issues
 
-- **Windows Users**: The worker script uses "solo" pool for Windows compatibility
-- **Port Conflicts**: Ensure ports 6379 (Redis) and 6333 (Qdrant) are available
+- **Port Conflicts**: Ensure port 6333 (Qdrant) is available if using vector storage
 - **Environment Variables**: Check that `.env` file is properly configured with API keys
+- **Worker Authentication**: Ensure API keys are valid and not expired
 
 ## License
 
