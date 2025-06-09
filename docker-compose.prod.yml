@@ -57,62 +57,9 @@ services:
     networks:
       - morag-network
 
-  # Celery workers
-  morag-worker-1:
-    build:
-      context: .
-      target: production
-    container_name: morag-worker-1-prod
-    restart: unless-stopped
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_URL=http://qdrant:6333
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
-    volumes:
-      - ./uploads:/app/uploads
-      - ./data:/app/data
-      - ./temp:/app/temp
-      - ./logs:/app/logs
-    depends_on:
-      - redis
-    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
-    networks:
-      - morag-network
-
-  morag-worker-2:
-    build:
-      context: .
-      target: production
-    container_name: morag-worker-2-prod
-    restart: unless-stopped
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_URL=http://qdrant:6333
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
-    volumes:
-      - ./uploads:/app/uploads
-      - ./data:/app/data
-      - ./temp:/app/temp
-      - ./logs:/app/logs
-    depends_on:
-      - redis
-    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
-    networks:
-      - morag-network
+  # Note: Production workers have been replaced with HTTP-based remote workers
+  # Use docker-compose.workers.yml for remote worker deployment
+  # Or run: python scripts/start_http_remote_worker.py --server-url http://your-server:8000 --api-key your-key
 
 volumes:
   redis_data:

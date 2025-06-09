@@ -156,7 +156,8 @@ COPY *.txt ./
 RUN mkdir -p temp logs data /home/morag/.cache/huggingface /home/morag/.cache/whisper /home/morag/.cache/transformers && \
     chmod -R 755 /home/morag/.cache && \
     chmod +x scripts/check_cpu_compatibility.py && \
-    chmod +x scripts/start_worker_safe.sh && \
+    chmod +x scripts/start_http_remote_worker.py && \
+    chmod +x scripts/start-http-worker.sh && \
     chown -R morag:morag /app /home/morag
 
 # Switch to app user

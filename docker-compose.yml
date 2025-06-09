@@ -61,7 +61,7 @@ services:
 
 
   # Note: Workers have been replaced with HTTP-based remote workers
-  # Use docker-compose.http-worker.yml for remote worker deployment
+  # Use docker-compose.workers.yml for remote worker deployment
   # Or run: python scripts/start_http_remote_worker.py
 
 volumes:
