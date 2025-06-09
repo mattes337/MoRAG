@@ -14,7 +14,6 @@ from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import structlog
-import redis
 import os
 
 from morag.api import MoRAGAPI
@@ -261,10 +260,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     # Initialize MoRAG API lazily to avoid settings validation at import time
     morag_api = None
 
-    # Initialize authentication services
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-    redis_client = redis.from_url(redis_url)
-    api_key_service = APIKeyService(redis_client)
+    # Initialize authentication services (HTTP workers use in-memory storage)
+    api_key_service = APIKeyService()
     auth = APIKeyAuth(api_key_service)
 
     def get_morag_api() -> MoRAGAPI:
