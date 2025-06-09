@@ -1,4 +1,4 @@
-# Remote GPU Workers - Simplified Implementation
+# Remote GPU Workers
 
 ## Overview
 
@@ -13,9 +13,7 @@ The Remote GPU Workers feature enables MoRAG to route processing tasks to dedica
 - **Backward Compatibility**: Existing API calls work unchanged
 - **HTTP File Transfer**: Remote workers download files via authenticated HTTP endpoints
 
-## Implementation Status
-
-### ✅ Completed (Tasks 1-2)
+## Architecture
 
 - **API Key Service**: Redis-based authentication with secure key generation
 - **Authentication Middleware**: Optional API key validation for user identification
@@ -23,14 +21,6 @@ The Remote GPU Workers feature enables MoRAG to route processing tasks to dedica
 - **API Integration**: GPU parameter added to processing endpoints
 - **Remote Worker Tasks**: HTTP file transfer variants for remote processing
 - **Management Endpoints**: API key creation, validation, and queue information
-
-### 🔄 Remaining (Tasks 3-6)
-
-- **GPU Worker Configuration**: Standalone worker package for remote deployment
-- **HTTP File Transfer**: Complete implementation for remote file access
-- **Cookie Support**: YouTube download configuration for remote workers
-- **Documentation**: Setup guides and troubleshooting
-- **Testing**: Comprehensive test scripts and validation
 
 ## API Changes
 
@@ -161,35 +151,18 @@ python tests/demo_simple_remote_gpu_workers.py
 - **Network Issues**: Comprehensive retry mechanisms
 - **File Transfer Errors**: Detailed error logging and recovery
 
-## Next Steps
+## Production Deployment
 
-1. **Complete Task 3**: GPU worker configuration package
-2. **Complete Task 4**: HTTP file transfer implementation
-3. **Complete Task 5**: Cookie support for YouTube downloads
-4. **Complete Task 6**: Documentation and testing suite
-5. **Production Deployment**: Security hardening and monitoring
-
-## Files Modified
-
-### New Files
-- `packages/morag/src/morag/services/auth_service.py`
-- `packages/morag/src/morag/middleware/auth.py`
-- `packages/morag/src/morag/services/__init__.py`
-- `packages/morag/src/morag/middleware/__init__.py`
-
-### Modified Files
-- `packages/morag/src/morag/worker.py`
-- `packages/morag/src/morag/server.py`
-
-### Test Files
-- `tests/test_auth_service_standalone.py`
-- `tests/test_api_integration.py`
-- `tests/demo_simple_remote_gpu_workers.py`
+For production deployment considerations:
+- **Security Hardening**: Use strong API keys and secure Redis configuration
+- **Monitoring**: Monitor queue lengths and worker performance
+- **Scaling**: Add GPU workers based on demand
+- **Network Security**: Use VPN or private networks for worker communication
 
 ## Support
 
 For issues or questions about the Remote GPU Workers feature:
-1. Check the test scripts for usage examples
+1. Check the [Remote Workers Setup Guide](remote-workers-setup.md) for detailed setup instructions
 2. Review the API documentation at `/docs`
 3. Examine the queue information endpoint for debugging
 4. Check Redis for API key storage and validation

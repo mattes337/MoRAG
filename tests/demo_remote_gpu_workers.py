@@ -201,13 +201,15 @@ def main():
         
         print("\n\n🎉 Demo completed successfully!")
         print("=" * 60)
-        print("Next steps:")
-        print("1. Start the MoRAG server: python -m morag.server")
+        print("Production ready! Next steps:")
+        print("1. Start the MoRAG server: docker-compose up -d")
         print("2. Create an API key using the /api/v1/auth/create-key endpoint")
-        print("3. Start a GPU worker with your user-specific queue")
+        print("3. Configure and start a remote GPU worker:")
+        print("   ./scripts/start-remote-worker.sh configs/remote-worker.env")
         print("4. Test GPU processing with gpu=true parameter")
         print("")
-        print("For testing, run: python tests/test_api_integration.py")
+        print("For complete setup: docs/remote-workers-setup.md")
+        print("For testing: python tests/test-gpu-workers.py")
         
         return True
         

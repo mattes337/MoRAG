@@ -27,6 +27,7 @@ packages/
 - **Advanced AI Integration**: Gemini API for embeddings and summarization
 - **Vector Storage**: Qdrant integration for similarity search
 - **Background Processing**: Celery-based task queue for scalable processing
+- **Remote GPU Workers**: User-specific remote workers with API key authentication for GPU-accelerated processing
 - **Docker Support**: Complete containerization with docker-compose
 - **Multiple Interfaces**: REST API, CLI, and Python API
 - **Universal Document Conversion**: Unified framework for converting any document format to structured markdown
@@ -246,6 +247,38 @@ python tests/cli/test-web.py https://example.com --ingest --webhook-url https://
 
 For comprehensive CLI documentation, see [CLI.md](CLI.md).
 
+## Remote GPU Workers
+
+MoRAG supports user-specific remote GPU workers for accelerated processing:
+
+```bash
+# 1. Create API key for remote worker
+curl -X POST "http://localhost:8000/api/v1/auth/create-key" \
+  -F "user_id=gpu_user_01" \
+  -F "description=GPU Worker"
+
+# 2. Configure remote worker
+cp configs/gpu-worker.env.example configs/remote-worker.env
+# Edit with your API key and server details
+
+# 3. Start remote worker
+./scripts/start-remote-worker.sh configs/remote-worker.env
+
+# 4. Process with GPU acceleration
+curl -X POST "http://localhost:8000/process/file" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@audio.mp3" \
+  -F "gpu=true"
+```
+
+**Benefits:**
+- **5-10x faster** audio/video processing with GPU acceleration
+- **User isolation** - each user's tasks are completely isolated
+- **Automatic fallback** to local processing when remote workers unavailable
+- **Simple integration** - just add `gpu=true` parameter with API key
+
+For detailed setup instructions, see [Remote Workers Setup Guide](docs/remote-workers-setup.md).
+
 ## Architecture
 
 The MoRAG pipeline consists of several key components:
@@ -259,12 +292,13 @@ The MoRAG pipeline consists of several key components:
 
 ## Documentation
 
-- [CLI Documentation](CLI.md) - **NEW**: Comprehensive CLI commands for both processing and ingestion modes
+- [CLI Documentation](CLI.md) - Comprehensive CLI commands for both processing and ingestion modes
 - [Usage Guide](USAGE.md) - Comprehensive usage examples and API reference
+- [Remote Workers Setup Guide](docs/remote-workers-setup.md) - Setup user-specific GPU workers for accelerated processing
 - [API Documentation](http://localhost:8000/docs) (when running locally)
 - [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) - Complete Docker deployment instructions
 - [Universal Document Conversion](docs/UNIVERSAL_DOCUMENT_CONVERSION.md) - Complete guide to the conversion framework
-- [Batch Embedding Guide](docs/batch-embedding.md) - **NEW**: Optimized batch embedding with Gemini API for 4x performance improvement
+- [Batch Embedding Guide](docs/batch-embedding.md) - Optimized batch embedding with Gemini API for 4x performance improvement
 - [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md) - Development setup and guidelines
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
