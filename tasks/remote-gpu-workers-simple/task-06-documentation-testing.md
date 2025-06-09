@@ -1,36 +1,38 @@
 # Task 6: Documentation & Testing
 
 ## Objective
-Create comprehensive documentation and testing scripts for the simplified remote GPU workers implementation.
+Create comprehensive documentation and testing scripts for the user-specific remote worker implementation.
 
 ## Background
-Users need complete setup guides, troubleshooting documentation, and test scripts to successfully deploy and validate remote GPU workers.
+Users need complete setup guides, troubleshooting documentation, and test scripts to successfully deploy and validate user-specific remote workers with API key authentication.
 
 ## Implementation Steps
 
 ### 6.1 Complete Setup Guide
 
-**File**: `docs/remote-gpu-workers-setup.md`
+**File**: `docs/remote-workers-setup.md`
 
 ```markdown
-# Remote GPU Workers Setup Guide
+# User-Specific Remote Workers Setup Guide
 
 ## Overview
-This guide walks you through setting up remote GPU workers for MoRAG to accelerate audio, video, and image processing tasks.
+This guide walks you through setting up user-specific remote workers for MoRAG that authenticate with API keys and process only their user's tasks.
 
 ## Prerequisites
 
 ### Main Server Requirements
-- MoRAG server running with Redis and Qdrant
-- Network connectivity to GPU workers
-- Shared storage (NFS) OR HTTP file transfer capability
+- MoRAG server running with Redis (Qdrant handled by server only)
+- API key management system configured
+- Network connectivity to remote workers
+- HTTP file transfer capability
 
-### GPU Worker Requirements
-- NVIDIA GPU with CUDA support
+### Remote Worker Requirements
+- NVIDIA GPU with CUDA support (recommended)
 - CUDA drivers installed (version 12.1+)
 - Python 3.11+ with pip
-- Network access to main server (Redis, Qdrant, HTTP API)
+- Network access to main server (Redis and HTTP API only)
 - Sufficient disk space for temporary files
+- Valid API key for authentication
 
 ## Quick Start
 
