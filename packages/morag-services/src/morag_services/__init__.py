@@ -14,6 +14,7 @@ from .embedding import (
     SummaryResult,
     GeminiService
 )
+from .contextual_retrieval import ContextualRetrievalService
 
 __version__ = "0.1.0"
 
@@ -33,4 +34,5 @@ __all__ = [
     "EmbeddingResult",
     "SummaryResult",
     "GeminiService",
+    "ContextualRetrievalService",
 ]

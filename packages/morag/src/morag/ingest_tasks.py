@@ -11,6 +11,7 @@ import structlog
 from morag.worker import celery_app, get_morag_api
 from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 from morag_core.models import Document, DocumentChunk
+from morag_core.config import get_settings, validate_chunk_size
 
 logger = structlog.get_logger(__name__)
 
@@ -50,17 +51,79 @@ def send_webhook_notification(webhook_url: str, task_id: str, status: str, resul
                     error=str(e))
 
 
+def generate_document_id(source: str, content: Optional[str] = None) -> str:
+    """Generate consistent document ID from source and optionally content.
+
+    Args:
+        source: Source identifier (filename, URL, etc.)
+        content: Optional content for hash generation
+
+    Returns:
+        Generated document ID
+    """
+    import hashlib
+    import os
+    from urllib.parse import urlparse, urlunparse
+
+    # For URLs, use normalized URL as base
+    if source.startswith(('http://', 'https://')):
+        parsed = urlparse(source)
+        normalized = urlunparse((
+            parsed.scheme.lower(),
+            parsed.netloc.lower(),
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            ''  # Remove fragment
+        ))
+        return hashlib.sha256(normalized.encode()).hexdigest()[:16]
+
+    # For files, use filename and optionally content hash
+    elif ('/' in source or '\\' in source or '.' in source) and not source.startswith(('http://', 'https://')):
+        filename = os.path.basename(source)
+        # Remove extension and replace special characters
+        base_name = os.path.splitext(filename)[0].replace('.', '_').replace(' ', '_')
+        extension = os.path.splitext(filename)[1].replace('.', '').replace(' ', '_')
+
+        if content:
+            content_hash = hashlib.sha256(content.encode()).hexdigest()[:8]
+            return f"{base_name}_{extension}_{content_hash}"
+        return f"{base_name}_{extension}" if extension else base_name
+
+    # For other sources, use direct hash
+    else:
+        return hashlib.sha256(source.encode()).hexdigest()[:16]
+
 async def store_content_in_vector_db(
     content: str,
     metadata: Dict[str, Any],
-    collection_name: str = "morag_vectors"
+    collection_name: str = "morag_vectors",
+    chunk_size: Optional[int] = None,
+    chunk_overlap: Optional[int] = None,
+    document_id: Optional[str] = None,
+    replace_existing: bool = False,
+    use_content_checksum: bool = True
 ) -> List[str]:
-    """Store processed content in vector database."""
+    """Store processed content in vector database with document replacement support."""
     if not content.strip():
         logger.warning("Empty content provided for vector storage")
         return []
 
     try:
+        # Get settings for chunk configuration
+        settings = get_settings()
+
+        # Use provided chunk size or default from settings
+        chunk_size = chunk_size or settings.default_chunk_size
+        chunk_overlap = chunk_overlap or settings.default_chunk_overlap
+
+        # Validate chunk size
+        is_valid, validation_message = validate_chunk_size(chunk_size, content)
+        if not is_valid:
+            logger.warning("Chunk size validation warning",
+                         chunk_size=chunk_size,
+                         message=validation_message)
+
         # Initialize services with environment configuration
         qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
         qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
@@ -82,39 +145,55 @@ async def store_content_in_vector_db(
             raise ValueError("GEMINI_API_KEY environment variable is required")
 
         embedding_service = GeminiEmbeddingService(api_key=api_key)
-        
+
         # Connect to vector storage
         await vector_storage.connect()
-        
+
+        # Generate content checksum for duplicate detection
+        content_checksum = None
+        if use_content_checksum:
+            import hashlib
+            content_checksum = hashlib.sha256(content.encode()).hexdigest()
+
+            # Check if document with same checksum already exists
+            if not replace_existing:
+                existing_points = await vector_storage.search_by_metadata(
+                    {"content_checksum": content_checksum},
+                    limit=1
+                )
+                if existing_points:
+                    logger.info("Document with same content checksum already exists, skipping",
+                               content_checksum=content_checksum[:16],
+                               existing_point_id=existing_points[0]["id"])
+                    return [existing_points[0]["id"]]
+
         # Create document chunks for better retrieval
-        # Split content into chunks (simple implementation)
-        chunk_size = 1000  # characters
         chunks = []
-        
+
         if len(content) <= chunk_size:
             chunks = [content]
         else:
-            # Split into overlapping chunks
-            overlap = 200
-            for i in range(0, len(content), chunk_size - overlap):
+            # Split into overlapping chunks with configured sizes
+            for i in range(0, len(content), chunk_size - chunk_overlap):
                 chunk = content[i:i + chunk_size]
                 if chunk.strip():
                     chunks.append(chunk)
         
-        # Generate embeddings for each chunk
-        embeddings = []
-        chunk_metadata = []
-        
-        for i, chunk in enumerate(chunks):
-            # Generate embedding
-            embedding_result = await embedding_service.generate_embedding_with_result(
-                chunk,
-                task_type="retrieval_document"
-            )
+        # Generate embeddings for all chunks using batch processing
+        logger.info("Generating embeddings for chunks", chunk_count=len(chunks))
 
-            embeddings.append(embedding_result.embedding)
-            
-            # Prepare metadata for this chunk
+        # Use batch embedding for better performance
+        batch_result = await embedding_service.generate_embeddings_batch(
+            chunks,
+            task_type="retrieval_document"
+        )
+
+        # Extract embeddings from batch result
+        embeddings = [result.embedding for result in batch_result]
+
+        # Prepare metadata for each chunk
+        chunk_metadata = []
+        for i, chunk in enumerate(chunks):
             chunk_meta = {
                 **metadata,
                 "chunk_index": i,
@@ -122,17 +201,38 @@ async def store_content_in_vector_db(
                 "text": chunk,  # Store the actual text for retrieval
                 "text_length": len(chunk)
             }
+
+            # Add document_id if provided
+            if document_id:
+                chunk_meta["document_id"] = document_id
+
+            # Add content checksum if generated
+            if content_checksum:
+                chunk_meta["content_checksum"] = content_checksum
+
             chunk_metadata.append(chunk_meta)
-        
-        # Store vectors in Qdrant
-        point_ids = await vector_storage.store_vectors(
-            embeddings, 
-            chunk_metadata, 
-            collection_name
-        )
+
+        # Store vectors in Qdrant with replacement support
+        if document_id and replace_existing:
+            # Use document replacement
+            point_ids = await vector_storage.replace_document(
+                document_id,
+                embeddings,
+                chunk_metadata,
+                collection_name
+            )
+        else:
+            # Regular storage
+            point_ids = await vector_storage.store_vectors(
+                embeddings,
+                chunk_metadata,
+                collection_name
+            )
         
         logger.info("Content stored in vector database successfully",
                    chunk_count=len(chunks),
+                   chunk_size=chunk_size,
+                   chunk_overlap=chunk_overlap,
                    point_ids_count=len(point_ids),
                    collection=collection_name)
         
@@ -215,10 +315,20 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     **options_metadata
                 }
 
-                # Store content in vector database
+                # Generate document ID if not provided
+                document_id = options.get('document_id')
+                if not document_id:
+                    document_id = generate_document_id(file_path, result.text_content or result.content)
+
+                # Store content in vector database with chunk configuration and document replacement
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
-                    vector_metadata
+                    vector_metadata,
+                    chunk_size=options.get('chunk_size'),
+                    chunk_overlap=options.get('chunk_overlap'),
+                    document_id=document_id,
+                    replace_existing=options.get('replace_existing', False),
+                    use_content_checksum=options.get('use_content_checksum', True)
                 )
 
                 # Add vector storage info to result
@@ -346,10 +456,20 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                     **options_metadata
                 }
 
-                # Store content in vector database
+                # Generate document ID if not provided
+                document_id = options.get('document_id')
+                if not document_id:
+                    document_id = generate_document_id(url, result.text_content or result.content)
+
+                # Store content in vector database with chunk configuration and document replacement
                 point_ids = await store_content_in_vector_db(
                     result.text_content or result.content,
-                    vector_metadata
+                    vector_metadata,
+                    chunk_size=options.get('chunk_size'),
+                    chunk_overlap=options.get('chunk_overlap'),
+                    document_id=document_id,
+                    replace_existing=options.get('replace_existing', False),
+                    use_content_checksum=options.get('use_content_checksum', True)
                 )
 
                 # Add vector storage info to result
@@ -500,7 +620,9 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
 
                         point_ids = await store_content_in_vector_db(
                             result.text_content or result.content,
-                            vector_metadata
+                            vector_metadata,
+                            chunk_size=options.get('chunk_size'),
+                            chunk_overlap=options.get('chunk_overlap')
                         )
 
                         result.metadata['vector_point_ids'] = point_ids

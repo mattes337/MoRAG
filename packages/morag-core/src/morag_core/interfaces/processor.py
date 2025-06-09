@@ -32,6 +32,10 @@ class ProcessingConfig:
     store_in_vector_db: Optional[bool] = None
     generate_embeddings: Optional[bool] = None
 
+    # Document management options (handled at service level)
+    document_id: Optional[str] = None
+    replace_existing: Optional[bool] = None
+
     def __post_init__(self):
         """Post-initialization to handle any additional unknown parameters."""
         # This allows the config to accept additional parameters without failing

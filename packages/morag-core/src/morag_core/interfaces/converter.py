@@ -44,8 +44,8 @@ class ConversionOptions:
     # General options
     format_type: Optional[str] = None
     chunking_strategy: ChunkingStrategy = ChunkingStrategy.PARAGRAPH
-    chunk_size: int = 1000
-    chunk_overlap: int = 100
+    chunk_size: Optional[int] = None  # Will use settings default if None
+    chunk_overlap: Optional[int] = None  # Will use settings default if None
     extract_metadata: bool = True
     extract_images: bool = True
     extract_tables: bool = True

@@ -20,6 +20,7 @@ from morag_core.interfaces.converter import (
 from morag_core.models.document import Document, DocumentType
 from morag_core.utils.file_handling import get_file_info, detect_format
 from morag_core.exceptions import ValidationError, ProcessingError
+from morag_core.config import get_settings, validate_configuration_and_log
 
 from .converters.base import DocumentConverter
 from .converters.pdf import PDFConverter
@@ -103,14 +104,24 @@ class DocumentProcessor(BaseProcessor):
             if not converter:
                 raise UnsupportedFormatError(f"No converter found for format '{format_type}'")
 
+            # Get settings and log configuration for debugging
+            settings = validate_configuration_and_log()
+
             # Create conversion options
             options = ConversionOptions(
                 format_type=format_type,
                 chunking_strategy=config.chunking_strategy or ChunkingStrategy.PARAGRAPH,
-                chunk_size=config.chunk_size or 1000,
-                chunk_overlap=config.chunk_overlap or 100,
+                chunk_size=config.chunk_size or settings.default_chunk_size,
+                chunk_overlap=config.chunk_overlap or settings.default_chunk_overlap,
                 extract_metadata=config.extract_metadata or True,
             )
+
+            # Log the actual options being used
+            logger.info("Document processing options:",
+                       chunking_strategy=options.chunking_strategy,
+                       chunk_size=options.chunk_size,
+                       chunk_overlap=options.chunk_overlap,
+                       format_type=options.format_type)
 
             # Convert document
             conversion_result = await converter.convert(file_path, options)

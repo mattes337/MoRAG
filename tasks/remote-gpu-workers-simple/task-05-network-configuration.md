@@ -1,70 +1,151 @@
-# Task 5: Network Configuration
+# Task 5: URL Processing Configuration
 
 ## Objective
-Configure network access, file sharing, and connectivity between the main server and remote GPU workers.
+Configure remote workers to process URLs directly (web pages, YouTube videos) with proper cookie support and authentication.
 
 ## Background
-Remote GPU workers need to:
-1. Access the same Redis instance for task queues
-2. Access the same Qdrant instance for vector storage
-3. Share files with the main server (uploads, temp files, results)
-4. Handle network security and firewall configurations
+Remote workers need to handle URL processing independently:
+1. Direct web page crawling and content extraction
+2. YouTube video downloading with cookie authentication
+3. Proper user-agent and header configuration
+4. Cookie file management for authenticated content
+5. No external service dependencies (Qdrant, Gemini handled by server)
 
 ## Implementation Steps
 
-### 5.1 Network Requirements Documentation
+### 5.1 YouTube Cookie Configuration
 
-**File**: `docs/network-requirements.md`
+**File**: `packages/morag/src/morag/services/youtube_config.py`
 
-```markdown
-# Network Requirements for Remote GPU Workers
+```python
+"""YouTube configuration service for remote workers."""
 
-## Required Network Access
+import os
+import json
+from pathlib import Path
+from typing import Optional, Dict, Any
+import structlog
 
-### From GPU Worker to Main Server
-- **Redis**: Port 6379 (TCP) - Task queue communication
-- **Qdrant**: Port 6333 (TCP) - Vector database access
-- **HTTP API**: Port 8000 (TCP) - File transfer (if using HTTP mode)
+logger = structlog.get_logger(__name__)
 
-### From Main Server to GPU Worker
-- **Health Check**: Port 8001 (TCP) - Optional worker health monitoring
+class YouTubeCookieManager:
+    """Manage YouTube cookies for authenticated downloads."""
 
-## Firewall Configuration
+    def __init__(self, cookie_file_path: Optional[str] = None):
+        self.cookie_file_path = cookie_file_path or os.getenv('YOUTUBE_COOKIES_FILE')
 
-### Main Server Firewall Rules
-```bash
-# Allow Redis access from GPU workers
-sudo ufw allow from GPU_WORKER_IP to any port 6379
+    def get_yt_dlp_options(self) -> Dict[str, Any]:
+        """Get yt-dlp options with cookie configuration."""
+        options = {
+            # Basic options
+            'format': 'best[height<=720]/best',
+            'writesubtitles': True,
+            'writeautomaticsub': True,
+            'subtitleslangs': ['en', 'en-US'],
 
-# Allow Qdrant access from GPU workers  
-sudo ufw allow from GPU_WORKER_IP to any port 6333
+            # Bot detection avoidance
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'referer': 'https://www.youtube.com/',
+            'headers': {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-us,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            },
 
-# Allow HTTP API access from GPU workers (if using HTTP file transfer)
-sudo ufw allow from GPU_WORKER_IP to any port 8000
+            # Retry configuration
+            'retries': 3,
+            'fragment_retries': 3,
+            'force_ipv4': True,
+        }
+
+        # Add cookies if available
+        if self.cookie_file_path and Path(self.cookie_file_path).exists():
+            options['cookiefile'] = self.cookie_file_path
+            logger.info("Using YouTube cookies", cookie_file=self.cookie_file_path)
+        else:
+            logger.warning("No YouTube cookies configured - some videos may be inaccessible")
+
+        return options
+
+    def validate_cookie_file(self) -> bool:
+        """Validate that cookie file exists and is readable."""
+        if not self.cookie_file_path:
+            return False
+
+        cookie_path = Path(self.cookie_file_path)
+        if not cookie_path.exists():
+            logger.error("Cookie file not found", path=self.cookie_file_path)
+            return False
+
+        try:
+            # Try to read the file
+            with open(cookie_path, 'r') as f:
+                content = f.read(100)  # Read first 100 chars
+                if not content.strip():
+                    logger.error("Cookie file is empty", path=self.cookie_file_path)
+                    return False
+
+            logger.info("Cookie file validated", path=self.cookie_file_path)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to read cookie file", path=self.cookie_file_path, error=str(e))
+            return False
 ```
 
-### GPU Worker Firewall Rules
-```bash
-# Allow health check from main server (optional)
-sudo ufw allow from MAIN_SERVER_IP to any port 8001
+### 5.2 Web Processing Configuration
 
-# Allow outbound connections to main server
-sudo ufw allow out to MAIN_SERVER_IP port 6379
-sudo ufw allow out to MAIN_SERVER_IP port 6333
-sudo ufw allow out to MAIN_SERVER_IP port 8000
-```
+**File**: `packages/morag/src/morag/services/web_config.py`
 
-## File Sharing Options
+```python
+"""Web processing configuration for remote workers."""
 
-### Option A: Network File System (Recommended)
-- **NFS**: Linux-to-Linux file sharing
-- **SMB/CIFS**: Cross-platform file sharing
-- **Cloud Storage**: S3, Azure Blob, Google Cloud Storage
+import os
+from typing import Dict, Any, Optional
+import structlog
 
-### Option B: HTTP File Transfer
-- Files transferred via HTTP API endpoints
-- Automatic cleanup after processing
-- Higher network overhead but simpler setup
+logger = structlog.get_logger(__name__)
+
+class WebProcessingConfig:
+    """Configuration for web content processing on remote workers."""
+
+    def __init__(self):
+        self.user_agent = os.getenv(
+            'WEB_USER_AGENT',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        )
+        self.timeout = int(os.getenv('WEB_TIMEOUT', '30'))
+        self.max_retries = int(os.getenv('WEB_MAX_RETRIES', '3'))
+
+    def get_requests_config(self) -> Dict[str, Any]:
+        """Get requests configuration for web scraping."""
+        return {
+            'headers': {
+                'User-Agent': self.user_agent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            },
+            'timeout': self.timeout,
+            'allow_redirects': True,
+            'verify': True,
+        }
+
+    def get_selenium_config(self) -> Dict[str, Any]:
+        """Get Selenium configuration for dynamic content."""
+        return {
+            'user_agent': self.user_agent,
+            'timeout': self.timeout,
+            'headless': True,
+            'disable_images': True,
+            'disable_javascript': False,  # Some sites need JS
+        }
 ```
 
 ### 5.2 Shared Storage Configuration

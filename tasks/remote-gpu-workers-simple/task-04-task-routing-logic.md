@@ -1,23 +1,24 @@
-# Task 4: Task Routing Logic
+# Task 4: User-Specific Task Routing Logic
 
 ## Objective
-Implement intelligent task routing logic that handles GPU worker availability, fallback mechanisms, and task distribution.
+Implement user-specific task routing logic that directs tasks to the correct user's remote workers based on API key authentication.
 
 ## Background
 The system needs to gracefully handle scenarios where:
-1. GPU workers are unavailable (fallback to CPU)
-2. GPU workers are overloaded (queue management)
-3. Tasks fail on GPU workers (retry on CPU)
-4. Mixed worker environments (some GPU, some CPU)
+1. User-specific remote workers are unavailable (fallback to default queue)
+2. User workers are overloaded (queue management)
+3. Tasks fail on remote workers (retry locally)
+4. Mixed environments (some users have remote workers, others don't)
+5. Complete user isolation in task processing
 
 ## Implementation Steps
 
-### 4.1 Create Task Router Service
+### 4.1 Create User-Specific Task Router Service
 
-**File**: `packages/morag/src/morag/services/task_router.py`
+**File**: `packages/morag/src/morag/services/user_task_router.py`
 
 ```python
-"""Task routing service for GPU/CPU worker management."""
+"""User-specific task routing service for remote worker management."""
 
 import time
 import logging
@@ -29,18 +30,22 @@ import redis
 from celery import Celery
 from celery.exceptions import WorkerLostError, Retry
 
+from morag.services.auth_service import APIKeyService
+
 logger = logging.getLogger(__name__)
 
 
 class WorkerType(Enum):
-    CPU = "cpu"
-    GPU = "gpu"
+    LOCAL = "local"
+    REMOTE_GPU = "remote_gpu"
+    REMOTE_CPU = "remote_cpu"
 
 
 @dataclass
-class WorkerStatus:
-    """Worker status information."""
+class UserWorkerStatus:
+    """User worker status information."""
     worker_id: str
+    user_id: str
     worker_type: WorkerType
     active_tasks: int
     max_tasks: int
@@ -48,59 +53,71 @@ class WorkerStatus:
     queues: List[str]
 
 
-class TaskRouter:
-    """Intelligent task routing for GPU/CPU workers."""
-    
-    def __init__(self, celery_app: Celery, redis_client: redis.Redis):
+class UserTaskRouter:
+    """User-specific task routing for remote workers."""
+
+    def __init__(self, celery_app: Celery, redis_client: redis.Redis, api_key_service: APIKeyService):
         self.celery_app = celery_app
         self.redis = redis_client
+        self.api_key_service = api_key_service
         self.worker_timeout = 60  # seconds
-        
-    def get_available_workers(self, worker_type: Optional[WorkerType] = None) -> Dict[str, WorkerStatus]:
-        """Get currently available workers."""
+
+    def get_user_workers(self, user_id: str) -> Dict[str, UserWorkerStatus]:
+        """Get currently available workers for a specific user."""
         try:
             inspect = self.celery_app.control.inspect()
-            
+
             # Get active workers
             active_workers = inspect.active()
             if not active_workers:
                 return {}
-            
+
             # Get worker stats
             stats = inspect.stats() or {}
-            
-            workers = {}
+
+            user_workers = {}
             current_time = time.time()
-            
+            user_queue_prefix = f"gpu-tasks-{user_id}"
+
             for worker_name in active_workers.keys():
-                # Determine worker type from queues
+                # Get worker queues
                 worker_queues = self._get_worker_queues(worker_name)
-                if 'gpu-tasks' in worker_queues:
-                    wtype = WorkerType.GPU
-                else:
-                    wtype = WorkerType.CPU
-                
-                # Filter by requested worker type
-                if worker_type and wtype != worker_type:
-                    continue
-                
+
+                # Check if this worker serves the user's queue
+                user_queue_found = False
+                worker_type = WorkerType.LOCAL
+
+                for queue in worker_queues:
+                    if queue == user_queue_prefix:
+                        worker_type = WorkerType.REMOTE_GPU
+                        user_queue_found = True
+                        break
+                    elif queue == f"cpu-tasks-{user_id}":
+                        worker_type = WorkerType.REMOTE_CPU
+                        user_queue_found = True
+                        break
+
+                if not user_queue_found:
+                    continue  # This worker doesn't serve this user
+
                 # Get worker stats
                 worker_stats = stats.get(worker_name, {})
                 active_tasks = len(active_workers.get(worker_name, []))
-                
-                workers[worker_name] = WorkerStatus(
+
+                user_workers[worker_name] = UserWorkerStatus(
                     worker_id=worker_name,
-                    worker_type=wtype,
+                    user_id=user_id,
+                    worker_type=worker_type,
                     active_tasks=active_tasks,
                     max_tasks=worker_stats.get('pool', {}).get('max-concurrency', 1),
                     last_seen=current_time,
                     queues=worker_queues
                 )
-            
-            return workers
-            
+
+            return user_workers
+
         except Exception as e:
-            logger.error(f"Failed to get worker status: {e}")
+            logger.error(f"Failed to get user worker status for {user_id}: {e}")
             return {}
     
     def _get_worker_queues(self, worker_name: str) -> List[str]:
@@ -113,17 +130,17 @@ class TaskRouter:
             return []
         except Exception:
             return []
-    
-    def has_gpu_workers_available(self) -> bool:
-        """Check if GPU workers are available and not overloaded."""
-        gpu_workers = self.get_available_workers(WorkerType.GPU)
-        
-        for worker in gpu_workers.values():
+
+    def has_user_workers_available(self, user_id: str) -> bool:
+        """Check if user has remote workers available and not overloaded."""
+        user_workers = self.get_user_workers(user_id)
+
+        for worker in user_workers.values():
             if worker.active_tasks < worker.max_tasks:
                 return True
-        
+
         return False
-    
+
     def get_queue_length(self, queue_name: str) -> int:
         """Get current queue length."""
         try:
@@ -131,33 +148,32 @@ class TaskRouter:
         except Exception as e:
             logger.error(f"Failed to get queue length for {queue_name}: {e}")
             return 0
-    
-    def should_use_gpu_worker(self, requested_gpu: bool, content_type: str) -> bool:
-        """Determine if GPU worker should be used based on availability and content type."""
-        if not requested_gpu:
+
+    def should_use_remote_worker(self, user_id: Optional[str], use_remote: bool, content_type: str) -> bool:
+        """Determine if remote worker should be used based on user and availability."""
+        if not use_remote or not user_id:
             return False
-        
-        # Check if content type benefits from GPU
-        gpu_beneficial_types = ['audio', 'video', 'image']
-        if content_type not in gpu_beneficial_types:
-            logger.info(f"Content type '{content_type}' doesn't benefit from GPU, using CPU")
+
+        # Check if user has remote workers available
+        if not self.has_user_workers_available(user_id):
+            logger.warning(f"Remote processing requested for user {user_id} but no workers available, using local")
             return False
-        
-        # Check GPU worker availability
-        if not self.has_gpu_workers_available():
-            logger.warning("GPU requested but no GPU workers available, falling back to CPU")
+
+        # Check user queue length vs default queue
+        user_queue = self.api_key_service.get_user_queue_name(user_id, "gpu")
+        user_queue_length = self.get_queue_length(user_queue)
+        default_queue_length = self.get_queue_length('celery')
+
+        # If user queue is significantly longer, consider local fallback
+        if user_queue_length > default_queue_length + 10:
+            logger.info(f"User {user_id} queue overloaded ({user_queue_length} vs {default_queue_length}), using local")
             return False
-        
-        # Check GPU queue length
-        gpu_queue_length = self.get_queue_length('gpu-tasks')
-        cpu_queue_length = self.get_queue_length('celery')
-        
-        # If GPU queue is significantly longer, consider CPU fallback
-        if gpu_queue_length > cpu_queue_length + 5:
-            logger.info(f"GPU queue overloaded ({gpu_queue_length} vs {cpu_queue_length}), using CPU")
-            return False
-        
+
         return True
+
+    def get_user_queue_name(self, user_id: str, worker_type: str = "gpu") -> str:
+        """Get queue name for user and worker type."""
+        return self.api_key_service.get_user_queue_name(user_id, worker_type)
     
     def log_task_routing(self, task_name: str, use_gpu: bool, content_type: str, task_id: str):
         """Log task routing decision."""

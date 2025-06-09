@@ -1,0 +1,812 @@
+{
+  "summary": {
+    "total_dependencies": 70,
+    "core_dependencies": 42,
+    "optional_dependencies": 28,
+    "categories": [
+      "optional-dependencies",
+      "image processing (basic)",
+      "nlp (basic)",
+      "morag-video",
+      "morag",
+      "web scraping (basic)",
+      "morag-image",
+      "audio processing (basic)",
+      "morag-web",
+      "core",
+      "morag-youtube",
+      "morag-services",
+      "office documents (basic)",
+      "morag-document",
+      "morag-embedding",
+      "pdf processing (enhanced)"
+    ]
+  },
+  "dependencies": {
+    "Development Status :: 3 - Alpha": {
+      "version": "",
+      "source": "pyproject.toml (main)",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "Development Status :: 3 - Alpha"
+    },
+    "Intended Audience :: Developers": {
+      "version": "",
+      "source": "pyproject.toml (main)",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "Intended Audience :: Developers"
+    },
+    "License :: OSI Approved :: MIT License": {
+      "version": "",
+      "source": "pyproject.toml (main)",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "License :: OSI Approved :: MIT License"
+    },
+    "Pillow": {
+      "version": ">=10.0.0,<11.0.0",
+      "source": "requirements.txt, morag-video/pyproject.toml, morag-image/pyproject.toml",
+      "category": "image processing (basic)",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "Pillow"
+    },
+    "Programming Language :: Python :: 3": {
+      "version": "",
+      "source": "pyproject.toml (main)",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "Programming Language :: Python :: 3"
+    },
+    "Programming Language :: Python :: 3.10": {
+      "version": "",
+      "source": "pyproject.toml (main)",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "Programming Language :: Python :: 3.10"
+    },
+    "Programming Language :: Python :: 3.11": {
+      "version": "",
+      "source": "pyproject.toml (main)",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "Programming Language :: Python :: 3.11"
+    },
+    "Programming Language :: Python :: 3.9": {
+      "version": "",
+      "source": "pyproject.toml (main)",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "Programming Language :: Python :: 3.9"
+    },
+    "aiofiles": {
+      "version": "==24.1.0",
+      "source": "requirements.txt, morag-youtube/pyproject.toml, morag-services/pyproject.toml, morag-image/pyproject.toml, morag-web/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag/src/morag/utils/file_upload.py"
+      ],
+      "import_name": "aiofiles"
+    },
+    "beautifulsoup4": {
+      "version": "==4.12.3",
+      "source": "requirements.txt, morag-document/pyproject.toml, morag-web/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 4,
+      "usage_locations": [
+        "./tests/unit/test_content_converter.py",
+        "./tests/test_web_processor.py",
+        "./packages/morag-web/src/morag_web/processor.py",
+        "./packages/morag-document/src/morag_document/converters/text.py"
+      ],
+      "import_name": "bs4"
+    },
+    "black": {
+      "version": ">=23.0.0,<24.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "black"
+    },
+    "celery": {
+      "version": "==5.3.6",
+      "source": "requirements.txt, morag/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 4,
+      "usage_locations": [
+        "./scripts/test-docker-build.py",
+        "./packages/morag/src/morag/ingest_tasks.py",
+        "./scripts/start_worker.py",
+        "./packages/morag/src/morag/worker.py"
+      ],
+      "import_name": "celery"
+    },
+    "click": {
+      "version": ">=8.1.0",
+      "source": "morag/pyproject.toml",
+      "category": "morag",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag/src/morag/cli.py"
+      ],
+      "import_name": "click"
+    },
+    "cloudpathlib": {
+      "version": ">=0.20.0,<1.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "cloudpathlib"
+    },
+    "docling": {
+      "version": ">=2.7.0,<3.0.0",
+      "source": "requirements.txt, morag-document/pyproject.toml",
+      "category": "pdf processing (enhanced)",
+      "required": false,
+      "usage_count": 3,
+      "usage_locations": [
+        "./tests/manual/test_pdf_parsing.py",
+        "./scripts/test_docling_docker.py",
+        "./packages/morag-document/src/morag_document/converters/pdf.py"
+      ],
+      "import_name": "docling"
+    },
+    "easyocr": {
+      "version": ">=1.7.0,<2.0.0",
+      "source": "pyproject.toml (optional-dependencies), morag-image/pyproject.toml",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 3,
+      "usage_locations": [
+        "./packages/morag-video/src/morag_video/processor.py",
+        "./packages/morag-image/tests/conftest.py",
+        "./packages/morag-image/src/morag_image/processor.py"
+      ],
+      "import_name": "easyocr"
+    },
+    "fastapi": {
+      "version": "==0.115.4",
+      "source": "requirements.txt, morag/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 13,
+      "usage_locations": [
+        "./tests/test_api_chunk_size.py",
+        "./packages/morag/src/morag/server.py",
+        "./tests/test_processing_result_fixes.py",
+        "./tests/test_02_api_framework.py",
+        "./tests/conftest.py",
+        "./tests/test_monitoring.py",
+        "./tests/test_file_upload_race_condition_fix.py",
+        "./tests/test_03_integration.py",
+        "./tests/test_02_health_checks.py",
+        "./tests/test_17_ingestion_api.py"
+      ],
+      "import_name": "fastapi"
+    },
+    "faster-whisper": {
+      "version": ">=1.0.0",
+      "source": "pyproject.toml (optional-dependencies), morag-audio/pyproject.toml",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-audio/src/morag_audio/processor.py"
+      ],
+      "import_name": "faster_whisper"
+    },
+    "ffmpeg-python": {
+      "version": ">=0.2.0",
+      "source": "requirements.txt, morag-video/pyproject.toml, morag-audio/pyproject.toml",
+      "category": "audio processing (basic)",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "ffmpeg-python"
+    },
+    "flake8": {
+      "version": ">=6.0.0,<7.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "flake8"
+    },
+    "google-genai": {
+      "version": "==1.18.0",
+      "source": "requirements.txt",
+      "category": "core",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-services/src/morag_services/embedding.py"
+      ],
+      "import_name": "google.genai"
+    },
+    "google-generativeai": {
+      "version": ">=0.3.0,<0.4.0",
+      "source": "morag-image/pyproject.toml, morag-embedding/pyproject.toml",
+      "category": "morag-image",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "google-generativeai"
+    },
+    "httpx": {
+      "version": "==0.28.1",
+      "source": "requirements.txt, morag-web/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 7,
+      "usage_locations": [
+        "./tests/integration/test_webhooks.py",
+        "./tests/manual/test_webhook_demo.py",
+        "./tests/test_web_processor.py",
+        "./tests/test_web_integration.py",
+        "./packages/morag-web/src/morag_web/processor.py",
+        "./tests/manual/test_qdrant_auth.py",
+        "./tests/manual/test_qdrant_network.py"
+      ],
+      "import_name": "httpx"
+    },
+    "isort": {
+      "version": ">=5.12.0,<6.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "isort"
+    },
+    "jinja2": {
+      "version": ">=3.1.0",
+      "source": "morag/pyproject.toml",
+      "category": "morag",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "jinja2"
+    },
+    "langdetect": {
+      "version": ">=1.0.9",
+      "source": "morag-document/pyproject.toml",
+      "category": "morag-document",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-document/src/morag_document/converters/base.py"
+      ],
+      "import_name": "langdetect"
+    },
+    "lxml": {
+      "version": ">=4.9.0",
+      "source": "morag-web/pyproject.toml",
+      "category": "morag-web",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "lxml"
+    },
+    "markdown": {
+      "version": "==3.7",
+      "source": "requirements.txt, morag-document/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 3,
+      "usage_locations": [
+        "./packages/morag-document/src/morag_document/converters/pdf.py",
+        "./packages/morag-web/src/morag_web/processor.py",
+        "./packages/morag-document/src/morag_document/converters/text.py"
+      ],
+      "import_name": "markdown"
+    },
+    "markdownify": {
+      "version": "==0.14.1",
+      "source": "requirements.txt, morag-web/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-web/src/morag_web/processor.py"
+      ],
+      "import_name": "markdownify"
+    },
+    "morag-audio": {
+      "version": ">=0.1.0,<0.2.0",
+      "source": "morag-youtube/pyproject.toml, morag-video/pyproject.toml, morag-services/pyproject.toml",
+      "category": "morag-youtube",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-audio"
+    },
+    "morag-core": {
+      "version": ">=0.1.0,<0.2.0",
+      "source": "morag-youtube/pyproject.toml, morag-document/pyproject.toml, morag-video/pyproject.toml, morag-audio/pyproject.toml, morag-services/pyproject.toml, morag/pyproject.toml, morag-image/pyproject.toml, morag-web/pyproject.toml, morag-embedding/pyproject.toml",
+      "category": "morag-youtube",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-core"
+    },
+    "morag-document": {
+      "version": ">=0.1.0",
+      "source": "morag-services/pyproject.toml",
+      "category": "morag-services",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-document"
+    },
+    "morag-embedding": {
+      "version": ">=0.1.0",
+      "source": "morag-document/pyproject.toml, morag-video/pyproject.toml, morag-audio/pyproject.toml, morag-services/pyproject.toml",
+      "category": "morag-document",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-embedding"
+    },
+    "morag-image": {
+      "version": ">=0.1.0",
+      "source": "morag-services/pyproject.toml",
+      "category": "morag-services",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-image"
+    },
+    "morag-services": {
+      "version": ">=0.1.0",
+      "source": "morag/pyproject.toml",
+      "category": "morag",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-services"
+    },
+    "morag-video": {
+      "version": ">=0.1.0,<0.2.0",
+      "source": "morag-youtube/pyproject.toml, morag-services/pyproject.toml",
+      "category": "morag-youtube",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-video"
+    },
+    "morag-web": {
+      "version": ">=0.1.0",
+      "source": "morag-services/pyproject.toml, morag/pyproject.toml",
+      "category": "morag-services",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-web"
+    },
+    "morag-youtube": {
+      "version": ">=0.1.0",
+      "source": "morag-services/pyproject.toml, morag/pyproject.toml",
+      "category": "morag-services",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "morag-youtube"
+    },
+    "mutagen": {
+      "version": ">=1.47.0",
+      "source": "pyproject.toml (optional-dependencies), morag-audio/pyproject.toml",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-audio/src/morag_audio/processor.py"
+      ],
+      "import_name": "mutagen"
+    },
+    "mypy": {
+      "version": ">=1.7.0,<2.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "mypy"
+    },
+    "nltk": {
+      "version": ">=3.7",
+      "source": "morag-document/pyproject.toml",
+      "category": "morag-document",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-audio/src/morag_audio/services/topic_segmentation.py"
+      ],
+      "import_name": "nltk"
+    },
+    "numpy": {
+      "version": ">=1.20.0",
+      "source": "morag-video/pyproject.toml, morag-audio/pyproject.toml, morag-embedding/pyproject.toml",
+      "category": "morag-video",
+      "required": true,
+      "usage_count": 9,
+      "usage_locations": [
+        "./packages/morag-image/src/morag_image/processor.py",
+        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
+        "./packages/morag-audio/src/morag_audio/services/topic_segmentation.py",
+        "./tests/integration/test_audio_pipeline.py",
+        "./scripts/generate_test_audio.py",
+        "./tests/unit/test_audio_processor.py",
+        "./packages/morag-embedding/src/morag_embedding/service.py",
+        "./packages/morag-video/src/morag_video/processor.py",
+        "./tests/integration/test_enhanced_audio_pipeline.py"
+      ],
+      "import_name": "numpy"
+    },
+    "opencv-python": {
+      "version": ">=4.8.0",
+      "source": "pyproject.toml (optional-dependencies), morag-video/pyproject.toml, morag-image/pyproject.toml",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 2,
+      "usage_locations": [
+        "./packages/morag-video/src/morag_video/processor.py",
+        "./packages/morag-image/src/morag_image/processor.py"
+      ],
+      "import_name": "cv2"
+    },
+    "openpyxl": {
+      "version": ">=3.1.5,<4.0.0",
+      "source": "requirements.txt, morag-document/pyproject.toml",
+      "category": "office documents (basic)",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-document/src/morag_document/converters/excel.py"
+      ],
+      "import_name": "openpyxl"
+    },
+    "playwright": {
+      "version": ">=1.40.0,<2.0.0",
+      "source": "requirements.txt",
+      "category": "web scraping (basic)",
+      "required": false,
+      "usage_count": 2,
+      "usage_locations": [
+        "./packages/morag-web/src/morag_web/converter.py",
+        "./scripts/check_dependencies.py"
+      ],
+      "import_name": "playwright"
+    },
+    "pre-commit": {
+      "version": ">=3.5.0,<4.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "pre-commit"
+    },
+    "psutil": {
+      "version": "==6.1.0",
+      "source": "requirements.txt",
+      "category": "core",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./tests/integration/test_package_independence.py"
+      ],
+      "import_name": "psutil"
+    },
+    "pyannote.audio": {
+      "version": ">=3.1.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 4,
+      "usage_locations": [
+        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
+        "./scripts/check_dependencies.py",
+        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
+        "./scripts/check_dependencies.py"
+      ],
+      "import_name": "pyannote"
+    },
+    "pydantic": {
+      "version": "==2.10.3",
+      "source": "requirements.txt, morag-core/pyproject.toml, morag-services/pyproject.toml, morag/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 3,
+      "usage_locations": [
+        "./packages/morag-core/src/morag_core/config.py",
+        "./packages/morag-services/src/morag_services/services.py",
+        "./packages/morag/src/morag/server.py"
+      ],
+      "import_name": "pydantic"
+    },
+    "pydantic-settings": {
+      "version": "==2.7.0",
+      "source": "requirements.txt, morag-core/pyproject.toml, morag/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "pydantic-settings"
+    },
+    "pydub": {
+      "version": ">=0.25.1",
+      "source": "requirements.txt, morag-audio/pyproject.toml",
+      "category": "audio processing (basic)",
+      "required": false,
+      "usage_count": 2,
+      "usage_locations": [
+        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
+        "./packages/morag-audio/src/morag_audio/processor.py"
+      ],
+      "import_name": "pydub"
+    },
+    "pypdf": {
+      "version": ">=3.0.0",
+      "source": "morag-document/pyproject.toml",
+      "category": "morag-document",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-document/src/morag_document/converters/pdf.py"
+      ],
+      "import_name": "pypdf"
+    },
+    "pytesseract": {
+      "version": ">=0.3.10,<1.0.0",
+      "source": "requirements.txt, morag-image/pyproject.toml",
+      "category": "image processing (basic)",
+      "required": false,
+      "usage_count": 3,
+      "usage_locations": [
+        "./packages/morag-video/src/morag_video/processor.py",
+        "./packages/morag-image/tests/conftest.py",
+        "./packages/morag-image/src/morag_image/processor.py"
+      ],
+      "import_name": "pytesseract"
+    },
+    "pytest": {
+      "version": ">=7.4.0,<8.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 90,
+      "usage_locations": [
+        "./tests/test_15_vector_storage.py",
+        "./tests/unit/test_ai_error_handling.py",
+        "./tests/test_race_condition_integration.py",
+        "./tests/unit/test_document_processor.py",
+        "./tests/unit/test_youtube_tasks.py",
+        "./tests/test_file_upload_race_condition_fix_v2.py",
+        "./tests/conftest.py",
+        "./tests/test_basic_enhanced_converters.py",
+        "./tests/test_enhanced_race_condition_fix.py",
+        "./packages/morag-document/tests/test_service.py"
+      ],
+      "import_name": "pytest"
+    },
+    "pytest-asyncio": {
+      "version": ">=0.21.0,<1.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "pytest-asyncio"
+    },
+    "pytest-cov": {
+      "version": ">=4.1.0,<5.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 0,
+      "usage_locations": [],
+      "import_name": "pytest-cov"
+    },
+    "python-docx": {
+      "version": ">=1.1.2,<2.0.0",
+      "source": "requirements.txt, morag-document/pyproject.toml",
+      "category": "office documents (basic)",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-document/src/morag_document/converters/word.py"
+      ],
+      "import_name": "docx"
+    },
+    "python-dotenv": {
+      "version": "==1.0.1",
+      "source": "requirements.txt, morag-core/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 4,
+      "usage_locations": [
+        "./tests/cli/validate-standalone-cli.py",
+        "./tests/cli/test-document.py",
+        "./tests/cli/test-audio.py",
+        "./tests/cli/test-simple.py"
+      ],
+      "import_name": "dotenv"
+    },
+    "python-pptx": {
+      "version": ">=0.6.21,<1.0.0",
+      "source": "pyproject.toml (optional-dependencies), morag-document/pyproject.toml",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-document/src/morag_document/converters/presentation.py"
+      ],
+      "import_name": "pptx"
+    },
+    "qdrant-client": {
+      "version": "==1.12.1",
+      "source": "requirements.txt",
+      "category": "core",
+      "required": true,
+      "usage_count": 3,
+      "usage_locations": [
+        "./packages/morag-services/src/morag_services/storage.py",
+        "./tests/manual/test_qdrant_auth.py",
+        "./scripts/test-docker.py"
+      ],
+      "import_name": "qdrant_client"
+    },
+    "redis": {
+      "version": "==5.2.1",
+      "source": "requirements.txt, morag/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 3,
+      "usage_locations": [
+        "./tests/cli/test-ingest-workflow.py",
+        "./scripts/test-docker.py",
+        "./tests/conftest.py"
+      ],
+      "import_name": "redis"
+    },
+    "sentence-transformers": {
+      "version": ">=2.2.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-audio/src/morag_audio/services/topic_segmentation.py"
+      ],
+      "import_name": "sentence_transformers"
+    },
+    "spacy": {
+      "version": ">=3.7.0,<4.0.0",
+      "source": "requirements.txt, morag-document/pyproject.toml",
+      "category": "nlp (basic)",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-audio/src/morag_audio/services/topic_segmentation.py"
+      ],
+      "import_name": "spacy"
+    },
+    "structlog": {
+      "version": "==24.4.0",
+      "source": "requirements.txt, morag-youtube/pyproject.toml, morag-document/pyproject.toml, morag-video/pyproject.toml, morag-audio/pyproject.toml, morag-core/pyproject.toml, morag-services/pyproject.toml, morag/pyproject.toml, morag-image/pyproject.toml, morag-web/pyproject.toml, morag-embedding/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 60,
+      "usage_locations": [
+        "./packages/morag-web/src/morag_web/converter.py",
+        "./tests/test_speaker_diarization_and_rate_limiting_fixes.py",
+        "./packages/morag/src/morag/api.py",
+        "./packages/morag/src/morag/server.py",
+        "./packages/morag-audio/src/morag_audio/cli.py",
+        "./packages/morag-core/src/morag_core/utils/logging.py",
+        "./packages/morag/src/morag/ingest_tasks.py",
+        "./tests/test_03_database_init.py",
+        "./packages/morag-document/src/morag_document/converters/pdf.py",
+        "./packages/morag-services/src/morag_services/contextual_retrieval.py"
+      ],
+      "import_name": "structlog"
+    },
+    "tenacity": {
+      "version": ">=8.0.0",
+      "source": "morag-embedding/pyproject.toml",
+      "category": "morag-embedding",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-embedding/src/morag_embedding/service.py"
+      ],
+      "import_name": "tenacity"
+    },
+    "torch": {
+      "version": ">=2.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 5,
+      "usage_locations": [
+        "./packages/morag-core/src/morag_core/config.py",
+        "./scripts/test_docling_docker.py",
+        "./packages/morag-audio/src/morag_audio/services/speaker_diarization.py",
+        "./scripts/check_cpu_compatibility.py",
+        "./packages/morag-core/src/morag_core/utils/device.py"
+      ],
+      "import_name": "torch"
+    },
+    "trafilatura": {
+      "version": ">=1.6.0,<2.0.0",
+      "source": "requirements.txt",
+      "category": "web scraping (basic)",
+      "required": false,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-web/src/morag_web/converter.py"
+      ],
+      "import_name": "trafilatura"
+    },
+    "unstructured": {
+      "version": ">=0.11.0,<1.0.0",
+      "source": "pyproject.toml (optional-dependencies)",
+      "category": "optional-dependencies",
+      "required": false,
+      "usage_count": 2,
+      "usage_locations": [
+        "./tests/unit/test_document_processor.py",
+        "./tests/manual/test_pdf_parsing.py"
+      ],
+      "import_name": "unstructured"
+    },
+    "uvicorn": {
+      "version": "==0.32.1",
+      "source": "requirements.txt, morag/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag/src/morag/server.py"
+      ],
+      "import_name": "uvicorn"
+    },
+    "yt-dlp": {
+      "version": "==2024.12.13",
+      "source": "requirements.txt, morag-youtube/pyproject.toml",
+      "category": "core",
+      "required": true,
+      "usage_count": 1,
+      "usage_locations": [
+        "./packages/morag-youtube/src/morag_youtube/processor.py"
+      ],
+      "import_name": "yt_dlp"
+    }
+  }
+}

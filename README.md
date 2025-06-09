@@ -183,6 +183,8 @@ docker-compose -f docker-compose.dev.yml ps
 - **Port conflicts**: Stop existing services on ports 6379 (Redis), 6333/6334 (Qdrant), 8000 (API)
 - **Build issues**: Run `docker-compose build --no-cache` to rebuild images
 - **Permission issues**: Ensure Docker has access to the project directory
+- **NNPACK issues**: If running on proxmox, add this to the vm config: args: -cpu host,+kvm_pv_eoi,+kvm_pv_unhalt,host-cache-info=on,topoext=on
+-- See https://github.com/Maratyszcza/NNPACK/issues/221#issuecomment-2899754029
 
 ### Recent Docker Fixes (January 2025)
 
@@ -199,6 +201,24 @@ python tests/cli/test-docker-fixes.py
 ```
 
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
+
+### CPU Compatibility (NEW)
+
+✅ **Fixed CPU Compatibility Issues**: MoRAG now includes comprehensive CPU compatibility fixes to prevent crashes on systems with limited instruction set support.
+
+**What was fixed:**
+- **SIGILL crashes**: Workers no longer crash with "Illegal Instruction" errors
+- **PyTorch compatibility**: CPU-only PyTorch installation with safety settings
+- **Docling fallback**: Automatic fallback to pypdf when docling/PyTorch fails
+- **Environment safety**: Automatic CPU safety configuration
+
+**Features:**
+- Automatic CPU feature detection and compatibility checking
+- Safe startup scripts that configure environment for maximum compatibility
+- Fallback mechanisms for ML libraries that require advanced CPU features
+- Comprehensive logging and debugging for CPU-related issues
+
+For detailed information, see [CPU Compatibility Guide](docs/CPU_COMPATIBILITY.md).
 
 ## Usage
 

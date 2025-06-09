@@ -25,9 +25,177 @@ class PDFConverter(DocumentConverter):
         """Initialize PDF converter."""
         super().__init__()
         self.supported_formats = {"pdf"}
+        self._docling_available = self._check_docling_availability()
+
+    def _check_docling_availability(self) -> bool:
+        """Check if docling is available and safe to use.
+
+        Returns:
+            True if docling can be safely used, False otherwise
+        """
+        # Check if we should disable docling explicitly
+        import os
+        disable_docling = os.environ.get('MORAG_DISABLE_DOCLING', 'false').lower() == 'true'
+
+        if disable_docling:
+            logger.info("Docling explicitly disabled via MORAG_DISABLE_DOCLING")
+            return False
+
+        try:
+            # Try importing docling
+            import docling
+
+            # Try a basic docling operation to ensure it works
+            from docling.document_converter import DocumentConverter
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+            # Test basic initialization without processing
+            pipeline_options = PdfPipelineOptions()
+
+            # Configure for CPU-safe operation
+            force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
+            if force_cpu:
+                # Use CPU-safe settings
+                pipeline_options.do_ocr = False  # Disable OCR to avoid GPU dependencies
+                pipeline_options.do_table_structure = False  # Disable table structure to reduce complexity
+                logger.info("Configuring docling for CPU-only mode")
+            else:
+                # Use default settings
+                pipeline_options.do_ocr = False  # Still disable for test
+                pipeline_options.do_table_structure = False  # Still disable for test
+
+            # This should not crash if PyTorch is compatible
+            test_converter = DocumentConverter()
+
+            logger.info("Docling is available and compatible for enhanced PDF processing",
+                       cpu_mode=force_cpu)
+            return True
+
+        except ImportError as e:
+            logger.info("Docling not available, falling back to pypdf for PDF processing", error=str(e))
+            return False
+        except Exception as e:
+            logger.warning("Docling initialization failed, falling back to pypdf for PDF processing",
+                         error=str(e), error_type=e.__class__.__name__)
+            return False
+
+    async def _extract_text_with_docling(self, file_path: Path, document: Document, options: ConversionOptions) -> Document:
+        """Extract text from PDF using docling for better markdown conversion.
+
+        Args:
+            file_path: Path to PDF file
+            document: Document to update
+            options: Conversion options
+
+        Returns:
+            Updated document with markdown content
+
+        Raises:
+            ConversionError: If text extraction fails
+        """
+        try:
+            from docling.document_converter import DocumentConverter, PdfFormatOption
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+            # Configure docling for optimal markdown conversion with CPU safety
+            pipeline_options = PdfPipelineOptions()
+
+            # Check if we should use safer settings for CPU compatibility
+            import os
+            force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
+
+            if force_cpu:
+                # Use safer settings for CPU-only mode
+                pipeline_options.do_ocr = False  # Disable OCR to avoid GPU dependencies
+                pipeline_options.do_table_structure = False  # Disable table structure to reduce complexity
+                logger.info("Using CPU-safe docling configuration")
+            else:
+                pipeline_options.do_ocr = True  # Enable OCR for scanned PDFs
+                pipeline_options.do_table_structure = True  # Preserve table structure
+
+            doc_converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
+
+            # Convert PDF to docling document
+            result = doc_converter.convert(file_path)
+
+            if not result.document:
+                raise ConversionError("Docling failed to convert PDF document")
+
+            # Extract markdown content
+            markdown_content = result.document.export_to_markdown()
+
+            # Set document content
+            document.raw_text = markdown_content
+
+            # Extract metadata from docling result
+            if hasattr(result.document, 'meta'):
+                meta = result.document.meta
+                if hasattr(meta, 'title') and meta.title:
+                    document.metadata.title = meta.title
+                if hasattr(meta, 'authors') and meta.authors:
+                    document.metadata.author = ", ".join(meta.authors)
+                if hasattr(meta, 'creation_date') and meta.creation_date:
+                    document.metadata.created_at = meta.creation_date
+
+            # Extract page information for page-based chunking
+            if hasattr(result.document, 'pages'):
+                document.pages = []
+                for page in result.document.pages:
+                    page_markdown = page.export_to_markdown() if hasattr(page, 'export_to_markdown') else str(page)
+                    document.pages.append(page_markdown)
+
+                document.metadata.page_count = len(document.pages)
+
+            # Estimate word count from markdown
+            document.metadata.word_count = len(markdown_content.split())
+
+            logger.info("Successfully converted PDF to markdown using docling",
+                       file_path=str(file_path),
+                       page_count=document.metadata.page_count,
+                       word_count=document.metadata.word_count)
+
+            return document
+
+        except ImportError:
+            logger.warning("Docling not available, falling back to pypdf")
+            return await self._extract_text_with_pypdf(file_path, document, options)
+        except Exception as e:
+            logger.error("Docling PDF conversion failed, falling back to pypdf",
+                        error=str(e),
+                        error_type=e.__class__.__name__,
+                        file_path=str(file_path))
+            return await self._extract_text_with_pypdf(file_path, document, options)
 
     async def _extract_text(self, file_path: Path, document: Document, options: ConversionOptions) -> Document:
-        """Extract text from PDF document.
+        """Extract text from PDF document using docling (preferred) or pypdf (fallback).
+
+        Args:
+            file_path: Path to PDF file
+            document: Document to update
+            options: Conversion options
+
+        Returns:
+            Updated document
+
+        Raises:
+            ConversionError: If text extraction fails
+        """
+        # Try docling first for better markdown conversion
+        if self._docling_available:
+            logger.info("Using docling for PDF processing", file_path=str(file_path))
+            return await self._extract_text_with_docling(file_path, document, options)
+        else:
+            logger.info("Using pypdf for PDF processing", file_path=str(file_path))
+            return await self._extract_text_with_pypdf(file_path, document, options)
+
+    async def _extract_text_with_pypdf(self, file_path: Path, document: Document, options: ConversionOptions) -> Document:
+        """Extract text from PDF document using pypdf (fallback method).
 
         Args:
             file_path: Path to PDF file

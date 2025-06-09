@@ -369,8 +369,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     @app.post("/process/file", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_file(
         file: UploadFile = File(...),
-        content_type: Optional[str] = Form(None),
-        options: Optional[str] = Form(None)  # JSON string
+        content_type: Optional[str] = Form(default=None),
+        options: Optional[str] = Form(default=None)  # JSON string
     ):
         """Process content from an uploaded file."""
         temp_path = None
@@ -543,11 +543,16 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     # Ingest API endpoints
     @app.post("/api/v1/ingest/file", response_model=IngestResponse, tags=["Ingestion"])
     async def ingest_file(
-        source_type: Optional[str] = Form(None),  # Auto-detect if not provided
+        source_type: Optional[str] = Form(default=None),  # Auto-detect if not provided
         file: UploadFile = File(...),
-        webhook_url: Optional[str] = Form(None),
-        metadata: Optional[str] = Form(None),  # JSON string
-        use_docling: Optional[bool] = Form(False)
+        document_id: Optional[str] = Form(default=None),  # Custom document identifier
+        replace_existing: bool = Form(default=False),  # Whether to replace existing document
+        webhook_url: Optional[str] = Form(default=None),
+        metadata: Optional[str] = Form(default=None),  # JSON string
+        use_docling: Optional[bool] = Form(default=False),
+        chunk_size: Optional[int] = Form(default=None),  # Use default from settings if not provided
+        chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
+        chunking_strategy: Optional[str] = Form(default=None)  # paragraph, sentence, word, character, etc.
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -583,11 +588,38 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            error=str(e))
                 raise HTTPException(status_code=400, detail=str(e))
 
+            # Validate chunk size parameters
+            if chunk_size is not None and (chunk_size < 500 or chunk_size > 16000):
+                raise HTTPException(
+                    status_code=400,
+                    detail="chunk_size must be between 500 and 16000 characters"
+                )
+
+            if chunk_overlap is not None and (chunk_overlap < 0 or chunk_overlap > 1000):
+                raise HTTPException(
+                    status_code=400,
+                    detail="chunk_overlap must be between 0 and 1000 characters"
+                )
+
+            # Validate document ID if provided
+            if document_id:
+                import re
+                if not re.match(r'^[a-zA-Z0-9_-]+$', document_id):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Document ID must contain only alphanumeric characters, hyphens, and underscores"
+                    )
+
             # Create task options with sanitized inputs
             options = {
+                "document_id": document_id,
+                "replace_existing": replace_existing,
                 "webhook_url": webhook_url or "",  # Ensure string, not None
                 "metadata": parsed_metadata or {},  # Ensure dict, not None
                 "use_docling": use_docling,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "chunking_strategy": chunking_strategy,
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 

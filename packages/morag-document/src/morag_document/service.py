@@ -8,9 +8,10 @@ import structlog
 
 from morag_core.interfaces.service import BaseService, ServiceConfig, ServiceStatus
 from morag_core.interfaces.processor import ProcessingConfig, ProcessingResult
-from morag_core.interfaces.converter import ChunkingStrategy
+from morag_core.interfaces.converter import ChunkingStrategy, ConversionOptions
 from morag_core.models.document import Document
 from morag_core.exceptions import ValidationError, ProcessingError
+from morag_core.config import get_settings
 from morag_embedding.service import GeminiEmbeddingService
 
 from .processor import DocumentProcessor
@@ -197,10 +198,13 @@ class DocumentService(BaseService):
                 }
             )
 
+            # Get settings for default chunk configuration
+            settings = get_settings()
+
             # Apply chunking
             chunking_strategy = kwargs.get("chunking_strategy", ChunkingStrategy.PARAGRAPH)
-            chunk_size = kwargs.get("chunk_size", 1000)
-            chunk_overlap = kwargs.get("chunk_overlap", 100)
+            chunk_size = kwargs.get("chunk_size", settings.default_chunk_size)
+            chunk_overlap = kwargs.get("chunk_overlap", settings.default_chunk_overlap)
 
             # Create processing config
             config = ProcessingConfig(
