@@ -7,11 +7,13 @@ from .cleanup_service import (
     stop_cleanup_service,
     force_cleanup
 )
+from .auth_service import APIKeyService
 
 __all__ = [
     "PeriodicCleanupService",
-    "get_cleanup_service", 
+    "get_cleanup_service",
     "start_cleanup_service",
     "stop_cleanup_service",
-    "force_cleanup"
+    "force_cleanup",
+    "APIKeyService"
 ]

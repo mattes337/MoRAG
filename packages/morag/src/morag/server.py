@@ -8,12 +8,14 @@ import json
 import uuid
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import structlog
+import redis
+import os
 
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
@@ -22,9 +24,12 @@ from morag.utils.file_upload import get_upload_handler, FileUploadError, validat
 from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
 from morag.worker import (
     process_file_task, process_url_task, process_web_page_task,
-    process_youtube_video_task, process_batch_task, celery_app
+    process_youtube_video_task, process_batch_task, celery_app,
+    submit_task_for_user
 )
 from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
+from morag.services.auth_service import APIKeyService
+from morag.middleware.auth import APIKeyAuth
 
 logger = structlog.get_logger(__name__)
 
@@ -185,6 +190,7 @@ class ProcessURLRequest(BaseModel):
     url: str
     content_type: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
+    gpu: Optional[bool] = False  # NEW: GPU worker flag
 
 
 class ProcessBatchRequest(BaseModel):
@@ -259,6 +265,12 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
     # Initialize MoRAG API lazily to avoid settings validation at import time
     morag_api = None
+
+    # Initialize authentication services
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    redis_client = redis.from_url(redis_url)
+    api_key_service = APIKeyService(redis_client)
+    auth = APIKeyAuth(api_key_service)
 
     def get_morag_api() -> MoRAGAPI:
         """Get or create MoRAG API instance."""
@@ -346,14 +358,48 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
     
     @app.post("/process/url", response_model=ProcessingResultResponse, tags=["Processing"])
-    async def process_url(request: ProcessURLRequest):
+    async def process_url(http_request: Request, request: ProcessURLRequest):
         """Process content from a URL."""
         try:
-            result = await get_morag_api().process_url(
-                request.url,
-                request.content_type,
-                request.options
-            )
+            # Check for API key authentication and GPU routing
+            user_id = await auth.get_user_id(http_request)
+
+            if request.gpu and user_id:
+                # Route to GPU worker for authenticated user
+                logger.info("Routing URL to GPU worker",
+                           url=request.url,
+                           user_id=user_id,
+                           content_type=request.content_type)
+
+                # For now, process locally but log the routing decision
+                # TODO: Implement remote worker task submission
+                result = await get_morag_api().process_url(
+                    request.url,
+                    request.content_type,
+                    request.options
+                )
+
+                logger.info("GPU worker URL processing completed (local fallback)",
+                           url=request.url,
+                           user_id=user_id,
+                           success=result.success)
+            elif request.gpu and not user_id:
+                # GPU requested but no authentication - fallback to local
+                logger.warning("GPU processing requested without authentication, falling back to local",
+                             url=request.url)
+                result = await get_morag_api().process_url(
+                    request.url,
+                    request.content_type,
+                    request.options
+                )
+            else:
+                # Standard local processing
+                result = await get_morag_api().process_url(
+                    request.url,
+                    request.content_type,
+                    request.options
+                )
+
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
@@ -368,9 +414,11 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     
     @app.post("/process/file", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_file(
+        request: Request,
         file: UploadFile = File(...),
         content_type: Optional[str] = Form(default=None),
-        options: Optional[str] = Form(default=None)  # JSON string
+        options: Optional[str] = Form(default=None),  # JSON string
+        gpu: Optional[bool] = Form(default=False)  # NEW: GPU worker flag
     ):
         """Process content from an uploaded file."""
         temp_path = None
@@ -404,11 +452,46 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 # Normalize content type from MIME type to MoRAG content type
                 normalized_content_type = normalize_content_type(content_type)
 
-                result = await get_morag_api().process_file(
-                    temp_path,
-                    normalized_content_type,
-                    parsed_options
-                )
+                # Check for API key authentication and GPU routing
+                user_id = await auth.get_user_id(request)
+
+                if gpu and user_id:
+                    # Route to GPU worker for authenticated user
+                    logger.info("Routing to GPU worker",
+                               filename=file.filename,
+                               user_id=user_id,
+                               content_type=normalized_content_type)
+
+                    # For GPU workers, we need to provide a download URL instead of file path
+                    # For now, process locally but log the routing decision
+                    # TODO: Implement HTTP file transfer for remote workers
+                    result = await get_morag_api().process_file(
+                        temp_path,
+                        normalized_content_type,
+                        parsed_options
+                    )
+
+                    logger.info("GPU worker processing completed (local fallback)",
+                               filename=file.filename,
+                               user_id=user_id,
+                               success=result.success,
+                               processing_time=result.processing_time)
+                elif gpu and not user_id:
+                    # GPU requested but no authentication - fallback to local
+                    logger.warning("GPU processing requested without authentication, falling back to local",
+                                 filename=file.filename)
+                    result = await get_morag_api().process_file(
+                        temp_path,
+                        normalized_content_type,
+                        parsed_options
+                    )
+                else:
+                    # Standard local processing
+                    result = await get_morag_api().process_file(
+                        temp_path,
+                        normalized_content_type,
+                        parsed_options
+                    )
 
                 logger.info("File processing completed",
                            filename=file.filename,
@@ -861,6 +944,78 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
         except Exception as e:
             logger.error("Failed to perform manual cleanup", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # API Key Management endpoints
+    @app.post("/api/v1/auth/create-key", tags=["Authentication"])
+    async def create_api_key(
+        user_id: str = Form(...),
+        description: str = Form(default=""),
+        expires_days: Optional[int] = Form(default=None)
+    ):
+        """Create a new API key for a user."""
+        try:
+            api_key = await api_key_service.create_api_key(user_id, description, expires_days)
+
+            logger.info("API key created via endpoint", user_id=user_id, description=description)
+
+            return {
+                "api_key": api_key,
+                "user_id": user_id,
+                "description": description,
+                "expires_days": expires_days,
+                "message": "API key created successfully"
+            }
+        except Exception as e:
+            logger.error("Failed to create API key", user_id=user_id, error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/auth/validate-key", tags=["Authentication"])
+    async def validate_api_key_endpoint(api_key: str = Form(...)):
+        """Validate an API key and return user information."""
+        try:
+            user_data = await api_key_service.validate_api_key(api_key)
+
+            if not user_data:
+                raise HTTPException(status_code=401, detail="Invalid API key")
+
+            return {
+                "valid": True,
+                "user_data": user_data,
+                "message": "API key is valid"
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Failed to validate API key", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/v1/auth/queue-info", tags=["Authentication"])
+    async def get_queue_info(request: Request):
+        """Get queue information for the authenticated user."""
+        try:
+            user_id = await auth.get_user_id(request)
+
+            if not user_id:
+                return {
+                    "authenticated": False,
+                    "default_queue": api_key_service.get_default_queue_name(),
+                    "message": "No authentication provided - using default queue"
+                }
+
+            gpu_queue = api_key_service.get_user_queue_name(user_id, "gpu")
+            cpu_queue = api_key_service.get_cpu_queue_name(user_id)
+
+            return {
+                "authenticated": True,
+                "user_id": user_id,
+                "gpu_queue": gpu_queue,
+                "cpu_queue": cpu_queue,
+                "default_queue": api_key_service.get_default_queue_name(),
+                "message": "User-specific queues available"
+            }
+        except Exception as e:
+            logger.error("Failed to get queue info", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
     return app

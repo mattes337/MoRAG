@@ -104,13 +104,13 @@ For detailed information about completed tasks and implementation history, see [
     - Added document ID validation and auto-generation support
     - Updated ingestion tasks to support document replacement workflow
 
-### ✅ Remote GPU Workers - Simplified Implementation ✅ PLANNED
+### ✅ Remote GPU Workers - Simplified Implementation ✅ IN PROGRESS
 - **Feature**: Add remote GPU worker support with simple `gpu` parameter in API endpoints
-- **Implementation**: Created comprehensive task breakdown for simplified approach
+- **Implementation**: Implementing comprehensive task breakdown for simplified approach
 - **Approach**: Simple boolean flag routing instead of complex priority queue system
 - **Tasks Created**:
-  - [Task 1: Queue Architecture Setup](./tasks/remote-gpu-workers-simple/task-01-queue-architecture-setup.md)
-  - [Task 2: API Parameter Addition](./tasks/remote-gpu-workers-simple/task-02-api-parameter-addition.md)
+  - [Task 1: Queue Architecture Setup](./tasks/remote-gpu-workers-simple/task-01-queue-architecture-setup.md) ✅ **COMPLETED**
+  - [Task 2: API Parameter Addition](./tasks/remote-gpu-workers-simple/task-02-api-parameter-addition.md) ✅ **COMPLETED**
   - [Task 3: GPU Worker Configuration](./tasks/remote-gpu-workers-simple/task-03-gpu-worker-configuration.md)
   - [Task 4: Task Routing Logic](./tasks/remote-gpu-workers-simple/task-04-task-routing-logic.md)
   - [Task 5: Network Configuration](./tasks/remote-gpu-workers-simple/task-05-network-configuration.md)
@@ -126,7 +126,15 @@ For detailed information about completed tasks and implementation history, see [
   - Simple setup process (< 30 minutes for new GPU worker)
   - Backward compatible (existing API calls unchanged)
   - Intelligent routing based on worker availability and queue load
-- **Status**: Task breakdown complete, ready for implementation
+- **Status**: Tasks 1-2 completed - API key authentication service and API integration implemented
+- **Implementation Progress**:
+  - ✅ **Task 1**: API key authentication service with Redis storage
+  - ✅ **Task 2**: API endpoints updated with `gpu` parameter and authentication middleware
+  - ✅ **Authentication**: API key creation, validation, and user identification
+  - ✅ **Queue Architecture**: User-specific queue naming and routing logic
+  - ✅ **Remote Worker Tasks**: HTTP file transfer variants for remote processing
+  - ✅ **API Integration**: GPU flag support in `/process/file` and `/process/url` endpoints
+  - ✅ **Management Endpoints**: API key creation, validation, and queue info endpoints
 
 ## 🔧 Recent Fixes (January 2025)
 

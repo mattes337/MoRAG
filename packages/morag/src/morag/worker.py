@@ -2,11 +2,14 @@
 
 import asyncio
 import os
+import tempfile
+import requests
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from celery import Celery
 import structlog
+import redis
 
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
@@ -30,7 +33,21 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     broker_connection_retry_on_startup=True,  # Fix deprecation warning
+
+    # Dynamic queue routing - queues created on demand
+    task_default_queue='celery',
+    task_default_exchange='celery',
+    task_default_exchange_type='direct',
+    task_default_routing_key='celery',
+
+    # Enable dynamic queue creation
+    task_create_missing_queues=True,
+    worker_direct=True,
 )
+
+# Initialize Redis client and API key service for remote workers
+redis_client = redis.from_url(redis_url)
+api_key_service = None  # Will be initialized when needed
 
 # Global MoRAG API instance
 morag_api: Optional[MoRAGAPI] = None
@@ -42,6 +59,39 @@ def get_morag_api() -> MoRAGAPI:
     if morag_api is None:
         morag_api = MoRAGAPI()
     return morag_api
+
+
+def get_api_key_service():
+    """Get or create API key service instance."""
+    global api_key_service
+    if api_key_service is None:
+        from morag.services.auth_service import APIKeyService
+        api_key_service = APIKeyService(redis_client)
+    return api_key_service
+
+
+def get_task_for_user(base_task_name: str, user_id: Optional[str] = None,
+                     use_remote: bool = False):
+    """Get the appropriate task function and queue based on user and remote flag."""
+    if use_remote and user_id:
+        remote_task_name = f"{base_task_name}_remote"
+        queue_name = get_api_key_service().get_user_queue_name(user_id, "gpu")
+        return globals().get(remote_task_name, globals()[base_task_name]), queue_name
+
+    # Default to local processing
+    return globals()[base_task_name], 'celery'
+
+
+def submit_task_for_user(task_func, args, kwargs, user_id: Optional[str] = None,
+                        use_remote: bool = False):
+    """Submit task to appropriate queue based on user."""
+    task, queue = get_task_for_user(task_func.__name__, user_id, use_remote)
+
+    return task.apply_async(
+        args=args,
+        kwargs=kwargs,
+        queue=queue
+    )
 
 
 @celery_app.task(bind=True)
@@ -203,6 +253,139 @@ def health_check_task():
             raise
     
     return asyncio.run(_health())
+
+
+# Remote worker task variants for HTTP file transfer
+@celery_app.task(bind=True)
+def process_file_task_remote(self, file_url: str, user_id: str, content_type: Optional[str] = None,
+                           task_options: Optional[Dict[str, Any]] = None):
+    """Remote worker variant - downloads file via HTTP and processes."""
+    async def _process():
+        api = get_morag_api()
+        temp_path = None
+
+        try:
+            # Download file from server
+            self.update_state(state='DOWNLOADING', meta={'stage': 'downloading_file'})
+
+            response = requests.get(file_url, stream=True)
+            response.raise_for_status()
+
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file_url).suffix) as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    temp_file.write(chunk)
+                temp_path = temp_file.name
+
+            self.update_state(state='PROCESSING', meta={'stage': 'processing'})
+
+            # Process the file (only heavy lifting - no external services)
+            result = await api.process_file(temp_path, content_type, task_options)
+
+            # Return only markdown content and metadata - no vector storage
+            return {
+                'success': result.success,
+                'content': result.text_content or result.content,
+                'metadata': result.metadata,
+                'processing_time': result.processing_time,
+                'error_message': result.error_message,
+                'user_id': user_id
+            }
+
+        except Exception as e:
+            logger.error("Remote file processing failed", file_url=file_url, error=str(e))
+            self.update_state(state='FAILURE', meta={'error': str(e)})
+            raise
+        finally:
+            # Clean up temporary file
+            if temp_path and Path(temp_path).exists():
+                Path(temp_path).unlink()
+
+    return asyncio.run(_process())
+
+
+@celery_app.task(bind=True)
+def process_url_task_remote(self, url: str, user_id: str, content_type: Optional[str] = None,
+                          task_options: Optional[Dict[str, Any]] = None):
+    """Remote worker variant - processes URL directly."""
+    async def _process():
+        api = get_morag_api()
+        try:
+            self.update_state(state='PROCESSING', meta={'stage': 'processing_url'})
+
+            # Process URL directly (no external service calls)
+            result = await api.process_url(url, content_type, task_options)
+
+            # Return only markdown content and metadata
+            return {
+                'success': result.success,
+                'content': result.text_content or result.content,
+                'metadata': result.metadata,
+                'processing_time': result.processing_time,
+                'error_message': result.error_message,
+                'user_id': user_id
+            }
+
+        except Exception as e:
+            logger.error("Remote URL processing failed", url=url, error=str(e))
+            self.update_state(state='FAILURE', meta={'error': str(e)})
+            raise
+
+    return asyncio.run(_process())
+
+
+@celery_app.task(bind=True)
+def process_web_page_task_remote(self, url: str, user_id: str, task_options: Optional[Dict[str, Any]] = None):
+    """Remote worker variant - processes web page directly."""
+    async def _process():
+        api = get_morag_api()
+        try:
+            self.update_state(state='PROCESSING', meta={'stage': 'web_scraping'})
+
+            result = await api.process_web_page(url, task_options)
+
+            return {
+                'success': result.success,
+                'content': result.text_content or result.content,
+                'metadata': result.metadata,
+                'processing_time': result.processing_time,
+                'error_message': result.error_message,
+                'user_id': user_id
+            }
+
+        except Exception as e:
+            logger.error("Remote web page processing failed", url=url, error=str(e))
+            self.update_state(state='FAILURE', meta={'error': str(e)})
+            raise
+
+    return asyncio.run(_process())
+
+
+@celery_app.task(bind=True)
+def process_youtube_video_task_remote(self, url: str, user_id: str, task_options: Optional[Dict[str, Any]] = None):
+    """Remote worker variant - processes YouTube video directly."""
+    async def _process():
+        api = get_morag_api()
+        try:
+            self.update_state(state='PROCESSING', meta={'stage': 'youtube_download'})
+
+            result = await api.process_youtube_video(url, task_options)
+
+            return {
+                'success': result.success,
+                'content': result.text_content or result.content,
+                'metadata': result.metadata,
+                'processing_time': result.processing_time,
+                'error_message': result.error_message,
+                'user_id': user_id
+            }
+
+        except Exception as e:
+            logger.error("Remote YouTube processing failed", url=url, error=str(e))
+            self.update_state(state='FAILURE', meta={'error': str(e)})
+            raise
+
+    return asyncio.run(_process())
 
 
 # Worker event handlers
