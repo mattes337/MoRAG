@@ -133,9 +133,6 @@ def main():
         logger.warning("Advanced CPU features (AVX/AVX2) not detected or not available")
         logger.info("Enabling safe CPU mode for maximum compatibility")
         set_safe_environment()
-    else:
-        logger.info("Advanced CPU features detected, but enabling safe mode anyway for stability")
-        set_safe_environment()
     
     # Test PyTorch compatibility
     pytorch_ok = check_pytorch_compatibility()
@@ -144,6 +141,7 @@ def main():
         logger.error("PyTorch compatibility test failed")
         logger.info("This may cause issues with docling and other ML components")
         logger.info("Consider installing PyTorch CPU-only version")
+        set_safe_environment()
         
     # Final recommendations
     logger.info("=== CPU Compatibility Check Complete ===")
