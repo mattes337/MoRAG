@@ -183,6 +183,8 @@ docker-compose -f docker-compose.dev.yml ps
 - **Port conflicts**: Stop existing services on ports 6379 (Redis), 6333/6334 (Qdrant), 8000 (API)
 - **Build issues**: Run `docker-compose build --no-cache` to rebuild images
 - **Permission issues**: Ensure Docker has access to the project directory
+- **NNPACK issues**: If running on proxmox, add this to the vm config: args: -cpu host,+kvm_pv_eoi,+kvm_pv_unhalt,host-cache-info=on,topoext=on
+-- See https://github.com/Maratyszcza/NNPACK/issues/221#issuecomment-2899754029
 
 ### Recent Docker Fixes (January 2025)
 
