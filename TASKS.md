@@ -52,6 +52,7 @@ For setup instructions, see [HTTP Remote Workers Guide](docs/HTTP_REMOTE_WORKERS
 - **Error Handling**: Comprehensive fixes for processing and ingestion workflows
 - **Performance**: Optimized chunking, embedding, and search operations
 - **HTTP Remote Workers**: Replaced Redis/Celery workers with HTTP-based workers for simplified deployment
+- **Code Cleanup**: Removed all backwards compatibility code and legacy imports for cleaner architecture
 
 ## Core Features
 

@@ -42,6 +42,9 @@ def submit_task_for_user(user_id: str, task_type: str, **kwargs) -> str:
     return str(uuid.uuid4())
 
 
+
+
+
 def main():
     """Main entry point for HTTP worker."""
     logger.info("Starting HTTP worker...")

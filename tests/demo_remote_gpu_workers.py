@@ -65,9 +65,9 @@ def demo_worker_routing():
     """Demonstrate worker task routing."""
     print("\n\n⚙️ Worker Task Routing Demo")
     print("=" * 50)
-    
-    from morag.worker import get_task_for_user, get_api_key_service
-    
+
+    from morag.worker import submit_task_for_user
+
     # Test different routing scenarios
     scenarios = [
         ("Anonymous user, no GPU", None, False),
@@ -75,12 +75,13 @@ def demo_worker_routing():
         ("Authenticated user, no GPU", "gpu_user_001", False),
         ("Authenticated user, GPU requested", "gpu_user_001", True),
     ]
-    
+
     for description, user_id, use_remote in scenarios:
         print(f"\n{description}:")
-        task, queue = get_task_for_user('process_file_task', user_id, use_remote)
-        print(f"   Task: {task.__name__}")
-        print(f"   Queue: {queue}")
+        task_id = submit_task_for_user(user_id or "anonymous", 'process_file', file_path="/test/file.pdf")
+        print(f"   Task ID: {task_id}")
+        print(f"   User: {user_id or 'anonymous'}")
+        print(f"   Remote: {use_remote}")
 
 def demo_api_endpoints():
     """Demonstrate API endpoint usage."""
