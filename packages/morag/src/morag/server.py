@@ -10,7 +10,7 @@ import uuid
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import structlog
@@ -1016,6 +1016,153 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             }
         except Exception as e:
             logger.error("Failed to get queue info", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # File Transfer endpoints for remote workers
+    @app.post("/api/v1/files/download", tags=["File Transfer"])
+    async def download_file(request: Request, file_request: Dict[str, str]):
+        """Download file for remote worker processing."""
+        try:
+            # Require authentication for file downloads
+            user_data = await auth.require_authentication(request)
+            user_id = user_data.get("user_id")
+
+            file_path = file_request.get('file_path')
+            if not file_path:
+                raise HTTPException(status_code=400, detail="file_path required")
+
+            # Validate file exists and is accessible
+            if not os.path.exists(file_path):
+                raise HTTPException(status_code=404, detail="File not found")
+
+            # Security check - ensure file is in allowed directories
+            allowed_dirs = ['/app/temp', '/app/uploads', '/tmp']
+            if not any(file_path.startswith(d) for d in allowed_dirs):
+                raise HTTPException(status_code=403, detail="File access denied")
+
+            logger.info("File download requested",
+                       file_path=file_path,
+                       user_id=user_id)
+
+            return FileResponse(
+                path=file_path,
+                filename=os.path.basename(file_path),
+                media_type='application/octet-stream'
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("File download failed", file_path=file_request.get('file_path'), error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/files/upload-result", tags=["File Transfer"])
+    async def upload_result(
+        request: Request,
+        file: Optional[UploadFile] = File(None),
+        result_data: str = Form(...)
+    ):
+        """Upload processing result from remote worker."""
+        try:
+            # Require authentication for result uploads
+            user_data = await auth.require_authentication(request)
+            user_id = user_data.get("user_id")
+
+            import json
+            result = json.loads(result_data)
+
+            # Handle file upload if provided
+            if file:
+                # Save uploaded file to temp directory
+                temp_path = f"/tmp/result_{uuid.uuid4().hex}_{file.filename}"
+                with open(temp_path, "wb") as buffer:
+                    import shutil
+                    shutil.copyfileobj(file.file, buffer)
+                result['uploaded_file'] = temp_path
+
+            # Process result (store in database, trigger webhooks, etc.)
+            logger.info("Result uploaded from remote worker",
+                       result=result,
+                       user_id=user_id)
+
+            return {"status": "success", "message": "Result uploaded successfully"}
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Result upload failed", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Worker status monitoring endpoint
+    @app.get("/api/v1/status/workers", tags=["Task Management"])
+    async def get_worker_status():
+        """Get current worker and queue status."""
+        try:
+            from morag.services.user_task_router import get_task_router
+            task_router = get_task_router()
+
+            # Get basic queue information
+            gpu_queue_length = task_router.get_queue_length('gpu-tasks')
+            cpu_queue_length = task_router.get_queue_length('celery')
+
+            # Get worker information from Celery
+            inspect = celery_app.control.inspect()
+            active_workers = inspect.active() or {}
+            stats = inspect.stats() or {}
+
+            worker_details = {}
+            gpu_workers = 0
+            cpu_workers = 0
+
+            for worker_name, tasks in active_workers.items():
+                worker_stats = stats.get(worker_name, {})
+                worker_queues = []
+
+                # Try to get worker queues
+                try:
+                    queue_inspect = inspect.active_queues()
+                    if queue_inspect and worker_name in queue_inspect:
+                        worker_queues = [q['name'] for q in queue_inspect[worker_name]]
+                except:
+                    pass
+
+                # Determine worker type based on queues
+                worker_type = "cpu"
+                if any("gpu-tasks" in queue for queue in worker_queues):
+                    worker_type = "gpu"
+                    gpu_workers += 1
+                else:
+                    cpu_workers += 1
+
+                worker_details[worker_name] = {
+                    "type": worker_type,
+                    "active_tasks": len(tasks),
+                    "max_tasks": worker_stats.get('pool', {}).get('max-concurrency', 1),
+                    "queues": worker_queues
+                }
+
+            return {
+                "workers": {
+                    "total": len(active_workers),
+                    "gpu": gpu_workers,
+                    "cpu": cpu_workers,
+                    "details": worker_details
+                },
+                "queues": {
+                    "gpu-tasks": {
+                        "length": gpu_queue_length,
+                        "workers": gpu_workers
+                    },
+                    "celery": {
+                        "length": cpu_queue_length,
+                        "workers": cpu_workers
+                    }
+                },
+                "gpu_available": gpu_workers > 0
+            }
+
+        except Exception as e:
+            logger.error("Failed to get worker status", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
