@@ -164,12 +164,12 @@ ENV TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
 ENV WHISPER_CACHE_DIR=/home/morag/.cache/whisper
 
 # Default command - requires environment variables to be set
-CMD ["python", "scripts/start_http_remote_worker.py", \
-     "--server-url", "${MORAG_SERVER_URL}", \
-     "--api-key", "${MORAG_API_KEY}", \
-     "--worker-type", "${WORKER_TYPE:-gpu}", \
-     "--poll-interval", "${POLL_INTERVAL:-5}", \
-     "--max-concurrent", "${MAX_CONCURRENT_TASKS:-1}"]
+CMD python scripts/start_http_remote_worker.py \
+    --server-url ${MORAG_SERVER_URL} \
+    --api-key ${MORAG_API_KEY} \
+    --worker-type ${WORKER_TYPE:-gpu} \
+    --poll-interval ${POLL_INTERVAL:-5} \
+    --max-concurrent ${MAX_CONCURRENT_TASKS:-1}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
