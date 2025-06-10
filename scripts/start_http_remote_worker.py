@@ -33,8 +33,17 @@ from dataclasses import dataclass
 from aiohttp import web
 
 # Add the packages to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src"))
+packages_dir = Path(__file__).parent.parent / "packages"
+sys.path.insert(0, str(packages_dir / "morag" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-core" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-services" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-web" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-youtube" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-audio" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-video" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-document" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-image" / "src"))
+sys.path.insert(0, str(packages_dir / "morag-embedding" / "src"))
 
 import structlog
 from morag.api import MoRAGAPI
@@ -85,7 +94,12 @@ class HTTPRemoteWorker:
         self.session = aiohttp.ClientSession(timeout=timeout)
         
         # Initialize MoRAG API
-        self.morag_api = MoRAGAPI()
+        try:
+            self.morag_api = MoRAGAPI()
+            logger.info("MoRAG API initialized successfully")
+        except Exception as e:
+            logger.error("Failed to initialize MoRAG API", error=str(e))
+            raise
         
         # Register worker with server
         await self.register_worker()
@@ -222,46 +236,59 @@ class HTTPRemoteWorker:
         """Execute the actual task processing."""
         task_type = task["task_type"]
         params = task.get("parameters", {})
-        
-        # Map task types to MoRAG API methods
-        if task_type == "process_audio":
-            file_path = input_files.get("audio_file")
-            if file_path:
-                result = await self.morag_api.process_audio_file(file_path, **params)
-                return {"content": result.content, "metadata": result.metadata}
-        
-        elif task_type == "process_video":
-            file_path = input_files.get("video_file")
-            if file_path:
-                result = await self.morag_api.process_video_file(file_path, **params)
-                return {"content": result.content, "metadata": result.metadata}
-        
-        elif task_type == "process_document":
-            file_path = input_files.get("document_file")
-            if file_path:
-                result = await self.morag_api.process_document(file_path, **params)
-                return {"content": result.content, "metadata": result.metadata}
-        
-        elif task_type == "process_image":
-            file_path = input_files.get("image_file")
-            if file_path:
-                result = await self.morag_api.process_image(file_path, **params)
-                return {"content": result.content, "metadata": result.metadata}
-        
-        elif task_type == "process_web":
-            url = params.get("url")
-            if url:
-                result = await self.morag_api.process_web_page(url, **params)
-                return {"content": result.content, "metadata": result.metadata}
-        
-        elif task_type == "process_youtube":
-            url = params.get("url")
-            if url:
-                result = await self.morag_api.process_youtube_video(url, **params)
-                return {"content": result.content, "metadata": result.metadata}
-        
-        else:
-            raise ValueError(f"Unknown task type: {task_type}")
+
+        logger.info("Executing task", task_type=task_type, params=params, input_files=list(input_files.keys()))
+
+        try:
+            # Map task types to MoRAG API methods
+            if task_type == "process_audio":
+                file_path = input_files.get("audio_file")
+                if not file_path:
+                    raise ValueError("No audio_file provided in input_files")
+                result = await self.morag_api.process_audio(file_path, params)
+                return {"content": result.text_content, "metadata": result.metadata}
+
+            elif task_type == "process_video":
+                file_path = input_files.get("video_file")
+                if not file_path:
+                    raise ValueError("No video_file provided in input_files")
+                result = await self.morag_api.process_video(file_path, params)
+                return {"content": result.text_content, "metadata": result.metadata}
+
+            elif task_type == "process_document":
+                file_path = input_files.get("document_file")
+                if not file_path:
+                    raise ValueError("No document_file provided in input_files")
+                result = await self.morag_api.process_document(file_path, params)
+                return {"content": result.text_content, "metadata": result.metadata}
+
+            elif task_type == "process_image":
+                file_path = input_files.get("image_file")
+                if not file_path:
+                    raise ValueError("No image_file provided in input_files")
+                result = await self.morag_api.process_image(file_path, params)
+                return {"content": result.text_content, "metadata": result.metadata}
+
+            elif task_type == "process_web":
+                url = params.get("url")
+                if not url:
+                    raise ValueError("No url provided in parameters")
+                result = await self.morag_api.process_web_page(url, params)
+                return {"content": result.text_content, "metadata": result.metadata}
+
+            elif task_type == "process_youtube":
+                url = params.get("url")
+                if not url:
+                    raise ValueError("No url provided in parameters")
+                result = await self.morag_api.process_youtube_video(url, params)
+                return {"content": result.text_content, "metadata": result.metadata}
+
+            else:
+                raise ValueError(f"Unknown task type: {task_type}")
+
+        except Exception as e:
+            logger.error("Task execution failed", task_type=task_type, error=str(e))
+            raise
     
     async def upload_result_files(self, task_id: str, result: Dict[str, Any]):
         """Upload any result files to the server."""
