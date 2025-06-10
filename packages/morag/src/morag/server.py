@@ -255,6 +255,55 @@ class TaskStatus(BaseModel):
     estimated_time_remaining: Optional[int] = None
 
 
+async def initialize_default_api_key(api_key_service: APIKeyService) -> None:
+    """Initialize a default API key for first-time setup."""
+    import os
+
+    # Check if we have a default API key from environment
+    default_api_key = os.getenv('MORAG_API_KEY')
+
+    if default_api_key and default_api_key != 'morag-default-api-key-change-me-in-production':
+        # Validate the provided API key
+        user_data = await api_key_service.validate_api_key(default_api_key)
+        if user_data:
+            logger.info("Using existing API key from environment")
+            return
+
+    # Create a default API key for the system
+    try:
+        default_key = await api_key_service.create_api_key(
+            user_id="system",
+            description="Default API key for HTTP remote workers",
+            expires_days=None  # No expiration for default key
+        )
+
+        # Also register the placeholder key from .env if it exists
+        if default_api_key == 'morag-default-api-key-change-me-in-production':
+            # Create a key entry for the placeholder so docker-compose works
+            import hashlib
+            key_hash = hashlib.sha256(default_api_key.encode()).hexdigest()
+            api_key_service._api_keys[key_hash] = {
+                "user_id": "system",
+                "description": "Default placeholder API key from .env",
+                "created_at": "2024-01-01T00:00:00",
+                "expires_at": None,
+                "active": True
+            }
+            logger.info("Registered placeholder API key from .env for docker-compose compatibility")
+
+        logger.info("Default API key created for first-time setup",
+                   api_key_preview=f"{default_key[:8]}...")
+
+        # Log instructions for users
+        logger.info("🔑 Default API key created! Use this key for HTTP remote workers:")
+        logger.info(f"   API Key: {default_key}")
+        logger.info("   You can create additional API keys via: POST /api/v1/auth/create-key")
+        logger.info("   For production, create a new API key and update MORAG_API_KEY in .env")
+
+    except Exception as e:
+        logger.error("Failed to create default API key", error=str(e))
+
+
 def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     """Create FastAPI application."""
 
@@ -285,6 +334,9 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         except RuntimeError as e:
             logger.error("STARTUP FAILURE: Temp directory validation failed", error=str(e))
             raise RuntimeError(f"Cannot start server: {str(e)}")
+
+        # Initialize default API key for first-time setup
+        await initialize_default_api_key(api_key_service)
 
         # Start periodic cleanup service
         start_cleanup_service(

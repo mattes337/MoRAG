@@ -54,10 +54,11 @@ services:
       dockerfile: Dockerfile.worker
     container_name: morag-worker
     restart: unless-stopped
+    env_file: .env
     environment:
       # Required: Main server connection
       - MORAG_SERVER_URL=${MORAG_SERVER_URL:-http://morag-api:8000}
-      - MORAG_API_KEY=${MORAG_API_KEY}
+      - MORAG_API_KEY=${MORAG_API_KEY:-morag-default-api-key-change-me-in-production}
       
       # Worker configuration
       - WORKER_TYPE=cpu

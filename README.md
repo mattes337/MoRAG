@@ -94,6 +94,7 @@ pip install -e .
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
+# Note: MORAG_API_KEY is automatically generated on first startup
 ```
 
 5. Start the services:
@@ -119,8 +120,11 @@ docker-compose up -d
 # Check service health
 curl http://localhost:8000/health
 
-# View logs
-docker-compose logs -f
+# View logs (check for auto-generated API key)
+docker-compose logs -f morag-api
+
+# The API server will automatically generate a default API key on first startup
+# Look for log messages like: "🔑 Default API key created! Use this key for HTTP remote workers:"
 ```
 
 ### Docker Deployment Options
@@ -273,6 +277,46 @@ curl -X POST "http://localhost:8000/process/file" \
 - **Flexible scaling** - add/remove workers without configuration
 
 For detailed setup instructions, see [HTTP Remote Workers Guide](docs/HTTP_REMOTE_WORKERS.md).
+
+## API Key Management
+
+MoRAG automatically generates a default API key on first startup for seamless Docker deployment:
+
+### Automatic API Key Generation
+
+```bash
+# Start MoRAG - API key is auto-generated
+docker-compose up -d
+
+# Check logs for the generated API key
+docker-compose logs morag-api | grep "Default API key created"
+# Output: 🔑 Default API key created! Use this key for HTTP remote workers:
+#         API Key: abc123xyz...
+```
+
+### Manual API Key Management
+
+```bash
+# Create a new API key
+curl -X POST "http://localhost:8000/api/v1/auth/create-key" \
+  -F "user_id=my_user" \
+  -F "description=My custom API key" \
+  -F "expires_days=30"
+
+# Validate an API key
+curl -X POST "http://localhost:8000/api/v1/auth/validate-key" \
+  -F "api_key=your_api_key_here"
+```
+
+### Configuration
+
+The default API key is stored in `.env`:
+```bash
+# Default API key (auto-generated on first startup)
+MORAG_API_KEY=morag-default-api-key-change-me-in-production
+```
+
+**For production**: Create a new API key and update `MORAG_API_KEY` in your `.env` file.
 
 ## Architecture
 
