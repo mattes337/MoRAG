@@ -142,6 +142,190 @@ curl -X POST "http://localhost:8000/search" \
 curl -X GET "http://localhost:8000/health"
 ```
 
+## Remote Processing
+
+### Overview
+
+MoRAG supports remote processing for computationally intensive tasks (audio and video processing). This allows you to offload processing to remote workers with better hardware capabilities, including GPU support.
+
+### Client Side Usage
+
+#### REST API with Remote Processing
+
+```bash
+# Upload audio file with remote processing enabled
+curl -X POST "http://localhost:8000/api/v1/ingest/file" \
+     -F "file=@audio.mp3" \
+     -F "remote=true" \
+     -F "content_type=audio" \
+     -F "webhook_url=http://my-app.com/webhook"
+
+# Upload video file with remote processing
+curl -X POST "http://localhost:8000/api/v1/ingest/file" \
+     -F "file=@video.mp4" \
+     -F "remote=true" \
+     -F "content_type=video" \
+     -F "fallback_to_local=true"
+```
+
+#### Python API with Remote Processing
+
+```python
+import asyncio
+from morag import MoRAGAPI
+
+async def main():
+    api = MoRAGAPI()
+
+    # Process audio with remote workers
+    result = await api.ingest_file(
+        "audio.mp3",
+        content_type="audio",
+        options={
+            "remote": True,
+            "webhook_url": "http://my-app.com/webhook",
+            "fallback_to_local": True
+        }
+    )
+
+    print(f"Task ID: {result.task_id}")
+
+    # Monitor task progress
+    status = await api.get_task_status(result.task_id)
+    print(f"Status: {status}")
+
+asyncio.run(main())
+```
+
+#### CLI with Remote Processing
+
+```bash
+# Process audio with remote workers
+python tests/cli/test-audio.py my-audio.mp3 --ingest --remote
+
+# Process video with remote workers and webhook
+python tests/cli/test-video.py my-video.mp4 --ingest --remote --webhook-url https://my-app.com/webhook
+
+# Test remote conversion system
+python cli/test-remote-conversion.py --test all
+```
+
+### Remote Worker Setup
+
+#### Environment Configuration
+
+```bash
+# Required environment variables for remote workers
+export MORAG_WORKER_ID="gpu-worker-01"
+export MORAG_API_BASE_URL="https://your-morag-server.com"
+export MORAG_WORKER_CONTENT_TYPES="audio,video"
+export MORAG_WORKER_POLL_INTERVAL="10"
+export MORAG_WORKER_MAX_CONCURRENT_JOBS="2"
+export MORAG_TEMP_DIR="/tmp/morag_remote"
+
+# Optional API authentication
+export MORAG_API_KEY="your-api-key"
+```
+
+#### Configuration File
+
+Create `remote_converter_config.yaml`:
+
+```yaml
+worker_id: "gpu-worker-01"
+api_base_url: "https://your-morag-server.com"
+api_key: "your-api-key-here"
+content_types: ["audio", "video"]
+poll_interval: 10
+max_concurrent_jobs: 2
+log_level: "INFO"
+temp_dir: "/tmp/morag_remote"
+```
+
+#### Starting Remote Worker
+
+```bash
+# Install remote converter dependencies
+pip install -e packages/morag-core
+pip install -e packages/morag-audio
+pip install -e packages/morag-video
+pip install requests pyyaml python-dotenv structlog
+
+# Start remote worker
+python tools/remote-converter/cli.py --config remote_converter_config.yaml
+
+# Or with command line options
+python tools/remote-converter/cli.py \
+    --worker-id gpu-worker-01 \
+    --api-url https://your-morag-server.com \
+    --content-types audio,video \
+    --max-jobs 2
+```
+
+### Remote Job Management
+
+#### Check Job Status
+
+```bash
+# Get specific job status
+curl "http://localhost:8000/api/v1/remote-jobs/{job_id}/status"
+
+# Poll for available jobs (worker perspective)
+curl "http://localhost:8000/api/v1/remote-jobs/poll?worker_id=worker-1&content_types=audio,video&max_jobs=1"
+```
+
+#### Monitor Remote Processing
+
+```python
+import requests
+
+# Check remote job status
+def check_remote_job_status(job_id):
+    response = requests.get(f"http://localhost:8000/api/v1/remote-jobs/{job_id}/status")
+    return response.json()
+
+# List all remote jobs (admin endpoint)
+def list_remote_jobs():
+    response = requests.get("http://localhost:8000/api/v1/remote-jobs/")
+    return response.json()
+```
+
+### Remote Processing Features
+
+#### Automatic Fallback
+
+```python
+# Enable automatic fallback to local processing
+result = await api.ingest_file(
+    "audio.mp3",
+    options={
+        "remote": True,
+        "fallback_to_local": True  # Falls back if no remote workers available
+    }
+)
+```
+
+#### Content Type Support
+
+- **Supported for Remote Processing**: `audio`, `video`
+- **Local Processing Only**: `document`, `image`, `web`, `youtube`
+
+#### Job Timeouts
+
+- **Audio jobs**: 30 minutes default
+- **Video jobs**: 1 hour default
+- **Configurable**: Set custom timeouts in task options
+
+```python
+result = await api.ingest_file(
+    "long-video.mp4",
+    options={
+        "remote": True,
+        "timeout_seconds": 7200  # 2 hours
+    }
+)
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -162,6 +346,14 @@ REDIS_URL=redis://localhost:6379/0
 LOG_LEVEL=INFO
 MAX_WORKERS=4
 CHUNK_SIZE=1000
+
+# Remote Processing (Optional)
+MORAG_REMOTE_JOBS_DATA_DIR=/app/data/remote_jobs
+MORAG_WORKER_ID=remote-worker-01
+MORAG_API_BASE_URL=http://localhost:8000
+MORAG_WORKER_CONTENT_TYPES=audio,video
+MORAG_WORKER_POLL_INTERVAL=10
+MORAG_WORKER_MAX_CONCURRENT_JOBS=2
 ```
 
 ### Configuration File

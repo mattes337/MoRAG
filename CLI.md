@@ -20,6 +20,13 @@ MoRAG supports two distinct operation modes:
 - **Storage**: Results stored in Qdrant vector database
 - **Searchable**: Yes, via `/search` endpoint
 
+### **Remote Processing Mode** (Offload to Remote Workers)
+- **Purpose**: Offload computationally intensive tasks to remote workers with GPU support
+- **Use Case**: Scalable processing, GPU acceleration, distributed workloads
+- **Supported Content**: Audio and video files only
+- **Requirements**: Remote workers must be running and accessible
+- **Fallback**: Can automatically fall back to local processing if configured
+
 ## 📁 Available CLI Scripts
 
 All CLI scripts are located in `tests/cli/` and support both operation modes.
@@ -56,10 +63,17 @@ python tests/cli/test-audio.py my-audio.mp3 --ingest
 python tests/cli/test-audio.py recording.wav --ingest --webhook-url https://my-app.com/webhook
 ```
 
+**Remote Processing Mode** (offload to remote workers):
+```bash
+python tests/cli/test-audio.py my-audio.mp3 --ingest --remote
+python tests/cli/test-audio.py recording.wav --ingest --remote --webhook-url https://my-app.com/webhook
+```
+
 **Features**:
 - Audio transcription with Whisper
 - Speaker diarization (when enabled)
 - Topic segmentation (when enabled)
+- Remote processing support (GPU workers)
 - Supports MP3, WAV, M4A, and video files (audio extraction)
 
 #### `test-document.py`
@@ -101,11 +115,18 @@ python tests/cli/test-video.py my-video.mp4 --ingest
 python tests/cli/test-video.py recording.avi --ingest --thumbnails
 ```
 
+**Remote Processing Mode** (offload to remote workers):
+```bash
+python tests/cli/test-video.py my-video.mp4 --ingest --remote
+python tests/cli/test-video.py recording.avi --ingest --remote --thumbnails
+```
+
 **Features**:
 - Audio extraction and transcription
 - Optional thumbnail generation (opt-in)
 - Video metadata extraction
 - OCR on video frames (when enabled)
+- Remote processing support (GPU workers)
 
 #### `test-image.py`
 **Purpose**: Image processing with OCR and AI description
@@ -171,6 +192,24 @@ python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-ur
 - Metadata extraction (title, description, duration)
 - Supports standard YouTube URL formats
 
+### Remote Conversion Testing Scripts
+
+#### `test-remote-conversion.py`
+**Purpose**: Test the remote conversion system functionality
+
+**Basic Usage**:
+```bash
+python cli/test-remote-conversion.py --test all
+python cli/test-remote-conversion.py --test lifecycle
+python cli/test-remote-conversion.py --test api
+```
+
+**Features**:
+- Tests complete remote job lifecycle
+- Validates API endpoints
+- Simulates worker behavior
+- Comprehensive error testing
+
 ## 🔧 Command Line Options
 
 ### Common Options (All Scripts)
@@ -178,6 +217,7 @@ python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-ur
 | Option | Description | Example |
 |--------|-------------|---------|
 | `--ingest` | Enable ingestion mode (background processing + storage) | `--ingest` |
+| `--remote` | Enable remote processing (requires `--ingest`) | `--remote` |
 | `--webhook-url URL` | Webhook URL for completion notifications | `--webhook-url https://my-app.com/webhook` |
 | `--metadata JSON` | Additional metadata as JSON string | `--metadata '{"category": "research"}'` |
 | `--help` | Show help message | `--help` |
@@ -306,7 +346,154 @@ python tests/cli/test-audio.py uploads/audio.mp3 --enable-diarization --enable-t
 python tests/cli/test-web.py https://example.com --ingest --metadata '{"category": "reference"}'
 ```
 
+### Remote Processing Examples
+```bash
+# Process audio with remote GPU workers
+python tests/cli/test-audio.py uploads/audio.mp3 --ingest --remote
+
+# Process video with remote workers and webhook
+python tests/cli/test-video.py uploads/video.mp4 --ingest --remote --webhook-url https://my-app.com/webhook
+
+# Test remote conversion system
+python cli/test-remote-conversion.py --test all
+```
+
+## 🔄 Remote Processing Setup
+
+### Remote Worker Configuration
+
+#### Environment Setup
+```bash
+# Set up environment variables for remote worker
+export MORAG_WORKER_ID="gpu-worker-01"
+export MORAG_API_BASE_URL="https://your-morag-server.com"
+export MORAG_WORKER_CONTENT_TYPES="audio,video"
+export MORAG_WORKER_POLL_INTERVAL="10"
+export MORAG_WORKER_MAX_CONCURRENT_JOBS="2"
+export MORAG_TEMP_DIR="/tmp/morag_remote"
+```
+
+#### Configuration File
+Create `remote_converter_config.yaml`:
+```yaml
+worker_id: "gpu-worker-01"
+api_base_url: "https://your-morag-server.com"
+content_types: ["audio", "video"]
+poll_interval: 10
+max_concurrent_jobs: 2
+log_level: "INFO"
+temp_dir: "/tmp/morag_remote"
+```
+
+#### Starting Remote Worker
+```bash
+# Install dependencies
+pip install -e packages/morag-core packages/morag-audio packages/morag-video
+pip install requests pyyaml python-dotenv structlog
+
+# Start remote worker (when implemented)
+python tools/remote-converter/cli.py --config remote_converter_config.yaml
+
+# Or with command line options
+python tools/remote-converter/cli.py \
+    --worker-id gpu-worker-01 \
+    --api-url https://your-morag-server.com \
+    --content-types audio,video
+```
+
+### Remote Processing Examples
+
+#### Audio Processing with Remote Workers
+```bash
+# Process audio file using remote workers
+python tests/cli/test-audio.py uploads/audio.mp3 --ingest --remote
+
+# With webhook notification
+python tests/cli/test-audio.py uploads/audio.mp3 --ingest --remote \
+    --webhook-url https://my-app.com/webhook
+
+# With metadata and advanced options
+python tests/cli/test-audio.py uploads/audio.mp3 --ingest --remote \
+    --metadata '{"priority": "high", "category": "meeting"}' \
+    --enable-diarization --enable-topics
+```
+
+#### Video Processing with Remote Workers
+```bash
+# Process video file using remote workers
+python tests/cli/test-video.py uploads/video.mp4 --ingest --remote
+
+# With thumbnail generation
+python tests/cli/test-video.py uploads/video.mp4 --ingest --remote --thumbnails
+
+# With custom settings
+python tests/cli/test-video.py uploads/video.mp4 --ingest --remote \
+    --thumbnail-count 5 --enable-ocr
+```
+
+#### Testing Remote Conversion System
+```bash
+# Test complete remote conversion system
+python cli/test-remote-conversion.py --test all
+
+# Test only job lifecycle
+python cli/test-remote-conversion.py --test lifecycle
+
+# Test only API endpoints
+python cli/test-remote-conversion.py --test api
+```
+
+### Remote Job Monitoring
+
+#### Check Job Status
+```bash
+# Monitor remote job progress
+curl "http://localhost:8000/api/v1/remote-jobs/{job_id}/status"
+
+# List all remote jobs
+curl "http://localhost:8000/api/v1/remote-jobs/"
+```
+
+#### Worker Health Check
+```bash
+# Test worker connection to API
+python tools/remote-converter/cli.py --test-connection
+
+# Check worker capabilities
+python tools/remote-converter/cli.py --worker-id test-worker --content-types audio,video --test-connection
+```
+
 ## 🔧 Troubleshooting
+
+### Remote Processing Issues
+
+#### No Remote Workers Available
+```bash
+# Check if remote workers are running
+curl "http://localhost:8000/api/v1/remote-jobs/poll?worker_id=test&content_types=audio"
+
+# Enable fallback to local processing
+python tests/cli/test-audio.py audio.mp3 --ingest --remote --fallback-local
+```
+
+#### Remote Job Timeouts
+```bash
+# Check job status for timeout issues
+curl "http://localhost:8000/api/v1/remote-jobs/{job_id}/status"
+
+# Increase timeout for large files
+python tests/cli/test-video.py large-video.mp4 --ingest --remote \
+    --metadata '{"timeout_seconds": 7200}'
+```
+
+#### Worker Connection Issues
+```bash
+# Test API connectivity from worker machine
+curl "http://your-morag-server.com/health"
+
+# Check worker logs
+python tools/remote-converter/cli.py --log-level DEBUG
+```
 
 ### Import Errors
 ```bash

@@ -33,6 +33,7 @@ packages/
 - **Intelligent Chunking**: Page-based chunking for documents with configurable strategies (page, semantic, sentence, paragraph)
 - **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
 - **Batch Embedding**: Optimized batch processing using Gemini's native batch API for 4x faster embeddings and reduced rate limiting
+- **Remote Processing**: Offload computationally intensive tasks (audio/video) to remote workers with GPU support
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
 
 ## Quick Start
@@ -220,6 +221,40 @@ For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/
 
 For detailed information, see [CPU Compatibility Guide](docs/CPU_COMPATIBILITY.md).
 
+## Remote Processing (NEW)
+
+✅ **Remote Conversion System**: MoRAG now supports offloading computationally intensive tasks to remote workers with GPU support.
+
+**Key Features:**
+- **Horizontal Scaling**: Distribute audio/video processing across multiple machines
+- **GPU Support**: Leverage remote GPUs for faster processing
+- **Automatic Fallback**: Falls back to local processing if remote workers are unavailable
+- **Secure File Transfer**: Safe file download and result submission
+- **Job Management**: Complete job lifecycle tracking and monitoring
+
+**Quick Start:**
+```bash
+# Enable remote processing for audio/video files
+python tests/cli/test-audio.py my-audio.mp3 --ingest --remote
+python tests/cli/test-video.py my-video.mp4 --ingest --remote
+
+# Test remote conversion system
+python cli/test-remote-conversion.py --test all
+```
+
+**Remote Worker Setup:**
+```bash
+# Set up remote worker (on GPU machine)
+export MORAG_WORKER_ID="gpu-worker-01"
+export MORAG_API_BASE_URL="https://your-morag-server.com"
+export MORAG_WORKER_CONTENT_TYPES="audio,video"
+
+# Start remote worker (implementation in progress)
+python tools/remote-converter/cli.py
+```
+
+For complete documentation, see [Remote Conversion System Guide](docs/remote-conversion-system.md).
+
 ## Usage
 
 For detailed usage examples including Python API, CLI commands, REST API endpoints, and configuration options, see [USAGE.md](USAGE.md).
@@ -265,6 +300,7 @@ The MoRAG pipeline consists of several key components:
 - [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md) - Complete Docker deployment instructions
 - [Universal Document Conversion](docs/UNIVERSAL_DOCUMENT_CONVERSION.md) - Complete guide to the conversion framework
 - [Batch Embedding Guide](docs/batch-embedding.md) - **NEW**: Optimized batch embedding with Gemini API for 4x performance improvement
+- [Remote Conversion System](docs/remote-conversion-system.md) - **NEW**: Remote processing with GPU workers for scalable audio/video processing
 - [Architecture Guide](docs/ARCHITECTURE.md) - Detailed system architecture
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md) - Development setup and guidelines
 - [Page-Based Chunking Guide](docs/page-based-chunking.md)
