@@ -8,7 +8,7 @@
 
 **Fix**: Updated method calls in `_process_file()` to use the correct method names:
 - `AudioProcessor.process(file_path)` ✓
-- `VideoProcessor.process(file_path)` ✓  
+- `VideoProcessor.process_video(file_path)` ✓ (was incorrectly using process())
 - `DocumentProcessor.process_file(file_path)` ✓
 - `ImageProcessor.process(file_path)` ✓
 - `WebProcessor.process_url(url)` ✓
@@ -18,10 +18,19 @@
 
 **Problem**: The remote converter was importing `ProcessingResult` from `morag_core.models` and trying to create it with a `text_content` parameter, but that class doesn't have this parameter.
 
-**Fix**: 
+**Fix**:
 - Created a unified `ProcessingResult` class specifically for the remote converter with the required `text_content` parameter
 - Added a `convert_to_unified_result()` function to convert processor-specific results to the unified format
 - Updated all result creation to use the new unified format
+
+### 3. 'AudioProcessingResult' object has no attribute 'language'
+
+**Problem**: VideoProcessor was trying to access `audio_result.language`, `audio_result.speaker_segments`, and `audio_result.topic_segments` but these attributes don't exist on AudioProcessingResult.
+
+**Fix**:
+- Updated VideoProcessor to access correct attributes from AudioProcessingResult.metadata
+- Added language detection storage in AudioProcessor
+- Fixed attribute access: `audio_result.metadata.get("language", "unknown")`, `audio_result.metadata.get("num_speakers", 0)`, `audio_result.metadata.get("num_topics", 0)`
 
 ## Files Modified
 
@@ -32,6 +41,15 @@
 3. **Added convert_to_unified_result() function** to handle conversion from processor-specific results
 4. **Fixed method calls** in `_process_file()` to use correct processor method names
 5. **Updated result handling** to use the conversion function
+
+### `packages/morag-video/src/morag_video/processor.py`
+
+1. **Fixed AudioProcessingResult attribute access** to use correct metadata fields
+2. **Updated logging** to access language, speakers, and topics from metadata instead of non-existent attributes
+
+### `packages/morag-audio/src/morag_audio/processor.py`
+
+1. **Added language detection storage** to store detected language in metadata for VideoProcessor compatibility
 
 ## Key Changes
 
@@ -72,9 +90,10 @@ Created test scripts to verify fixes:
 
 ## Status
 
-✅ **Fixed**: Method name issues  
-✅ **Fixed**: ProcessingResult parameter issues  
-✅ **Fixed**: Result conversion logic  
-✅ **Fixed**: Import structure  
+✅ **Fixed**: Method name issues (AudioProcessor.process_audio → process, VideoProcessor.process → process_video)
+✅ **Fixed**: ProcessingResult parameter issues (added text_content parameter)
+✅ **Fixed**: Result conversion logic (unified conversion function)
+✅ **Fixed**: Import structure (avoid heavy initialization)
+✅ **Fixed**: AudioProcessingResult attribute access (language, speaker_segments, topic_segments → metadata fields)
 
-The remote converter should now work correctly with all MoRAG processors.
+The remote converter should now work correctly with all MoRAG processors without any attribute or method errors.

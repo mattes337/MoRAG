@@ -416,8 +416,8 @@ class RemoteConverter:
                 # AudioProcessor has process() method
                 result = await processor.process(file_path)
             elif content_type == 'video':
-                # VideoProcessor has process() method
-                result = await processor.process(file_path)
+                # VideoProcessor has process_video() method
+                result = await processor.process_video(file_path)
             elif content_type == 'document':
                 # DocumentProcessor has process_file() method
                 result = await processor.process_file(file_path)

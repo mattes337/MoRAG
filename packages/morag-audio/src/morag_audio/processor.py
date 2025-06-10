@@ -293,10 +293,18 @@ class AudioProcessor:
             )
         )
         
+        # Store language information in metadata
+        if hasattr(info, 'language'):
+            self.metadata["language"] = info.language
+        elif hasattr(info, 'detected_language'):
+            self.metadata["language"] = info.detected_language
+        else:
+            self.metadata["language"] = self.config.language or "unknown"
+
         # Convert to our segment format
         segments = []
         full_transcript = ""
-        
+
         for segment_data in segments_data:
             segment = AudioSegment(
                 start=segment_data.start,
@@ -306,7 +314,7 @@ class AudioProcessor:
             )
             segments.append(segment)
             full_transcript += segment_data.text + " "
-        
+
         return segments, full_transcript.strip()
     
     async def _apply_diarization(self, file_path: Union[str, Path], segments: List[AudioSegment]) -> List[AudioSegment]:

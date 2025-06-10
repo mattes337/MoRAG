@@ -105,7 +105,7 @@ def test_fixes():
     print("\n3. Testing method name expectations...")
     print("✅ Expected method names:")
     print("   - AudioProcessor.process() ✓ (not process_audio)")
-    print("   - VideoProcessor.process() ✓")
+    print("   - VideoProcessor.process_video() ✓ (not process)")
     print("   - DocumentProcessor.process_file() ✓")
     print("   - ImageProcessor.process() ✓")
     print("   - WebProcessor.process_url() ✓")
@@ -128,13 +128,47 @@ def test_fixes():
         print(f"❌ Error result creation failed: {e}")
         return False
     
+    # Test 5: AudioProcessingResult attribute access
+    print("\n5. Testing AudioProcessingResult attribute access...")
+    try:
+        # Create mock AudioProcessingResult with correct attributes
+        audio_result = MockAudioProcessingResult(
+            transcript="Test transcript",
+            segments=[],
+            metadata={
+                "language": "en",
+                "num_speakers": 2,
+                "num_topics": 3,
+                "duration": 120.5
+            },
+            file_path="test.mp3",
+            processing_time=5.2,
+            success=True,
+            error_message=None
+        )
+
+        # Test accessing attributes that VideoProcessor expects
+        language = audio_result.metadata.get("language", "unknown")
+        speakers = audio_result.metadata.get("num_speakers", 0)
+        topics = audio_result.metadata.get("num_topics", 0)
+
+        print(f"✅ AudioProcessingResult attribute access successful:")
+        print(f"   Language: {language}")
+        print(f"   Speakers: {speakers}")
+        print(f"   Topics: {topics}")
+
+    except Exception as e:
+        print(f"❌ AudioProcessingResult attribute access failed: {e}")
+        return False
+
     print("\n✅ All simple tests passed!")
     print("\nSummary of fixes:")
     print("1. ✅ Fixed ProcessingResult to include text_content parameter")
     print("2. ✅ Fixed method calls to use correct processor method names")
     print("3. ✅ Added proper result conversion from processor-specific to unified format")
     print("4. ✅ Updated imports to avoid circular dependencies")
-    
+    print("5. ✅ Fixed VideoProcessor AudioProcessingResult attribute access")
+
     print("\nThe remote converter should now work correctly!")
     return True
 

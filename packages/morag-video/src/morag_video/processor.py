@@ -195,9 +195,9 @@ class VideoProcessor:
 
                         logger.info("Enhanced audio processing completed for video",
                                    transcription_length=len(audio_result.transcript) if audio_result.transcript else 0,
-                                   language=audio_result.language,
-                                   speakers_detected=len(audio_result.speaker_segments) if audio_result.speaker_segments else 0,
-                                   topics_detected=len(audio_result.topic_segments) if audio_result.topic_segments else 0)
+                                   language=audio_result.metadata.get("language", "unknown"),
+                                   speakers_detected=audio_result.metadata.get("num_speakers", 0),
+                                   topics_detected=audio_result.metadata.get("num_topics", 0))
 
                     except Exception as e:
                         logger.warning("Enhanced audio processing failed for video",
