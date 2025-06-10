@@ -50,10 +50,21 @@ def process_url_task(self, url: str, content_type: Optional[str] = None, options
     async def _process():
         api = get_morag_api()
         try:
-            self.update_state(state='PROCESSING', meta={'stage': 'starting'})
-            
+            self.update_state(state='PROCESSING', meta={'stage': 'starting', 'progress': 0.0, 'message': 'Initializing URL processing'})
+
+            # Create a progress callback for the API
+            def progress_callback(progress: float, message: str = None):
+                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+
+            # Pass progress callback to API if supported
+            if options is None:
+                options = {}
+            options['progress_callback'] = progress_callback
+
             result = await api.process_url(url, content_type, options)
-            
+
+            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing processing'})
+
             return {
                 'success': result.success,
                 'content': result.text_content or "",
@@ -65,7 +76,7 @@ def process_url_task(self, url: str, content_type: Optional[str] = None, options
             logger.error("URL processing task failed", url=url, error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_process())
 
 
@@ -75,10 +86,21 @@ def process_file_task(self, file_path: str, content_type: Optional[str] = None, 
     async def _process():
         api = get_morag_api()
         try:
-            self.update_state(state='PROCESSING', meta={'stage': 'starting'})
-            
+            self.update_state(state='PROCESSING', meta={'stage': 'starting', 'progress': 0.0, 'message': 'Initializing file processing'})
+
+            # Create a progress callback for the API
+            def progress_callback(progress: float, message: str = None):
+                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+
+            # Pass progress callback to API if supported
+            if options is None:
+                options = {}
+            options['progress_callback'] = progress_callback
+
             result = await api.process_file(file_path, content_type, options)
-            
+
+            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing processing'})
+
             return {
                 'success': result.success,
                 'content': result.text_content or "",
@@ -90,7 +112,7 @@ def process_file_task(self, file_path: str, content_type: Optional[str] = None, 
             logger.error("File processing task failed", file_path=file_path, error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_process())
 
 
@@ -100,10 +122,21 @@ def process_web_page_task(self, url: str, options: Optional[Dict[str, Any]] = No
     async def _process():
         api = get_morag_api()
         try:
-            self.update_state(state='PROCESSING', meta={'stage': 'web_scraping'})
-            
+            self.update_state(state='PROCESSING', meta={'stage': 'web_scraping', 'progress': 0.0, 'message': 'Initializing web page processing'})
+
+            # Create a progress callback for the API
+            def progress_callback(progress: float, message: str = None):
+                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+
+            # Pass progress callback to API if supported
+            if options is None:
+                options = {}
+            options['progress_callback'] = progress_callback
+
             result = await api.process_web_page(url, options)
-            
+
+            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing web page processing'})
+
             return {
                 'success': result.success,
                 'content': result.text_content or "",
@@ -115,7 +148,7 @@ def process_web_page_task(self, url: str, options: Optional[Dict[str, Any]] = No
             logger.error("Web page processing task failed", url=url, error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_process())
 
 
@@ -125,10 +158,21 @@ def process_youtube_video_task(self, url: str, options: Optional[Dict[str, Any]]
     async def _process():
         api = get_morag_api()
         try:
-            self.update_state(state='PROCESSING', meta={'stage': 'youtube_download'})
-            
+            self.update_state(state='PROCESSING', meta={'stage': 'youtube_download', 'progress': 0.0, 'message': 'Initializing YouTube video processing'})
+
+            # Create a progress callback for the API
+            def progress_callback(progress: float, message: str = None):
+                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+
+            # Pass progress callback to API if supported
+            if options is None:
+                options = {}
+            options['progress_callback'] = progress_callback
+
             result = await api.process_youtube_video(url, options)
-            
+
+            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing YouTube video processing'})
+
             return {
                 'success': result.success,
                 'content': result.text_content or "",
@@ -140,7 +184,7 @@ def process_youtube_video_task(self, url: str, options: Optional[Dict[str, Any]]
             logger.error("YouTube processing task failed", url=url, error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_process())
 
 
@@ -150,10 +194,37 @@ def process_batch_task(self, items: List[Dict[str, Any]], options: Optional[Dict
     async def _process():
         api = get_morag_api()
         try:
-            self.update_state(state='PROCESSING', meta={'stage': 'batch_processing', 'total_items': len(items)})
-            
+            total_items = len(items)
+            self.update_state(state='PROCESSING', meta={
+                'stage': 'batch_processing',
+                'total_items': total_items,
+                'progress': 0.0,
+                'message': f'Starting batch processing of {total_items} items'
+            })
+
+            # Create a progress callback for batch processing
+            def progress_callback(completed_items: int, message: str = None):
+                progress = completed_items / total_items if total_items > 0 else 0.0
+                self.update_state(state='PROGRESS', meta={
+                    'progress': progress,
+                    'completed_items': completed_items,
+                    'total_items': total_items,
+                    'message': message or f'Processed {completed_items}/{total_items} items'
+                })
+
+            # Pass progress callback to API if supported
+            if options is None:
+                options = {}
+            options['batch_progress_callback'] = progress_callback
+
             results = await api.process_batch(items, options)
-            
+
+            self.update_state(state='PROCESSING', meta={
+                'stage': 'completing',
+                'progress': 0.95,
+                'message': 'Finalizing batch processing'
+            })
+
             return [
                 {
                     'success': result.success,
@@ -167,7 +238,7 @@ def process_batch_task(self, items: List[Dict[str, Any]], options: Optional[Dict
             logger.error("Batch processing task failed", item_count=len(items), error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_process())
 
 
@@ -177,16 +248,25 @@ def search_task(self, query: str, limit: int = 10, filters: Optional[Dict[str, A
     async def _search():
         api = get_morag_api()
         try:
-            self.update_state(state='PROCESSING', meta={'stage': 'searching'})
-            
+            self.update_state(state='PROCESSING', meta={'stage': 'searching', 'progress': 0.1, 'message': 'Initializing search'})
+
+            # Create a progress callback for the API
+            def progress_callback(progress: float, message: str = None):
+                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Searching... {int(progress * 100)}%'})
+
+            # Search doesn't typically need progress callbacks, but we can simulate progress
+            self.update_state(state='PROGRESS', meta={'progress': 0.5, 'message': 'Executing search query'})
+
             results = await api.search(query, limit, filters)
-            
+
+            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.9, 'message': 'Finalizing search results'})
+
             return {'results': results}
         except Exception as e:
             logger.error("Search task failed", query=query, error=str(e))
             self.update_state(state='FAILURE', meta={'error': str(e)})
             raise
-    
+
     return asyncio.run(_search())
 
 

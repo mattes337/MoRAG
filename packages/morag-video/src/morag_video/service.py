@@ -91,10 +91,11 @@ class VideoService:
                 "error": str(e)
             }
 
-    async def process_file(self, 
-                         file_path: Union[str, Path], 
+    async def process_file(self,
+                         file_path: Union[str, Path],
                          save_output: bool = True,
-                         output_format: str = "markdown") -> Dict[str, Any]:
+                         output_format: str = "markdown",
+                         progress_callback: callable = None) -> Dict[str, Any]:
         """Process a video file and optionally save the results.
         
         Args:
@@ -116,8 +117,10 @@ class VideoService:
         
         try:
             # Process the video file
-            logger.info("Processing video file", file_path=str(file_path))
-            result = await self.processor.process_video(file_path)
+            logger.info("Starting video processing", file_path=str(file_path))
+            if progress_callback:
+                progress_callback(0.1, "Initializing video processing")
+            result = await self.processor.process_video(file_path, progress_callback)
             
             # Generate embeddings if embedding service is available
             if self.embedding_service and result.audio_processing_result and result.audio_processing_result.transcript:

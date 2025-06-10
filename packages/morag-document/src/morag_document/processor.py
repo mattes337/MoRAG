@@ -114,6 +114,7 @@ class DocumentProcessor(BaseProcessor):
                 chunk_size=config.chunk_size or settings.default_chunk_size,
                 chunk_overlap=config.chunk_overlap or settings.default_chunk_overlap,
                 extract_metadata=config.extract_metadata or True,
+                progress_callback=getattr(config, 'progress_callback', None),
             )
 
             # Log the actual options being used

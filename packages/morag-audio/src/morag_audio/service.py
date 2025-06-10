@@ -93,10 +93,11 @@ class AudioService:
                 "error": str(e)
             }
     
-    async def process_file(self, 
-                         file_path: Union[str, Path], 
+    async def process_file(self,
+                         file_path: Union[str, Path],
                          save_output: bool = True,
-                         output_format: str = "markdown") -> Dict[str, Any]:
+                         output_format: str = "markdown",
+                         progress_callback: callable = None) -> Dict[str, Any]:
         """Process an audio file and optionally save the results.
         
         Args:
@@ -123,7 +124,7 @@ class AudioService:
         
         try:
             # Process the audio file
-            result = await self.processor.process(file_path)
+            result = await self.processor.process(file_path, progress_callback)
             
             # Generate embeddings if embedding service is available
             if self.embedding_service and result.success:

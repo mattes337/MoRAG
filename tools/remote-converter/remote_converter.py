@@ -247,9 +247,6 @@ class RemoteConverter:
                         # Start processing job asynchronously
                         task = asyncio.create_task(self._process_job(job))
                         self.active_jobs[job['job_id']] = task
-                        logger.info("Started processing job", 
-                                   job_id=job['job_id'],
-                                   active_jobs=len(self.active_jobs))
                 
                 # Wait before next poll
                 await asyncio.sleep(self.poll_interval)
@@ -292,9 +289,6 @@ class RemoteConverter:
             if response.status_code == 200:
                 data = response.json()
                 if data.get('job_id'):
-                    logger.info("Job received from API", 
-                               job_id=data['job_id'],
-                               content_type=data.get('content_type'))
                     return data
             elif response.status_code != 204:  # 204 = no jobs available
                 logger.warning("Failed to poll for jobs", 
@@ -313,27 +307,31 @@ class RemoteConverter:
         content_type = job['content_type']
         task_options = job.get('task_options', {})
         
-        logger.info("Processing job", 
+        logger.info("Starting job processing",
                    job_id=job_id,
                    content_type=content_type)
-        
+
         start_time = time.time()
-        
+
         try:
             # Download source file
+            logger.info("Downloading source file", job_id=job_id)
             file_path = await self._download_source_file(job_id, job.get('source_file_url'))
             if not file_path:
                 await self._submit_error_result(job_id, "Failed to download source file")
                 return
-            
+
             # Process the file
+            logger.info("Processing file", job_id=job_id, content_type=content_type)
             result = await self._process_file(file_path, content_type, task_options)
             
             # Submit result
             if result and result.success:
+                logger.info("Job processing completed successfully", job_id=job_id, processing_time=time.time() - start_time)
                 await self._submit_success_result(job_id, result, time.time() - start_time)
             else:
                 error_msg = result.error_message if result else "Processing failed"
+                logger.warning("Job processing failed", job_id=job_id, error=error_msg)
                 await self._submit_error_result(job_id, error_msg)
             
         except Exception as e:
@@ -376,12 +374,6 @@ class RemoteConverter:
                         temp_file.write(chunk)
 
                 temp_file.close()
-
-                logger.info("Source file downloaded",
-                           job_id=job_id,
-                           file_path=temp_file.name,
-                           file_size=os.path.getsize(temp_file.name))
-
                 return temp_file.name
             else:
                 logger.error("Failed to download source file",
@@ -411,19 +403,25 @@ class RemoteConverter:
                     error_message=f"No processor available for content type: {content_type}"
                 )
 
+            # Create a simple progress callback for logging
+            def progress_callback(progress: float, message: str = None):
+                if message:
+                    logger.info(f"Processing progress: {message} ({int(progress * 100)}%)")
+
             # Process the file based on content type using correct method names
             if content_type == 'audio':
                 # AudioProcessor has process() method
-                result = await processor.process(file_path)
+                result = await processor.process(file_path, progress_callback)
             elif content_type == 'video':
                 # VideoProcessor has process_video() method
-                result = await processor.process_video(file_path)
+                result = await processor.process_video(file_path, progress_callback)
             elif content_type == 'document':
-                # DocumentProcessor has process_file() method
-                result = await processor.process_file(file_path)
+                # DocumentProcessor has process_file() method - need to pass via options
+                options['progress_callback'] = progress_callback
+                result = await processor.process_file(file_path, **options)
             elif content_type == 'image':
                 # ImageProcessor has process() method
-                result = await processor.process(file_path)
+                result = await processor.process(file_path, progress_callback)
             elif content_type == 'web':
                 # For web content, file_path would contain the URL
                 with open(file_path, 'r') as f:
@@ -475,9 +473,7 @@ class RemoteConverter:
 
             response = requests.put(url, json=payload, headers=headers, timeout=60)
 
-            if response.status_code == 200:
-                logger.info("Successfully submitted result", job_id=job_id)
-            else:
+            if response.status_code != 200:
                 logger.error("Failed to submit result",
                            job_id=job_id,
                            status_code=response.status_code,
@@ -502,9 +498,7 @@ class RemoteConverter:
 
             response = requests.put(url, json=payload, headers=headers, timeout=60)
 
-            if response.status_code == 200:
-                logger.info("Successfully submitted error result", job_id=job_id)
-            else:
+            if response.status_code != 200:
                 logger.error("Failed to submit error result",
                            job_id=job_id,
                            status_code=response.status_code)

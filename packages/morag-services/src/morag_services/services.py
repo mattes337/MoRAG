@@ -269,14 +269,19 @@ class MoRAGServices:
             ProcessingResult with extracted text and metadata
         """
         try:
+            # Extract progress callback from options if available
+            progress_callback = (options or {}).get('progress_callback')
+
             # Get both formats: markdown for Qdrant, JSON for API response
             markdown_result = await self.document_service.process_document(
                 Path(document_path),
+                progress_callback=progress_callback,
                 **(options or {})
             )
 
             json_result = await self.document_service.process_document_to_json(
                 Path(document_path),
+                progress_callback=progress_callback,
                 **(options or {})
             )
 
@@ -328,17 +333,22 @@ class MoRAGServices:
             ProcessingResult with transcription and metadata
         """
         try:
+            # Extract progress callback from options if available
+            progress_callback = (options or {}).get('progress_callback')
+
             # Get both markdown (for Qdrant) and JSON (for API response)
             markdown_result = await self.audio_service.process_file(
                 Path(audio_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="markdown"  # Use markdown format for Qdrant storage
+                output_format="markdown",  # Use markdown format for Qdrant storage
+                progress_callback=progress_callback
             )
 
             json_result = await self.audio_service.process_file(
                 Path(audio_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="json"  # Use JSON format for API response
+                output_format="json",  # Use JSON format for API response
+                progress_callback=progress_callback
             )
 
             # Use markdown content for text_content (Qdrant storage)
@@ -381,6 +391,9 @@ class MoRAGServices:
             ProcessingResult with extracted information
         """
         try:
+            # Extract progress callback from options if available
+            progress_callback = (options or {}).get('progress_callback')
+
             # Check if thumbnails should be generated (default to False - opt-in)
             include_thumbnails = options and options.get('include_thumbnails', False)
 
@@ -394,13 +407,15 @@ class MoRAGServices:
             markdown_result = await self.video_service.process_file(
                 Path(video_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="markdown"  # Use markdown format for Qdrant storage
+                output_format="markdown",  # Use markdown format for Qdrant storage
+                progress_callback=progress_callback
             )
 
             json_result = await self.video_service.process_file(
                 Path(video_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="json"  # Use JSON format for API response
+                output_format="json",  # Use JSON format for API response
+                progress_callback=progress_callback
             )
 
             # Restore original config

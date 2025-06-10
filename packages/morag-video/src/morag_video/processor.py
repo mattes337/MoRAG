@@ -140,29 +140,35 @@ class VideoProcessor:
                 raise VideoProcessingError(f"OCR engine not available: {str(e)}")
         return self._ocr_engine
 
-    async def process_video(self, file_path: Union[str, Path]) -> VideoProcessingResult:
+    async def process_video(self, file_path: Union[str, Path], progress_callback: callable = None) -> VideoProcessingResult:
         """Process video file with audio extraction and thumbnail generation.
-        
+
         Args:
             file_path: Path to the video file
-            
+            progress_callback: Optional callback for progress updates
+
         Returns:
             VideoProcessingResult containing processing results
-            
+
         Raises:
             VideoProcessingError: If processing fails
         """
         start_time = time.time()
         file_path = Path(file_path)
-        
+
         try:
             logger.info("Starting video processing", file_path=str(file_path))
-            
+
+            if progress_callback:
+                progress_callback(0.1, "Initializing video processing")
+
             # Validate input file
             if not file_path.exists():
                 raise VideoProcessingError(f"Video file not found: {file_path}")
-            
+
             # Extract metadata
+            if progress_callback:
+                progress_callback(0.2, "Extracting video metadata")
             metadata = await self._extract_metadata(file_path)
             
             # Initialize result
@@ -177,6 +183,8 @@ class VideoProcessor:
             
             # Extract audio if requested
             if self.config.extract_audio and metadata.has_audio:
+                if progress_callback:
+                    progress_callback(0.3, "Extracting audio from video")
                 audio_path = await self._extract_audio(file_path, self.config.audio_format)
                 result.audio_path = audio_path
                 result.temp_files.append(audio_path)
@@ -190,7 +198,15 @@ class VideoProcessor:
                                    enable_topic_segmentation=self.config.enable_topic_segmentation)
 
                         audio_processor = self._get_audio_processor()
-                        audio_result = await audio_processor.process(audio_path)
+                        # Pass progress callback to audio processor if available
+                        audio_progress_callback = None
+                        if progress_callback:
+                            def audio_progress_callback(progress: float, message: str = None):
+                                # Map audio progress to video progress range (0.5 to 0.7)
+                                video_progress = 0.5 + (progress * 0.2)
+                                progress_callback(video_progress, f"Audio processing: {message or 'Processing audio'}")
+
+                        audio_result = await audio_processor.process(audio_path, audio_progress_callback)
                         result.audio_processing_result = audio_result
 
                         logger.info("Enhanced audio processing completed for video",
@@ -208,8 +224,10 @@ class VideoProcessor:
             
             # Generate thumbnails if requested
             if self.config.generate_thumbnails:
+                if progress_callback:
+                    progress_callback(0.75, "Generating video thumbnails")
                 thumbnails = await self._generate_thumbnails(
-                    file_path, 
+                    file_path,
                     self.config.thumbnail_count,
                     self.config.thumbnail_size,
                     self.config.thumbnail_format
@@ -219,6 +237,8 @@ class VideoProcessor:
             
             # Extract keyframes if requested
             if self.config.extract_keyframes:
+                if progress_callback:
+                    progress_callback(0.85, "Extracting keyframes")
                 keyframes = await self._extract_keyframes(
                     file_path,
                     self.config.max_keyframes,
@@ -228,10 +248,12 @@ class VideoProcessor:
                 )
                 result.keyframes = keyframes
                 result.temp_files.extend(keyframes)
-                
+
                 # Perform OCR on keyframes if requested
                 if self.config.enable_ocr and keyframes:
                     try:
+                        if progress_callback:
+                            progress_callback(0.9, "Performing OCR on keyframes")
                         ocr_results = await self._perform_ocr(keyframes)
                         result.ocr_results = ocr_results
                     except Exception as e:
@@ -241,7 +263,10 @@ class VideoProcessor:
             
             processing_time = time.time() - start_time
             result.processing_time = processing_time
-            
+
+            if progress_callback:
+                progress_callback(0.95, "Finalizing video processing")
+
             logger.info("Video processing completed",
                        file_path=str(file_path),
                        processing_time=processing_time,
@@ -249,7 +274,7 @@ class VideoProcessor:
                        thumbnails_count=len(result.thumbnails),
                        keyframes_count=len(result.keyframes),
                        ocr_performed=result.ocr_results is not None)
-            
+
             return result
             
         except Exception as e:

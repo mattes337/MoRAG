@@ -34,10 +34,7 @@ async def create_remote_job(
     try:
         job = service.create_job(request)
 
-        logger.info("Remote job created",
-                   job_id=job.id,
-                   content_type=job.content_type,
-                   ingestion_task_id=job.ingestion_task_id)
+
 
         return CreateRemoteJobResponse(
             job_id=job.id,
@@ -72,10 +69,7 @@ async def poll_for_jobs(
         # Generate secure download URL for source file
         source_file_url = f"/api/v1/remote-jobs/{job.id}/download"
 
-        logger.info("Job assigned to worker",
-                   job_id=job.id,
-                   worker_id=worker_id,
-                   content_type=job.content_type)
+
 
         return PollJobsResponse(
             job_id=job.id,
@@ -107,10 +101,7 @@ async def submit_job_result(
                 detail=f"Job {job_id} not found"
             )
         
-        logger.info("Job result submitted",
-                   job_id=job_id,
-                   status=job.status,
-                   success=result.success)
+
         
         # Continue ingestion pipeline if successful
         ingestion_continued = False
@@ -126,9 +117,7 @@ async def submit_job_result(
                     result.metadata or {},
                     result.processing_time or 0.0
                 )
-                logger.info("Ingestion pipeline continued after remote processing",
-                           job_id=job_id,
-                           success=ingestion_continued)
+
             except Exception as e:
                 logger.error("Failed to continue ingestion pipeline",
                            job_id=job_id,
@@ -227,7 +216,7 @@ async def download_job_file(
                 detail=f"Source file not found: {job.source_file_path}"
             )
 
-        logger.info("File download requested", job_id=job_id, worker_id=job.worker_id)
+
 
         return FileResponse(
             path=str(source_file),

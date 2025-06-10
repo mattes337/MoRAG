@@ -58,6 +58,9 @@ class ConversionOptions:
     validate_output: bool = True
     fix_encoding_issues: bool = True
 
+    # Progress callback for long-running operations
+    progress_callback: Optional[callable] = None
+
     # Output options
     include_page_numbers: bool = True
     include_line_numbers: bool = False

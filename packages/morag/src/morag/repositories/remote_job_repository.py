@@ -164,7 +164,6 @@ class RemoteJobRepository:
                     logger.error("Failed to process job file", file=str(job_file), error=str(e))
                     continue
 
-            logger.info("Jobs polled", worker_id=worker_id, count=len(available_jobs))
             return available_jobs
 
         except Exception as e:

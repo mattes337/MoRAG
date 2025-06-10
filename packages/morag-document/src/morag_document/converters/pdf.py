@@ -99,6 +99,13 @@ class PDFConverter(DocumentConverter):
             from docling.datamodel.base_models import InputFormat
             from docling.datamodel.pipeline_options import PdfPipelineOptions
 
+            logger.info("Starting PDF to markdown conversion using docling", file_path=str(file_path))
+
+            # Report progress if callback available
+            progress_callback = getattr(options, 'progress_callback', None)
+            if progress_callback:
+                progress_callback(0.1, "Initializing PDF conversion with docling")
+
             # Configure docling for optimal markdown conversion with CPU safety
             pipeline_options = PdfPipelineOptions()
 
@@ -115,6 +122,9 @@ class PDFConverter(DocumentConverter):
                 pipeline_options.do_ocr = True  # Enable OCR for scanned PDFs
                 pipeline_options.do_table_structure = True  # Preserve table structure
 
+            if progress_callback:
+                progress_callback(0.3, "Converting PDF structure and extracting text")
+
             doc_converter = DocumentConverter(
                 format_options={
                     InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
@@ -126,6 +136,9 @@ class PDFConverter(DocumentConverter):
 
             if not result.document:
                 raise ConversionError("Docling failed to convert PDF document")
+
+            if progress_callback:
+                progress_callback(0.7, "Generating markdown from PDF content")
 
             # Extract markdown content
             markdown_content = result.document.export_to_markdown()
@@ -154,6 +167,9 @@ class PDFConverter(DocumentConverter):
 
             # Estimate word count from markdown
             document.metadata.word_count = len(markdown_content.split())
+
+            if progress_callback:
+                progress_callback(0.9, "PDF to markdown conversion completed")
 
             logger.info("Successfully converted PDF to markdown using docling",
                        file_path=str(file_path),
@@ -209,10 +225,17 @@ class PDFConverter(DocumentConverter):
             ConversionError: If text extraction fails
         """
         try:
+            logger.info("Starting PDF text extraction using pypdf", file_path=str(file_path))
+
+            # Report progress if callback available
+            progress_callback = getattr(options, 'progress_callback', None)
+            if progress_callback:
+                progress_callback(0.1, "Initializing PDF text extraction with pypdf")
+
             # Open PDF file
             with open(file_path, "rb") as file:
                 pdf = pypdf.PdfReader(file)
-                
+
                 # Extract document info
                 info = pdf.metadata
                 if info:
@@ -220,10 +243,14 @@ class PDFConverter(DocumentConverter):
                     document.metadata.author = info.author
                     document.metadata.created_at = info.creation_date
                     document.metadata.modified_at = info.modification_date
-                
+
                 # Extract page count
                 document.metadata.page_count = len(pdf.pages)
-                
+                total_pages = len(pdf.pages)
+
+                if progress_callback:
+                    progress_callback(0.3, f"Extracting text from {total_pages} pages")
+
                 # Extract text from each page
                 full_text = ""
                 page_texts = []  # Store page texts for chapter processing
@@ -243,6 +270,12 @@ class PDFConverter(DocumentConverter):
                                 )
 
                             full_text += page_text + "\n\n"
+
+                            # Report progress every 10 pages or at the end
+                            if progress_callback and (page_number % 10 == 0 or page_number == total_pages):
+                                progress = 0.3 + (page_number / total_pages) * 0.5  # 30% to 80% for page processing
+                                progress_callback(progress, f"Processed {page_number}/{total_pages} pages")
+
                     except Exception as e:
                         logger.warning(
                             "Failed to extract text from PDF page",
@@ -253,14 +286,19 @@ class PDFConverter(DocumentConverter):
 
                 # Handle chapter chunking
                 if options.chunking_strategy == "chapter":
+                    if progress_callback:
+                        progress_callback(0.85, "Processing chapters")
                     await self._chunk_by_chapters(document, page_texts)
-                
+
                 # Set raw text
                 document.raw_text = full_text
-                
+
                 # Estimate word count
                 document.metadata.word_count = len(full_text.split())
-                
+
+                if progress_callback:
+                    progress_callback(0.9, "PDF text extraction completed")
+
                 return document
                 
         except Exception as e:

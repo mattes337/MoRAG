@@ -145,49 +145,64 @@ class AudioProcessor:
                 logger.warning(f"Failed to initialize topic segmentation: {e}")
                 self.config.enable_topic_segmentation = False
     
-    async def process(self, file_path: Union[str, Path]) -> AudioProcessingResult:
+    async def process(self, file_path: Union[str, Path], progress_callback: callable = None) -> AudioProcessingResult:
         """Process an audio file to extract transcription and metadata.
-        
+
         Args:
             file_path: Path to the audio file
-            
+            progress_callback: Optional callback for progress updates
+
         Returns:
             AudioProcessingResult containing transcript, segments, and metadata
-            
+
         Raises:
             AudioProcessingError: If processing fails
         """
         start_time = time.time()
         file_path = Path(file_path)
-        
+
         if not file_path.exists():
             raise AudioProcessingError(f"File not found: {file_path}")
-        
-        logger.info("Processing audio file", 
+
+        logger.info("Starting audio processing",
                    file_path=str(file_path),
                    enable_diarization=self.config.enable_diarization,
                    enable_topic_segmentation=self.config.enable_topic_segmentation)
-        
+
+        if progress_callback:
+            progress_callback(0.1, "Initializing audio processing")
+
         try:
             # Reset metadata for this processing run
             self.metadata = {}
-            
+
             # Extract audio metadata
+            if progress_callback:
+                progress_callback(0.2, "Extracting audio metadata")
             self.metadata = await self._extract_metadata(file_path)
-            
+
             # Transcribe audio
+            if progress_callback:
+                progress_callback(0.3, "Transcribing audio content")
             segments, transcript = await self._transcribe_audio(file_path)
-            
+
             # Apply speaker diarization if enabled
             if self.config.enable_diarization and hasattr(self, 'diarization_service'):
+                if progress_callback:
+                    progress_callback(0.7, "Applying speaker diarization")
                 segments = await self._apply_diarization(file_path, segments)
-            
+
             # Apply topic segmentation if enabled
             if self.config.enable_topic_segmentation and hasattr(self, 'topic_segmentation_service'):
+                if progress_callback:
+                    progress_callback(0.85, "Applying topic segmentation")
                 segments = await self._apply_topic_segmentation(segments)
             
             processing_time = time.time() - start_time
-            
+
+            if progress_callback:
+                progress_callback(0.95, "Finalizing audio processing")
+
             # Update metadata with processing info
             self.metadata.update({
                 "processing_time": processing_time,
@@ -196,7 +211,7 @@ class AudioProcessor:
                 "has_speaker_info": self.config.enable_diarization,
                 "has_topic_info": self.config.enable_topic_segmentation
             })
-            
+
             if self.config.enable_diarization:
                 speakers = set(segment.speaker for segment in segments if segment.speaker)
                 self.metadata["num_speakers"] = len(speakers)
@@ -205,7 +220,7 @@ class AudioProcessor:
             if self.config.enable_topic_segmentation:
                 topics = set(segment.topic_id for segment in segments if segment.topic_id is not None)
                 self.metadata["num_topics"] = len(topics)
-            
+
             logger.info("Audio processing completed",
                        file_path=str(file_path),
                        processing_time=processing_time,
