@@ -24,11 +24,10 @@ import structlog
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from enum import Enum
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+import time
 
 from morag_core.models.remote_job import RemoteJob
-from morag.database.connection import db_manager
+from morag.storage.storage_manager import storage_manager
 
 logger = structlog.get_logger(__name__)
 
@@ -56,17 +55,19 @@ class JobLifecycleManager:
             'youtube': timedelta(minutes=30)
         }
     
-    def transition_job_status(self, session: Session, job_id: str, new_status: JobStatus, 
+    def transition_job_status(self, job_id: str, new_status: JobStatus,
                              error_message: str = None, result_data: Dict[str, Any] = None) -> bool:
         """Transition job to new status with validation."""
         try:
-            job = session.query(RemoteJob).filter(RemoteJob.id == job_id).first()
-            if not job:
+            # Load current job data
+            job_data = storage_manager.remote_jobs.load_job(job_id)
+            if not job_data:
                 logger.error("Job not found for status transition", job_id=job_id)
                 return False
-            
+
+            job = RemoteJob.from_dict(job_data)
             old_status = job.status
-            
+
             # Validate status transition
             if not self._is_valid_transition(old_status, new_status.value):
                 logger.error("Invalid status transition",
@@ -74,10 +75,10 @@ class JobLifecycleManager:
                            old_status=old_status,
                            new_status=new_status.value)
                 return False
-            
+
             # Update job status
             job.status = new_status.value
-            
+
             # Update timestamps based on status
             now = datetime.utcnow()
             if new_status == JobStatus.PROCESSING:
@@ -85,30 +86,32 @@ class JobLifecycleManager:
                 job.timeout_at = now + self.job_timeouts.get(job.content_type, timedelta(hours=1))
             elif new_status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.TIMEOUT, JobStatus.CANCELLED]:
                 job.completed_at = now
-            
+
             # Update error message and result data
             if error_message:
                 job.error_message = error_message
             if result_data:
                 job.result_data = result_data
-            
-            session.commit()
-            
+
+            # Save updated job
+            if not storage_manager.remote_jobs.save_job(job.to_dict()):
+                logger.error("Failed to save job after status transition", job_id=job_id)
+                return False
+
             logger.info("Job status transitioned",
                        job_id=job_id,
                        old_status=old_status,
                        new_status=new_status.value)
-            
+
             # Trigger post-transition actions
             self._handle_status_transition(job, old_status, new_status.value)
-            
+
             return True
-            
+
         except Exception as e:
             logger.error("Failed to transition job status",
                         job_id=job_id,
                         error=str(e))
-            session.rollback()
             return False
     
     def _is_valid_transition(self, old_status: str, new_status: str) -> bool:
@@ -175,29 +178,29 @@ class JobLifecycleManager:
     def _schedule_retry(self, job: RemoteJob):
         """Schedule job retry with exponential backoff."""
         try:
-            with db_manager.get_session() as session:
-                # Update retry count and reset status
-                job.retry_count += 1
-                job.status = 'pending'
-                job.worker_id = None
-                job.started_at = None
-                job.completed_at = None
-                
-                # Calculate retry delay (exponential backoff)
-                delay_minutes = min(2 ** job.retry_count, 60)  # Max 1 hour delay
-                job.timeout_at = datetime.utcnow() + timedelta(minutes=delay_minutes)
-                
-                session.add(job)
-                session.commit()
-                
+            # Update retry count and reset status
+            job.retry_count += 1
+            job.status = 'pending'
+            job.worker_id = None
+            job.started_at = None
+            job.completed_at = None
+
+            # Calculate retry delay (exponential backoff)
+            delay_minutes = min(2 ** job.retry_count, 60)  # Max 1 hour delay
+            job.timeout_at = datetime.utcnow() + timedelta(minutes=delay_minutes)
+
+            # Save updated job
+            if storage_manager.remote_jobs.save_job(job.to_dict()):
                 logger.info("Job retry scheduled",
-                           job_id=str(job.id),
+                           job_id=job.id,
                            retry_count=job.retry_count,
                            delay_minutes=delay_minutes)
-                
+            else:
+                logger.error("Failed to save job for retry", job_id=job.id)
+
         except Exception as e:
             logger.error("Failed to schedule job retry",
-                        job_id=str(job.id),
+                        job_id=job.id,
                         error=str(e))
     
     def _handle_job_failure(self, job: RemoteJob):
@@ -227,27 +230,20 @@ class JobLifecycleManager:
     def check_expired_jobs(self) -> int:
         """Check for and handle expired jobs."""
         try:
-            with db_manager.get_session() as session:
-                now = datetime.utcnow()
-                
-                # Find expired jobs
-                expired_jobs = session.query(RemoteJob).filter(
-                    and_(
-                        RemoteJob.status.in_(['pending', 'processing']),
-                        RemoteJob.timeout_at < now
-                    )
-                ).all()
-                
-                expired_count = 0
-                for job in expired_jobs:
-                    if self.transition_job_status(session, str(job.id), JobStatus.TIMEOUT):
-                        expired_count += 1
-                
-                if expired_count > 0:
-                    logger.info("Expired jobs handled", count=expired_count)
-                
-                return expired_count
-                
+            # Get expired jobs from storage
+            expired_jobs_data = storage_manager.remote_jobs.get_expired_jobs()
+
+            expired_count = 0
+            for job_data in expired_jobs_data:
+                job = RemoteJob.from_dict(job_data)
+                if self.transition_job_status(job.id, JobStatus.TIMEOUT):
+                    expired_count += 1
+
+            if expired_count > 0:
+                logger.info("Expired jobs handled", count=expired_count)
+
+            return expired_count
+
         except Exception as e:
             logger.error("Failed to check expired jobs", error=str(e))
             return 0
@@ -255,39 +251,31 @@ class JobLifecycleManager:
     def cleanup_old_jobs(self, days_old: int = 7) -> int:
         """Clean up old completed/failed jobs."""
         try:
-            with db_manager.get_session() as session:
-                cutoff_date = datetime.utcnow() - timedelta(days=days_old)
-                
-                # Find old jobs to clean up
-                old_jobs = session.query(RemoteJob).filter(
-                    and_(
-                        RemoteJob.status.in_(['completed', 'failed', 'cancelled', 'timeout']),
-                        RemoteJob.completed_at < cutoff_date
-                    )
-                ).all()
-                
-                cleaned_count = 0
-                for job in old_jobs:
-                    try:
-                        # Clean up any associated files
-                        self._cleanup_job_files(job)
-                        
-                        # Delete job record
-                        session.delete(job)
+            # Get old jobs from storage
+            old_jobs_data = storage_manager.remote_jobs.get_old_jobs(days_old)
+
+            cleaned_count = 0
+            for job_data in old_jobs_data:
+                try:
+                    job = RemoteJob.from_dict(job_data)
+
+                    # Clean up any associated files
+                    self._cleanup_job_files(job)
+
+                    # Delete job from storage
+                    if storage_manager.remote_jobs.delete_job(job.id):
                         cleaned_count += 1
-                        
-                    except Exception as e:
-                        logger.error("Failed to clean up job",
-                                   job_id=str(job.id),
-                                   error=str(e))
-                
-                session.commit()
-                
-                if cleaned_count > 0:
-                    logger.info("Old jobs cleaned up", count=cleaned_count)
-                
-                return cleaned_count
-                
+
+                except Exception as e:
+                    logger.error("Failed to clean up job",
+                               job_id=job_data.get('id'),
+                               error=str(e))
+
+            if cleaned_count > 0:
+                logger.info("Old jobs cleaned up", count=cleaned_count)
+
+            return cleaned_count
+
         except Exception as e:
             logger.error("Failed to cleanup old jobs", error=str(e))
             return 0
@@ -315,42 +303,56 @@ class JobLifecycleManager:
     def get_job_statistics(self) -> Dict[str, Any]:
         """Get statistics about job processing."""
         try:
-            with db_manager.get_session() as session:
-                from sqlalchemy import func
-                
-                # Count jobs by status
-                status_counts = session.query(
-                    RemoteJob.status,
-                    func.count(RemoteJob.id)
-                ).group_by(RemoteJob.status).all()
-                
-                # Average processing time by content type
-                avg_processing_times = session.query(
-                    RemoteJob.content_type,
-                    func.avg(
-                        func.extract('epoch', RemoteJob.completed_at - RemoteJob.started_at)
-                    ).label('avg_seconds')
-                ).filter(
-                    and_(
-                        RemoteJob.status == 'completed',
-                        RemoteJob.started_at.isnot(None),
-                        RemoteJob.completed_at.isnot(None)
-                    )
-                ).group_by(RemoteJob.content_type).all()
-                
-                # Recent job counts (last 24 hours)
-                recent_cutoff = datetime.utcnow() - timedelta(hours=24)
-                recent_jobs = session.query(func.count(RemoteJob.id)).filter(
-                    RemoteJob.created_at >= recent_cutoff
-                ).scalar()
-                
-                return {
-                    'status_counts': dict(status_counts),
-                    'avg_processing_times': {ct: float(avg) for ct, avg in avg_processing_times},
-                    'recent_jobs_24h': recent_jobs,
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-                
+            # Get basic statistics from storage
+            storage_stats = storage_manager.remote_jobs.get_statistics()
+
+            # Calculate additional statistics
+            stats = {
+                'status_counts': storage_stats.get('status_counts', {}),
+                'content_type_counts': storage_stats.get('content_type_counts', {}),
+                'total_jobs': storage_stats.get('total_jobs', 0),
+                'storage_size_mb': storage_stats.get('storage_size_mb', 0),
+                'avg_processing_times': {},
+                'recent_jobs_24h': 0,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+
+            # Calculate average processing times by content type
+            recent_cutoff = datetime.utcnow() - timedelta(hours=24)
+
+            for content_type in storage_stats.get('content_type_counts', {}):
+                jobs = storage_manager.remote_jobs.find_jobs_by_content_type(content_type)
+
+                # Filter completed jobs and calculate average processing time
+                completed_jobs = [
+                    job for job in jobs
+                    if job.get('status') == 'completed' and
+                       job.get('started_at') and job.get('completed_at')
+                ]
+
+                if completed_jobs:
+                    processing_times = []
+                    for job in completed_jobs:
+                        try:
+                            started = datetime.fromisoformat(job['started_at'])
+                            completed = datetime.fromisoformat(job['completed_at'])
+                            processing_times.append((completed - started).total_seconds())
+                        except Exception:
+                            continue
+
+                    if processing_times:
+                        stats['avg_processing_times'][content_type] = sum(processing_times) / len(processing_times)
+
+                # Count recent jobs
+                recent_jobs = [
+                    job for job in jobs
+                    if job.get('created_at') and
+                       datetime.fromisoformat(job['created_at']) >= recent_cutoff
+                ]
+                stats['recent_jobs_24h'] += len(recent_jobs)
+
+            return stats
+
         except Exception as e:
             logger.error("Failed to get job statistics", error=str(e))
             return {}

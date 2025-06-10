@@ -28,24 +28,29 @@ import uuid
 from morag.services.remote_job_service import RemoteJobService
 from morag.models.remote_job_api import CreateRemoteJobRequest, SubmitResultRequest
 from morag_core.models.remote_job import RemoteJob
+from morag.repositories.remote_job_repository import RemoteJobRepository
 
 class TestRemoteJobService:
     """Test suite for RemoteJobService."""
 
     @pytest.fixture
-    def mock_db_session(self):
-        """Mock database session."""
-        session = Mock()
-        session.query.return_value = Mock()
-        session.add = Mock()
-        session.commit = Mock()
-        session.refresh = Mock()
-        return session
+    def temp_storage_dir(self):
+        """Create temporary storage directory for testing."""
+        import tempfile
+        import shutil
+        temp_dir = tempfile.mkdtemp()
+        yield temp_dir
+        shutil.rmtree(temp_dir)
 
     @pytest.fixture
-    def remote_job_service(self, mock_db_session):
-        """Create RemoteJobService instance with mocked database."""
-        return RemoteJobService(mock_db_session)
+    def mock_repository(self, temp_storage_dir):
+        """Create RemoteJobRepository instance with temporary storage."""
+        return RemoteJobRepository(temp_storage_dir)
+
+    @pytest.fixture
+    def remote_job_service(self, mock_repository):
+        """Create RemoteJobService instance with mocked repository."""
+        return RemoteJobService(mock_repository)
 
     @pytest.fixture
     def sample_create_request(self):
@@ -57,39 +62,39 @@ class TestRemoteJobService:
             ingestion_task_id="test-task-123"
         )
 
-    def test_create_job_success(self, remote_job_service, sample_create_request, mock_db_session):
+    def test_create_job_success(self, remote_job_service, sample_create_request):
         """Test successful job creation."""
-        # Setup
-        mock_job = RemoteJob(
-            id=uuid.uuid4(),
-            ingestion_task_id=sample_create_request.ingestion_task_id,
-            source_file_path=sample_create_request.source_file_path,
-            content_type=sample_create_request.content_type,
-            task_options=sample_create_request.task_options
-        )
-        mock_db_session.refresh.side_effect = lambda job: setattr(job, 'id', mock_job.id)
-
         # Execute
         result = remote_job_service.create_job(sample_create_request)
 
         # Verify
         assert result is not None
-        mock_db_session.add.assert_called_once()
-        mock_db_session.commit.assert_called_once()
-        mock_db_session.refresh.assert_called_once()
+        assert result.id is not None
+        assert result.ingestion_task_id == sample_create_request.ingestion_task_id
+        assert result.source_file_path == sample_create_request.source_file_path
+        assert result.content_type == sample_create_request.content_type
+        assert result.status == 'pending'
 
-    def test_poll_available_jobs_success(self, remote_job_service, mock_db_session):
+        # Verify job was saved to storage
+        saved_job = remote_job_service.repository.get_job(result.id)
+        assert saved_job is not None
+        assert saved_job.id == result.id
+
+    def test_poll_available_jobs_success(self, remote_job_service, mock_repository):
         """Test successful job polling."""
-        # Setup
-        mock_jobs = [
-            RemoteJob(
-                id=uuid.uuid4(),
-                status='pending',
-                content_type='audio',
-                created_at=datetime.utcnow()
-            )
-        ]
-        mock_db_session.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = mock_jobs
+        # Setup - create a pending job
+        job = RemoteJob.create_new(
+            ingestion_task_id="test-task",
+            source_file_path="/tmp/test.mp3",
+            content_type="audio",
+            task_options={}
+        )
+        mock_repository.create_job(
+            job.ingestion_task_id,
+            job.source_file_path,
+            job.content_type,
+            job.task_options
+        )
 
         # Execute
         result = remote_job_service.poll_available_jobs("worker-1", ["audio"], 1)
@@ -98,7 +103,10 @@ class TestRemoteJobService:
         assert len(result) == 1
         assert result[0].status == 'processing'  # Should be updated to processing
         assert result[0].worker_id == "worker-1"
-        mock_db_session.commit.assert_called_once()
+
+        # Verify job was moved to processing status in storage
+        updated_job = mock_repository.get_job(result[0].id)
+        assert updated_job.status == 'processing'
 
     def test_poll_no_available_jobs(self, remote_job_service, mock_db_session):
         """Test polling when no jobs are available."""

@@ -224,6 +224,7 @@ from morag.worker import celery_app, get_morag_api
 from morag.services.remote_job_creator import RemoteJobCreator
 from morag.models.ingestion_request import RemoteJobCreationRequest
 from morag_core.models import ProcessingResult
+from morag.storage.storage_manager import storage_manager
 
 logger = structlog.get_logger(__name__)
 
@@ -283,16 +284,26 @@ async def _process_remotely(task, file_path: str, content_type: str, options: Di
     try:
         task.update_state(state='PROGRESS', meta={'stage': 'creating_remote_job', 'progress': 0.2})
         
-        # Create remote job
-        remote_request = RemoteJobCreationRequest(
+        # Create remote job using repository
+        from morag_core.models.remote_job import RemoteJob
+
+        job = RemoteJob.create_new(
+            ingestion_task_id=task.request.id,
             source_file_path=file_path,
             content_type=content_type,
-            task_options=options,
-            ingestion_task_id=task.request.id,
-            timeout_seconds=options.get('remote_timeout')
+            task_options=options
         )
-        
-        job_id = remote_creator.create_remote_job(remote_request)
+
+        # Set timeout based on content type
+        timeout_hours = {'audio': 0.5, 'video': 1, 'document': 0.25}.get(content_type, 1)
+        job.timeout_at = datetime.utcnow() + timedelta(hours=timeout_hours)
+
+        # Save job to storage
+        if not storage_manager.remote_jobs.save_job(job.to_dict()):
+            logger.error("Failed to create remote job")
+            return None
+
+        job_id = job.id
         if not job_id:
             logger.error("Failed to create remote job")
             return None
@@ -303,24 +314,44 @@ async def _process_remotely(task, file_path: str, content_type: str, options: Di
             'remote_job_id': job_id
         })
         
-        # Wait for remote job completion
+        # Wait for remote job completion by polling storage
         timeout_seconds = options.get('remote_timeout', 1800)
-        job_result = remote_creator.wait_for_remote_job_completion(job_id, timeout_seconds)
-        
-        if not job_result:
-            logger.error("Remote job failed or timed out", job_id=job_id)
-            return None
-        
-        # Convert remote job result to ProcessingResult
-        result_data = job_result.get('result_data', {})
-        
-        return ProcessingResult(
-            success=True,
-            text_content=result_data.get('content', ''),
-            metadata=result_data.get('metadata', {}),
-            processing_time=result_data.get('processing_time', 0.0),
-            error_message=None
-        )
+        start_time = time.time()
+        poll_interval = 10  # Poll every 10 seconds
+
+        while time.time() - start_time < timeout_seconds:
+            # Check job status from storage
+            job_data = storage_manager.remote_jobs.load_job(job_id)
+            if not job_data:
+                logger.error("Remote job not found", job_id=job_id)
+                return None
+
+            status = job_data.get('status')
+
+            if status == 'completed':
+                # Job completed successfully
+                result_data = job_data.get('result_data', {})
+                return ProcessingResult(
+                    success=True,
+                    text_content=result_data.get('content', ''),
+                    metadata=result_data.get('metadata', {}),
+                    processing_time=result_data.get('processing_time', 0.0),
+                    error_message=None
+                )
+            elif status in ['failed', 'timeout', 'cancelled']:
+                # Job failed
+                logger.error("Remote job failed",
+                           job_id=job_id,
+                           status=status,
+                           error=job_data.get('error_message'))
+                return None
+
+            # Job still processing, wait and check again
+            await asyncio.sleep(poll_interval)
+
+        # Timeout reached
+        logger.error("Remote job timed out", job_id=job_id, timeout=timeout_seconds)
+        return None
         
     except Exception as e:
         logger.error("Remote processing failed", error=str(e))

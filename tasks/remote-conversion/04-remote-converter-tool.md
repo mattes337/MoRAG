@@ -140,18 +140,18 @@ class RemoteConverter:
                 'content_types': ','.join(self.content_types),
                 'max_jobs': 1
             }
-            
+
             headers = {}
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
-            
+
             response = requests.get(
                 f"{self.api_base_url}/api/v1/remote-jobs/poll",
                 params=params,
                 headers=headers,
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 job_data = response.json()
                 if job_data.get('job_id'):
@@ -163,9 +163,9 @@ class RemoteConverter:
                 logger.warning("Unexpected response from poll endpoint",
                              status_code=response.status_code,
                              response=response.text)
-            
+
             return None
-            
+
         except Exception as e:
             logger.error("Error polling for jobs", error=str(e))
             return None

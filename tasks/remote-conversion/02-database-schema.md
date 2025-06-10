@@ -1,185 +1,555 @@
-# Task 2: Database Schema for Remote Job Tracking
+# Task 2: File-Based Storage for Remote Job Tracking
 
 ## Overview
 
-Implement the database schema and migration system for remote job tracking. This includes creating the necessary tables, indexes, and database utilities to support the remote conversion system.
+Implement a file-based storage system for remote job tracking using the repository pattern. This approach allows the system to work without a database while providing an abstraction layer that makes it easy to migrate to a database later when one is added to MoRAG.
 
 ## Objectives
 
-1. Create database migration scripts for remote job tables
-2. Implement database connection and session management
-3. Add proper indexing for performance optimization
-4. Create database initialization and cleanup utilities
-5. Ensure compatibility with existing MoRAG database structure
+1. Create file-based storage structure for remote jobs
+2. Implement repository pattern for data access abstraction
+3. Add proper file organization and indexing for performance
+4. Create storage initialization and cleanup utilities
+5. Ensure easy migration path to database when available
 
 ## Technical Requirements
 
-### 1. Database Migration Script
+### 1. File Storage Structure
 
-**File**: `packages/morag/migrations/001_create_remote_jobs_table.sql`
-
-```sql
--- Migration: Create remote_jobs table
--- Version: 001
--- Description: Add support for remote conversion job tracking
-
-BEGIN;
-
--- Create remote_jobs table
-CREATE TABLE IF NOT EXISTS remote_jobs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ingestion_task_id VARCHAR(255) NOT NULL,
-    source_file_path TEXT NOT NULL,
-    content_type VARCHAR(50) NOT NULL,
-    task_options JSONB NOT NULL DEFAULT '{}',
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    worker_id VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    started_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    error_message TEXT,
-    result_data JSONB,
-    retry_count INTEGER DEFAULT 0,
-    max_retries INTEGER DEFAULT 3,
-    timeout_at TIMESTAMP WITH TIME ZONE,
-    
-    -- Constraints
-    CONSTRAINT valid_status CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'timeout', 'cancelled')),
-    CONSTRAINT valid_retry_count CHECK (retry_count >= 0),
-    CONSTRAINT valid_max_retries CHECK (max_retries >= 0),
-    CONSTRAINT valid_content_type CHECK (content_type IN ('audio', 'video', 'document', 'image', 'web', 'youtube'))
-);
-
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_status ON remote_jobs(status);
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_content_type ON remote_jobs(content_type);
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_created_at ON remote_jobs(created_at);
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_ingestion_task ON remote_jobs(ingestion_task_id);
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_worker_id ON remote_jobs(worker_id);
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_timeout ON remote_jobs(timeout_at) WHERE timeout_at IS NOT NULL;
-
--- Composite indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_status_content_type ON remote_jobs(status, content_type);
-CREATE INDEX IF NOT EXISTS idx_remote_jobs_pending_timeout ON remote_jobs(status, timeout_at) WHERE status IN ('pending', 'processing');
-
--- Create migration tracking table if it doesn't exist
-CREATE TABLE IF NOT EXISTS schema_migrations (
-    version VARCHAR(10) PRIMARY KEY,
-    applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    description TEXT
-);
-
--- Record this migration
-INSERT INTO schema_migrations (version, description) 
-VALUES ('001', 'Create remote_jobs table for remote conversion tracking')
-ON CONFLICT (version) DO NOTHING;
-
-COMMIT;
-```
-
-### 2. Database Configuration and Connection
-
-**File**: `packages/morag/src/morag/database/__init__.py`
+**Directory Structure**: `packages/morag/src/morag/storage/remote_jobs_storage.py`
 
 ```python
-from .connection import DatabaseManager, get_db_session
-from .migrations import MigrationManager
-
-__all__ = ['DatabaseManager', 'get_db_session', 'MigrationManager']
-```
-
-**File**: `packages/morag/src/morag/database/connection.py`
-
-```python
-from sqlalchemy import create_engine, MetaData
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
-from contextlib import contextmanager
-from typing import Generator
-import structlog
 import os
+import json
+import glob
+import shutil
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
+import structlog
+import fcntl  # For file locking on Unix systems
+import time
 
 logger = structlog.get_logger(__name__)
 
-# Database configuration
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://morag:morag@localhost:5432/morag')
+class RemoteJobsStorage:
+    """File-based storage for remote jobs with atomic operations."""
 
-# Create SQLAlchemy engine
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    echo=os.getenv('SQL_DEBUG', 'false').lower() == 'true'
-)
+    def __init__(self, data_dir: str = None):
+        self.data_dir = Path(data_dir or os.getenv('MORAG_REMOTE_JOBS_DATA_DIR', '/app/data/remote_jobs'))
+        self.lock_dir = self.data_dir / '.locks'
+        self._ensure_directories()
 
-# Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    def _ensure_directories(self):
+        """Ensure all required directories exist."""
+        status_dirs = ['pending', 'processing', 'completed', 'failed', 'timeout', 'cancelled']
 
-# Create declarative base
-Base = declarative_base()
+        # Create main data directory
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.lock_dir.mkdir(parents=True, exist_ok=True)
 
-class DatabaseManager:
-    """Database connection and session management."""
-    
-    def __init__(self):
-        self.engine = engine
-        self.SessionLocal = SessionLocal
-    
-    @contextmanager
-    def get_session(self) -> Generator[Session, None, None]:
-        """Get a database session with automatic cleanup."""
-        session = self.SessionLocal()
+        # Create status directories
+        for status in status_dirs:
+            (self.data_dir / status).mkdir(exist_ok=True)
+
+        # Create index files for fast lookups
+        self._ensure_index_files()
+
+    def _ensure_index_files(self):
+        """Create index files for fast lookups."""
+        index_files = [
+            'content_type_index.json',  # Maps content_type -> [job_ids]
+            'worker_index.json',        # Maps worker_id -> [job_ids]
+            'ingestion_task_index.json' # Maps ingestion_task_id -> job_id
+        ]
+
+        for index_file in index_files:
+            index_path = self.data_dir / index_file
+            if not index_path.exists():
+                with open(index_path, 'w') as f:
+                    json.dump({}, f)
+
+    def _get_lock_file(self, job_id: str) -> Path:
+        """Get lock file path for a job."""
+        return self.lock_dir / f"{job_id}.lock"
+
+    def _acquire_lock(self, job_id: str, timeout: float = 5.0) -> Optional[object]:
+        """Acquire a file lock for atomic operations."""
+        lock_file = self._get_lock_file(job_id)
+
         try:
-            yield session
-            session.commit()
+            # Create lock file if it doesn't exist
+            lock_file.touch()
+
+            # Open and lock the file
+            lock_fd = open(lock_file, 'w')
+
+            # Try to acquire lock with timeout
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                try:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    return lock_fd
+                except BlockingIOError:
+                    time.sleep(0.1)
+
+            # Timeout reached
+            lock_fd.close()
+            return None
+
         except Exception as e:
-            session.rollback()
-            logger.error("Database session error", error=str(e))
-            raise
-        finally:
-            session.close()
-    
-    def create_tables(self):
-        """Create all tables defined in models."""
+            logger.error("Failed to acquire lock", job_id=job_id, error=str(e))
+            return None
+
+    def _release_lock(self, lock_fd):
+        """Release a file lock."""
         try:
-            Base.metadata.create_all(bind=self.engine)
-            logger.info("Database tables created successfully")
+            if lock_fd:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                lock_fd.close()
         except Exception as e:
-            logger.error("Failed to create database tables", error=str(e))
-            raise
-    
-    def drop_tables(self):
-        """Drop all tables (use with caution!)."""
+            logger.error("Failed to release lock", error=str(e))
+```
+
+### 2. Storage Operations
+
+**File**: `packages/morag/src/morag/storage/remote_jobs_storage.py` (continued)
+
+```python
+    def _get_job_file_path(self, job_id: str, status: str) -> Path:
+        """Get the file path for a job based on its status."""
+        return self.data_dir / status / f"{job_id}.json"
+
+    def _find_job_file(self, job_id: str) -> Optional[Path]:
+        """Find the job file across all status directories."""
+        for status_dir in self.data_dir.iterdir():
+            if status_dir.is_dir() and not status_dir.name.startswith('.'):
+                job_file = status_dir / f"{job_id}.json"
+                if job_file.exists():
+                    return job_file
+        return None
+
+    def _update_indexes(self, job_data: Dict[str, Any], operation: str = 'add'):
+        """Update index files for fast lookups."""
         try:
-            Base.metadata.drop_all(bind=self.engine)
-            logger.info("Database tables dropped successfully")
+            job_id = job_data['id']
+            content_type = job_data['content_type']
+            worker_id = job_data.get('worker_id')
+            ingestion_task_id = job_data['ingestion_task_id']
+
+            # Update content type index
+            content_index_path = self.data_dir / 'content_type_index.json'
+            with open(content_index_path, 'r+') as f:
+                content_index = json.load(f)
+
+                if operation == 'add':
+                    if content_type not in content_index:
+                        content_index[content_type] = []
+                    if job_id not in content_index[content_type]:
+                        content_index[content_type].append(job_id)
+                elif operation == 'remove':
+                    if content_type in content_index and job_id in content_index[content_type]:
+                        content_index[content_type].remove(job_id)
+
+                f.seek(0)
+                json.dump(content_index, f, indent=2)
+                f.truncate()
+
+            # Update worker index
+            if worker_id:
+                worker_index_path = self.data_dir / 'worker_index.json'
+                with open(worker_index_path, 'r+') as f:
+                    worker_index = json.load(f)
+
+                    if operation == 'add':
+                        if worker_id not in worker_index:
+                            worker_index[worker_id] = []
+                        if job_id not in worker_index[worker_id]:
+                            worker_index[worker_id].append(job_id)
+                    elif operation == 'remove':
+                        if worker_id in worker_index and job_id in worker_index[worker_id]:
+                            worker_index[worker_id].remove(job_id)
+
+                    f.seek(0)
+                    json.dump(worker_index, f, indent=2)
+                    f.truncate()
+
+            # Update ingestion task index
+            ingestion_index_path = self.data_dir / 'ingestion_task_index.json'
+            with open(ingestion_index_path, 'r+') as f:
+                ingestion_index = json.load(f)
+
+                if operation == 'add':
+                    ingestion_index[ingestion_task_id] = job_id
+                elif operation == 'remove':
+                    ingestion_index.pop(ingestion_task_id, None)
+
+                f.seek(0)
+                json.dump(ingestion_index, f, indent=2)
+                f.truncate()
+
         except Exception as e:
-            logger.error("Failed to drop database tables", error=str(e))
-            raise
-    
-    def test_connection(self) -> bool:
-        """Test database connectivity."""
-        try:
-            with self.engine.connect() as conn:
-                conn.execute("SELECT 1")
-            logger.info("Database connection test successful")
-            return True
-        except Exception as e:
-            logger.error("Database connection test failed", error=str(e))
+            logger.error("Failed to update indexes", job_id=job_data.get('id'), error=str(e))
+
+    def save_job(self, job_data: Dict[str, Any]) -> bool:
+        """Save a job to storage with atomic operations."""
+        job_id = job_data['id']
+        status = job_data['status']
+
+        # Acquire lock for atomic operation
+        lock_fd = self._acquire_lock(job_id)
+        if not lock_fd:
+            logger.error("Failed to acquire lock for job save", job_id=job_id)
             return False
 
-# Global database manager instance
-db_manager = DatabaseManager()
+        try:
+            # Remove old file if it exists in a different status directory
+            old_file = self._find_job_file(job_id)
 
-def get_db_session() -> Generator[Session, None, None]:
-    """Dependency for FastAPI to get database session."""
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
+            # Write new file
+            new_file = self._get_job_file_path(job_id, status)
+            with open(new_file, 'w') as f:
+                json.dump(job_data, f, indent=2)
+
+            # Remove old file if it's in a different directory
+            if old_file and old_file != new_file:
+                old_file.unlink()
+
+            # Update indexes
+            self._update_indexes(job_data, 'add')
+
+            logger.debug("Job saved", job_id=job_id, status=status)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to save job", job_id=job_id, error=str(e))
+            return False
+        finally:
+            self._release_lock(lock_fd)
+
+    def load_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Load a job from storage."""
+        try:
+            job_file = self._find_job_file(job_id)
+            if not job_file:
+                return None
+
+            with open(job_file, 'r') as f:
+                return json.load(f)
+
+        except Exception as e:
+            logger.error("Failed to load job", job_id=job_id, error=str(e))
+            return None
+
+    def delete_job(self, job_id: str) -> bool:
+        """Delete a job from storage."""
+        # Acquire lock for atomic operation
+        lock_fd = self._acquire_lock(job_id)
+        if not lock_fd:
+            logger.error("Failed to acquire lock for job deletion", job_id=job_id)
+            return False
+
+        try:
+            job_file = self._find_job_file(job_id)
+            if not job_file:
+                return False
+
+            # Load job data for index cleanup
+            with open(job_file, 'r') as f:
+                job_data = json.load(f)
+
+            # Delete file
+            job_file.unlink()
+
+            # Update indexes
+            self._update_indexes(job_data, 'remove')
+
+            logger.info("Job deleted", job_id=job_id)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to delete job", job_id=job_id, error=str(e))
+            return False
+        finally:
+            self._release_lock(lock_fd)
+```
+
+### 3. Query Operations
+
+**File**: `packages/morag/src/morag/storage/remote_jobs_storage.py` (continued)
+
+```python
+    def find_jobs_by_status(self, status: str) -> List[Dict[str, Any]]:
+        """Find all jobs with a specific status."""
+        try:
+            jobs = []
+            status_dir = self.data_dir / status
+
+            if not status_dir.exists():
+                return jobs
+
+            for job_file in status_dir.glob('*.json'):
+                try:
+                    with open(job_file, 'r') as f:
+                        jobs.append(json.load(f))
+                except Exception as e:
+                    logger.error("Failed to load job file", file=str(job_file), error=str(e))
+
+            # Sort by creation time
+            jobs.sort(key=lambda x: x.get('created_at', ''))
+            return jobs
+
+        except Exception as e:
+            logger.error("Failed to find jobs by status", status=status, error=str(e))
+            return []
+
+    def find_jobs_by_content_type(self, content_type: str) -> List[Dict[str, Any]]:
+        """Find all jobs with a specific content type using index."""
+        try:
+            jobs = []
+
+            # Use content type index for fast lookup
+            content_index_path = self.data_dir / 'content_type_index.json'
+            with open(content_index_path, 'r') as f:
+                content_index = json.load(f)
+
+            job_ids = content_index.get(content_type, [])
+
+            for job_id in job_ids:
+                job_data = self.load_job(job_id)
+                if job_data:
+                    jobs.append(job_data)
+
+            return jobs
+
+        except Exception as e:
+            logger.error("Failed to find jobs by content type", content_type=content_type, error=str(e))
+            return []
+
+    def find_jobs_by_worker(self, worker_id: str) -> List[Dict[str, Any]]:
+        """Find all jobs assigned to a specific worker using index."""
+        try:
+            jobs = []
+
+            # Use worker index for fast lookup
+            worker_index_path = self.data_dir / 'worker_index.json'
+            with open(worker_index_path, 'r') as f:
+                worker_index = json.load(f)
+
+            job_ids = worker_index.get(worker_id, [])
+
+            for job_id in job_ids:
+                job_data = self.load_job(job_id)
+                if job_data:
+                    jobs.append(job_data)
+
+            return jobs
+
+        except Exception as e:
+            logger.error("Failed to find jobs by worker", worker_id=worker_id, error=str(e))
+            return []
+
+    def find_job_by_ingestion_task(self, ingestion_task_id: str) -> Optional[Dict[str, Any]]:
+        """Find job by ingestion task ID using index."""
+        try:
+            # Use ingestion task index for fast lookup
+            ingestion_index_path = self.data_dir / 'ingestion_task_index.json'
+            with open(ingestion_index_path, 'r') as f:
+                ingestion_index = json.load(f)
+
+            job_id = ingestion_index.get(ingestion_task_id)
+            if job_id:
+                return self.load_job(job_id)
+
+            return None
+
+        except Exception as e:
+            logger.error("Failed to find job by ingestion task",
+                        ingestion_task_id=ingestion_task_id, error=str(e))
+            return None
+
+    def get_expired_jobs(self) -> List[Dict[str, Any]]:
+        """Get all expired jobs from pending and processing directories."""
+        try:
+            expired_jobs = []
+            now = datetime.utcnow().isoformat()
+
+            # Check pending and processing directories
+            for status in ['pending', 'processing']:
+                status_dir = self.data_dir / status
+                if not status_dir.exists():
+                    continue
+
+                for job_file in status_dir.glob('*.json'):
+                    try:
+                        with open(job_file, 'r') as f:
+                            job_data = json.load(f)
+
+                        timeout_at = job_data.get('timeout_at')
+                        if timeout_at and timeout_at < now:
+                            expired_jobs.append(job_data)
+
+                    except Exception as e:
+                        logger.error("Failed to check job expiration",
+                                   file=str(job_file), error=str(e))
+
+            return expired_jobs
+
+        except Exception as e:
+            logger.error("Failed to get expired jobs", error=str(e))
+            return []
+
+    def get_old_jobs(self, days_old: int = 7) -> List[Dict[str, Any]]:
+        """Get old completed/failed jobs for cleanup."""
+        try:
+            old_jobs = []
+            cutoff_time = datetime.utcnow() - timedelta(days=days_old)
+
+            # Check completed, failed, timeout, and cancelled directories
+            for status in ['completed', 'failed', 'timeout', 'cancelled']:
+                status_dir = self.data_dir / status
+                if not status_dir.exists():
+                    continue
+
+                for job_file in status_dir.glob('*.json'):
+                    try:
+                        # Check file modification time
+                        if datetime.fromtimestamp(job_file.stat().st_mtime) < cutoff_time:
+                            with open(job_file, 'r') as f:
+                                old_jobs.append(json.load(f))
+
+                    except Exception as e:
+                        logger.error("Failed to check job age",
+                                   file=str(job_file), error=str(e))
+
+            return old_jobs
+
+        except Exception as e:
+            logger.error("Failed to get old jobs", error=str(e))
+            return []
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+        try:
+            stats = {
+                'total_jobs': 0,
+                'status_counts': {},
+                'content_type_counts': {},
+                'storage_size_mb': 0
+            }
+
+            # Count jobs by status
+            for status_dir in self.data_dir.iterdir():
+                if status_dir.is_dir() and not status_dir.name.startswith('.'):
+                    job_count = len(list(status_dir.glob('*.json')))
+                    stats['status_counts'][status_dir.name] = job_count
+                    stats['total_jobs'] += job_count
+
+            # Get content type counts from index
+            content_index_path = self.data_dir / 'content_type_index.json'
+            if content_index_path.exists():
+                with open(content_index_path, 'r') as f:
+                    content_index = json.load(f)
+                    stats['content_type_counts'] = {
+                        ct: len(job_ids) for ct, job_ids in content_index.items()
+                    }
+
+            # Calculate storage size
+            total_size = 0
+            for file_path in self.data_dir.rglob('*.json'):
+                total_size += file_path.stat().st_size
+            stats['storage_size_mb'] = round(total_size / (1024 * 1024), 2)
+
+            return stats
+
+        except Exception as e:
+            logger.error("Failed to get storage statistics", error=str(e))
+            return {}
+```
+
+### 4. Storage Manager
+
+**File**: `packages/morag/src/morag/storage/__init__.py`
+
+```python
+from .remote_jobs_storage import RemoteJobsStorage
+
+__all__ = ['RemoteJobsStorage']
+```
+
+**File**: `packages/morag/src/morag/storage/storage_manager.py`
+
+```python
+import structlog
+from typing import Optional
+import os
+
+from .remote_jobs_storage import RemoteJobsStorage
+
+logger = structlog.get_logger(__name__)
+
+class StorageManager:
+    """Central storage manager for all MoRAG storage needs."""
+
+    def __init__(self):
+        self._remote_jobs_storage: Optional[RemoteJobsStorage] = None
+
+    @property
+    def remote_jobs(self) -> RemoteJobsStorage:
+        """Get remote jobs storage instance."""
+        if self._remote_jobs_storage is None:
+            self._remote_jobs_storage = RemoteJobsStorage()
+        return self._remote_jobs_storage
+
+    def initialize_storage(self) -> bool:
+        """Initialize all storage systems."""
+        try:
+            # Initialize remote jobs storage
+            self.remote_jobs._ensure_directories()
+
+            logger.info("Storage systems initialized successfully")
+            return True
+
+        except Exception as e:
+            logger.error("Failed to initialize storage systems", error=str(e))
+            return False
+
+    def cleanup_storage(self, days_old: int = 7) -> Dict[str, int]:
+        """Clean up old data across all storage systems."""
+        try:
+            results = {}
+
+            # Clean up old remote jobs
+            old_jobs = self.remote_jobs.get_old_jobs(days_old)
+            cleaned_count = 0
+
+            for job_data in old_jobs:
+                if self.remote_jobs.delete_job(job_data['id']):
+                    cleaned_count += 1
+
+            results['remote_jobs_cleaned'] = cleaned_count
+
+            logger.info("Storage cleanup completed", results=results)
+            return results
+
+        except Exception as e:
+            logger.error("Failed to cleanup storage", error=str(e))
+            return {}
+
+    def get_storage_statistics(self) -> Dict[str, Any]:
+        """Get statistics for all storage systems."""
+        try:
+            return {
+                'remote_jobs': self.remote_jobs.get_statistics(),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            logger.error("Failed to get storage statistics", error=str(e))
+            return {}
+
+# Global storage manager instance
+storage_manager = StorageManager()
 ```
 
 ### 3. Migration Management System
@@ -500,89 +870,115 @@ class RemoteJob(Base):
 
 ## Implementation Steps
 
-1. **Create Migration Directory Structure** (Day 1)
-   - Set up migrations directory
-   - Create initial migration script
-   - Test migration on development database
+1. **Create Storage Structure** (Day 1)
+   - Set up file-based storage directories
+   - Create storage classes with atomic operations
+   - Test basic file operations
 
-2. **Implement Database Connection** (Day 1)
-   - Create connection management utilities
-   - Add session handling for FastAPI
-   - Test database connectivity
+2. **Implement Repository Pattern** (Day 1)
+   - Create repository interface
+   - Implement file-based repository
+   - Add proper error handling
 
-3. **Create Migration System** (Day 2)
-   - Implement migration manager
-   - Add migration tracking table
-   - Create CLI for database management
+3. **Add Indexing System** (Day 2)
+   - Implement index files for fast lookups
+   - Add index maintenance operations
+   - Test query performance
 
 4. **Integrate with Models** (Day 2)
-   - Update RemoteJob model to use Base
-   - Add model relationships if needed
+   - Update RemoteJob model for file storage
+   - Add serialization/deserialization
    - Test model operations
 
-5. **Database Initialization** (Day 3)
-   - Create initialization scripts
-   - Add database reset functionality
+5. **Storage Management** (Day 3)
+   - Create storage manager
+   - Add initialization and cleanup utilities
    - Create development setup guide
 
 6. **Testing and Validation** (Day 3)
-   - Test all database operations
-   - Validate migration system
-   - Performance testing with indexes
+   - Test all storage operations
+   - Validate atomic operations and locking
+   - Performance testing with large datasets
 
 ## Testing Requirements
 
-### Database Tests
+### Storage Tests
 
-**File**: `tests/test_database_schema.py`
+**File**: `tests/test_file_storage.py`
 
 ```python
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import tempfile
+import shutil
+from pathlib import Path
 from datetime import datetime, timedelta
 
-from morag.database.connection import Base
+from morag.storage.remote_jobs_storage import RemoteJobsStorage
 from morag_core.models.remote_job import RemoteJob
-from morag.database.migrations import MigrationManager
 
-class TestDatabaseSchema:
-    def test_remote_job_creation(self):
-        # Test job creation and constraints
+class TestFileStorage:
+    @pytest.fixture
+    def temp_storage(self):
+        """Create temporary storage for testing."""
+        temp_dir = tempfile.mkdtemp()
+        storage = RemoteJobsStorage(temp_dir)
+        yield storage
+        shutil.rmtree(temp_dir)
+
+    def test_job_creation_and_retrieval(self, temp_storage):
+        # Test job creation and retrieval
         pass
-    
-    def test_database_indexes(self):
-        # Test index performance
+
+    def test_status_transitions(self, temp_storage):
+        # Test job status transitions and file moves
         pass
-    
-    def test_migration_system(self):
-        # Test migration application
+
+    def test_indexing_system(self, temp_storage):
+        # Test index file maintenance
         pass
-    
-    def test_job_lifecycle(self):
-        # Test complete job lifecycle
+
+    def test_atomic_operations(self, temp_storage):
+        # Test file locking and atomic operations
+        pass
+
+    def test_query_performance(self, temp_storage):
+        # Test query performance with indexes
+        pass
+
+    def test_cleanup_operations(self, temp_storage):
+        # Test cleanup of old and expired jobs
         pass
 ```
 
 ## Success Criteria
 
-1. Database migrations run successfully on fresh database
-2. All indexes are created and improve query performance
-3. RemoteJob model operations work correctly
-4. Migration system tracks applied migrations
-5. Database initialization script works for new deployments
+1. File storage operations work reliably with atomic guarantees
+2. Index files improve query performance significantly
+3. RemoteJob model serialization/deserialization works correctly
+4. Storage manager handles initialization and cleanup properly
+5. File-based storage provides easy migration path to database
 
 ## Dependencies
 
-- PostgreSQL database server
-- SQLAlchemy ORM
-- Existing MoRAG database configuration
-- Migration tracking system
+- File system with proper permissions
+- Python file locking capabilities
+- JSON serialization support
+- Existing MoRAG configuration system
 
 ## Next Steps
 
 After completing this task:
 1. Proceed to [Task 3: Worker Modifications](./03-worker-modifications.md)
-2. Test database schema with sample data
-3. Set up database in development environment
+2. Test storage system with sample data
+3. Set up storage directories in development environment
 4. Begin integration with API endpoints
+
+## Migration Path to Database
+
+When MoRAG adds database support, the migration will be straightforward:
+
+1. **Repository Interface**: The repository pattern provides a clean interface that can be implemented for database storage
+2. **Data Migration**: JSON files can be easily imported into database tables
+3. **Index Migration**: File-based indexes can be replaced with database indexes
+4. **Atomic Operations**: Database transactions replace file locking
+5. **Configuration**: Simple environment variable change to switch storage backends

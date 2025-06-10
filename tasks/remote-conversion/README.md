@@ -122,43 +122,78 @@ graph TD
   }
   ```
 
-## Database Schema Changes
+## File-Based Storage Schema
 
-### Remote Jobs Table
+### Remote Jobs Storage Structure
 
-```sql
-CREATE TABLE remote_jobs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ingestion_task_id VARCHAR(255) NOT NULL,
-    source_file_path TEXT NOT NULL,
-    content_type VARCHAR(50) NOT NULL,
-    task_options JSONB NOT NULL DEFAULT '{}',
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    worker_id VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    started_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    error_message TEXT,
-    result_data JSONB,
-    retry_count INTEGER DEFAULT 0,
-    max_retries INTEGER DEFAULT 3,
-    timeout_at TIMESTAMP WITH TIME ZONE
-);
+Since MoRAG doesn't have a database yet, remote jobs will be stored as JSON files on disk with the following structure:
 
-CREATE INDEX idx_remote_jobs_status ON remote_jobs(status);
-CREATE INDEX idx_remote_jobs_content_type ON remote_jobs(content_type);
-CREATE INDEX idx_remote_jobs_created_at ON remote_jobs(created_at);
-CREATE INDEX idx_remote_jobs_ingestion_task ON remote_jobs(ingestion_task_id);
+```
+/app/data/remote_jobs/
+├── pending/
+│   ├── job-uuid-1.json
+│   └── job-uuid-2.json
+├── processing/
+│   ├── job-uuid-3.json
+│   └── job-uuid-4.json
+├── completed/
+│   └── job-uuid-5.json
+├── failed/
+│   └── job-uuid-6.json
+├── timeout/
+└── cancelled/
+```
+
+### Job File Format
+
+Each job is stored as a JSON file with the following structure:
+
+```json
+{
+  "id": "job-uuid-123",
+  "ingestion_task_id": "celery-task-456",
+  "source_file_path": "/tmp/audio.mp3",
+  "content_type": "audio",
+  "task_options": {
+    "webhook_url": "https://example.com/webhook",
+    "metadata": {"source": "upload"}
+  },
+  "status": "pending",
+  "worker_id": null,
+  "created_at": "2025-01-15T10:30:00Z",
+  "started_at": null,
+  "completed_at": null,
+  "error_message": null,
+  "result_data": null,
+  "retry_count": 0,
+  "max_retries": 3,
+  "timeout_at": "2025-01-15T11:30:00Z"
+}
 ```
 
 ### Job Status Lifecycle
 
-1. **pending**: Job created, waiting for worker
-2. **processing**: Worker has claimed the job and is processing
-3. **completed**: Processing finished successfully
-4. **failed**: Processing failed (after retries)
-5. **timeout**: Job exceeded maximum processing time
-6. **cancelled**: Job was manually cancelled
+1. **pending**: Job created, waiting for worker (stored in `pending/` directory)
+2. **processing**: Worker has claimed the job and is processing (moved to `processing/` directory)
+3. **completed**: Processing finished successfully (moved to `completed/` directory)
+4. **failed**: Processing failed (after retries) (moved to `failed/` directory)
+5. **timeout**: Job exceeded maximum processing time (moved to `timeout/` directory)
+6. **cancelled**: Job was manually cancelled (moved to `cancelled/` directory)
+
+### Repository Pattern Implementation
+
+The file-based storage will use the repository pattern for easy migration to database later:
+
+```python
+class RemoteJobRepository:
+    def create_job(self, job: RemoteJob) -> str
+    def get_job(self, job_id: str) -> Optional[RemoteJob]
+    def update_job(self, job: RemoteJob) -> bool
+    def delete_job(self, job_id: str) -> bool
+    def find_jobs_by_status(self, status: str) -> List[RemoteJob]
+    def find_jobs_by_content_type(self, content_type: str) -> List[RemoteJob]
+    def cleanup_old_jobs(self, days_old: int) -> int
+```
 
 ## Error Handling and Failure Recovery
 
@@ -234,7 +269,8 @@ MORAG_REMOTE_FALLBACK_TIMEOUT=300    # 5 minutes
 MORAG_REMOTE_MAX_RETRIES=3
 MORAG_REMOTE_WORKER_HEARTBEAT_INTERVAL=30
 
-# File transfer settings
+# File-based storage settings
+MORAG_REMOTE_JOBS_DATA_DIR=/app/data/remote_jobs  # Directory for job storage
 MORAG_REMOTE_FILE_DOWNLOAD_TIMEOUT=600  # 10 minutes
 MORAG_REMOTE_MAX_FILE_SIZE=1073741824   # 1GB
 MORAG_REMOTE_CLEANUP_DELAY=3600         # 1 hour
@@ -295,11 +331,33 @@ MORAG_API_KEY=your-api-key-here
 
 ## Implementation Timeline
 
-1. **Phase 1**: API Extensions and Database Schema (Week 1)
+1. **Phase 1**: API Extensions and File-Based Storage (Week 1)
 2. **Phase 2**: Worker Modifications and Job Creation (Week 2)
 3. **Phase 3**: Remote Converter Tool Development (Week 3)
 4. **Phase 4**: Job Lifecycle Management and Error Handling (Week 4)
 5. **Phase 5**: Testing, Documentation, and Deployment (Week 5)
+
+## Migration Path to Database
+
+When MoRAG adds database support in the future, the migration will be straightforward:
+
+### Repository Pattern Benefits
+- **Clean Interface**: The repository pattern provides a clean abstraction that can be easily swapped
+- **Data Migration**: JSON files can be imported into database tables with simple scripts
+- **Index Migration**: File-based indexes can be replaced with database indexes
+- **Configuration Change**: Simple environment variable change to switch storage backends
+
+### Migration Steps
+1. **Implement Database Repository**: Create `DatabaseRemoteJobRepository` implementing the same interface
+2. **Data Migration Script**: Convert JSON files to database records
+3. **Configuration Update**: Change `MORAG_STORAGE_TYPE=database`
+4. **Gradual Rollout**: Support both storage types during transition
+5. **Cleanup**: Remove file-based storage after successful migration
+
+### Compatibility
+- **API Unchanged**: All API endpoints remain exactly the same
+- **Service Layer Unchanged**: Business logic remains identical
+- **Zero Downtime**: Migration can be performed without service interruption
 
 ## Next Steps
 
