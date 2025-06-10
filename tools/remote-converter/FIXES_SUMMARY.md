@@ -32,6 +32,15 @@
 - Added language detection storage in AudioProcessor
 - Fixed attribute access: `audio_result.metadata.get("language", "unknown")`, `audio_result.metadata.get("num_speakers", 0)`, `audio_result.metadata.get("num_topics", 0)`
 
+### 4. VideoProcessor ignoring WHISPER_MODEL_SIZE environment variable
+
+**Problem**: Remote worker was initializing with correct `large-v3` model at startup, but when processing video files, the VideoProcessor was creating a new AudioProcessor instance that defaulted to `base` model size, ignoring the `WHISPER_MODEL_SIZE` environment variable.
+
+**Fix**:
+- Added `__post_init__` method to `VideoConfig` class to read environment variables (`WHISPER_MODEL_SIZE`, `MORAG_ENABLE_SPEAKER_DIARIZATION`, `MORAG_ENABLE_TOPIC_SEGMENTATION`)
+- Updated `VideoProcessor._get_audio_processor()` to let `AudioConfig` handle environment variables instead of explicitly passing video config values
+- Added logic to only override AudioConfig defaults when VideoConfig has non-default values
+
 ## Files Modified
 
 ### `tools/remote-converter/remote_converter.py`
@@ -50,6 +59,12 @@
 ### `packages/morag-audio/src/morag_audio/processor.py`
 
 1. **Added language detection storage** to store detected language in metadata for VideoProcessor compatibility
+
+### `packages/morag-video/src/morag_video/processor.py` (Environment Variable Fix)
+
+1. **Added `__post_init__` method to VideoConfig** to read environment variables for audio processing configuration
+2. **Updated `_get_audio_processor()` method** to let AudioConfig handle environment variables instead of forcing video config values
+3. **Added conditional override logic** to only override AudioConfig defaults when VideoConfig has explicit non-default values
 
 ## Key Changes
 
@@ -95,5 +110,6 @@ Created test scripts to verify fixes:
 ✅ **Fixed**: Result conversion logic (unified conversion function)
 ✅ **Fixed**: Import structure (avoid heavy initialization)
 ✅ **Fixed**: AudioProcessingResult attribute access (language, speaker_segments, topic_segments → metadata fields)
+✅ **Fixed**: VideoProcessor environment variable handling (WHISPER_MODEL_SIZE now properly respected)
 
 The remote converter should now work correctly with all MoRAG processors without any attribute or method errors.

@@ -267,6 +267,15 @@ pip install -e ../../packages/morag-audio
 pip install -e ../../packages/morag-video
 ```
 
+#### Wrong Whisper Model Used for Video Processing
+If you see the remote worker initializing with the correct model (e.g., `large-v3`) but then using a different model (e.g., `base`) when processing video files, this indicates the environment variables are properly set. The VideoProcessor now correctly inherits the Whisper model configuration from environment variables.
+
+**Verification**: Check the logs - you should see:
+```
+{"model_size": "large-v3", "event": "Initializing Whisper model", "logger": "morag_audio.processor"}
+```
+Both at startup and during video processing.
+
 ## Architecture
 
 The remote converter consists of:

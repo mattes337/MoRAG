@@ -43,6 +43,29 @@ class VideoConfig:
     enable_ocr: bool = False
     ocr_engine: str = "tesseract"  # tesseract or easyocr
 
+    def __post_init__(self):
+        """Load configuration from environment variables if not explicitly set."""
+        import os
+
+        # Override with environment variables if they exist
+        # Support both WHISPER_MODEL_SIZE and MORAG_WHISPER_MODEL_SIZE
+        env_model_size = (
+            os.environ.get("WHISPER_MODEL_SIZE") or
+            os.environ.get("MORAG_WHISPER_MODEL_SIZE")
+        )
+        if env_model_size and self.audio_model_size == "base":  # Only override if using default
+            self.audio_model_size = env_model_size
+
+        # Override speaker diarization if set in environment
+        env_diarization = os.environ.get("MORAG_ENABLE_SPEAKER_DIARIZATION")
+        if env_diarization is not None:
+            self.enable_speaker_diarization = env_diarization.lower() in ("true", "1", "yes", "on")
+
+        # Override topic segmentation if set in environment
+        env_topic_segmentation = os.environ.get("MORAG_ENABLE_TOPIC_SEGMENTATION")
+        if env_topic_segmentation is not None:
+            self.enable_topic_segmentation = env_topic_segmentation.lower() in ("true", "1", "yes", "on")
+
 
 @dataclass
 class VideoMetadata:
@@ -101,20 +124,27 @@ class VideoProcessor:
         if self._audio_processor is None:
             try:
                 from morag_audio import AudioProcessor, AudioConfig
-                
-                # Create audio config based on video config
-                audio_config = AudioConfig(
-                    model_size=self.config.audio_model_size,
-                    enable_diarization=self.config.enable_speaker_diarization,
-                    enable_topic_segmentation=self.config.enable_topic_segmentation,
-                    device="auto"  # Auto-detect best available device
-                )
-                
+
+                # Create audio config - let AudioConfig handle environment variables
+                # Only override if video config has non-default values
+                audio_config = AudioConfig()
+
+                # Override with video config values if they differ from defaults
+                if self.config.audio_model_size != "base":
+                    audio_config.model_size = self.config.audio_model_size
+                if self.config.enable_speaker_diarization != False:
+                    audio_config.enable_diarization = self.config.enable_speaker_diarization
+                if self.config.enable_topic_segmentation != False:
+                    audio_config.enable_topic_segmentation = self.config.enable_topic_segmentation
+
+                # Always set device to auto for video processing
+                audio_config.device = "auto"
+
                 self._audio_processor = AudioProcessor(audio_config)
                 logger.info("Initialized AudioProcessor for video processing",
-                           model_size=self.config.audio_model_size,
-                           enable_diarization=self.config.enable_speaker_diarization,
-                           enable_topic_segmentation=self.config.enable_topic_segmentation)
+                           model_size=audio_config.model_size,
+                           enable_diarization=audio_config.enable_diarization,
+                           enable_topic_segmentation=audio_config.enable_topic_segmentation)
             except ImportError as e:
                 logger.warning("Could not import AudioProcessor", error=str(e))
                 raise VideoProcessingError(f"AudioProcessor not available: {str(e)}")
