@@ -1,84 +1,99 @@
-# Task 3: GPU Worker Configuration
+# Task 3: Remote Worker Configuration
 
 ## Objective
-Create configuration files and startup scripts for GPU workers that can run on remote machines with GPU capabilities.
+Create configuration files and startup scripts for remote workers that authenticate with API keys and process only their user's tasks.
 
 ## Background
-GPU workers need specific configuration to:
-1. Connect to the same Redis instance as the main server
-2. Consume only from the 'gpu-tasks' queue
-3. Access shared files (via network storage or HTTP)
-4. Use GPU-accelerated processing libraries
+Remote workers need specific configuration to:
+1. Authenticate with API keys to identify their user
+2. Connect to the same Redis instance as the main server
+3. Consume only from their user-specific queue
+4. Download files via HTTP (no shared storage)
+5. Use GPU-accelerated processing libraries
+6. Return only processed content (no external service connections)
 
 ## Implementation Steps
 
-### 3.1 Create GPU Worker Configuration
+### 3.1 Create Remote Worker Configuration
 
-**File**: `configs/gpu-worker.env`
+**File**: `configs/remote-worker.env`
 
 ```bash
-# GPU Worker Configuration
-# Copy this file to your GPU machine and modify as needed
+# Remote Worker Configuration
+# Copy this file to your remote machine and modify as needed
+
+# Authentication (REQUIRED)
+MORAG_API_KEY=your_api_key_here
+USER_ID=your_user_id_here
 
 # Redis Connection (must match main server)
 REDIS_URL=redis://YOUR_MAIN_SERVER_IP:6379/0
 
+# Main Server Connection
+MAIN_SERVER_URL=http://YOUR_MAIN_SERVER_IP:8000
+
 # Worker Configuration
 WORKER_TYPE=gpu
-WORKER_NAME=gpu-worker-01
-WORKER_QUEUES=gpu-tasks
+WORKER_NAME=remote-worker-01
 WORKER_CONCURRENCY=2
 
 # Celery Configuration
 CELERY_SOFT_TIME_LIMIT=7200  # 2 hours
 CELERY_TIME_LIMIT=7800       # 2 hours 10 minutes
 
-# File Access Configuration
-# Option A: Shared Network Storage
-TEMP_DIR=/mnt/shared/morag-temp
-UPLOAD_DIR=/mnt/shared/morag-uploads
-
-# Option B: HTTP File Transfer (if shared storage not available)
-# MAIN_SERVER_URL=http://YOUR_MAIN_SERVER_IP:8000
-# FILE_TRANSFER_MODE=http
+# Local Temp Directory (for downloaded files)
+TEMP_DIR=/tmp/morag-remote-worker
+CLEANUP_INTERVAL_HOURS=1
 
 # GPU Configuration
 CUDA_VISIBLE_DEVICES=0
 WHISPER_MODEL_SIZE=large-v3
 ENABLE_GPU_ACCELERATION=true
 
-# Qdrant Configuration (must match main server)
-QDRANT_URL=http://YOUR_MAIN_SERVER_IP:6333
-QDRANT_COLLECTION_NAME=morag_vectors
+# YouTube Configuration (optional)
+YOUTUBE_COOKIES_FILE=/path/to/youtube_cookies.txt
 
-# Gemini API Configuration
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-1.5-flash
-GEMINI_VISION_MODEL=gemini-1.5-flash
+# Processing Configuration (NO EXTERNAL SERVICES)
+# Remote workers do NOT connect to these services:
+# - No QDRANT_URL (vector storage handled by server)
+# - No GEMINI_API_KEY (embedding/LLM handled by server)
+# - Workers only do heavy processing and return markdown
+
+# Audio Processing
+ENABLE_DIARIZATION=true
+ENABLE_TOPIC_SEGMENTATION=true
+
+# Video Processing
+ENABLE_THUMBNAILS=false
+VIDEO_QUALITY=720p
+
+# Document Processing
+USE_DOCLING=true
+ENABLE_OCR=true
 ```
 
-### 3.2 Create GPU Worker Startup Script
+### 3.2 Create Remote Worker Startup Script
 
-**File**: `scripts/start-gpu-worker.sh`
+**File**: `scripts/start-remote-worker.sh`
 
 ```bash
 #!/bin/bash
-# GPU Worker Startup Script
+# Remote Worker Startup Script
 
 set -e
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-CONFIG_FILE="${1:-$PROJECT_ROOT/configs/gpu-worker.env}"
+CONFIG_FILE="${1:-$PROJECT_ROOT/configs/remote-worker.env}"
 
-echo "🚀 Starting MoRAG GPU Worker"
+echo "🚀 Starting MoRAG Remote Worker"
 echo "================================"
 
 # Check if config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "❌ Configuration file not found: $CONFIG_FILE"
-    echo "Please copy configs/gpu-worker.env and configure it for your environment"
+    echo "Please copy configs/remote-worker.env and configure it for your environment"
     exit 1
 fi
 
@@ -88,10 +103,10 @@ source "$CONFIG_FILE"
 
 # Validate required environment variables
 required_vars=(
+    "MORAG_API_KEY"
+    "USER_ID"
     "REDIS_URL"
-    "QDRANT_URL" 
-    "QDRANT_COLLECTION_NAME"
-    "GEMINI_API_KEY"
+    "MAIN_SERVER_URL"
 )
 
 for var in "${required_vars[@]}"; do
@@ -100,6 +115,29 @@ for var in "${required_vars[@]}"; do
         exit 1
     fi
 done
+
+# Validate API key with server
+echo "🔍 Validating API key with server..."
+if command -v curl &> /dev/null; then
+    response=$(curl -s -w "%{http_code}" -H "Authorization: Bearer $MORAG_API_KEY" "$MAIN_SERVER_URL/health" -o /dev/null)
+    if [ "$response" = "200" ] || [ "$response" = "401" ]; then
+        echo "✅ Server connection successful"
+        # Test API key validation
+        auth_response=$(curl -s -H "Authorization: Bearer $MORAG_API_KEY" "$MAIN_SERVER_URL/api/v1/status/")
+        if echo "$auth_response" | grep -q "error\|unauthorized" 2>/dev/null; then
+            echo "❌ API key validation failed"
+            echo "Please check your MORAG_API_KEY"
+            exit 1
+        else
+            echo "✅ API key validated successfully"
+        fi
+    else
+        echo "❌ Cannot connect to server at: $MAIN_SERVER_URL"
+        exit 1
+    fi
+else
+    echo "⚠️  curl not found. Cannot test server connectivity."
+fi
 
 # Check GPU availability
 echo "🔍 Checking GPU availability..."
@@ -123,22 +161,25 @@ else
     echo "⚠️  redis-cli not found. Cannot test Redis connectivity."
 fi
 
-# Check file access
-echo "🔍 Checking file access..."
+# Create and check temp directory
+echo "🔍 Setting up temp directory..."
 if [ -n "$TEMP_DIR" ]; then
+    mkdir -p "$TEMP_DIR"
     if [ -d "$TEMP_DIR" ] && [ -w "$TEMP_DIR" ]; then
-        echo "✅ Temp directory accessible: $TEMP_DIR"
+        echo "✅ Temp directory ready: $TEMP_DIR"
     else
-        echo "❌ Temp directory not accessible: $TEMP_DIR"
-        echo "Please ensure shared storage is mounted or create the directory"
+        echo "❌ Cannot create or write to temp directory: $TEMP_DIR"
         exit 1
     fi
 fi
 
+# Calculate user-specific queue name
+USER_QUEUE="gpu-tasks-${USER_ID}"
+
 # Set default values
-export WORKER_QUEUES="${WORKER_QUEUES:-gpu-tasks}"
+export WORKER_QUEUES="${USER_QUEUE}"
 export WORKER_CONCURRENCY="${WORKER_CONCURRENCY:-2}"
-export WORKER_NAME="${WORKER_NAME:-gpu-worker-$(hostname)}"
+export WORKER_NAME="${WORKER_NAME:-remote-worker-${USER_ID}-$(hostname)}"
 
 # Change to project directory
 cd "$PROJECT_ROOT"
@@ -147,7 +188,7 @@ cd "$PROJECT_ROOT"
 if [ "$INSTALL_DEPS" = "true" ]; then
     echo "📦 Installing dependencies..."
     pip install -e packages/morag_core
-    pip install -e packages/morag_services  
+    pip install -e packages/morag_services
     pip install -e packages/morag_audio
     pip install -e packages/morag_video
     pip install -e packages/morag_document
@@ -157,12 +198,18 @@ if [ "$INSTALL_DEPS" = "true" ]; then
     pip install -e packages/morag
 fi
 
-# Start the GPU worker
-echo "🎯 Starting Celery worker..."
+# Start the remote worker
+echo "🎯 Starting Remote Celery Worker..."
+echo "User ID: $USER_ID"
 echo "Worker Name: $WORKER_NAME"
-echo "Queues: $WORKER_QUEUES"
+echo "Queue: $WORKER_QUEUES"
 echo "Concurrency: $WORKER_CONCURRENCY"
 echo "Redis URL: $REDIS_URL"
+echo "Server URL: $MAIN_SERVER_URL"
+echo ""
+echo "⚠️  IMPORTANT: This worker will ONLY process tasks for user: $USER_ID"
+echo "⚠️  External services (Qdrant, Gemini) are handled by the main server"
+echo ""
 
 exec celery -A morag.worker worker \
     --hostname="$WORKER_NAME@%h" \

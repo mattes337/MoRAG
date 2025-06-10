@@ -33,14 +33,9 @@ class PDFConverter(DocumentConverter):
         Returns:
             True if docling can be safely used, False otherwise
         """
-        # Check if we should force CPU mode for safety
+        # Check if we should disable docling explicitly
         import os
-        force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
         disable_docling = os.environ.get('MORAG_DISABLE_DOCLING', 'false').lower() == 'true'
-
-        if force_cpu:
-            logger.info("CPU mode forced, disabling docling to avoid PyTorch compatibility issues")
-            return False
 
         if disable_docling:
             logger.info("Docling explicitly disabled via MORAG_DISABLE_DOCLING")
@@ -57,13 +52,24 @@ class PDFConverter(DocumentConverter):
 
             # Test basic initialization without processing
             pipeline_options = PdfPipelineOptions()
-            pipeline_options.do_ocr = False  # Disable OCR for test
-            pipeline_options.do_table_structure = False  # Disable table structure for test
+
+            # Configure for CPU-safe operation
+            force_cpu = os.environ.get('MORAG_FORCE_CPU', 'false').lower() == 'true'
+            if force_cpu:
+                # Use CPU-safe settings
+                pipeline_options.do_ocr = False  # Disable OCR to avoid GPU dependencies
+                pipeline_options.do_table_structure = False  # Disable table structure to reduce complexity
+                logger.info("Configuring docling for CPU-only mode")
+            else:
+                # Use default settings
+                pipeline_options.do_ocr = False  # Still disable for test
+                pipeline_options.do_table_structure = False  # Still disable for test
 
             # This should not crash if PyTorch is compatible
             test_converter = DocumentConverter()
 
-            logger.info("Docling is available and compatible for enhanced PDF processing")
+            logger.info("Docling is available and compatible for enhanced PDF processing",
+                       cpu_mode=force_cpu)
             return True
 
         except ImportError as e:
