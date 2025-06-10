@@ -15,6 +15,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+from dataclasses import dataclass
 import structlog
 import requests
 from dotenv import load_dotenv
@@ -30,13 +31,15 @@ sys.path.insert(0, str(project_root / "packages" / "morag-web" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag-youtube" / "src"))
 
 try:
-    from morag_audio import AudioProcessor
-    from morag_video import VideoProcessor
-    from morag_document import DocumentProcessor
-    from morag_image import ImageProcessor
-    from morag_web import WebProcessor
-    from morag_youtube import YouTubeProcessor
-    from morag_core.models import ProcessingResult
+    # Import processors directly from their modules to avoid __init__.py issues
+    from morag_audio.processor import AudioProcessor, AudioProcessingResult
+    from morag_video.processor import VideoProcessor, VideoProcessingResult
+    from morag_document.processor import DocumentProcessor
+    from morag_image.processor import ImageProcessor, ImageProcessingResult
+    from morag_web.processor import WebProcessor, WebScrapingResult as WebProcessingResult
+    from morag_youtube.processor import YouTubeProcessor, YouTubeDownloadResult as YouTubeProcessingResult
+    # Import base result types
+    from morag_core.interfaces.processor import ProcessingResult as BaseProcessingResult
 except ImportError as e:
     print(f"Error importing MoRAG packages: {e}")
     print("Please ensure MoRAG packages are installed:")
@@ -46,6 +49,117 @@ except ImportError as e:
     sys.exit(1)
 
 logger = structlog.get_logger(__name__)
+
+
+@dataclass
+class ProcessingResult:
+    """Unified processing result for remote converter."""
+    success: bool
+    text_content: str
+    metadata: Dict[str, Any]
+    processing_time: float
+    error_message: Optional[str] = None
+
+
+def convert_to_unified_result(result: Any, processing_time: float = None) -> ProcessingResult:
+    """Convert processor-specific result to unified ProcessingResult."""
+    if isinstance(result, AudioProcessingResult):
+        return ProcessingResult(
+            success=result.success,
+            text_content=result.transcript,
+            metadata=result.metadata,
+            processing_time=processing_time or result.processing_time,
+            error_message=result.error_message
+        )
+    elif isinstance(result, VideoProcessingResult):
+        # VideoProcessingResult doesn't have transcript directly, extract from audio processing result
+        text_content = ""
+        if hasattr(result, 'audio_processing_result') and result.audio_processing_result:
+            text_content = getattr(result.audio_processing_result, 'transcript', "")
+
+        return ProcessingResult(
+            success=True,  # VideoProcessingResult doesn't have success field
+            text_content=text_content,
+            metadata=result.metadata.__dict__ if hasattr(result.metadata, '__dict__') else {},
+            processing_time=processing_time or result.processing_time,
+            error_message=None
+        )
+    elif isinstance(result, BaseProcessingResult):
+        # Handle BaseProcessingResult from processors that use the interface
+        text_content = ""
+
+        # Extract text content from metadata or document
+        if hasattr(result, 'document') and result.document:
+            text_content = getattr(result.document, 'content', "")
+        elif hasattr(result, 'metadata') and result.metadata:
+            # For image processing, combine caption and extracted text from metadata
+            metadata = result.metadata
+            if 'caption' in metadata and metadata['caption']:
+                text_content += f"Caption: {metadata['caption']}\n"
+            if 'extracted_text' in metadata and metadata['extracted_text']:
+                text_content += f"Extracted Text: {metadata['extracted_text']}"
+
+        return ProcessingResult(
+            success=result.success,
+            text_content=text_content.strip(),
+            metadata=result.metadata,
+            processing_time=processing_time or result.processing_time,
+            error_message=result.error_message
+        )
+    elif isinstance(result, ImageProcessingResult):
+        # Specific ImageProcessingResult (when called directly)
+        text_content = ""
+        if hasattr(result, 'caption') and result.caption:
+            text_content += f"Caption: {result.caption}\n"
+        if hasattr(result, 'extracted_text') and result.extracted_text:
+            text_content += f"Extracted Text: {result.extracted_text}"
+
+        return ProcessingResult(
+            success=True,  # ImageProcessingResult doesn't have success field
+            text_content=text_content.strip(),
+            metadata=result.metadata.__dict__ if hasattr(result.metadata, '__dict__') else result.metadata,
+            processing_time=processing_time or result.processing_time,
+            error_message=None
+        )
+    elif isinstance(result, WebProcessingResult):
+        # WebScrapingResult has content field with WebContent
+        text_content = ""
+        if hasattr(result, 'content') and result.content:
+            text_content = getattr(result.content, 'markdown_content', "") or getattr(result.content, 'content', "")
+
+        return ProcessingResult(
+            success=result.success,
+            text_content=text_content,
+            metadata=result.metadata,
+            processing_time=processing_time or result.processing_time,
+            error_message=result.error_message
+        )
+    elif isinstance(result, YouTubeProcessingResult):
+        # YouTubeDownloadResult - extract metadata as text content
+        text_content = ""
+        if hasattr(result, 'metadata') and result.metadata:
+            metadata = result.metadata
+            text_content = f"Title: {getattr(metadata, 'title', 'Unknown')}\n"
+            text_content += f"Description: {getattr(metadata, 'description', 'No description')}\n"
+            text_content += f"Uploader: {getattr(metadata, 'uploader', 'Unknown')}\n"
+            text_content += f"Duration: {getattr(metadata, 'duration', 0)} seconds"
+
+        return ProcessingResult(
+            success=result.success,
+            text_content=text_content,
+            metadata=result.metadata.__dict__ if hasattr(result.metadata, '__dict__') else {},
+            processing_time=processing_time or result.processing_time,
+            error_message=getattr(result, 'error_message', None)
+        )
+    else:
+        # Fallback for unknown result types
+        return ProcessingResult(
+            success=False,
+            text_content="",
+            metadata={},
+            processing_time=processing_time or 0.0,
+            error_message=f"Unknown result type: {type(result)}"
+        )
 
 
 class RemoteConverter:
@@ -283,6 +397,8 @@ class RemoteConverter:
 
     async def _process_file(self, file_path: str, content_type: str, options: Dict[str, Any]) -> Optional[ProcessingResult]:
         """Process file using appropriate MoRAG processor."""
+        start_time = time.time()
+
         try:
             processor = self.processors.get(content_type)
             if not processor:
@@ -295,40 +411,49 @@ class RemoteConverter:
                     error_message=f"No processor available for content type: {content_type}"
                 )
 
-            # Process the file based on content type
+            # Process the file based on content type using correct method names
             if content_type == 'audio':
-                result = await processor.process_audio(file_path, options)
+                # AudioProcessor has process() method
+                result = await processor.process(file_path)
             elif content_type == 'video':
-                result = await processor.process_video(file_path, options)
+                # VideoProcessor has process() method
+                result = await processor.process(file_path)
             elif content_type == 'document':
-                result = await processor.process_document(file_path, options)
+                # DocumentProcessor has process_file() method
+                result = await processor.process_file(file_path)
             elif content_type == 'image':
-                result = await processor.process_image(file_path, options)
+                # ImageProcessor has process() method
+                result = await processor.process(file_path)
             elif content_type == 'web':
                 # For web content, file_path would contain the URL
                 with open(file_path, 'r') as f:
                     url = f.read().strip()
-                result = await processor.process_url(url, options)
+                # WebProcessor has process_url() method
+                result = await processor.process_url(url)
             elif content_type == 'youtube':
                 # For YouTube content, file_path would contain the URL
                 with open(file_path, 'r') as f:
                     url = f.read().strip()
-                result = await processor.process_youtube_video(url, options)
+                # YouTubeProcessor has process_url() method
+                result = await processor.process_url(url)
             else:
                 raise ValueError(f"Unsupported content type: {content_type}")
 
-            return result
+            # Convert processor-specific result to unified format
+            processing_time = time.time() - start_time
+            return convert_to_unified_result(result, processing_time)
 
         except Exception as e:
             logger.error("Exception processing file",
                         file_path=file_path,
                         content_type=content_type,
                         error=str(e))
+            processing_time = time.time() - start_time
             return ProcessingResult(
                 success=False,
                 text_content="",
                 metadata={},
-                processing_time=0.0,
+                processing_time=processing_time,
                 error_message=f"Processing exception: {str(e)}"
             )
 
