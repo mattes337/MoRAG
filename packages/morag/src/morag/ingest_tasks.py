@@ -12,8 +12,87 @@ from morag.worker import celery_app, get_morag_api
 from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 from morag_core.models import Document, DocumentChunk
 from morag_core.config import get_settings, validate_chunk_size
+from morag.services.remote_job_service import RemoteJobService
+from morag.models.remote_job_api import CreateRemoteJobRequest
 
 logger = structlog.get_logger(__name__)
+
+
+async def continue_ingestion_after_remote_processing(
+    remote_job_id: str,
+    content: str,
+    metadata: Dict[str, Any],
+    processing_time: float
+) -> bool:
+    """Continue the ingestion pipeline after remote processing completes."""
+    try:
+        # Get the remote job to get original task options
+        remote_service = RemoteJobService()
+        remote_job = remote_service.get_job_status(remote_job_id)
+
+        if not remote_job:
+            logger.error("Remote job not found for continuation", remote_job_id=remote_job_id)
+            return False
+
+        options = remote_job.task_options
+
+        # Store in vector database if requested
+        if options.get('store_in_vector_db', True):
+            # Prepare metadata for vector storage
+            options_metadata = options.get('metadata') or {}
+
+            vector_metadata = {
+                "source_type": remote_job.content_type,
+                "source_path": remote_job.source_file_path,
+                "processing_time": processing_time,
+                "remote_processing": True,
+                "remote_job_id": remote_job_id,
+                **metadata,
+                **options_metadata
+            }
+
+            # Generate document ID if not provided
+            document_id = options.get('document_id')
+            if not document_id:
+                document_id = generate_document_id(remote_job.source_file_path, content)
+
+            # Store content in vector database
+            point_ids = await store_content_in_vector_db(
+                content,
+                vector_metadata,
+                chunk_size=options.get('chunk_size'),
+                chunk_overlap=options.get('chunk_overlap'),
+                document_id=document_id,
+                replace_existing=options.get('replace_existing', False),
+                use_content_checksum=options.get('use_content_checksum', True)
+            )
+
+            logger.info("Remote processing result stored in vector database",
+                       remote_job_id=remote_job_id,
+                       point_ids_count=len(point_ids))
+
+        # Send webhook notification if requested
+        webhook_url = options.get('webhook_url')
+        if webhook_url:
+            send_webhook_notification(
+                webhook_url,
+                remote_job.ingestion_task_id,
+                'SUCCESS',
+                {
+                    'remote_job_id': remote_job_id,
+                    'chunks_processed': len(point_ids) if 'point_ids' in locals() else 0,
+                    'total_text_length': len(content),
+                    'metadata': {**metadata, 'remote_processing': True}
+                }
+            )
+
+        return True
+
+    except Exception as e:
+        logger.error("Failed to continue ingestion after remote processing",
+                    remote_job_id=remote_job_id,
+                    error=str(e))
+        return False
 
 
 def send_webhook_notification(webhook_url: str, task_id: str, status: str, result: Optional[Dict[str, Any]] = None):
@@ -258,9 +337,49 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                    task_id=self.request.id,
                    file_path=file_path,
                    content_type=content_type,
-                   file_exists=file_exists)
+                   file_exists=file_exists,
+                   remote=options.get('remote', False))
 
         try:
+            # Check if remote processing is requested
+            if options.get('remote', False):
+                # Check if content type supports remote processing (audio/video)
+                if content_type in ['audio', 'video']:
+                    logger.info("Creating remote job for processing",
+                               task_id=self.request.id,
+                               content_type=content_type)
+
+                    # Create remote job
+                    remote_service = RemoteJobService()
+                    remote_request = CreateRemoteJobRequest(
+                        source_file_path=file_path,
+                        content_type=content_type,
+                        task_options=options,
+                        ingestion_task_id=self.request.id
+                    )
+
+                    remote_job = remote_service.create_job(remote_request)
+
+                    logger.info("Remote job created, waiting for completion",
+                               task_id=self.request.id,
+                               remote_job_id=remote_job.id)
+
+                    # Return early - the remote worker will continue the pipeline
+                    return {
+                        'success': True,
+                        'content': "",
+                        'metadata': {
+                            'remote_job_id': remote_job.id,
+                            'remote_processing': True,
+                            'status': 'pending_remote_processing'
+                        },
+                        'processing_time': 0.0,
+                        'error_message': None
+                    }
+                else:
+                    logger.info("Content type does not support remote processing, falling back to local",
+                               content_type=content_type)
+                    # Fall through to local processing
             # Check if file still exists before processing
             if not file_exists:
                 # Get additional debugging information

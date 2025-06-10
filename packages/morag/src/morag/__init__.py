@@ -4,7 +4,7 @@ This is the main integration package that provides a unified interface
 to all MoRAG components and services.
 """
 
-from morag.api import MoRAGAPI
+from .api import MoRAGAPI
 from morag.cli import main as cli_main
 from morag.server import create_app, main as server_main
 from morag.worker import main as worker_main
