@@ -152,9 +152,19 @@ COPY docs/ ./docs/
 COPY *.md ./
 COPY *.txt ./
 
-# Create necessary directories including cache directories
-RUN mkdir -p temp logs data /home/morag/.cache/huggingface /home/morag/.cache/whisper /home/morag/.cache/transformers && \
+# Create necessary directories including cache directories and remote jobs structure
+RUN mkdir -p temp logs data \
+    data/remote_jobs/pending \
+    data/remote_jobs/processing \
+    data/remote_jobs/completed \
+    data/remote_jobs/failed \
+    data/remote_jobs/timeout \
+    data/remote_jobs/cancelled \
+    /home/morag/.cache/huggingface \
+    /home/morag/.cache/whisper \
+    /home/morag/.cache/transformers && \
     chmod -R 755 /home/morag/.cache && \
+    chmod -R 755 data && \
     chmod +x scripts/check_cpu_compatibility.py && \
     chmod +x scripts/start_worker_safe.sh && \
     chown -R morag:morag /app /home/morag
@@ -162,5 +172,5 @@ RUN mkdir -p temp logs data /home/morag/.cache/huggingface /home/morag/.cache/wh
 # Switch to app user
 USER morag
 
-# Run CPU compatibility check and then start the server
-CMD ["sh", "-c", "python scripts/check_cpu_compatibility.py && python -m morag.server --host 0.0.0.0 --port 8000"]
+# Run initialization scripts and then start the server
+CMD ["sh", "-c", "python scripts/ensure_data_directories.py && python scripts/check_cpu_compatibility.py && python -m morag.server --host 0.0.0.0 --port 8000"]

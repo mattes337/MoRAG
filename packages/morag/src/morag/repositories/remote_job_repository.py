@@ -23,9 +23,26 @@ class RemoteJobRepository:
 
     def _ensure_directories(self):
         """Ensure all required directories exist."""
-        status_dirs = ['pending', 'processing', 'completed', 'failed', 'timeout', 'cancelled']
-        for status in status_dirs:
-            (self.data_dir / status).mkdir(parents=True, exist_ok=True)
+        try:
+            # First ensure the base data directory exists
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            logger.info("Remote jobs data directory ensured", path=str(self.data_dir))
+
+            # Create status subdirectories
+            status_dirs = ['pending', 'processing', 'completed', 'failed', 'timeout', 'cancelled']
+            for status in status_dirs:
+                status_path = self.data_dir / status
+                status_path.mkdir(parents=True, exist_ok=True)
+                logger.debug("Status directory ensured", status=status, path=str(status_path))
+
+        except PermissionError as e:
+            logger.error("Permission denied creating remote jobs directories",
+                        path=str(self.data_dir), error=str(e))
+            raise RuntimeError(f"Cannot create remote jobs directories at {self.data_dir}: {e}")
+        except Exception as e:
+            logger.error("Failed to create remote jobs directories",
+                        path=str(self.data_dir), error=str(e))
+            raise
 
     def _get_job_file_path(self, job_id: str, status: str) -> Path:
         """Get the file path for a job based on its status."""
