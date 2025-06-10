@@ -36,6 +36,9 @@ class ProcessingConfig:
     document_id: Optional[str] = None
     replace_existing: Optional[bool] = None
 
+    # Remote processing options (handled at service level)
+    remote: Optional[bool] = None
+
     def __post_init__(self):
         """Post-initialization to handle any additional unknown parameters."""
         # This allows the config to accept additional parameters without failing

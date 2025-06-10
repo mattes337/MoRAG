@@ -28,6 +28,7 @@ from .config import (
     EmbeddingConfig,
     ProcessingResult,
 )
+from .remote_job import RemoteJob
 
 __all__ = [
     # API models
@@ -54,4 +55,6 @@ __all__ = [
     "WebProcessingConfig",
     "EmbeddingConfig",
     "ProcessingResult",
+    # Remote job models
+    "RemoteJob",
 ]

@@ -70,7 +70,8 @@ def test_processing_config_with_task_options():
             'webhook_url': '',
             'metadata': None,
             'use_docling': False,
-            'store_in_vector_db': True
+            'store_in_vector_db': True,
+            'remote': False
         }
         
         # Add file_path as required
@@ -88,6 +89,7 @@ def test_processing_config_with_task_options():
             print(f"   metadata: {config.metadata}")
             print(f"   use_docling: {config.use_docling}")
             print(f"   store_in_vector_db: {config.store_in_vector_db}")
+            print(f"   remote: {config.remote}")
             
             return True
             

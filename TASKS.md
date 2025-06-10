@@ -128,6 +128,32 @@ For detailed information about completed tasks and implementation history, see [
   - Intelligent routing based on worker availability and queue load
 - **Status**: Task breakdown complete, ready for implementation
 
+### ✅ Remote Conversion System ✅ PLANNED
+- **Feature**: Add remote conversion capabilities to offload processing tasks to external workers
+- **Problem**: Current CPU workers on servers lack sufficient processing power for efficient audio/video conversion
+- **Implementation**: Created comprehensive task breakdown for remote conversion system
+- **Approach**: Remote job management system with polling-based worker architecture
+- **Tasks Created**:
+  - [Overview Documentation](./tasks/remote-conversion/README.md)
+  - [Task 1: API Extensions](./tasks/remote-conversion/01-api-extensions.md)
+  - [Task 2: Database Schema](./tasks/remote-conversion/02-database-schema.md)
+  - [Task 3: Worker Modifications](./tasks/remote-conversion/03-worker-modifications.md)
+  - [Task 4: Remote Converter Tool](./tasks/remote-conversion/04-remote-converter-tool.md)
+  - [Task 5: Job Lifecycle Management](./tasks/remote-conversion/05-job-lifecycle-management.md)
+  - [Task 6: Testing and Validation](./tasks/remote-conversion/06-testing-and-validation.md)
+- **Key Features**:
+  - Optional `remote=true` parameter on all ingestion endpoints
+  - Remote job polling system for external workers
+  - Secure file transfer between server and remote workers
+  - Complete job lifecycle management with error handling
+  - Maintains backward compatibility with existing workflow
+- **Benefits**:
+  - Offload CPU-intensive conversion tasks to external workers
+  - Maintain existing ingestion workflow and API compatibility
+  - Scalable architecture for multiple remote workers
+  - Robust error handling and failure recovery
+- **Status**: Task breakdown complete, ready for implementation
+
 ## 🔧 Recent Fixes (January 2025)
 
 ### ✅ Docker Health Check & Permission Fixes

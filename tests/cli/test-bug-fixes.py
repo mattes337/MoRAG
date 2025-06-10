@@ -86,7 +86,8 @@ def test_processing_config_parameters():
             "store_in_vector_db": True,
             "generate_embeddings": True,
             "chunk_size": 1000,
-            "extract_metadata": True
+            "extract_metadata": True,
+            "remote": False
         }
         
         print("Testing ProcessingConfig with additional parameters:")
@@ -99,6 +100,7 @@ def test_processing_config_parameters():
             print(f"   use_docling: {config.use_docling}")
             print(f"   store_in_vector_db: {config.store_in_vector_db}")
             print(f"   generate_embeddings: {config.generate_embeddings}")
+            print(f"   remote: {config.remote}")
             
         except Exception as e:
             print(f"❌ ProcessingConfig creation failed: {e}")

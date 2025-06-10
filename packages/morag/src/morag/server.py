@@ -25,6 +25,7 @@ from morag.worker import (
     process_youtube_video_task, process_batch_task, celery_app
 )
 from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
+from morag.endpoints import remote_jobs_router
 
 logger = structlog.get_logger(__name__)
 
@@ -213,6 +214,7 @@ class IngestFileRequest(BaseModel):
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     use_docling: Optional[bool] = False
+    remote: Optional[bool] = False  # Use remote processing for audio/video
 
 
 class IngestURLRequest(BaseModel):
@@ -220,11 +222,13 @@ class IngestURLRequest(BaseModel):
     url: str
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    remote: Optional[bool] = False  # Use remote processing for audio/video
 
 
 class IngestBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     webhook_url: Optional[str] = None
+    remote: Optional[bool] = False  # Use remote processing for audio/video
 
 
 class IngestResponse(BaseModel):
@@ -552,7 +556,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         use_docling: Optional[bool] = Form(default=False),
         chunk_size: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
-        chunking_strategy: Optional[str] = Form(default=None)  # paragraph, sentence, word, character, etc.
+        chunking_strategy: Optional[str] = Form(default=None),  # paragraph, sentence, word, character, etc.
+        remote: Optional[bool] = Form(default=False)  # Use remote processing for audio/video
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -620,6 +625,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
                 "chunking_strategy": chunking_strategy,
+                "remote": remote,  # Remote processing flag
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -670,6 +676,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             options = {
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "metadata": request.metadata or {},  # Ensure dict, not None
+                "remote": request.remote,  # Remote processing flag
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -699,6 +706,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             # Create batch options with sanitized inputs
             options = {
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
+                "remote": request.remote,  # Remote processing flag
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -862,6 +870,9 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         except Exception as e:
             logger.error("Failed to perform manual cleanup", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
+
+    # Include remote job router
+    app.include_router(remote_jobs_router)
 
     return app
 
