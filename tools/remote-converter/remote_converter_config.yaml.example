@@ -1,0 +1,10 @@
+api_base_url: https://api.morag.com
+api_key: your-api-key-here
+content_types:
+- audio
+- video
+log_level: INFO
+max_concurrent_jobs: 2
+poll_interval: 10
+temp_dir: /tmp/morag_remote
+worker_id: gpu-worker-01

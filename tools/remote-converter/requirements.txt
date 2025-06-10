@@ -1,0 +1,24 @@
+# MoRAG Remote Converter Dependencies
+
+# Core dependencies
+requests>=2.31.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+structlog>=23.1.0
+
+# MoRAG packages (install with -e flag)
+# pip install -e ../../packages/morag-core
+# pip install -e ../../packages/morag-audio
+# pip install -e ../../packages/morag-video
+# pip install -e ../../packages/morag-document
+# pip install -e ../../packages/morag-image
+# pip install -e ../../packages/morag-web
+# pip install -e ../../packages/morag-youtube
+
+# Optional dependencies for enhanced functionality
+# pyannote.audio>=3.0.0  # Speaker diarization
+# sentence-transformers>=2.2.0  # Advanced topic segmentation
+# playwright>=1.40.0  # Dynamic web content
+# trafilatura>=1.6.0  # Advanced web extraction
+# readability-lxml>=0.8.0  # Content cleaning
+# newspaper3k>=0.2.8  # Article extraction

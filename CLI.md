@@ -391,7 +391,7 @@ temp_dir: "/tmp/morag_remote"
 pip install -e packages/morag-core packages/morag-audio packages/morag-video
 pip install requests pyyaml python-dotenv structlog
 
-# Start remote worker (when implemented)
+# Start remote worker
 python tools/remote-converter/cli.py --config remote_converter_config.yaml
 
 # Or with command line options

@@ -249,7 +249,7 @@ export MORAG_WORKER_ID="gpu-worker-01"
 export MORAG_API_BASE_URL="https://your-morag-server.com"
 export MORAG_WORKER_CONTENT_TYPES="audio,video"
 
-# Start remote worker (implementation in progress)
+# Start remote worker
 python tools/remote-converter/cli.py
 ```
 
