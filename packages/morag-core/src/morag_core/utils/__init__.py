@@ -12,6 +12,7 @@ from .file_handling import (
     get_file_size,
     is_file_readable,
     cleanup_temp_files,
+    parse_size_string,
 )
 from .logging import (
     setup_logging,
@@ -36,6 +37,7 @@ __all__ = [
     "get_file_size",
     "is_file_readable",
     "cleanup_temp_files",
+    "parse_size_string",
     # Logging
     "setup_logging",
     "get_logger",

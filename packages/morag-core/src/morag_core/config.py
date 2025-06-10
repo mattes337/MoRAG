@@ -119,7 +119,10 @@ class Settings(BaseSettings):
     temp_dir: str = Field(default="./temp", alias="MORAG_TEMP_DIR")
     max_file_size: str = Field(default="100MB", alias="MORAG_MAX_FILE_SIZE")
 
-    # File Size Limits (in bytes)
+    # Upload Size Limits (configurable via environment)
+    max_upload_size_bytes: int = Field(default=5 * 1024 * 1024 * 1024, alias="MORAG_MAX_UPLOAD_SIZE_BYTES")  # 5GB default
+
+    # File Size Limits (in bytes) - for specific content types
     max_document_size: int = Field(default=100 * 1024 * 1024, alias="MORAG_MAX_DOCUMENT_SIZE")  # 100MB
     max_audio_size: int = Field(default=2 * 1024 * 1024 * 1024, alias="MORAG_MAX_AUDIO_SIZE")  # 2GB
     max_video_size: int = Field(default=5 * 1024 * 1024 * 1024, alias="MORAG_MAX_VIDEO_SIZE")  # 5GB
@@ -212,6 +215,32 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore"
     )
+
+    def get_max_upload_size_bytes(self) -> int:
+        """Get the maximum upload size in bytes.
+
+        This method first checks MORAG_MAX_UPLOAD_SIZE_BYTES, then falls back to
+        parsing MORAG_MAX_FILE_SIZE if the bytes setting is not configured.
+
+        Returns:
+            Maximum upload size in bytes
+        """
+        # If max_upload_size_bytes is explicitly set and not the default, use it
+        if hasattr(self, '_max_upload_size_bytes_set'):
+            return self.max_upload_size_bytes
+
+        # Check if MORAG_MAX_UPLOAD_SIZE_BYTES was set via environment
+        import os
+        if os.getenv("MORAG_MAX_UPLOAD_SIZE_BYTES"):
+            return self.max_upload_size_bytes
+
+        # Fall back to parsing max_file_size string
+        try:
+            from .utils.file_handling import parse_size_string
+            return parse_size_string(self.max_file_size)
+        except Exception:
+            # If parsing fails, return the default bytes value
+            return self.max_upload_size_bytes
 
 # Global settings instance - lazy loaded
 _settings_instance = None

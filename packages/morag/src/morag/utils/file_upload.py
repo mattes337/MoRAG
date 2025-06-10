@@ -422,13 +422,41 @@ def get_upload_handler() -> FileUploadHandler:
     global _upload_handler
     if _upload_handler is None:
         logger.info("Creating new global FileUploadHandler instance")
-        _upload_handler = FileUploadHandler()
+
+        # Get configuration from MoRAG settings
+        try:
+            from morag_core.config import get_settings
+            settings = get_settings()
+            max_upload_size = settings.get_max_upload_size_bytes()
+
+            config = FileUploadConfig(max_file_size=max_upload_size)
+            _upload_handler = FileUploadHandler(config)
+
+            logger.info("FileUploadHandler configured from settings",
+                       max_upload_size_mb=max_upload_size / (1024 * 1024),
+                       max_upload_size_bytes=max_upload_size)
+        except Exception as e:
+            logger.warning("Failed to load MoRAG settings, using default config",
+                         error=str(e))
+            _upload_handler = FileUploadHandler()
     else:
         # Check if the handler's temp directory still exists
         if not _upload_handler.temp_dir.exists():
             logger.warning("Global FileUploadHandler temp directory missing, creating new handler",
                          old_temp_dir=str(_upload_handler.temp_dir))
-            _upload_handler = FileUploadHandler()
+
+            # Recreate with same configuration approach
+            try:
+                from morag_core.config import get_settings
+                settings = get_settings()
+                max_upload_size = settings.get_max_upload_size_bytes()
+
+                config = FileUploadConfig(max_file_size=max_upload_size)
+                _upload_handler = FileUploadHandler(config)
+            except Exception as e:
+                logger.warning("Failed to load MoRAG settings for new handler, using default config",
+                             error=str(e))
+                _upload_handler = FileUploadHandler()
     return _upload_handler
 
 

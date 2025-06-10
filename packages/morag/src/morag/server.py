@@ -30,6 +30,116 @@ from morag.endpoints import remote_jobs_router
 logger = structlog.get_logger(__name__)
 
 
+async def download_remote_file(file_path: str, temp_dir: Path) -> Path:
+    """Download a remote file (HTTP/HTTPS URL or UNC path) to local temp directory.
+
+    Args:
+        file_path: Remote file path (URL or UNC path)
+        temp_dir: Local temporary directory
+
+    Returns:
+        Path to downloaded local file
+
+    Raises:
+        HTTPException: If download fails
+    """
+    import aiohttp
+    import aiofiles
+    from urllib.parse import urlparse
+    import os
+
+    # Determine if it's a URL or UNC path
+    parsed = urlparse(file_path)
+    is_url = parsed.scheme in ('http', 'https')
+    is_unc = file_path.startswith('\\\\') or (len(file_path) > 1 and file_path[1] == ':' and '\\' in file_path)
+
+    if not is_url and not is_unc:
+        raise HTTPException(status_code=400, detail=f"Invalid remote file path: {file_path}. Must be HTTP/HTTPS URL or UNC path.")
+
+    # Generate local filename
+    if is_url:
+        filename = Path(parsed.path).name or "downloaded_file"
+    else:
+        filename = Path(file_path).name
+
+    if not filename or filename == '.':
+        filename = f"remote_file_{uuid.uuid4().hex[:8]}"
+
+    local_path = temp_dir / filename
+
+    try:
+        if is_url:
+            # Download from HTTP/HTTPS URL
+            async with aiohttp.ClientSession() as session:
+                async with session.get(file_path) as response:
+                    if response.status != 200:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to download file from {file_path}: HTTP {response.status}"
+                        )
+
+                    # Check content length if available
+                    content_length = response.headers.get('content-length')
+                    if content_length:
+                        try:
+                            from morag_core.config import get_settings
+                            settings = get_settings()
+                            max_size = settings.get_max_upload_size_bytes()
+                            if int(content_length) > max_size:
+                                raise HTTPException(
+                                    status_code=413,
+                                    detail=f"Remote file too large: {content_length} bytes exceeds limit of {max_size} bytes"
+                                )
+                        except Exception as e:
+                            logger.warning("Could not check file size limit", error=str(e))
+
+                    # Download file
+                    async with aiofiles.open(local_path, 'wb') as f:
+                        async for chunk in response.content.iter_chunked(8192):
+                            await f.write(chunk)
+
+        else:
+            # Copy from UNC path
+            import shutil
+            if not os.path.exists(file_path):
+                raise HTTPException(status_code=404, detail=f"UNC file not found: {file_path}")
+
+            # Check file size
+            try:
+                file_size = os.path.getsize(file_path)
+                from morag_core.config import get_settings
+                settings = get_settings()
+                max_size = settings.get_max_upload_size_bytes()
+                if file_size > max_size:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Remote file too large: {file_size} bytes exceeds limit of {max_size} bytes"
+                    )
+            except Exception as e:
+                logger.warning("Could not check UNC file size limit", error=str(e))
+
+            # Copy file
+            await asyncio.get_event_loop().run_in_executor(
+                None, shutil.copy2, file_path, local_path
+            )
+
+        logger.info("Remote file downloaded successfully",
+                   remote_path=file_path,
+                   local_path=str(local_path),
+                   file_size=local_path.stat().st_size)
+
+        return local_path
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error("Failed to download remote file",
+                    remote_path=file_path,
+                    error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to download remote file: {str(e)}")
+
+
 def normalize_content_type(content_type: Optional[str]) -> Optional[str]:
     """Normalize content type from MIME type to MoRAG content type.
 
@@ -229,6 +339,26 @@ class IngestBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     webhook_url: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
+
+
+class IngestRemoteFileRequest(BaseModel):
+    file_path: str  # UNC path or HTTP/HTTPS URL
+    source_type: Optional[str] = None  # Auto-detect if not provided
+    document_id: Optional[str] = None  # Custom document identifier
+    replace_existing: bool = False  # Whether to replace existing document
+    webhook_url: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    use_docling: Optional[bool] = False
+    chunk_size: Optional[int] = None
+    chunk_overlap: Optional[int] = None
+    chunking_strategy: Optional[str] = None
+    remote: Optional[bool] = False  # Use remote processing for audio/video
+
+
+class ProcessRemoteFileRequest(BaseModel):
+    file_path: str  # UNC path or HTTP/HTTPS URL
+    content_type: Optional[str] = None  # Auto-detect if not provided
+    options: Optional[Dict[str, Any]] = None
 
 
 class IngestResponse(BaseModel):
@@ -729,6 +859,156 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
         except Exception as e:
             logger.error("Batch ingestion failed", item_count=len(request.items), error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/ingest/remote-file", response_model=IngestResponse, tags=["Ingestion"])
+    async def ingest_remote_file(request: IngestRemoteFileRequest):
+        """Ingest and process a remote file (UNC path or HTTP/HTTPS URL), storing results in vector database."""
+        temp_path = None
+        try:
+            # Get upload handler for temp directory
+            upload_handler = get_upload_handler()
+
+            # Download remote file to temp directory
+            temp_path = await download_remote_file(request.file_path, upload_handler.temp_dir)
+
+            # Auto-detect source type if not provided
+            source_type = request.source_type
+            if not source_type:
+                source_type = get_morag_api()._detect_content_type_from_file(temp_path)
+                logger.info("Auto-detected content type for remote file",
+                           remote_path=request.file_path,
+                           detected_type=source_type)
+
+            logger.info("Remote file downloaded for ingestion",
+                       remote_path=request.file_path,
+                       temp_path=str(temp_path),
+                       source_type=source_type)
+
+            # Create task options with sanitized inputs
+            options = {
+                "document_id": request.document_id,
+                "replace_existing": request.replace_existing,
+                "webhook_url": request.webhook_url or "",  # Ensure string, not None
+                "metadata": request.metadata or {},  # Ensure dict, not None
+                "use_docling": request.use_docling,
+                "chunk_size": request.chunk_size,
+                "chunk_overlap": request.chunk_overlap,
+                "chunking_strategy": request.chunking_strategy,
+                "remote": request.remote,  # Remote processing flag
+                "store_in_vector_db": True  # Key difference from process endpoints
+            }
+
+            # Submit to background task queue for processing and storage
+            task = ingest_file_task.delay(
+                str(temp_path),
+                source_type,
+                options
+            )
+
+            logger.info("Remote file ingestion task created",
+                       task_id=task.id,
+                       remote_path=request.file_path,
+                       source_type=source_type)
+
+            return IngestResponse(
+                task_id=task.id,
+                status="pending",
+                message=f"Remote file ingestion started for {request.file_path}",
+                estimated_time=60  # Remote files may take longer due to download
+            )
+
+        except HTTPException:
+            # Clean up temp file on HTTP errors
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as cleanup_error:
+                    logger.warning("Failed to clean up temp file after error",
+                                 temp_path=str(temp_path),
+                                 error=str(cleanup_error))
+            raise
+        except Exception as e:
+            # Clean up temp file on other errors
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as cleanup_error:
+                    logger.warning("Failed to clean up temp file after error",
+                                 temp_path=str(temp_path),
+                                 error=str(cleanup_error))
+
+            logger.error("Remote file ingestion failed",
+                        remote_path=request.file_path,
+                        error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/process/remote-file", response_model=ProcessingResultResponse, tags=["Processing"])
+    async def process_remote_file(request: ProcessRemoteFileRequest):
+        """Process content from a remote file (UNC path or HTTP/HTTPS URL) without storing in vector database."""
+        temp_path = None
+        try:
+            # Get upload handler for temp directory
+            upload_handler = get_upload_handler()
+
+            # Download remote file to temp directory
+            temp_path = await download_remote_file(request.file_path, upload_handler.temp_dir)
+
+            # Auto-detect content type if not provided
+            content_type = request.content_type
+            if not content_type:
+                content_type = get_morag_api()._detect_content_type_from_file(temp_path)
+                logger.info("Auto-detected content type for remote file",
+                           remote_path=request.file_path,
+                           detected_type=content_type)
+
+            logger.info("Remote file downloaded for processing",
+                       remote_path=request.file_path,
+                       temp_path=str(temp_path),
+                       content_type=content_type)
+
+            # Submit to background task queue for processing (no storage)
+            task = process_file_task.delay(
+                str(temp_path),
+                content_type,
+                request.options or {}
+            )
+
+            logger.info("Remote file processing task created",
+                       task_id=task.id,
+                       remote_path=request.file_path,
+                       content_type=content_type)
+
+            return ProcessingResultResponse(
+                task_id=task.id,
+                status="pending",
+                message=f"Remote file processing started for {request.file_path}",
+                estimated_time=60  # Remote files may take longer due to download
+            )
+
+        except HTTPException:
+            # Clean up temp file on HTTP errors
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as cleanup_error:
+                    logger.warning("Failed to clean up temp file after error",
+                                 temp_path=str(temp_path),
+                                 error=str(cleanup_error))
+            raise
+        except Exception as e:
+            # Clean up temp file on other errors
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as cleanup_error:
+                    logger.warning("Failed to clean up temp file after error",
+                                 temp_path=str(temp_path),
+                                 error=str(cleanup_error))
+
+            logger.error("Remote file processing failed",
+                        remote_path=request.file_path,
+                        error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
     # Task status endpoints

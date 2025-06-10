@@ -242,6 +242,51 @@ def is_file_readable(file_path: Union[str, Path]) -> bool:
         return False
 
 
+def parse_size_string(size_str: str) -> int:
+    """Parse size string like '100MB', '5GB' to bytes.
+
+    Args:
+        size_str: Size string (e.g., '100MB', '5GB', '1024')
+
+    Returns:
+        Size in bytes
+
+    Raises:
+        ValueError: If size string format is invalid
+    """
+    if not size_str:
+        raise ValueError("Size string cannot be empty")
+
+    size_str = size_str.strip().upper()
+
+    # If it's just a number, return as-is (assume bytes)
+    if size_str.isdigit():
+        return int(size_str)
+
+    # Define size multipliers
+    multipliers = {
+        'B': 1,
+        'KB': 1024,
+        'MB': 1024 * 1024,
+        'GB': 1024 * 1024 * 1024,
+        'TB': 1024 * 1024 * 1024 * 1024,
+    }
+
+    # Extract number and unit
+    import re
+    match = re.match(r'^(\d+(?:\.\d+)?)\s*([KMGT]?B)$', size_str)
+    if not match:
+        raise ValueError(f"Invalid size format: {size_str}. Expected format like '100MB', '5GB', etc.")
+
+    number_str, unit = match.groups()
+    number = float(number_str)
+
+    if unit not in multipliers:
+        raise ValueError(f"Unknown size unit: {unit}. Supported units: {list(multipliers.keys())}")
+
+    return int(number * multipliers[unit])
+
+
 def cleanup_temp_files(pattern: str = "morag_*", max_age_hours: int = 24) -> int:
     """Clean up temporary files.
 
