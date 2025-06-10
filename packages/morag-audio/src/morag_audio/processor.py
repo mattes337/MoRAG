@@ -29,7 +29,7 @@ class AudioSegment:
 @dataclass
 class AudioConfig:
     """Configuration for audio processing."""
-    model_size: str = "medium"  # tiny, base, small, medium, large-v2
+    model_size: str = "medium"  # tiny, base, small, medium, large-v2, large-v3
     language: Optional[str] = None  # Auto-detect if None
     enable_diarization: bool = True  # Enable by default
     enable_topic_segmentation: bool = True  # Enable by default
@@ -46,6 +46,39 @@ class AudioConfig:
     })
     word_timestamps: bool = True
     include_metadata: bool = True
+
+    def __post_init__(self):
+        """Load configuration from environment variables if not explicitly set."""
+        import os
+
+        # Override with environment variables if they exist
+        # Support both WHISPER_MODEL_SIZE and MORAG_WHISPER_MODEL_SIZE
+        env_model_size = (
+            os.environ.get("WHISPER_MODEL_SIZE") or
+            os.environ.get("MORAG_WHISPER_MODEL_SIZE")
+        )
+        if env_model_size and self.model_size == "medium":  # Only override if using default
+            self.model_size = env_model_size
+
+        # Override language if set in environment
+        env_language = os.environ.get("MORAG_AUDIO_LANGUAGE")
+        if env_language and self.language is None:
+            self.language = env_language
+
+        # Override device if set in environment
+        env_device = os.environ.get("MORAG_AUDIO_DEVICE")
+        if env_device and self.device == "auto":  # Only override if using default
+            self.device = env_device
+
+        # Override diarization setting
+        env_diarization = os.environ.get("MORAG_ENABLE_SPEAKER_DIARIZATION")
+        if env_diarization is not None:
+            self.enable_diarization = env_diarization.lower() in ("true", "1", "yes", "on")
+
+        # Override topic segmentation setting
+        env_topic_seg = os.environ.get("MORAG_ENABLE_TOPIC_SEGMENTATION")
+        if env_topic_seg is not None:
+            self.enable_topic_segmentation = env_topic_seg.lower() in ("true", "1", "yes", "on")
 
 
 @dataclass

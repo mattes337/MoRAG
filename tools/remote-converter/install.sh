@@ -115,6 +115,25 @@ MORAG_WORKER_MAX_CONCURRENT_JOBS=2
 # Logging and Temp Directory
 MORAG_LOG_LEVEL=INFO
 MORAG_TEMP_DIR=/tmp/morag_remote
+
+# Audio Processing Configuration
+# Override Whisper model size (tiny, base, small, medium, large-v2, large-v3)
+WHISPER_MODEL_SIZE=large-v3
+# Alternative variable name (both are supported)
+# MORAG_WHISPER_MODEL_SIZE=large-v3
+
+# Audio language (optional, auto-detect if not set)
+# MORAG_AUDIO_LANGUAGE=en
+
+# Audio device (auto, cpu, cuda)
+# MORAG_AUDIO_DEVICE=auto
+
+# Enable/disable features
+# MORAG_ENABLE_SPEAKER_DIARIZATION=true
+# MORAG_ENABLE_TOPIC_SEGMENTATION=true
+
+# SpaCy model for topic segmentation (en_core_web_sm, de_core_news_sm, etc.)
+# MORAG_SPACY_MODEL=de_core_news_sm
 EOF
 
 echo ""

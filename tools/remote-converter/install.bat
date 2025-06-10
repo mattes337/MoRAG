@@ -83,6 +83,26 @@ echo # MORAG_API_KEY=your-api-key-here >> .env.example
 echo. >> .env.example
 echo # Logging and Temp Directory >> .env.example
 echo MORAG_LOG_LEVEL=INFO >> .env.example
+echo MORAG_TEMP_DIR=/tmp/morag_remote >> .env.example
+echo. >> .env.example
+echo # Audio Processing Configuration >> .env.example
+echo # Override Whisper model size (tiny, base, small, medium, large-v2, large-v3) >> .env.example
+echo WHISPER_MODEL_SIZE=large-v3 >> .env.example
+echo # Alternative variable name (both are supported) >> .env.example
+echo # MORAG_WHISPER_MODEL_SIZE=large-v3 >> .env.example
+echo. >> .env.example
+echo # Audio language (optional, auto-detect if not set) >> .env.example
+echo # MORAG_AUDIO_LANGUAGE=en >> .env.example
+echo. >> .env.example
+echo # Audio device (auto, cpu, cuda) >> .env.example
+echo # MORAG_AUDIO_DEVICE=auto >> .env.example
+echo. >> .env.example
+echo # Enable/disable features >> .env.example
+echo # MORAG_ENABLE_SPEAKER_DIARIZATION=true >> .env.example
+echo # MORAG_ENABLE_TOPIC_SEGMENTATION=true >> .env.example
+echo. >> .env.example
+echo # SpaCy model for topic segmentation (en_core_web_sm, de_core_news_sm, etc.) >> .env.example
+echo # MORAG_SPACY_MODEL=de_core_news_sm >> .env.example
 echo MORAG_TEMP_DIR=C:\temp\morag_remote >> .env.example
 
 echo.

@@ -96,7 +96,7 @@ def main():
                         help="Output format (default: markdown)")
     
     # Model configuration
-    parser.add_argument("--model-size", choices=["tiny", "base", "small", "medium", "large-v2"],
+    parser.add_argument("--model-size", choices=["tiny", "base", "small", "medium", "large-v2", "large-v3"],
                         default="medium", help="Whisper model size (default: medium)")
     parser.add_argument("--language", "-l", help="Language code (auto-detect if not specified)")
     parser.add_argument("--device", choices=["cpu", "cuda", "auto"], default="auto",

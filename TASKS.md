@@ -505,27 +505,78 @@ For detailed information about completed tasks and implementation history, see [
   - **Consistent Environment**: Same `.env` configuration used by CLI and API
 - **Status**: CLI scripts now work completely independently with full ingestion capabilities
 
+### ✅ Audio Model Configuration Support (January 2025)
+
+#### 17. **Environment Variable Model Override Support** ✅ IMPLEMENTED
+- **Issue**: Remote converter couldn't override Whisper model size or spaCy models through environment variables
+- **Problems Identified**:
+  - `AudioConfig` class didn't read environment variables during initialization
+  - Hardcoded model defaults couldn't be overridden for remote workers
+  - No support for configuring spaCy models for different languages
+  - Remote converter configuration didn't include audio-specific environment variables
+- **Solution**: Implemented comprehensive environment variable support for audio model configuration
+- **Changes Implemented**:
+  - **AudioConfig Environment Loading**: Added `__post_init__` method to read environment variables
+    - `WHISPER_MODEL_SIZE` and `MORAG_WHISPER_MODEL_SIZE` for Whisper model override
+    - `MORAG_AUDIO_LANGUAGE` for language override
+    - `MORAG_AUDIO_DEVICE` for device selection (auto, cpu, cuda)
+    - `MORAG_ENABLE_SPEAKER_DIARIZATION` and `MORAG_ENABLE_TOPIC_SEGMENTATION` for feature toggles
+  - **SpaCy Model Configuration**: Enhanced topic segmentation service to support configurable models
+    - `MORAG_SPACY_MODEL` environment variable for model selection
+    - Intelligent fallback to common models (en_core_web_sm, de_core_news_sm, etc.)
+    - Better error handling when models are not available
+  - **Remote Converter Integration**: Updated remote converter configuration
+    - Added audio environment variables to configuration tracking
+    - Updated .env.example templates with audio configuration options
+    - Enhanced documentation with model override examples
+  - **CLI Support**: Updated audio CLI to support large-v3 model option
+  - **Comprehensive Documentation**: Created detailed model configuration guide
+- **Technical Details**:
+  - **Environment Variable Priority**: Environment variables only override defaults, explicit parameters take precedence
+  - **Backward Compatibility**: All existing code continues to work without changes
+  - **Model Support**: Added support for latest Whisper models including large-v3
+  - **Language Support**: Enhanced spaCy integration for multiple languages (German, French, Spanish)
+  - **Validation**: Added comprehensive test suite to verify environment variable loading
+- **Files Modified**:
+  - `packages/morag-audio/src/morag_audio/processor.py`: Added environment variable loading to AudioConfig
+  - `packages/morag-audio/src/morag_audio/services/topic_segmentation.py`: Added configurable spaCy model support
+  - `packages/morag-audio/src/morag_audio/cli.py`: Added large-v3 model option
+  - `tools/remote-converter/config.py`: Added audio environment variable tracking
+  - `tools/remote-converter/install.sh` and `install.bat`: Updated .env templates
+  - `tools/remote-converter/README.md`: Added comprehensive model configuration documentation
+  - `.env.example`: Enhanced with audio model configuration options
+- **Files Added**:
+  - `docs/model-configuration.md`: Comprehensive model configuration guide
+  - `tools/remote-converter/test_env_config.py`: Environment variable loading tests
+  - `tools/remote-converter/test_env_file.py`: .env file integration tests
+- **Usage Examples**:
+  - **GPU Worker**: `WHISPER_MODEL_SIZE=large-v3` for maximum accuracy
+  - **German Processing**: `MORAG_SPACY_MODEL=de_core_news_sm` for German language support
+  - **CPU Optimization**: `WHISPER_MODEL_SIZE=base` for faster processing
+  - **Feature Control**: `MORAG_ENABLE_SPEAKER_DIARIZATION=false` to disable features
+- **Status**: Complete environment variable support implemented, comprehensive documentation provided
+
 ### ✅ Critical Bug Fixes (January 2025)
 
-#### 17. **Image Processing API Error** ✅ FIXED
+#### 18. **Image Processing API Error** ✅ FIXED
 - **Issue**: `AttributeError: module 'google.generativeai' has no attribute 'get_api_key'` in image caption generation
 - **Root Cause**: Code was calling `genai.get_api_key()` which doesn't exist in the Google Generative AI library
 - **Solution**: Replaced with proper environment variable check using `os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")`
 - **Files Modified**: `packages/morag-image/src/morag_image/processor.py`
 - **Status**: Image processing now fails gracefully with proper error message instead of AttributeError
 
-#### 18. **Web Service Method Signature Mismatch** ✅ FIXED
+#### 19. **Web Service Method Signature Mismatch** ✅ FIXED
 - **Issue**: `TypeError: WebService.process_url() got an unexpected keyword argument 'config'` in web URL processing
 - **Root Cause**: `MoRAGServices.process_url()` was calling `self.web_service.process_url()` with `config` parameter but method expects `config_options`
 - **Solution**: Fixed parameter name from `config` to `config_options` and added proper config conversion
 - **Files Modified**: `packages/morag-services/src/morag_services/services.py`
 - **Status**: Web URL processing now works without method signature errors
 
-#### 19. **Search Endpoint Implementation** ✅ IMPLEMENTED
+#### 20. **Search Endpoint Implementation** ✅ IMPLEMENTED
 - **Issue**: Search functionality returned empty list with warning "Search functionality not yet implemented"
 - **Root Cause**: The `search_similar` method in MoRAGServices was not implemented
 
-#### 20. **API Parameter Defaults and Qdrant Collection Validation** ✅ FIXED
+#### 21. **API Parameter Defaults and Qdrant Collection Validation** ✅ FIXED
 - **Issue**: Two critical API usability issues:
   1. Optional API parameters required manual "send empty value" clicks in Swagger UI
   2. Qdrant collection environment variable validation error on startup due to `env_prefix="MORAG_"` conflict

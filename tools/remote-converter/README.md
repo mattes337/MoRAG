@@ -73,7 +73,62 @@ log_level: "INFO"
 temp_dir: "/tmp/morag_remote"
 ```
 
-### 3. Environment Variables (Optional)
+### 3. Model Configuration (Optional)
+
+The remote converter supports overriding AI models through environment variables:
+
+#### Audio Models
+
+**Whisper Model Override:**
+```bash
+# Use large-v3 model for better accuracy (requires more GPU memory)
+WHISPER_MODEL_SIZE=large-v3
+
+# Alternative variable name (both are supported)
+MORAG_WHISPER_MODEL_SIZE=large-v3
+```
+
+Available Whisper models:
+- `tiny` - Fastest, least accurate (~39 MB)
+- `base` - Good balance (~74 MB)
+- `small` - Better accuracy (~244 MB)
+- `medium` - High accuracy (~769 MB) - **Default**
+- `large-v2` - Highest accuracy (~1550 MB)
+- `large-v3` - Latest, highest accuracy (~1550 MB) - **Recommended for GPU workers**
+
+**SpaCy Model Override:**
+```bash
+# Use German model for topic segmentation
+MORAG_SPACY_MODEL=de_core_news_sm
+
+# Use larger English model
+MORAG_SPACY_MODEL=en_core_web_md
+```
+
+Common SpaCy models:
+- `en_core_web_sm` - English small model - **Default**
+- `en_core_web_md` - English medium model
+- `de_core_news_sm` - German small model
+- `de_core_news_md` - German medium model
+- `fr_core_news_sm` - French small model
+
+#### Audio Processing Features
+
+```bash
+# Enable/disable speaker diarization (who spoke when)
+MORAG_ENABLE_SPEAKER_DIARIZATION=true
+
+# Enable/disable topic segmentation (automatic topic detection)
+MORAG_ENABLE_TOPIC_SEGMENTATION=true
+
+# Force specific language (optional, auto-detect if not set)
+MORAG_AUDIO_LANGUAGE=de
+
+# Force specific device
+MORAG_AUDIO_DEVICE=cuda  # auto, cpu, cuda
+```
+
+### 4. Environment Variables (Optional)
 
 ```bash
 # Copy environment template
@@ -84,6 +139,7 @@ cp .env.example .env
 Environment variables:
 
 ```bash
+# Worker Configuration
 MORAG_WORKER_ID=gpu-worker-01
 MORAG_API_BASE_URL=https://your-morag-server.com
 MORAG_WORKER_CONTENT_TYPES=audio,video
@@ -92,9 +148,17 @@ MORAG_WORKER_MAX_CONCURRENT_JOBS=2
 MORAG_API_KEY=your-api-key-here
 MORAG_LOG_LEVEL=INFO
 MORAG_TEMP_DIR=/tmp/morag_remote
+
+# Audio Processing Configuration
+WHISPER_MODEL_SIZE=large-v3                    # Whisper model: tiny, base, small, medium, large-v2, large-v3
+MORAG_AUDIO_LANGUAGE=en                        # Audio language (optional, auto-detect if not set)
+MORAG_AUDIO_DEVICE=auto                        # Device: auto, cpu, cuda
+MORAG_ENABLE_SPEAKER_DIARIZATION=true          # Enable speaker diarization
+MORAG_ENABLE_TOPIC_SEGMENTATION=true           # Enable topic segmentation
+MORAG_SPACY_MODEL=de_core_news_sm              # SpaCy model for topic segmentation
 ```
 
-### 4. Test Connection
+### 5. Test Connection
 
 ```bash
 # Test connection to MoRAG API
@@ -104,7 +168,7 @@ python cli.py --test-connection
 python cli.py --show-config
 ```
 
-### 5. Start the Remote Converter
+### 6. Start the Remote Converter
 
 ```bash
 # Start with configuration file

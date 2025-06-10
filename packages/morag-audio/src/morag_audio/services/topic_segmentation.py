@@ -19,15 +19,30 @@ logger = structlog.get_logger(__name__)
 try:
     import spacy
     SPACY_AVAILABLE = True
+
+    # Get spacy model from environment variable or use default
+    import os
+    spacy_model = os.environ.get("MORAG_SPACY_MODEL", "en_core_web_sm")
+
     try:
-        nlp = spacy.load("en_core_web_sm")
+        nlp = spacy.load(spacy_model)
+        logger.info(f"Loaded spaCy model: {spacy_model}")
     except OSError:
-        # Fallback to small model if main model not available
-        try:
-            nlp = spacy.load("en_core_web_md")
-        except OSError:
-            logger.warning("spaCy models not available, using basic NLP processing")
-            nlp = None
+        # Fallback to other common models
+        fallback_models = ["en_core_web_sm", "en_core_web_md", "de_core_news_sm", "de_core_news_md"]
+        nlp = None
+
+        for model in fallback_models:
+            if model != spacy_model:  # Don't try the same model twice
+                try:
+                    nlp = spacy.load(model)
+                    logger.info(f"Loaded fallback spaCy model: {model}")
+                    break
+                except OSError:
+                    continue
+
+        if nlp is None:
+            logger.warning("No spaCy models available, using basic NLP processing")
             SPACY_AVAILABLE = False
 except ImportError:
     SPACY_AVAILABLE = False

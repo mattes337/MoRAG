@@ -42,6 +42,27 @@ class RemoteConverterConfig:
             'log_level': os.getenv('MORAG_LOG_LEVEL', 'INFO'),
             'temp_dir': os.getenv('MORAG_TEMP_DIR', '/tmp/morag_remote')
         }
+
+        # Audio processing environment variables - these will be passed through to processors
+        audio_env_vars = [
+            'WHISPER_MODEL_SIZE',
+            'MORAG_WHISPER_MODEL_SIZE',
+            'MORAG_AUDIO_LANGUAGE',
+            'MORAG_AUDIO_DEVICE',
+            'MORAG_ENABLE_SPEAKER_DIARIZATION',
+            'MORAG_ENABLE_TOPIC_SEGMENTATION',
+            'MORAG_SPACY_MODEL'
+        ]
+
+        # Add audio environment variables to config for documentation/debugging
+        audio_config = {}
+        for var in audio_env_vars:
+            value = os.getenv(var)
+            if value is not None:
+                audio_config[var] = value
+
+        if audio_config:
+            env_config['audio_env_vars'] = audio_config
         
         # Remove None values
         env_config = {k: v for k, v in env_config.items() if v is not None}
