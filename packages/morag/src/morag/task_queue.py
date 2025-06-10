@@ -58,20 +58,28 @@ class Worker:
 
 class HTTPTaskQueue:
     """HTTP-based task queue manager."""
-    
+
     def __init__(self):
         self.tasks: Dict[str, Task] = {}
         self.workers: Dict[str, Worker] = {}
         self.user_queues: Dict[str, List[str]] = {}  # user_id -> task_ids
         self.general_queue: List[str] = []  # For tasks without specific user
-        self._lock = asyncio.Lock()
-        
-        # Start cleanup task
-        asyncio.create_task(self._cleanup_loop())
-    
-    async def register_worker(self, worker_id: str, worker_type: str, api_key: str, 
+        self._lock = None  # Will be initialized when first used
+        self._cleanup_task = None  # Will be started when first used
+        self._initialized = False
+
+    async def _ensure_initialized(self):
+        """Ensure the task queue is properly initialized with async components."""
+        if not self._initialized:
+            self._lock = asyncio.Lock()
+            # Start cleanup task
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+            self._initialized = True
+
+    async def register_worker(self, worker_id: str, worker_type: str, api_key: str,
                             user_id: Optional[str] = None, max_concurrent_tasks: int = 1) -> bool:
         """Register a worker."""
+        await self._ensure_initialized()
         async with self._lock:
             self.workers[worker_id] = Worker(
                 worker_id=worker_id,
@@ -88,6 +96,7 @@ class HTTPTaskQueue:
     
     async def unregister_worker(self, worker_id: str) -> bool:
         """Unregister a worker."""
+        await self._ensure_initialized()
         async with self._lock:
             if worker_id in self.workers:
                 worker = self.workers[worker_id]
@@ -106,11 +115,12 @@ class HTTPTaskQueue:
                 return True
             return False
     
-    async def submit_task(self, task_type: str, parameters: Dict[str, Any], 
+    async def submit_task(self, task_type: str, parameters: Dict[str, Any],
                          user_id: Optional[str] = None) -> str:
         """Submit a new task."""
+        await self._ensure_initialized()
         task_id = str(uuid.uuid4())
-        
+
         async with self._lock:
             task = Task(
                 task_id=task_id,
@@ -140,6 +150,7 @@ class HTTPTaskQueue:
     
     async def get_next_task(self, worker_id: str) -> Optional[Dict[str, Any]]:
         """Get next available task for a worker."""
+        await self._ensure_initialized()
         async with self._lock:
             if worker_id not in self.workers:
                 return None
@@ -191,10 +202,11 @@ class HTTPTaskQueue:
             
             return None
     
-    async def update_task_status(self, task_id: str, status: TaskStatus, 
+    async def update_task_status(self, task_id: str, status: TaskStatus,
                                result: Optional[Dict[str, Any]] = None,
                                error_message: Optional[str] = None) -> bool:
         """Update task status."""
+        await self._ensure_initialized()
         async with self._lock:
             if task_id not in self.tasks:
                 return False
@@ -224,6 +236,7 @@ class HTTPTaskQueue:
     
     async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get task status."""
+        await self._ensure_initialized()
         async with self._lock:
             if task_id not in self.tasks:
                 return None
@@ -253,6 +266,8 @@ class HTTPTaskQueue:
     
     async def _cleanup_old_tasks(self):
         """Remove old completed/failed tasks."""
+        if not self._initialized:
+            return
         async with self._lock:
             cutoff_time = datetime.now() - timedelta(hours=24)
             tasks_to_remove = []
@@ -268,6 +283,8 @@ class HTTPTaskQueue:
     
     async def _cleanup_inactive_workers(self):
         """Remove inactive workers and reassign their tasks."""
+        if not self._initialized:
+            return
         async with self._lock:
             cutoff_time = datetime.now() - timedelta(minutes=10)
             workers_to_remove = []
@@ -279,6 +296,17 @@ class HTTPTaskQueue:
             for worker_id in workers_to_remove:
                 await self.unregister_worker(worker_id)
                 logger.info("Removed inactive worker", worker_id=worker_id)
+
+    async def shutdown(self):
+        """Shutdown the task queue and cleanup resources."""
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+
+        logger.info("Task queue shutdown completed")
 
 
 # Global task queue instance

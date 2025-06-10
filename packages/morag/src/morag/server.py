@@ -300,6 +300,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         logger.info("MoRAG API server shutting down")
         stop_cleanup_service()
         logger.info("Periodic cleanup service stopped")
+        await task_queue.shutdown()
+        logger.info("Task queue shutdown completed")
         await get_morag_api().cleanup()
         logger.info("MoRAG API server shut down")
 

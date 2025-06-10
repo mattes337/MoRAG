@@ -51,17 +51,25 @@ class Worker:
 
 class HTTPTaskQueue:
     """HTTP-based task queue manager."""
-    
+
     def __init__(self):
         self.tasks: Dict[str, Task] = {}
         self.workers: Dict[str, Worker] = {}
         self.user_queues: Dict[str, List[str]] = {}
         self.general_queue: List[str] = []
-        self._lock = asyncio.Lock()
+        self._lock = None  # Will be initialized when first used
+        self._initialized = False
+
+    async def _ensure_initialized(self):
+        """Ensure the task queue is properly initialized with async components."""
+        if not self._initialized:
+            self._lock = asyncio.Lock()
+            self._initialized = True
     
-    async def register_worker(self, worker_id: str, worker_type: str, api_key: str, 
+    async def register_worker(self, worker_id: str, worker_type: str, api_key: str,
                             user_id: Optional[str] = None, max_concurrent_tasks: int = 1) -> bool:
         """Register a worker."""
+        await self._ensure_initialized()
         async with self._lock:
             self.workers[worker_id] = Worker(
                 worker_id=worker_id,
@@ -72,11 +80,12 @@ class HTTPTaskQueue:
             )
             return True
     
-    async def submit_task(self, task_type: str, parameters: Dict[str, Any], 
+    async def submit_task(self, task_type: str, parameters: Dict[str, Any],
                          user_id: Optional[str] = None) -> str:
         """Submit a new task."""
+        await self._ensure_initialized()
         task_id = str(uuid.uuid4())
-        
+
         async with self._lock:
             task = Task(
                 task_id=task_id,
@@ -101,6 +110,7 @@ class HTTPTaskQueue:
     
     async def get_next_task(self, worker_id: str) -> Optional[Dict[str, Any]]:
         """Get next available task for a worker."""
+        await self._ensure_initialized()
         async with self._lock:
             if worker_id not in self.workers:
                 return None
@@ -145,10 +155,11 @@ class HTTPTaskQueue:
             
             return None
     
-    async def update_task_status(self, task_id: str, status: TaskStatus, 
+    async def update_task_status(self, task_id: str, status: TaskStatus,
                                result: Optional[Dict[str, Any]] = None,
                                error_message: Optional[str] = None) -> bool:
         """Update task status."""
+        await self._ensure_initialized()
         async with self._lock:
             if task_id not in self.tasks:
                 return False
@@ -172,6 +183,7 @@ class HTTPTaskQueue:
     
     async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get task status."""
+        await self._ensure_initialized()
         async with self._lock:
             if task_id not in self.tasks:
                 return None
