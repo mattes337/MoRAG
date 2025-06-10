@@ -9,7 +9,7 @@ services:
 #      - "6333:6333"
 #      - "6334:6334"
 #    volumes:
-#      - qdrant_data:/qdrant/storage
+#      - ./qdrant-data:/qdrant/storage
 #    environment:
 #      - QDRANT__SERVICE__HTTP_PORT=6333
 #      - QDRANT__SERVICE__GRPC_PORT=6334
@@ -47,15 +47,58 @@ services:
       - ./temp:/app/temp
 
 
+  # HTTP Remote Worker - CPU only
+  morag-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: morag-worker
+    restart: unless-stopped
+    environment:
+      # Required: Main server connection
+      - MORAG_SERVER_URL=${MORAG_SERVER_URL:-http://morag-api:8000}
+      - MORAG_API_KEY=${MORAG_API_KEY}
+      
+      # Worker configuration
+      - WORKER_TYPE=cpu
+      - POLL_INTERVAL=${POLL_INTERVAL:-10}
+      - MAX_CONCURRENT_TASKS=${MAX_CONCURRENT_TASKS:-2}
+      
+      # Force CPU processing
+      - MORAG_FORCE_CPU=true
+      
+      # Cache directories
+      - HF_HOME=/home/morag/.cache/huggingface
+      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
+      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      
+      # CPU optimization
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS:-2}
+      - MKL_NUM_THREADS=${MKL_NUM_THREADS:-2}
+      - OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-2}
+      - VECLIB_MAXIMUM_THREADS=${VECLIB_MAXIMUM_THREADS:-2}
+      - NUMEXPR_NUM_THREADS=${NUMEXPR_NUM_THREADS:-2}
+      
+      # PyTorch CPU compatibility
+      - PYTORCH_DISABLE_NNPACK=1
+      - PYTORCH_DISABLE_AVX=1
+      - PYTORCH_DISABLE_AVX2=1
+    
+    volumes:
+      # Cache directories for models
+      - ./cache:/home/morag/.cache
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+
   # Note: Workers have been replaced with HTTP-based remote workers
   # Use docker-compose.workers.yml for remote worker deployment
   # Or run: python scripts/start_http_remote_worker.py
-
-volumes:
-  qdrant_data:
-    driver: local
-
-networks:
-  default:
-    name: morag-network
-    driver: bridge
