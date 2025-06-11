@@ -136,6 +136,28 @@ class Settings(BaseSettings):
     log_backup_count: int = Field(default=5, alias="MORAG_LOG_BACKUP_COUNT")
     log_rotation: str = Field(default="daily", alias="MORAG_LOG_ROTATION")  # daily, weekly, size
 
+    # Database Configuration
+    database_url: str = Field(
+        default="sqlite:///./morag.db",
+        alias="MORAG_DATABASE_URL",
+        description="Database connection URL"
+    )
+    database_pool_size: int = Field(
+        default=5,
+        alias="MORAG_DATABASE_POOL_SIZE",
+        description="Database connection pool size"
+    )
+    database_max_overflow: int = Field(
+        default=10,
+        alias="MORAG_DATABASE_MAX_OVERFLOW",
+        description="Database connection pool max overflow"
+    )
+    database_echo: bool = Field(
+        default=False,
+        alias="MORAG_DATABASE_ECHO",
+        description="Enable SQL query logging"
+    )
+
     # Environment settings
     environment: str = Field(default="development", alias="MORAG_ENVIRONMENT")  # development, testing, production
     debug: bool = Field(default=True, alias="MORAG_DEBUG")

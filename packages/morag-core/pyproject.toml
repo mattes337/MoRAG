@@ -25,6 +25,11 @@ dependencies = [
     "pydantic-settings>=2.7.0,<3.0.0",
     "structlog>=24.4.0,<25.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
+    # Database dependencies
+    "sqlalchemy>=1.4.0,<3.0.0",
+    "alembic>=1.8.0,<2.0.0",
+    "bcrypt>=3.2.0,<5.0.0",
+    "pyjwt>=2.4.0,<3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +41,19 @@ dev = [
     "isort>=5.12.0,<6.0.0",
     "flake8>=6.0.0,<7.0.0",
     "mypy>=1.7.0,<2.0.0",
+]
+# Database driver dependencies
+postgresql = [
+    "psycopg2-binary>=2.9.0,<3.0.0",
+]
+mysql = [
+    "pymysql>=1.0.0,<2.0.0",
+    "cryptography>=3.0.0,<42.0.0",
+]
+all-databases = [
+    "psycopg2-binary>=2.9.0,<3.0.0",
+    "pymysql>=1.0.0,<2.0.0",
+    "cryptography>=3.0.0,<42.0.0",
 ]
 
 [project.urls]
