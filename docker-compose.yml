@@ -12,6 +12,18 @@ services:
     # Note: To fix memory overcommit warning, run on host:
     # echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
+  mariadb:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: peak4tw
+      MARIADB_USER: morag
+      MARIADB_PASSWORD: morag1234
+      MARIADB_DATABASE: morag
+    volumes:
+      - /var/docker/mariadb:/var/lib/mysql
+    ports:
+      - "3306:3306"
+      
   # Qdrant vector database
 #  qdrant:
 #    image: qdrant/qdrant:latest
