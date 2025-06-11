@@ -34,6 +34,15 @@ from morag_core.auth import (
     UserCreate, UserLogin, UserResponse, UserUpdate,
     UserSettingsUpdate, UserSettingsResponse, TokenResponse, PasswordChangeRequest
 )
+from morag_core.api_keys import (
+    ApiKeyService, ApiKeyMiddleware, get_api_key_user, require_api_key,
+    ApiKeyCreate, ApiKeyUpdate, ApiKeyResponse, ApiKeyCreateResponse,
+    ApiKeySearchRequest, ApiKeySearchResponse
+)
+from morag_core.tenancy import (
+    TenantService, TenantMiddleware,
+    TenantInfo, TenantSearchRequest, TenantSearchResponse, ResourceType
+)
 from morag_core.exceptions import (
     AuthenticationError, AuthorizationError, ValidationError,
     NotFoundError, ConflictError, DatabaseError
@@ -491,9 +500,13 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Health check failed", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Initialize authentication components
+    # Initialize authentication and multi-tenancy components
     user_service = UserService()
     auth_middleware = AuthenticationMiddleware()
+    api_key_service = ApiKeyService()
+    api_key_middleware = ApiKeyMiddleware()
+    tenant_service = TenantService()
+    tenant_middleware = TenantMiddleware()
 
     # Authentication endpoints
     @app.post("/auth/register", response_model=UserResponse, tags=["Authentication"])
@@ -644,6 +657,145 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Admin health check failed", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
+    # API Key Management endpoints
+    @app.post("/api/v1/api-keys", response_model=ApiKeyCreateResponse, tags=["API Keys"])
+    async def create_api_key(
+        api_key_data: ApiKeyCreate,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """Create a new API key."""
+        try:
+            # Check quota
+            if not tenant_middleware.check_resource_quota(current_user.id, ResourceType.API_KEYS):
+                raise HTTPException(status_code=429, detail="API key quota exceeded")
+
+            api_key = api_key_service.create_api_key(api_key_data, current_user.id)
+            logger.info("API key created",
+                       api_key_id=api_key.api_key.id,
+                       user_id=current_user.id)
+            return api_key
+        except ConflictError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except Exception as e:
+            logger.error("Failed to create API key", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to create API key")
+
+    @app.get("/api/v1/api-keys", response_model=ApiKeySearchResponse, tags=["API Keys"])
+    async def list_api_keys(
+        skip: int = 0,
+        limit: int = 50,
+        name_contains: Optional[str] = None,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """List user's API keys."""
+        try:
+            search_request = ApiKeySearchRequest(
+                skip=skip,
+                limit=limit,
+                name_contains=name_contains
+            )
+            return api_key_service.list_api_keys(search_request, current_user.id)
+        except Exception as e:
+            logger.error("Failed to list API keys", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to list API keys")
+
+    @app.get("/api/v1/api-keys/{api_key_id}", response_model=ApiKeyResponse, tags=["API Keys"])
+    async def get_api_key(
+        api_key_id: str,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """Get API key details."""
+        try:
+            api_key = api_key_service.get_api_key(api_key_id, current_user.id)
+            if not api_key:
+                raise HTTPException(status_code=404, detail="API key not found")
+            return api_key
+        except Exception as e:
+            logger.error("Failed to get API key", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to get API key")
+
+    @app.put("/api/v1/api-keys/{api_key_id}", response_model=ApiKeyResponse, tags=["API Keys"])
+    async def update_api_key(
+        api_key_id: str,
+        api_key_data: ApiKeyUpdate,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """Update API key."""
+        try:
+            api_key = api_key_service.update_api_key(api_key_id, api_key_data, current_user.id)
+            logger.info("API key updated", api_key_id=api_key_id, user_id=current_user.id)
+            return api_key
+        except NotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ConflictError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except Exception as e:
+            logger.error("Failed to update API key", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to update API key")
+
+    @app.delete("/api/v1/api-keys/{api_key_id}", tags=["API Keys"])
+    async def delete_api_key(
+        api_key_id: str,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """Delete API key."""
+        try:
+            success = api_key_service.delete_api_key(api_key_id, current_user.id)
+            if success:
+                logger.info("API key deleted", api_key_id=api_key_id, user_id=current_user.id)
+                return {"message": "API key deleted successfully"}
+            else:
+                raise HTTPException(status_code=500, detail="Failed to delete API key")
+        except NotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            logger.error("Failed to delete API key", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to delete API key")
+
+    # Tenant Management endpoints
+    @app.get("/api/v1/tenant/info", response_model=TenantInfo, tags=["Tenant Management"])
+    async def get_tenant_info(current_user: UserResponse = Depends(require_authentication)):
+        """Get current tenant information."""
+        try:
+            tenant_info = tenant_service.get_tenant_info(current_user.id)
+            if not tenant_info:
+                raise HTTPException(status_code=404, detail="Tenant information not found")
+            return tenant_info
+        except Exception as e:
+            logger.error("Failed to get tenant info", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to get tenant info")
+
+    @app.get("/api/v1/tenant/collections", tags=["Tenant Management"])
+    async def get_tenant_collections(current_user: UserResponse = Depends(require_authentication)):
+        """Get user's vector database collections."""
+        try:
+            collections = tenant_service.get_user_collections(current_user.id)
+            return {"collections": collections}
+        except Exception as e:
+            logger.error("Failed to get tenant collections", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to get tenant collections")
+
+    @app.get("/admin/tenants", response_model=TenantSearchResponse, tags=["Administration"])
+    async def list_tenants(
+        skip: int = 0,
+        limit: int = 50,
+        email_contains: Optional[str] = None,
+        name_contains: Optional[str] = None,
+        current_user: UserResponse = Depends(require_admin)
+    ):
+        """List all tenants (admin only)."""
+        try:
+            search_request = TenantSearchRequest(
+                skip=skip,
+                limit=limit,
+                email_contains=email_contains,
+                name_contains=name_contains
+            )
+            return tenant_service.list_tenants(search_request)
+        except Exception as e:
+            logger.error("Failed to list tenants", error=str(e))
+            raise HTTPException(status_code=500, detail="Failed to list tenants")
+
     @app.post("/process/url", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_url(request: ProcessURLRequest):
         """Process content from a URL."""
@@ -670,13 +822,17 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         file: UploadFile = File(...),
         content_type: Optional[str] = Form(default=None),
         options: Optional[str] = Form(default=None),  # JSON string
-        current_user: Optional[UserResponse] = Depends(get_current_user)  # Optional auth
+        current_user: Optional[UserResponse] = Depends(get_current_user),  # Optional JWT auth
+        api_key_user: Optional[UserResponse] = Depends(get_api_key_user)  # Optional API key auth
     ):
         """Process content from an uploaded file."""
         temp_path = None
         try:
+            # Determine authenticated user (JWT takes precedence over API key)
+            authenticated_user = current_user or api_key_user
+
             # Extract user context for logging
-            user_context = auth_middleware.extract_user_context(current_user)
+            user_context = auth_middleware.extract_user_context(authenticated_user)
             logger.info("Processing file request",
                        filename=file.filename,
                        user_id=user_context.get("user_id"),
@@ -861,11 +1017,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunking_strategy: Optional[str] = Form(default=None),  # paragraph, sentence, word, character, etc.
         remote: Optional[bool] = Form(default=False),  # Use remote processing for audio/video
-        current_user: Optional[UserResponse] = Depends(get_current_user)  # Optional auth
+        current_user: Optional[UserResponse] = Depends(get_current_user),  # Optional JWT auth
+        api_key_user: Optional[UserResponse] = Depends(get_api_key_user)  # Optional API key auth
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
         try:
+            # Determine authenticated user (JWT takes precedence over API key)
+            authenticated_user = current_user or api_key_user
             # Parse metadata if provided
             parsed_metadata = None
             if metadata:
@@ -920,7 +1079,13 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                     )
 
             # Extract user context
-            user_context = auth_middleware.extract_user_context(current_user)
+            user_context = auth_middleware.extract_user_context(authenticated_user)
+
+            # Check document quota if user is authenticated
+            if authenticated_user and not tenant_middleware.check_resource_quota(
+                authenticated_user.id, ResourceType.DOCUMENTS
+            ):
+                raise HTTPException(status_code=429, detail="Document quota exceeded")
 
             # Create task options with sanitized inputs
             options = {

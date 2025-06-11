@@ -24,9 +24,10 @@ def get_session():
 
 
 @contextmanager
-def get_session_context():
+def get_session_context(db_manager=None):
     """Get a database session with context manager."""
-    db_manager = get_database_manager()
+    if db_manager is None:
+        db_manager = get_database_manager()
     session = db_manager.get_session()
     try:
         yield session
