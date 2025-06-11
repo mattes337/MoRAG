@@ -56,6 +56,34 @@ class AuthenticationError(MoRAGException):
     def __init__(self, message: str = "Authentication required"):
         super().__init__(message, status_code=401, error_type="authentication_error")
 
+
+class AuthorizationError(MoRAGException):
+    """Raised when authorization fails."""
+
+    def __init__(self, message: str = "Insufficient permissions"):
+        super().__init__(message, status_code=403, error_type="authorization_error")
+
+
+class NotFoundError(MoRAGException):
+    """Raised when a resource is not found."""
+
+    def __init__(self, message: str = "Resource not found"):
+        super().__init__(message, status_code=404, error_type="not_found_error")
+
+
+class ConflictError(MoRAGException):
+    """Raised when a resource conflict occurs."""
+
+    def __init__(self, message: str = "Resource conflict"):
+        super().__init__(message, status_code=409, error_type="conflict_error")
+
+
+class DatabaseError(MoRAGException):
+    """Raised when database operations fail."""
+
+    def __init__(self, message: str = "Database operation failed"):
+        super().__init__(message, status_code=500, error_type="database_error")
+
 class RateLimitError(MoRAGException):
     """Raised when rate limits are exceeded."""
 

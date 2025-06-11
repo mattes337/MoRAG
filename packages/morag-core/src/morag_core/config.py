@@ -158,6 +158,23 @@ class Settings(BaseSettings):
         description="Enable SQL query logging"
     )
 
+    # JWT Authentication Configuration
+    jwt_secret_key: str = Field(
+        default="your-secret-key-change-in-production",
+        alias="MORAG_JWT_SECRET_KEY",
+        description="Secret key for JWT token signing"
+    )
+    jwt_algorithm: str = Field(
+        default="HS256",
+        alias="MORAG_JWT_ALGORITHM",
+        description="JWT signing algorithm"
+    )
+    jwt_expiration_hours: int = Field(
+        default=24,
+        alias="MORAG_JWT_EXPIRATION_HOURS",
+        description="JWT token expiration time in hours"
+    )
+
     # Environment settings
     environment: str = Field(default="development", alias="MORAG_ENVIRONMENT")  # development, testing, production
     debug: bool = Field(default=True, alias="MORAG_DEBUG")

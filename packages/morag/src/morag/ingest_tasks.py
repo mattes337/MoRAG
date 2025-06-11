@@ -323,7 +323,7 @@ async def store_content_in_vector_db(
 
 
 @celery_app.task(bind=True)
-def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
+def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None, user_context: Optional[Dict[str, Any]] = None):
     """Ingest file: process content and store in vector database."""
     async def _ingest():
         api = get_morag_api()
@@ -333,12 +333,52 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
         file_path_obj = Path(file_path)
         file_exists = file_path_obj.exists()
 
+        # Extract user context
+        user_id = user_context.get("user_id") if user_context else None
+        collection_name = user_context.get("collection_name", "morag_documents") if user_context else "morag_documents"
+
+        # Initialize job tracking
+        job_tracker = None
+        job_id = None
+        document_id = options.get('document_id')
+
+        try:
+            from morag_core.jobs import JobTracker
+            from morag_core.document import DocumentLifecycleManager
+
+            if user_id and document_id:
+                job_tracker = JobTracker()
+                document_lifecycle = DocumentLifecycleManager()
+
+                # Start job tracking
+                from pathlib import Path
+                document_name = Path(file_path).name
+                job_id = job_tracker.start_job(
+                    document_name=document_name,
+                    document_type=content_type or "UNKNOWN",
+                    document_id=document_id,
+                    user_id=user_id,
+                    summary=f"Ingesting {content_type or 'file'}: {document_name}"
+                )
+
+                # Start document lifecycle tracking
+                document_lifecycle.mark_processing_started(document_id, user_id)
+
+                logger.info("Job and document tracking started",
+                           job_id=job_id,
+                           document_id=document_id)
+        except Exception as e:
+            logger.warning("Failed to initialize job tracking", error=str(e))
+
         logger.info("Starting file ingestion task",
                    task_id=self.request.id,
                    file_path=file_path,
                    content_type=content_type,
                    file_exists=file_exists,
-                   remote=options.get('remote', False))
+                   remote=options.get('remote', False),
+                   user_id=user_id,
+                   collection_name=collection_name,
+                   job_id=job_id)
 
         try:
             # Check if remote processing is requested
@@ -408,6 +448,10 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
 
             self.update_state(state='PROGRESS', meta={'stage': 'processing', 'progress': 0.1})
 
+            # Update job progress
+            if job_tracker and job_id:
+                job_tracker.mark_processing(job_id, user_id)
+
             # Process the file
             result = await api.process_file(file_path, content_type, options)
             
@@ -419,6 +463,10 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                 result.metadata = {}
 
             self.update_state(state='PROGRESS', meta={'stage': 'storing', 'progress': 0.7})
+
+            # Update job progress
+            if job_tracker and job_id:
+                job_tracker.update_progress(job_id, 70, None, "Storing in vector database", user_id)
 
             # Store in vector database if requested
             if options.get('store_in_vector_db', True):
@@ -470,14 +518,38 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     }
                 )
             
+            # Mark job and document as completed
+            if job_tracker and job_id and document_id:
+                try:
+                    # Mark job as completed
+                    chunks_processed = len(result.metadata.get('vector_point_ids', []))
+                    completion_summary = f"Successfully processed {chunks_processed} chunks"
+                    job_tracker.mark_completed(job_id, completion_summary, user_id)
+
+                    # Mark document as completed
+                    document_lifecycle.mark_processing_completed(
+                        document_id,
+                        vector_point_ids=result.metadata.get('vector_point_ids'),
+                        collection_name=collection_name,
+                        chunk_count=chunks_processed,
+                        user_id=user_id
+                    )
+
+                    logger.info("Job and document marked as completed",
+                               job_id=job_id,
+                               document_id=document_id,
+                               chunks_processed=chunks_processed)
+                except Exception as e:
+                    logger.warning("Failed to mark job/document as completed", error=str(e))
+
             # Clean up temporary file
             try:
                 Path(file_path).unlink(missing_ok=True)
                 logger.debug("Cleaned up temporary file", file_path=file_path)
             except Exception as e:
-                logger.warning("Failed to clean up temporary file", 
+                logger.warning("Failed to clean up temporary file",
                              file_path=file_path, error=str(e))
-            
+
             return {
                 'success': result.success,
                 'content': result.text_content or "",
@@ -487,6 +559,18 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
             }
             
         except Exception as e:
+            # Mark job and document as failed
+            if job_tracker and job_id and document_id:
+                try:
+                    job_tracker.mark_failed(job_id, str(e), user_id)
+                    document_lifecycle.mark_processing_failed(document_id, str(e), user_id)
+                    logger.info("Job and document marked as failed",
+                               job_id=job_id,
+                               document_id=document_id,
+                               error=str(e))
+                except Exception as tracking_error:
+                    logger.warning("Failed to mark job/document as failed", error=str(tracking_error))
+
             # Add specific context for file not found errors
             if isinstance(e, FileNotFoundError):
                 logger.error("File ingestion task failed - temporary file was cleaned up prematurely",

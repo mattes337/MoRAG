@@ -8,7 +8,7 @@ import json
 import uuid
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -26,6 +26,18 @@ from morag.worker import (
 )
 from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
 from morag.endpoints import remote_jobs_router
+
+# Authentication imports
+from morag_core.auth import (
+    UserService, AuthenticationMiddleware,
+    get_current_user, require_authentication, require_admin, require_user,
+    UserCreate, UserLogin, UserResponse, UserUpdate,
+    UserSettingsUpdate, UserSettingsResponse, TokenResponse, PasswordChangeRequest
+)
+from morag_core.exceptions import (
+    AuthenticationError, AuthorizationError, ValidationError,
+    NotFoundError, ConflictError, DatabaseError
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -478,7 +490,160 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         except Exception as e:
             logger.error("Health check failed", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
-    
+
+    # Initialize authentication components
+    user_service = UserService()
+    auth_middleware = AuthenticationMiddleware()
+
+    # Authentication endpoints
+    @app.post("/auth/register", response_model=UserResponse, tags=["Authentication"])
+    async def register_user(user_data: UserCreate):
+        """Register a new user."""
+        try:
+            user = user_service.create_user(user_data)
+            logger.info("User registered", user_id=user.id, email=user.email)
+            return user
+        except ConflictError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error("User registration failed", error=str(e))
+            raise HTTPException(status_code=500, detail="Registration failed")
+
+    @app.post("/auth/login", response_model=TokenResponse, tags=["Authentication"])
+    async def login_user(login_data: UserLogin):
+        """Authenticate user and return access token."""
+        user = user_service.authenticate_user(login_data.email, login_data.password)
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password"
+            )
+
+        # Create JWT token
+        token_data = user_service.jwt_manager.create_access_token(
+            user.id, user.email, user.role
+        )
+
+        logger.info("User logged in", user_id=user.id, email=user.email)
+        return TokenResponse(
+            access_token=token_data["access_token"],
+            token_type=token_data["token_type"],
+            expires_in=token_data["expires_in"],
+            user=user
+        )
+
+    @app.get("/auth/me", response_model=UserResponse, tags=["Authentication"])
+    async def get_current_user_info(current_user: UserResponse = Depends(require_authentication)):
+        """Get current user information."""
+        return current_user
+
+    @app.put("/auth/me", response_model=UserResponse, tags=["Authentication"])
+    async def update_current_user(
+        user_data: UserUpdate,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """Update current user information."""
+        try:
+            updated_user = user_service.update_user(current_user.id, user_data)
+            logger.info("User updated", user_id=current_user.id)
+            return updated_user
+        except ConflictError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+        except NotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    @app.get("/auth/settings", response_model=UserSettingsResponse, tags=["Authentication"])
+    async def get_user_settings(current_user: UserResponse = Depends(require_authentication)):
+        """Get current user settings."""
+        settings = user_service.get_user_settings(current_user.id)
+        if not settings:
+            raise HTTPException(status_code=404, detail="User settings not found")
+        return settings
+
+    @app.put("/auth/settings", response_model=UserSettingsResponse, tags=["Authentication"])
+    async def update_user_settings(
+        settings_data: UserSettingsUpdate,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """Update current user settings."""
+        try:
+            updated_settings = user_service.update_user_settings(current_user.id, settings_data)
+            logger.info("User settings updated", user_id=current_user.id)
+            return updated_settings
+        except NotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    @app.post("/auth/change-password", tags=["Authentication"])
+    async def change_password(
+        password_data: PasswordChangeRequest,
+        current_user: UserResponse = Depends(require_authentication)
+    ):
+        """Change user password."""
+        try:
+            success = user_service.change_password(current_user.id, password_data)
+            if success:
+                logger.info("Password changed", user_id=current_user.id)
+                return {"message": "Password changed successfully"}
+            else:
+                raise HTTPException(status_code=500, detail="Password change failed")
+        except AuthenticationError as e:
+            raise HTTPException(status_code=401, detail=str(e))
+
+    @app.post("/auth/refresh", response_model=TokenResponse, tags=["Authentication"])
+    async def refresh_token(current_user: UserResponse = Depends(require_authentication)):
+        """Refresh access token."""
+        token_data = user_service.jwt_manager.create_access_token(
+            current_user.id, current_user.email, current_user.role
+        )
+
+        return TokenResponse(
+            access_token=token_data["access_token"],
+            token_type=token_data["token_type"],
+            expires_in=token_data["expires_in"],
+            user=current_user
+        )
+
+    # Admin endpoints
+    @app.get("/admin/users", response_model=List[UserResponse], tags=["Administration"])
+    async def list_users(
+        skip: int = 0,
+        limit: int = 100,
+        current_user: UserResponse = Depends(require_admin)
+    ):
+        """List all users (admin only)."""
+        users = user_service.list_users(skip=skip, limit=limit)
+        return users
+
+    @app.get("/admin/health", tags=["Administration"])
+    async def admin_health_check(current_user: UserResponse = Depends(require_admin)):
+        """Detailed health check for administrators."""
+        try:
+            # Get basic health status
+            health_data = await get_morag_api().health_check()
+
+            # Add admin-specific information
+            from morag_core.database import get_database_manager, User, Document, Job
+            from morag_core.database.session import get_session_context
+
+            db_manager = get_database_manager()
+            with get_session_context(db_manager) as session:
+                user_count = session.query(User).count()
+                # document_count = session.query(Document).count()  # Will be available when Document model is integrated
+                # job_count = session.query(Job).count()  # Will be available when Job model is integrated
+
+                health_data["statistics"] = {
+                    "total_users": user_count,
+                    "total_documents": 0,  # Placeholder
+                    "total_jobs": 0  # Placeholder
+                }
+
+            return health_data
+        except Exception as e:
+            logger.error("Admin health check failed", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.post("/process/url", response_model=ProcessingResultResponse, tags=["Processing"])
     async def process_url(request: ProcessURLRequest):
         """Process content from a URL."""
@@ -504,11 +669,19 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_file(
         file: UploadFile = File(...),
         content_type: Optional[str] = Form(default=None),
-        options: Optional[str] = Form(default=None)  # JSON string
+        options: Optional[str] = Form(default=None),  # JSON string
+        current_user: Optional[UserResponse] = Depends(get_current_user)  # Optional auth
     ):
         """Process content from an uploaded file."""
         temp_path = None
         try:
+            # Extract user context for logging
+            user_context = auth_middleware.extract_user_context(current_user)
+            logger.info("Processing file request",
+                       filename=file.filename,
+                       user_id=user_context.get("user_id"),
+                       user_email=user_context.get("user_email"))
+
             # Parse options if provided
             parsed_options = None
             if options:
@@ -687,7 +860,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         chunk_size: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunking_strategy: Optional[str] = Form(default=None),  # paragraph, sentence, word, character, etc.
-        remote: Optional[bool] = Form(default=False)  # Use remote processing for audio/video
+        remote: Optional[bool] = Form(default=False),  # Use remote processing for audio/video
+        current_user: Optional[UserResponse] = Depends(get_current_user)  # Optional auth
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -745,6 +919,9 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                         detail="Document ID must contain only alphanumeric characters, hyphens, and underscores"
                     )
 
+            # Extract user context
+            user_context = auth_middleware.extract_user_context(current_user)
+
             # Create task options with sanitized inputs
             options = {
                 "document_id": document_id,
@@ -763,7 +940,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             task = ingest_file_task.delay(
                 str(temp_path),
                 source_type,
-                options
+                options,
+                user_context  # Pass user context to task
             )
 
             logger.info("File ingestion task created",
