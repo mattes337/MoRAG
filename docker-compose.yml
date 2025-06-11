@@ -23,7 +23,22 @@ services:
       - /var/docker/mariadb:/var/lib/mysql
     ports:
       - "3306:3306"
-      
+
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    ports:
+      - 81:80
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_ABSOLUTE_URI=https://db.morag.drydev.de
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.morag-phpmyadmin.entrypoints=websecure"
+      - "traefik.http.routers.morag-phpmyadmin.rule=Host(`db.morag.drydev.de`)"
+      - "traefik.http.routers.morag-phpmyadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.morag-phpmyadmin.loadbalancer.server.port=81"
+
   # Qdrant vector database
 #  qdrant:
 #    image: qdrant/qdrant:latest
