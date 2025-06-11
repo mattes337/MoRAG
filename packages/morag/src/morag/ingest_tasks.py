@@ -366,7 +366,6 @@ def ingest_file_task_impl(self, file_path: str, content_type: Optional[str] = No
                 document_lifecycle = DocumentLifecycleManager()
 
                 # Start job tracking
-                from pathlib import Path
                 document_name = Path(file_path).name
                 job_id = job_tracker.start_job(
                     document_name=document_name,
