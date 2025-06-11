@@ -11,6 +11,7 @@ from morag.models.remote_job_api import (
     CreateRemoteJobRequest, CreateRemoteJobResponse,
     PollJobsRequest, PollJobsResponse,
     SubmitResultRequest, SubmitResultResponse,
+    SubmitProgressRequest, SubmitProgressResponse,
     JobStatusResponse
 )
 from morag.services.remote_job_service import RemoteJobService
@@ -174,7 +175,9 @@ async def get_job_status(
             completed_at=job.completed_at,
             error_message=job.error_message,
             retry_count=job.retry_count,
-            estimated_completion=estimated_completion
+            estimated_completion=estimated_completion,
+            percentage=None,  # TODO: Add progress tracking to RemoteJob model
+            progress_message=None
         )
     except HTTPException:
         raise
@@ -183,6 +186,79 @@ async def get_job_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get job status: {str(e)}"
+        )
+
+
+@router.put("/{job_id}/progress", response_model=SubmitProgressResponse)
+async def submit_job_progress(
+    job_id: str,
+    progress: SubmitProgressRequest,
+    service: RemoteJobService = Depends(get_remote_job_service)
+):
+    """Submit progress update for a remote job."""
+    try:
+        # Get the job to verify it exists and is in processing state
+        job = service.get_job_status(job_id)
+
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job {job_id} not found"
+            )
+
+        if job.status not in ['processing', 'pending']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot update progress for job in {job.status} state"
+            )
+
+        # Import progress handler here to avoid circular imports
+        try:
+            from morag_core.jobs.progress_handler import ProgressHandler
+
+            progress_handler = ProgressHandler()
+
+            # Register job mapping if worker_id is available
+            if job.worker_id:
+                progress_handler.register_job_mapping(job.worker_id, job_id)
+
+            # Process the progress update
+            success = progress_handler.process_remote_worker_progress(
+                worker_id=job.worker_id or job_id,
+                percentage=progress.percentage,
+                message=progress.message
+            )
+
+            if success:
+                logger.info("Progress updated for remote job",
+                           job_id=job_id,
+                           percentage=progress.percentage,
+                           message=progress.message[:50])
+
+                return SubmitProgressResponse(
+                    success=True,
+                    message=f"Progress updated to {progress.percentage}%"
+                )
+            else:
+                return SubmitProgressResponse(
+                    success=False,
+                    message="Failed to update job progress"
+                )
+
+        except ImportError as e:
+            logger.error("Failed to import progress handler", error=str(e))
+            return SubmitProgressResponse(
+                success=False,
+                message="Progress tracking not available"
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to submit job progress", job_id=job_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit job progress: {str(e)}"
         )
 
 

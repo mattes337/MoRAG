@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
+from datetime import datetime
 import structlog
 import requests
 from dotenv import load_dotenv
@@ -323,7 +324,7 @@ class RemoteConverter:
 
             # Process the file
             logger.info("Processing file", job_id=job_id, content_type=content_type)
-            result = await self._process_file(file_path, content_type, task_options)
+            result = await self._process_file(file_path, content_type, task_options, job_id)
             
             # Submit result
             if result and result.success:
@@ -387,7 +388,7 @@ class RemoteConverter:
                         error=str(e))
             return None
 
-    async def _process_file(self, file_path: str, content_type: str, options: Dict[str, Any]) -> Optional[ProcessingResult]:
+    async def _process_file(self, file_path: str, content_type: str, options: Dict[str, Any], job_id: str = None) -> Optional[ProcessingResult]:
         """Process file using appropriate MoRAG processor."""
         start_time = time.time()
 
@@ -403,10 +404,14 @@ class RemoteConverter:
                     error_message=f"No processor available for content type: {content_type}"
                 )
 
-            # Create a simple progress callback for logging
+            # Create a progress callback for logging and API reporting
             def progress_callback(progress: float, message: str = None):
+                percentage = int(progress * 100)
                 if message:
-                    logger.info(f"Processing progress: {message} ({int(progress * 100)}%)")
+                    logger.info(f"Processing progress: {message} ({percentage}%)")
+
+                # Report progress to the API
+                asyncio.create_task(self._report_progress(job_id, percentage, message or f"Processing at {percentage}%"))
 
             # Process the file based on content type using correct method names
             if content_type == 'audio':
@@ -505,6 +510,39 @@ class RemoteConverter:
 
         except Exception as e:
             logger.error("Exception submitting error result", job_id=job_id, error=str(e))
+
+    async def _report_progress(self, job_id: str, percentage: int, message: str):
+        """Report progress update to the API."""
+        try:
+            url = f"{self.api_base_url}/api/v1/remote-jobs/{job_id}/progress"
+
+            payload = {
+                'percentage': percentage,
+                'message': message,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+
+            headers = {'Content-Type': 'application/json'}
+            if self.api_key:
+                headers['Authorization'] = f'Bearer {self.api_key}'
+
+            response = requests.put(url, json=payload, headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                logger.debug("Progress reported successfully",
+                           job_id=job_id,
+                           percentage=percentage)
+            else:
+                logger.warning("Failed to report progress",
+                             job_id=job_id,
+                             status_code=response.status_code,
+                             response=response.text[:100])
+
+        except Exception as e:
+            logger.warning("Exception reporting progress",
+                         job_id=job_id,
+                         percentage=percentage,
+                         error=str(e))
 
     def test_connection(self) -> bool:
         """Test connection to the MoRAG API."""

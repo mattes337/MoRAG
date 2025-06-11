@@ -565,9 +565,60 @@ For detailed information about completed tasks and implementation history, see [
   - **Consistent Environment**: Same `.env` configuration used by CLI and API
 - **Status**: CLI scripts now work completely independently with full ingestion capabilities
 
+### ✅ Progress Reporting System (January 2025)
+
+#### 17. **Worker Progress Reporting to Job Entities** ✅ IMPLEMENTED
+- **Issue**: Workers (both local and remote) couldn't report progress back to job entities, making it difficult to track processing status
+- **Problems Identified**:
+  - Remote workers logged progress events but these weren't captured in job entities
+  - Local Celery tasks had no mechanism to update job progress during processing
+  - No standardized way to parse progress information from log messages
+  - Job entities only showed start/end status without intermediate progress
+- **Solution**: Implemented comprehensive progress reporting system with event parsing and job integration
+- **Components Implemented**:
+  - **Progress Event Parser**: Parses progress information from various log formats (JSON, plain text)
+  - **Progress Handler**: Processes progress events and updates job entities in database
+  - **Remote Job API**: Added `/api/v1/remote-jobs/{job_id}/progress` endpoint for remote workers
+  - **Worker Integration**: Enhanced remote converter and local tasks to report progress
+- **Features Added**:
+  - **Multiple Progress Formats**: Supports various log message formats with regex patterns
+  - **Real-time Updates**: Progress events immediately update job percentage, status, and summary
+  - **Worker Mapping**: Maps worker IDs to job IDs for proper progress attribution
+  - **Error Handling**: Graceful handling of invalid logs and missing job mappings
+  - **Integration Points**: Works with remote workers, Celery tasks, and direct log processing
+- **Technical Details**:
+  - **Progress Patterns**: Supports formats like "Processing progress: Audio processing (52%)", "[75%] Processing", etc.
+  - **Job Status Mapping**: Automatically maps progress percentages to job statuses (PENDING, PROCESSING, FINISHED)
+  - **API Integration**: Remote workers can POST progress updates via REST API
+  - **Database Updates**: Progress updates modify job entity fields (percentage, status, summary, updated_at)
+  - **Async Support**: Handles asynchronous progress reporting from multiple sources
+- **Files Added**:
+  - `packages/morag-core/src/morag_core/jobs/progress_parser.py`: Progress event parsing logic
+  - `packages/morag-core/src/morag_core/jobs/progress_handler.py`: Progress event handling and job updates
+  - `tests/test_progress_reporting.py`: Unit tests for progress parsing and handling
+  - `tests/test_progress_integration.py`: Integration tests for end-to-end progress flow
+  - `examples/progress_reporting_demo.py`: Demonstration script showing system capabilities
+  - `docs/PROGRESS_REPORTING.md`: Comprehensive documentation and usage guide
+- **Files Modified**:
+  - `packages/morag/src/morag/models/remote_job_api.py`: Added progress update request/response models
+  - `packages/morag/src/morag/endpoints/remote_jobs.py`: Added progress reporting endpoint
+  - `tools/remote-converter/remote_converter.py`: Enhanced to report progress to API
+  - `packages/morag/src/morag/ingest_tasks.py`: Added progress callbacks for job tracking
+  - `packages/morag-core/src/morag_core/jobs/__init__.py`: Exported new progress classes
+- **Usage Examples**:
+  - **Remote Worker**: `handler.process_remote_worker_progress("worker-1", 75, "Processing audio")`
+  - **Log Parsing**: `handler.process_log_line(json_log_line, job_id="job-123")`
+  - **Celery Task**: `handler.process_celery_task_progress("task-123", 50, "Processing document")`
+- **Benefits**:
+  - **Real-time Monitoring**: Users can track job progress in real-time through API
+  - **Better UX**: Progress bars and status updates instead of just pending/complete
+  - **Debugging**: Detailed progress messages help identify where processing stalls
+  - **Scalability**: Works with multiple workers and job sources simultaneously
+- **Status**: Complete implementation with comprehensive testing and documentation
+
 ### ✅ Audio Model Configuration Support (January 2025)
 
-#### 17. **Environment Variable Model Override Support** ✅ IMPLEMENTED
+#### 18. **Environment Variable Model Override Support** ✅ IMPLEMENTED
 - **Issue**: Remote converter couldn't override Whisper model size or spaCy models through environment variables
 - **Problems Identified**:
   - `AudioConfig` class didn't read environment variables during initialization
@@ -618,25 +669,25 @@ For detailed information about completed tasks and implementation history, see [
 
 ### ✅ Critical Bug Fixes (January 2025)
 
-#### 18. **Image Processing API Error** ✅ FIXED
+#### 19. **Image Processing API Error** ✅ FIXED
 - **Issue**: `AttributeError: module 'google.generativeai' has no attribute 'get_api_key'` in image caption generation
 - **Root Cause**: Code was calling `genai.get_api_key()` which doesn't exist in the Google Generative AI library
 - **Solution**: Replaced with proper environment variable check using `os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")`
 - **Files Modified**: `packages/morag-image/src/morag_image/processor.py`
 - **Status**: Image processing now fails gracefully with proper error message instead of AttributeError
 
-#### 19. **Web Service Method Signature Mismatch** ✅ FIXED
+#### 20. **Web Service Method Signature Mismatch** ✅ FIXED
 - **Issue**: `TypeError: WebService.process_url() got an unexpected keyword argument 'config'` in web URL processing
 - **Root Cause**: `MoRAGServices.process_url()` was calling `self.web_service.process_url()` with `config` parameter but method expects `config_options`
 - **Solution**: Fixed parameter name from `config` to `config_options` and added proper config conversion
 - **Files Modified**: `packages/morag-services/src/morag_services/services.py`
 - **Status**: Web URL processing now works without method signature errors
 
-#### 20. **Search Endpoint Implementation** ✅ IMPLEMENTED
+#### 21. **Search Endpoint Implementation** ✅ IMPLEMENTED
 - **Issue**: Search functionality returned empty list with warning "Search functionality not yet implemented"
 - **Root Cause**: The `search_similar` method in MoRAGServices was not implemented
 
-#### 21. **API Parameter Defaults and Qdrant Collection Validation** ✅ FIXED
+#### 22. **API Parameter Defaults and Qdrant Collection Validation** ✅ FIXED
 - **Issue**: Two critical API usability issues:
   1. Optional API parameters required manual "send empty value" clicks in Swagger UI
   2. Qdrant collection environment variable validation error on startup due to `env_prefix="MORAG_"` conflict
@@ -671,7 +722,7 @@ For detailed information about completed tasks and implementation history, see [
 - **Files Modified**: `packages/morag-services/src/morag_services/services.py`
 - **Status**: Search endpoint now fully functional with vector similarity search
 
-#### 20. **YouTube Processing Bot Detection** ✅ FIXED
+#### 23. **YouTube Processing Bot Detection** ✅ FIXED
 - **Issue**: YouTube URL processing failed with "Sign in to confirm you're not a bot" error from yt-dlp
 - **Root Cause**: YouTube's bot detection was triggered by default yt-dlp configuration
 - **Solution**: Added comprehensive bot detection avoidance measures
@@ -689,14 +740,14 @@ For detailed information about completed tasks and implementation history, see [
   - Applied to all yt-dlp operations: metadata extraction, video download, playlist processing
 - **Status**: YouTube processing now works reliably without bot detection errors
 
-#### 21. **Speaker Diarization Coroutine Error** ✅ FIXED
+#### 24. **Speaker Diarization Coroutine Error** ✅ FIXED
 - **Issue**: `AttributeError: 'coroutine' object has no attribute 'segments'` in audio processing speaker diarization
 - **Root Cause**: `_apply_diarization` method incorrectly wrapped async `diarize_audio()` method in `run_in_executor`
 - **Solution**: Removed `run_in_executor` wrapper and directly awaited the async `diarize_audio()` method
 - **Files Modified**: `packages/morag-audio/src/morag_audio/processor.py`
 - **Status**: Speaker diarization now works correctly without coroutine access errors
 
-#### 22. **Gemini API Rate Limiting** ✅ FIXED
+#### 25. **Gemini API Rate Limiting** ✅ FIXED
 - **Issue**: `429 RESOURCE_EXHAUSTED` errors from Gemini API without proper retry logic and exponential backoff
 - **Root Cause**: Embedding services lacked specific handling for 429 errors and proper retry mechanisms
 - **Solution**: Implemented comprehensive rate limiting with exponential backoff and jitter

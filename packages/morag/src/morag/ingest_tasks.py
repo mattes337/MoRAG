@@ -466,6 +466,24 @@ def ingest_file_task_impl(self, file_path: str, content_type: Optional[str] = No
             if job_tracker and job_id:
                 job_tracker.mark_processing(job_id, user_id)
 
+            # Create progress callback for job tracking
+            def progress_callback(progress: float, message: str = None):
+                if job_tracker and job_id:
+                    percentage = int(progress * 100)
+                    # Map progress to processing stage (10-70%)
+                    mapped_percentage = 10 + int(progress * 60)
+                    job_tracker.update_progress(
+                        job_id,
+                        mapped_percentage,
+                        None,
+                        message or f"Processing: {mapped_percentage}%",
+                        user_id
+                    )
+
+            # Add progress callback to options
+            if 'progress_callback' not in options:
+                options['progress_callback'] = progress_callback
+
             # Process the file
             result = await api.process_file(file_path, content_type, options)
             

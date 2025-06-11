@@ -12,6 +12,8 @@ from .models import (
 )
 from .service import JobService
 from .tracker import JobTracker
+from .progress_parser import ProgressEventParser, ProgressEvent
+from .progress_handler import ProgressHandler
 
 __all__ = [
     # Models
@@ -26,4 +28,8 @@ __all__ = [
     # Services
     "JobService",
     "JobTracker",
+    # Progress tracking
+    "ProgressEventParser",
+    "ProgressEvent",
+    "ProgressHandler",
 ]

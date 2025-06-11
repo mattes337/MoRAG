@@ -50,6 +50,19 @@ class SubmitResultResponse(BaseModel):
     ingestion_continued: bool = Field(..., description="Whether ingestion pipeline continued")
 
 
+class SubmitProgressRequest(BaseModel):
+    """Request model for submitting progress updates."""
+    percentage: int = Field(..., ge=0, le=100, description="Progress percentage (0-100)")
+    message: str = Field(..., description="Progress message/description")
+    timestamp: Optional[datetime] = Field(None, description="Progress timestamp")
+
+
+class SubmitProgressResponse(BaseModel):
+    """Response model for submitting progress updates."""
+    success: bool = Field(..., description="Whether progress update was successful")
+    message: str = Field(..., description="Response message")
+
+
 class JobStatusResponse(BaseModel):
     """Response model for job status."""
     job_id: str = Field(..., description="Job identifier")
@@ -61,3 +74,5 @@ class JobStatusResponse(BaseModel):
     error_message: Optional[str] = Field(None, description="Error message if failed")
     retry_count: int = Field(..., description="Number of retry attempts")
     estimated_completion: Optional[datetime] = Field(None, description="Estimated completion time")
+    percentage: Optional[int] = Field(None, description="Current progress percentage")
+    progress_message: Optional[str] = Field(None, description="Current progress message")
