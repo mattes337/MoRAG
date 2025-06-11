@@ -272,17 +272,20 @@ class MoRAGServices:
             # Extract progress callback from options if available
             progress_callback = (options or {}).get('progress_callback')
 
+            # Create a copy of options without progress_callback to avoid duplicate parameter
+            filtered_options = {k: v for k, v in (options or {}).items() if k != 'progress_callback'}
+
             # Get both formats: markdown for Qdrant, JSON for API response
             markdown_result = await self.document_service.process_document(
                 Path(document_path),
                 progress_callback=progress_callback,
-                **(options or {})
+                **filtered_options
             )
 
             json_result = await self.document_service.process_document_to_json(
                 Path(document_path),
                 progress_callback=progress_callback,
-                **(options or {})
+                **filtered_options
             )
 
             # Use markdown content for text_content (Qdrant storage)

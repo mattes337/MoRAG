@@ -74,32 +74,61 @@ class TestProcessContent:
     @pytest.mark.asyncio
     async def test_process_document(self, services):
         """Test document processing."""
-        # Mock document service response
-        mock_result = MagicMock()
-        mock_result.text = "Document text"
-        mock_result.metadata = {"pages": 5}
-        mock_result.extracted_files = [Path("extracted.txt")]
-        mock_result.processing_time = 1.5
-        mock_result.success = True
-        mock_result.error_message = None
-        
-        services.document_service.process_document.return_value = mock_result
-        
+        # Mock document with chunks for markdown response
+        mock_document = MagicMock()
+        mock_chunk = MagicMock()
+        mock_chunk.content = "Document text"
+        mock_chunk.section = "Chapter 1"
+        mock_document.chunks = [mock_chunk]
+        mock_document.raw_text = "Document text"
+
+        # Mock document service markdown response
+        mock_markdown_result = MagicMock()
+        mock_markdown_result.document = mock_document
+        mock_markdown_result.text = "Document text"
+        mock_markdown_result.metadata = {"pages": 5}
+        mock_markdown_result.extracted_files = [Path("extracted.txt")]
+        mock_markdown_result.processing_time = 1.5
+        mock_markdown_result.success = True
+        mock_markdown_result.error_message = None
+
+        # Mock document service JSON response
+        mock_json_result = {
+            "title": "Test Document",
+            "filename": "test.pdf",
+            "metadata": {
+                "pages": 5,
+                "processing_time": 1.5
+            },
+            "chapters": [
+                {
+                    "title": "Chapter 1",
+                    "content": "Document text",
+                    "page_number": 1,
+                    "chapter_index": 0,
+                    "metadata": {}
+                }
+            ]
+        }
+
+        services.document_service.process_document.return_value = mock_markdown_result
+        services.document_service.process_document_to_json.return_value = mock_json_result
+
         # Process document
         result = await services.process_document("test.pdf")
-        
+
         # Verify result
         assert result.content_type == ContentType.DOCUMENT
         assert result.content_path == "test.pdf"
-        assert result.text_content == "Document text"
-        assert result.metadata == {"pages": 5}
-        assert result.extracted_files == ["extracted.txt"]
+        assert result.text_content == "## Chapter 1\n\nDocument text"  # Markdown format with section header
+        assert result.metadata == {"pages": 5, "processing_time": 1.5}
         assert result.processing_time == 1.5
         assert result.success is True
         assert result.error_message is None
-        
-        # Verify service call
+
+        # Verify service calls
         services.document_service.process_document.assert_called_once()
+        services.document_service.process_document_to_json.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_process_audio(self, services):
@@ -277,6 +306,10 @@ class TestProcessContent:
         mock_doc_result.metadata = {"pages": 5}
         mock_doc_result.success = True
         services.document_service.process_document.return_value = mock_doc_result
+        services.document_service.process_document_to_json.return_value = {
+            "metadata": {"pages": 5},
+            "chapters": [{"content": "Document text"}]
+        }
         
         # Mock web service
         mock_web_result = MagicMock()
@@ -302,6 +335,7 @@ class TestProcessContent:
         """Test error handling in content processing."""
         # Mock service to raise exception
         services.document_service.process_document.side_effect = Exception("Test error")
+        services.document_service.process_document_to_json.side_effect = Exception("Test error")
         
         # Process with error
         result = await services.process_content("test.pdf")
@@ -323,6 +357,10 @@ class TestBatchProcessing:
         mock_doc_result.text = "Document text"
         mock_doc_result.success = True
         services.document_service.process_document.return_value = mock_doc_result
+        services.document_service.process_document_to_json.return_value = {
+            "metadata": {},
+            "chapters": [{"content": "Document text"}]
+        }
         
         # Mock web service
         mock_web_result = MagicMock()
@@ -348,6 +386,10 @@ class TestBatchProcessing:
         mock_doc_result.text = "Document text"
         mock_doc_result.success = True
         services.document_service.process_document.return_value = mock_doc_result
+        services.document_service.process_document_to_json.return_value = {
+            "metadata": {},
+            "chapters": [{"content": "Document text"}]
+        }
         
         # Mock web service to fail
         services.web_service.process_url.side_effect = Exception("Web error")
