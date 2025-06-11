@@ -337,8 +337,8 @@ async def store_content_in_vector_db(
 # Get worker components at module level
 celery_app, get_morag_api = get_worker_components()
 
-@celery_app.task(bind=True)
-def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None, user_context: Optional[Dict[str, Any]] = None):
+# Implementation functions for tasks (called by the worker)
+def ingest_file_task_impl(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None, user_context: Optional[Dict[str, Any]] = None):
     """Ingest file: process content and store in vector database."""
     async def _ingest():
         api = get_morag_api()
@@ -638,8 +638,7 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
     return asyncio.run(_ingest())
 
 
-@celery_app.task(bind=True)
-def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
+def ingest_url_task_impl(self, url: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
     """Ingest URL: process content and store in vector database."""
     async def _ingest():
         api = get_morag_api()
@@ -754,8 +753,7 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
     return asyncio.run(_ingest())
 
 
-@celery_app.task(bind=True)
-def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[Dict[str, Any]] = None):
+def ingest_batch_task_impl(self, items: List[Dict[str, Any]], task_options: Optional[Dict[str, Any]] = None):
     """Ingest batch: process multiple items and store in vector database."""
     async def _ingest():
         api = get_morag_api()
@@ -918,3 +916,27 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
                     raise Exception(str(e))
 
     return asyncio.run(_ingest())
+
+
+# Wrapper functions for API server to import and call
+# These will be registered as actual Celery tasks by the worker
+class TaskWrapper:
+    """Wrapper class to provide task-like interface for API server."""
+
+    def __init__(self, task_name):
+        self.task_name = task_name
+
+    def delay(self, *args, **kwargs):
+        """Simulate Celery task.delay() method."""
+        # Get the actual registered task from the worker's celery app
+        return celery_app.send_task(self.task_name, args=args, kwargs=kwargs)
+
+    def apply_async(self, args=None, kwargs=None, **options):
+        """Simulate Celery task.apply_async() method."""
+        return celery_app.send_task(self.task_name, args=args or [], kwargs=kwargs or {}, **options)
+
+
+# Create task wrappers that the API server can import
+ingest_file_task = TaskWrapper("morag.ingest_tasks.ingest_file_task")
+ingest_url_task = TaskWrapper("morag.ingest_tasks.ingest_url_task")
+ingest_batch_task = TaskWrapper("morag.ingest_tasks.ingest_batch_task")

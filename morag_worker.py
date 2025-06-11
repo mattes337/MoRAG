@@ -305,6 +305,41 @@ def worker_shutdown_handler(sender=None, **kwargs):
     logger.info("MoRAG worker shutdown")
 
 
+# Define ingest tasks directly in this module to avoid circular imports
+@celery_app.task(bind=True, name="morag.ingest_tasks.ingest_file_task")
+def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None, user_context: Optional[Dict[str, Any]] = None):
+    """Ingest file: process content and store in vector database."""
+    # Import the implementation function
+    from morag.ingest_tasks import ingest_file_task_impl
+
+    # Call the implementation with the task context
+    return ingest_file_task_impl(self, file_path, content_type, task_options, user_context)
+
+
+@celery_app.task(bind=True, name="morag.ingest_tasks.ingest_url_task")
+def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None):
+    """Ingest URL: process content and store in vector database."""
+    # Import the implementation function
+    from morag.ingest_tasks import ingest_url_task_impl
+
+    # Call the implementation with the task context
+    return ingest_url_task_impl(self, url, content_type, task_options)
+
+
+@celery_app.task(bind=True, name="morag.ingest_tasks.ingest_batch_task")
+def ingest_batch_task(self, batch_items: List[Dict[str, Any]], task_options: Optional[Dict[str, Any]] = None):
+    """Ingest batch: process multiple items and store in vector database."""
+    # Import the implementation function
+    from morag.ingest_tasks import ingest_batch_task_impl
+
+    # Call the implementation with the task context
+    return ingest_batch_task_impl(self, batch_items, task_options)
+
+
+logger.info("Registered ingest tasks",
+            tasks=["ingest_file_task", "ingest_url_task", "ingest_batch_task"])
+
+
 def main():
     """Main entry point for the worker."""
     import argparse
