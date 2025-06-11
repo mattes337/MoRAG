@@ -82,7 +82,7 @@ services:
       - ./logs:/app/logs
     depends_on:
       - redis
-    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
+    command: ["celery", "-A", "morag_worker", "worker", "--loglevel=info", "--concurrency=2"]
     networks:
       - morag-network
 

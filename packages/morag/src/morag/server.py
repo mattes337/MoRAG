@@ -20,10 +20,26 @@ from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
 from morag.utils.file_upload import get_upload_handler, FileUploadError, validate_temp_directory_access
 from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
-from morag.worker import (
-    process_file_task, process_url_task, process_web_page_task,
-    process_youtube_video_task, process_batch_task, celery_app
-)
+# Import worker tasks - use lazy import to avoid circular dependencies
+def get_worker_tasks():
+    """Get worker tasks with lazy import."""
+    import sys
+    from pathlib import Path
+
+    # Add root directory to path for standalone worker
+    root_path = str(Path(__file__).parent.parent.parent.parent.parent)
+    if root_path not in sys.path:
+        sys.path.insert(0, root_path)
+
+    import morag_worker
+    return (
+        morag_worker.process_file_task,
+        morag_worker.process_url_task,
+        morag_worker.process_web_page_task,
+        morag_worker.process_youtube_video_task,
+        morag_worker.process_batch_task,
+        morag_worker.celery_app
+    )
 from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
 from morag.endpoints import remote_jobs_router
 
@@ -1311,6 +1327,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                        content_type=content_type)
 
             # Submit to background task queue for processing (no storage)
+            process_file_task, process_url_task, process_web_page_task, process_youtube_video_task, process_batch_task, celery_app = get_worker_tasks()
             task = process_file_task.delay(
                 str(temp_path),
                 content_type,
@@ -1360,6 +1377,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Get the status of a processing task."""
         try:
             # Get task result from Celery
+            _, _, _, _, _, celery_app = get_worker_tasks()
             task_result = celery_app.AsyncResult(task_id)
 
             # Map Celery states to our API states
@@ -1410,6 +1428,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Get all currently active tasks."""
         try:
             # Get active tasks from Celery
+            _, _, _, _, _, celery_app = get_worker_tasks()
             inspect = celery_app.control.inspect()
             active_tasks = inspect.active()
 
@@ -1436,6 +1455,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Get processing queue statistics."""
         try:
             # Get queue stats from Celery
+            _, _, _, _, _, celery_app = get_worker_tasks()
             inspect = celery_app.control.inspect()
 
             # Get active tasks
@@ -1465,6 +1485,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         """Cancel a running or pending task."""
         try:
             # Revoke the task
+            _, _, _, _, _, celery_app = get_worker_tasks()
             celery_app.control.revoke(task_id, terminate=True)
 
             logger.info("Task cancelled", task_id=task_id)

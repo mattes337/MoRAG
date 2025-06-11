@@ -8,6 +8,8 @@ from .models import (
     ResourceQuota,
     ResourceType,
     TenantStatus,
+    TenantSearchRequest,
+    TenantSearchResponse,
 )
 from .service import TenantService
 from .middleware import TenantMiddleware
@@ -16,11 +18,13 @@ __all__ = [
     # Models
     "TenantInfo",
     "TenantQuotas",
-    "TenantConfiguration", 
+    "TenantConfiguration",
     "TenantUsageStats",
     "ResourceQuota",
     "ResourceType",
     "TenantStatus",
+    "TenantSearchRequest",
+    "TenantSearchResponse",
     # Services
     "TenantService",
     "TenantMiddleware",

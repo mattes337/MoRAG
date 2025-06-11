@@ -122,6 +122,7 @@ WORKDIR /app
 # Copy application code and configuration (this layer changes frequently)
 COPY packages/ ./packages/
 COPY scripts/ ./scripts/
+COPY morag_worker.py ./
 
 # Create necessary directories
 RUN mkdir -p temp logs data && \
@@ -131,4 +132,4 @@ RUN mkdir -p temp logs data && \
 USER morag
 
 # Default command for worker
-CMD ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
+CMD ["celery", "-A", "morag_worker", "worker", "--loglevel=info", "--concurrency=2"]

@@ -8,7 +8,19 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import structlog
 
-from morag.worker import celery_app, get_morag_api
+# Import worker with lazy loading to avoid circular dependencies
+def get_worker_components():
+    """Get worker components with lazy import."""
+    import sys
+    from pathlib import Path
+
+    # Add root directory to path for standalone worker
+    root_path = str(Path(__file__).parent.parent.parent.parent.parent)
+    if root_path not in sys.path:
+        sys.path.insert(0, root_path)
+
+    import morag_worker
+    return morag_worker.celery_app, morag_worker.get_morag_api
 from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 from morag_core.models import Document, DocumentChunk
 from morag_core.config import get_settings, validate_chunk_size
@@ -321,6 +333,9 @@ async def store_content_in_vector_db(
         logger.error("Failed to store content in vector database", error=str(e))
         raise
 
+
+# Get worker components at module level
+celery_app, get_morag_api = get_worker_components()
 
 @celery_app.task(bind=True)
 def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, task_options: Optional[Dict[str, Any]] = None, user_context: Optional[Dict[str, Any]] = None):

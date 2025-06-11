@@ -8,6 +8,9 @@ from .models import (
     ApiKeyUsage,
     ApiKeyPermission,
     ApiKeyStatus,
+    ApiKeySearchRequest,
+    ApiKeySearchResponse,
+    ApiKeyUsageStats,
 )
 from .service import ApiKeyService
 from .middleware import ApiKeyMiddleware
@@ -17,11 +20,14 @@ __all__ = [
     # Models
     "ApiKeyCreate",
     "ApiKeyUpdate",
-    "ApiKeyResponse", 
+    "ApiKeyResponse",
     "ApiKeyCreateResponse",
     "ApiKeyUsage",
     "ApiKeyPermission",
     "ApiKeyStatus",
+    "ApiKeySearchRequest",
+    "ApiKeySearchResponse",
+    "ApiKeyUsageStats",
     # Services
     "ApiKeyService",
     "ApiKeyMiddleware",

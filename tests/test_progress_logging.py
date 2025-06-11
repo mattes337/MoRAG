@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" 
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-document" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-audio" / "src"))
 
-from morag.worker import process_file_task
+from morag.worker_app import process_file_task
 from morag_core.interfaces.processor import ProcessingConfig
 
 

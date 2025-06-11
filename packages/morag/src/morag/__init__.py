@@ -7,7 +7,7 @@ to all MoRAG components and services.
 from .api import MoRAGAPI
 from morag.cli import main as cli_main
 from morag.server import create_app, main as server_main
-from morag.worker import main as worker_main
+from morag.worker_app import main as worker_main
 from morag.orchestrator import MoRAGOrchestrator
 
 # Re-export key components from sub-packages

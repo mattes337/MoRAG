@@ -76,7 +76,7 @@ services:
       - ./logs:/app/logs
       - ./temp:/app/temp
       - ./uploads:/app/uploads
-    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
+    command: ["celery", "-A", "morag_worker", "worker", "--loglevel=info", "--concurrency=2"]
 
   morag-worker-2:
     build:
@@ -101,7 +101,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
-    command: ["celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
+    command: ["celery", "-A", "morag_worker", "worker", "--loglevel=info", "--concurrency=2"]
 
 volumes:
   redis_data:

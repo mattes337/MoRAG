@@ -90,7 +90,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
-    command: ["scripts/start_worker_safe.sh", "celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
+    command: ["scripts/start_worker_safe.sh", "celery", "-A", "morag_worker", "worker", "--loglevel=info", "--concurrency=2"]
 
   morag-worker-2:
     build:
@@ -121,7 +121,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
-    command: ["scripts/start_worker_safe.sh", "celery", "-A", "morag.worker", "worker", "--loglevel=info", "--concurrency=2"]
+    command: ["scripts/start_worker_safe.sh", "celery", "-A", "morag_worker", "worker", "--loglevel=info", "--concurrency=2"]
 
   # Celery Beat for scheduled tasks
   morag-beat:
@@ -152,7 +152,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    command: ["celery", "-A", "morag.worker", "beat", "--loglevel=info"]
+    command: ["celery", "-A", "morag_worker", "beat", "--loglevel=info"]
 
 volumes:
   redis_data:

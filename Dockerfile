@@ -125,6 +125,7 @@ COPY packages/ ./packages/
 COPY scripts/ ./scripts/
 COPY examples/ ./examples/
 COPY docs/ ./docs/
+COPY morag_worker.py ./
 COPY *.md ./
 COPY *.txt ./
 
@@ -149,6 +150,7 @@ COPY packages/ ./packages/
 COPY scripts/ ./scripts/
 COPY examples/ ./examples/
 COPY docs/ ./docs/
+COPY morag_worker.py ./
 COPY *.md ./
 COPY *.txt ./
 

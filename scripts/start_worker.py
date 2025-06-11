@@ -8,7 +8,7 @@ from pathlib import Path
 # Add packages to path for modular architecture
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag" / "src"))
 
-from morag.worker import celery_app
+from morag.worker_app import celery_app
 
 if __name__ == "__main__":
     # Use solo pool for Windows compatibility
