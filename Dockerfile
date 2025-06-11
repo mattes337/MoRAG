@@ -168,6 +168,7 @@ RUN mkdir -p temp logs data \
     chmod -R 755 /home/morag/.cache && \
     chmod -R 755 data && \
     chmod +x scripts/check_cpu_compatibility.py && \
+    chmod +x scripts/init_sql_db.py && \
     chmod +x scripts/start_worker_safe.sh && \
     chown -R morag:morag /app /home/morag
 
@@ -175,4 +176,4 @@ RUN mkdir -p temp logs data \
 USER morag
 
 # Run initialization scripts and then start the server
-CMD ["sh", "-c", "python scripts/ensure_data_directories.py && python scripts/check_cpu_compatibility.py && python -m morag.server --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python scripts/ensure_data_directories.py && python scripts/check_cpu_compatibility.py && python scripts/init_sql_db.py && python -m morag.server --host 0.0.0.0 --port 8000"]

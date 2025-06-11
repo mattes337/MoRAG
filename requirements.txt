@@ -23,6 +23,10 @@ python-dotenv==1.0.1
 structlog==24.4.0
 psutil==6.1.0
 
+# Database drivers
+pymysql>=1.0.0,<2.0.0
+cryptography>=3.0.0,<42.0.0
+
 # Optional dependencies for basic functionality
 # Audio processing (basic)
 pydub>=0.25.1

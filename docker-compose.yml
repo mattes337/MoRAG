@@ -66,6 +66,7 @@ services:
       - PYTORCH_DISABLE_AVX2=1
     depends_on:
       - redis
+      - mariadb
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -98,6 +99,7 @@ services:
       - PYTORCH_DISABLE_AVX2=1
     depends_on:
       - redis
+      - mariadb
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -129,6 +131,7 @@ services:
       - PYTORCH_DISABLE_AVX2=1
     depends_on:
       - redis
+      - mariadb
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -161,6 +164,7 @@ services:
       - PYTORCH_DISABLE_AVX2=1
     depends_on:
       - redis
+      - mariadb
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
