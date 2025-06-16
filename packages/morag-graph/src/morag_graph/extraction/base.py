@@ -238,7 +238,7 @@ class BaseExtractor(ABC):
         
         try:
             response = await self.call_llm(messages)
-            return self.parse_response(response)
+            return self.parse_response(response, text=text)
             
         except Exception as e:
             logger.error(f"Error during extraction: {e}")

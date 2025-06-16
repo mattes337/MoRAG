@@ -1,7 +1,7 @@
 """LLM-based relation extraction."""
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 
 from ..models import Entity, Relation, RelationType
 from .base import BaseExtractor, LLMConfig
@@ -16,6 +16,63 @@ class RelationExtractor(BaseExtractor):
     It identifies relationships like "works for", "located in", "part of", etc.
     """
     
+    def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, **kwargs):
+        """Initialize the relation extractor.
+        
+        Args:
+            config: LLM configuration as LLMConfig object or dictionary
+            **kwargs: Additional configuration parameters (for backward compatibility)
+        """
+        # Handle backward compatibility with llm_config parameter
+        if config is None and 'llm_config' in kwargs:
+            config = kwargs['llm_config']
+        
+        # Convert dictionary to LLMConfig if needed
+        if isinstance(config, dict):
+            config = LLMConfig(**config)
+        elif config is None:
+            config = LLMConfig()
+            
+        super().__init__(config)
+    
+    async def extract(self, text: str, entities: Optional[List[Entity]] = None, doc_id: Optional[str] = None, **kwargs) -> List[Relation]:
+        """Extract relations from text.
+        
+        Args:
+            text: Text to extract relations from
+            entities: Optional list of known entities
+            doc_id: Optional document ID to associate with relations
+            **kwargs: Additional arguments
+            
+        Returns:
+            List of Relation objects
+        """
+        if not text or not text.strip():
+            return []
+        
+        system_prompt = self.get_system_prompt()
+        user_prompt = self.get_user_prompt(text, entities=entities, **kwargs)
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        
+        try:
+            response = await self.call_llm(messages)
+            relations = self.parse_response(response, text=text)
+            
+            # Set document ID if provided
+            if doc_id:
+                for relation in relations:
+                    relation.source_doc_id = doc_id
+                    
+            return relations
+            
+        except Exception as e:
+            logger.error(f"Error during relation extraction: {e}")
+            return []
+     
     def get_system_prompt(self) -> str:
         """Get the system prompt for relation extraction.
         
@@ -30,6 +87,7 @@ Extract relations of the following types:
 - LOCATED_IN: Entity is located in a place
 - PART_OF: Entity is part of another entity
 - CREATED_BY: Entity was created by a person or organization
+- FOUNDED: Person founded an organization
 - OWNS: Person or organization owns an entity
 - USES: Entity uses another entity
 - RELATED_TO: Generic relationship between entities
@@ -98,11 +156,12 @@ Return the relations as a JSON array as specified in the system prompt.
         
         return base_prompt
     
-    def parse_response(self, response: str) -> List[Relation]:
+    def parse_response(self, response: str, text: str = "") -> List[Relation]:
         """Parse the LLM response into Relation objects.
         
         Args:
             response: Raw LLM response
+            text: Original text that was processed (for source_text)
             
         Returns:
             List of Relation objects
@@ -119,6 +178,8 @@ Return the relations as a JSON array as specified in the system prompt.
                 try:
                     relation = self._create_relation_from_dict(item)
                     if relation:
+                        # Set source text (first 500 chars as context)
+                        relation.source_text = text[:500] if text else ""
                         relations.append(relation)
                 except Exception as e:
                     logger.warning(f"Failed to create relation from {item}: {e}")
@@ -180,6 +241,38 @@ Return the relations as a JSON array as specified in the system prompt.
         except Exception as e:
             logger.error(f"Error creating relation from data {data}: {e}")
             return None
+    
+    async def extract_for_entity_pairs(
+        self,
+        text: str,
+        entities: List[Entity],
+        entity_pairs: List[tuple],
+        doc_id: Optional[str] = None
+    ) -> List[Relation]:
+        """Extract relations for specific entity pairs.
+        
+        Args:
+            text: Text to extract relations from
+            entities: List of known entities
+            entity_pairs: List of (source_entity_id, target_entity_id) tuples
+            doc_id: Optional document ID to associate with relations
+            
+        Returns:
+            List of Relation objects for the specified pairs
+        """
+        # Extract all relations first
+        all_relations = await self.extract(text, entities, doc_id=doc_id)
+        
+        # Filter relations to only include specified pairs
+        filtered_relations = []
+        for relation in all_relations:
+            for source_id, target_id in entity_pairs:
+                if (relation.source_entity_id == source_id and relation.target_entity_id == target_id) or \
+                   (relation.source_entity_id == target_id and relation.target_entity_id == source_id):
+                    filtered_relations.append(relation)
+                    break
+        
+        return filtered_relations
     
     async def extract_with_entities(
         self, 

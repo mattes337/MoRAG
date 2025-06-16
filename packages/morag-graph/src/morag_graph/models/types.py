@@ -30,6 +30,7 @@ class RelationType(str, Enum):
     LOCATED_IN = "LOCATED_IN"  # Entity -> Location
     PART_OF = "PART_OF"  # Entity -> Entity
     CREATED_BY = "CREATED_BY"  # Entity -> Person/Organization
+    FOUNDED = "FOUNDED"  # Person -> Organization (founding relationship)
     OWNS = "OWNS"  # Person/Organization -> Entity
     USES = "USES"  # Entity -> Entity
     RELATED_TO = "RELATED_TO"  # Generic relation

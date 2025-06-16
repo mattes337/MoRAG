@@ -1,5 +1,6 @@
 """Relation model for graph-augmented RAG."""
 
+import json
 import uuid
 from typing import Dict, List, Optional, Any, Union, ClassVar
 
@@ -83,6 +84,10 @@ class Relation(BaseModel):
         if isinstance(properties['type'], RelationType):
             properties['type'] = properties['type'].value
             
+        # Serialize attributes to JSON string for Neo4J storage
+        if 'attributes' in properties:
+            properties['attributes'] = json.dumps(properties['attributes'])
+            
         # Remove entity IDs as they are handled by Neo4J relationship structure
         properties.pop('source_entity_id', None)
         properties.pop('target_entity_id', None)
@@ -97,6 +102,13 @@ class Relation(BaseModel):
         target_entity_id: EntityId
     ) -> 'Relation':
         """Create relation from Neo4J relationship properties."""
+        # Make a copy to avoid modifying the original
+        relationship = relationship.copy()
+        
+        # Deserialize attributes from JSON string
+        if 'attributes' in relationship and isinstance(relationship['attributes'], str):
+            relationship['attributes'] = json.loads(relationship['attributes'])
+        
         # Add entity IDs back
         relationship['source_entity_id'] = source_entity_id
         relationship['target_entity_id'] = target_entity_id

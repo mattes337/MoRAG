@@ -1,7 +1,7 @@
 """LLM-based entity extraction."""
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 
 from ..models import Entity, EntityType
 from .base import BaseExtractor, LLMConfig
@@ -15,6 +15,45 @@ class EntityExtractor(BaseExtractor):
     This class uses Large Language Models to extract entities from text.
     It identifies named entities like persons, organizations, locations, concepts, etc.
     """
+    
+    def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, **kwargs):
+        """Initialize the entity extractor.
+        
+        Args:
+            config: LLM configuration as LLMConfig object or dictionary
+            **kwargs: Additional configuration parameters (for backward compatibility)
+        """
+        # Handle backward compatibility with llm_config parameter
+        if config is None and 'llm_config' in kwargs:
+            config = kwargs['llm_config']
+        
+        # Convert dictionary to LLMConfig if needed
+        if isinstance(config, dict):
+            config = LLMConfig(**config)
+        elif config is None:
+            config = LLMConfig()
+            
+        super().__init__(config)
+    
+    async def extract(self, text: str, doc_id: Optional[str] = None, **kwargs) -> List[Entity]:
+        """Extract entities from text.
+        
+        Args:
+            text: Text to extract entities from
+            doc_id: Optional document ID to associate with entities
+            **kwargs: Additional arguments
+            
+        Returns:
+            List of Entity objects
+        """
+        entities = await super().extract(text, **kwargs)
+        
+        # Set document ID if provided
+        if doc_id:
+            for entity in entities:
+                entity.source_doc_id = doc_id
+                
+        return entities
     
     def get_system_prompt(self) -> str:
         """Get the system prompt for entity extraction.
@@ -84,11 +123,12 @@ Extract named entities from the following text:
 Return the entities as a JSON array as specified in the system prompt.
 """
     
-    def parse_response(self, response: str) -> List[Entity]:
+    def parse_response(self, response: str, text: str = "") -> List[Entity]:
         """Parse the LLM response into Entity objects.
         
         Args:
             response: Raw LLM response
+            text: Original text that was processed (for source_text)
             
         Returns:
             List of Entity objects
@@ -105,6 +145,8 @@ Return the entities as a JSON array as specified in the system prompt.
                 try:
                     entity = self._create_entity_from_dict(item)
                     if entity:
+                        # Set source text (first 500 chars as context)
+                        entity.source_text = text[:500] if text else ""
                         entities.append(entity)
                 except Exception as e:
                     logger.warning(f"Failed to create entity from {item}: {e}")

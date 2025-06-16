@@ -1,5 +1,6 @@
 """Entity model for graph-augmented RAG."""
 
+import json
 import uuid
 from typing import Dict, List, Optional, Any, Union, ClassVar
 
@@ -63,6 +64,10 @@ class Entity(BaseModel):
         if isinstance(properties['type'], EntityType):
             properties['type'] = properties['type'].value
             
+        # Serialize attributes to JSON string for Neo4J storage
+        if 'attributes' in properties:
+            properties['attributes'] = json.dumps(properties['attributes'])
+            
         # Add label for Neo4J
         properties['_labels'] = [self._neo4j_label, properties['type']]
         
@@ -71,6 +76,13 @@ class Entity(BaseModel):
     @classmethod
     def from_neo4j_node(cls, node: Dict[str, Any]) -> 'Entity':
         """Create entity from Neo4J node properties."""
+        # Make a copy to avoid modifying the original
+        node = node.copy()
+        
+        # Deserialize attributes from JSON string
+        if 'attributes' in node and isinstance(node['attributes'], str):
+            node['attributes'] = json.loads(node['attributes'])
+        
         # Remove Neo4J specific properties
         if '_labels' in node:
             node.pop('_labels')

@@ -27,14 +27,14 @@ def run_command(cmd: List[str], cwd: Optional[Path] = None, check: bool = True) 
     Returns:
         CompletedProcess result
     """
-    print(f"🔧 Running: {' '.join(cmd)}")
+    print(f"[INFO] Running: {' '.join(cmd)}")
     try:
-        result = subprocess.run(cmd, cwd=cwd, check=check, capture_output=True, text=True)
+        result = subprocess.run(cmd, cwd=cwd, check=check, capture_output=True, text=True, encoding='utf-8')
         if result.stdout:
             print(result.stdout)
         return result
     except subprocess.CalledProcessError as e:
-        print(f"❌ Command failed with exit code {e.returncode}")
+        print(f"[ERROR] Command failed with exit code {e.returncode}")
         if e.stderr:
             print(f"Error: {e.stderr}")
         if check:
@@ -48,14 +48,14 @@ def check_python_version() -> bool:
     Returns:
         True if Python version is compatible, False otherwise
     """
-    print("🐍 Checking Python version...")
+    print("[INFO] Checking Python version...")
     
     version = sys.version_info
     if version.major != 3 or version.minor < 8:
-        print(f"❌ Python 3.8+ is required, but you have {version.major}.{version.minor}.{version.micro}")
+        print(f"[ERROR] Python 3.8+ is required, but you have {version.major}.{version.minor}.{version.micro}")
         return False
     
-    print(f"✅ Python {version.major}.{version.minor}.{version.micro} is compatible")
+    print(f"[SUCCESS] Python {version.major}.{version.minor}.{version.micro} is compatible")
     return True
 
 
@@ -65,19 +65,19 @@ def check_pip() -> bool:
     Returns:
         True if pip is available, False otherwise
     """
-    print("📦 Checking pip...")
+    print("[INFO] Checking pip...")
     
     try:
         result = run_command(["python", "-m", "pip", "--version"])
-        print("✅ pip is available")
+        print("[SUCCESS] pip is available")
         
         # Try to upgrade pip
-        print("🔄 Upgrading pip...")
+        print("[INFO] Upgrading pip...")
         run_command(["python", "-m", "pip", "install", "--upgrade", "pip"], check=False)
         
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ pip is not available")
+        print("[ERROR] pip is not available")
         return False
 
 
@@ -87,18 +87,18 @@ def install_package_in_development_mode() -> bool:
     Returns:
         True if installation succeeded, False otherwise
     """
-    print("📦 Installing morag-graph in development mode...")
+    print("[INFO] Installing morag-graph in development mode...")
     
     try:
         # Install in editable mode with development dependencies
         run_command(["python", "-m", "pip", "install", "-e", ".[dev]"])
-        print("✅ Package installed in development mode")
+        print("[SUCCESS] Package installed in development mode")
         return True
     except subprocess.CalledProcessError:
-        print("❌ Failed to install package in development mode")
+        print("[ERROR] Failed to install package in development mode")
         
         # Try installing dependencies manually
-        print("🔄 Trying to install dependencies manually...")
+        print("[INFO] Trying to install dependencies manually...")
         try:
             # Core dependencies
             core_deps = [
@@ -124,10 +124,10 @@ def install_package_in_development_mode() -> bool:
             all_deps = core_deps + dev_deps
             
             run_command(["python", "-m", "pip", "install"] + all_deps)
-            print("✅ Dependencies installed manually")
+            print("[SUCCESS] Dependencies installed manually")
             return True
         except subprocess.CalledProcessError:
-            print("❌ Failed to install dependencies")
+            print("[ERROR] Failed to install dependencies")
             return False
 
 
@@ -140,13 +140,13 @@ def setup_environment_file(api_key: Optional[str] = None) -> bool:
     Returns:
         True if .env file was set up, False otherwise
     """
-    print("🔧 Setting up environment file...")
+    print("[INFO] Setting up environment file...")
     
     env_file = Path(".env")
     
     # Check if .env already exists
     if env_file.exists():
-        print("✅ .env file already exists")
+        print("[SUCCESS] .env file already exists")
         return True
     
     # Create .env file
@@ -167,16 +167,16 @@ def setup_environment_file(api_key: Optional[str] = None) -> bool:
     ]
     
     try:
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding='utf-8') as f:
             f.write("\n".join(env_content))
         
-        print(f"✅ Created .env file: {env_file.absolute()}")
+        print(f"[SUCCESS] Created .env file: {env_file.absolute()}")
         if not api_key:
-            print("⚠️  Please edit .env file and add your Gemini API key")
+            print("[WARNING] Please edit .env file and add your Gemini API key")
         
         return True
     except Exception as e:
-        print(f"❌ Failed to create .env file: {e}")
+        print(f"[ERROR] Failed to create .env file: {e}")
         return False
 
 
@@ -186,7 +186,7 @@ def run_code_quality_checks() -> bool:
     Returns:
         True if all checks passed, False otherwise
     """
-    print("🔍 Running code quality checks...")
+    print("[INFO] Running code quality checks...")
     
     checks_passed = True
     
@@ -199,40 +199,40 @@ def run_code_quality_checks() -> bool:
             run_command(["python", "-m", tool, "--version"])
             available_tools.append(tool)
         except subprocess.CalledProcessError:
-            print(f"⚠️  {tool} is not available")
+            print(f"[WARNING] {tool} is not available")
     
     if not available_tools:
-        print("⚠️  No code quality tools available, skipping checks")
+        print("[WARNING] No code quality tools available, skipping checks")
         return True
     
     # Run black (code formatting)
     if "black" in available_tools:
         try:
-            print("🎨 Running black (code formatting)...")
+            print("[INFO] Running black (code formatting)...")
             run_command(["python", "-m", "black", "--check", "src", "tests", "examples"])
-            print("✅ Black formatting check passed")
+            print("[SUCCESS] Black formatting check passed")
         except subprocess.CalledProcessError:
-            print("⚠️  Black formatting issues found (run 'black src tests examples' to fix)")
+            print("[WARNING] Black formatting issues found (run 'black src tests examples' to fix)")
             checks_passed = False
     
     # Run isort (import sorting)
     if "isort" in available_tools:
         try:
-            print("📚 Running isort (import sorting)...")
+            print("[INFO] Running isort (import sorting)...")
             run_command(["python", "-m", "isort", "--check-only", "src", "tests", "examples"])
-            print("✅ isort check passed")
+            print("[SUCCESS] isort check passed")
         except subprocess.CalledProcessError:
-            print("⚠️  Import sorting issues found (run 'isort src tests examples' to fix)")
+            print("[WARNING] Import sorting issues found (run 'isort src tests examples' to fix)")
             checks_passed = False
     
     # Run flake8 (linting)
     if "flake8" in available_tools:
         try:
-            print("🔍 Running flake8 (linting)...")
+            print("[INFO] Running flake8 (linting)...")
             run_command(["python", "-m", "flake8", "src", "tests", "examples"])
-            print("✅ flake8 linting passed")
+            print("[SUCCESS] flake8 linting passed")
         except subprocess.CalledProcessError:
-            print("⚠️  Linting issues found")
+            print("[WARNING] Linting issues found")
             checks_passed = False
     
     return checks_passed
@@ -242,24 +242,24 @@ def run_basic_tests(api_key: Optional[str] = None) -> bool:
     """Run basic tests to verify setup.
     
     Args:
-        api_key: Optional OpenAI API key for tests
+        api_key: Optional Gemini API key for tests
         
     Returns:
         True if tests passed, False otherwise
     """
-    print("🧪 Running basic tests...")
+    print("[INFO] Running basic tests...")
     
     # Set API key if provided
     env = os.environ.copy()
     if api_key:
-        env["OPENAI_API_KEY"] = api_key
+        env["GEMINI_API_KEY"] = api_key
     
     try:
         # Check if pytest is available
         run_command(["python", "-m", "pytest", "--version"])
         
         # Run import tests (quick validation)
-        print("📦 Testing package imports...")
+        print("[INFO] Testing package imports...")
         import_test_code = """
 import sys
 sys.path.insert(0, 'src')
@@ -268,9 +268,9 @@ try:
     from morag_graph.models import Entity, Relation, Graph
     from morag_graph.extraction import EntityExtractor, RelationExtractor
     from morag_graph.storage import JsonStorage
-    print("✅ All imports successful")
+    print("[SUCCESS] All imports successful")
 except ImportError as e:
-    print(f"❌ Import failed: {e}")
+    print(f"[ERROR] Import failed: {e}")
     sys.exit(1)
 """
         
@@ -278,32 +278,33 @@ except ImportError as e:
             ["python", "-c", import_test_code],
             capture_output=True,
             text=True,
-            env=env
+            env=env,
+            encoding='utf-8'
         )
         
         if result.returncode == 0:
             print(result.stdout)
         else:
-            print(f"❌ Import test failed: {result.stderr}")
+            print(f"[ERROR] Import test failed: {result.stderr}")
             return False
         
         # Run quick pytest if API key is available
         if api_key:
-            print("🧪 Running quick pytest validation...")
+            print("[INFO] Running quick pytest validation...")
             try:
                 run_command(
                     ["python", "-m", "pytest", "tests/", "-v", "--tb=short", "-x", "--maxfail=1"],
                     check=False  # Don't fail setup if tests fail
                 )
             except subprocess.CalledProcessError:
-                print("⚠️  Some tests failed, but setup can continue")
+                print("[WARNING] Some tests failed, but setup can continue")
         else:
-            print("⚠️  Skipping pytest (no API key provided)")
+            print("[WARNING] Skipping pytest (no API key provided)")
         
         return True
         
     except subprocess.CalledProcessError:
-        print("❌ pytest is not available")
+        print("[ERROR] pytest is not available")
         return False
 
 
@@ -313,7 +314,7 @@ def create_development_scripts() -> bool:
     Returns:
         True if scripts were created successfully, False otherwise
     """
-    print("📝 Creating development scripts...")
+    print("[INFO] Creating development scripts...")
     
     scripts = {
         "format_code.py": """
@@ -323,13 +324,13 @@ import subprocess
 import sys
 
 def main():
-    print("🎨 Formatting code with black...")
+    print("[INFO] Formatting code with black...")
     subprocess.run(["python", "-m", "black", "src", "tests", "examples"])
     
-    print("📚 Sorting imports with isort...")
+    print("[INFO] Sorting imports with isort...")
     subprocess.run(["python", "-m", "isort", "src", "tests", "examples"])
     
-    print("✅ Code formatting complete")
+    print("[SUCCESS] Code formatting complete")
 
 if __name__ == "__main__":
     main()
@@ -341,17 +342,17 @@ import subprocess
 import sys
 
 def main():
-    print("🔍 Running flake8 linting...")
+    print("[INFO] Running flake8 linting...")
     result1 = subprocess.run(["python", "-m", "flake8", "src", "tests", "examples"])
     
-    print("🔍 Running mypy type checking...")
+    print("[INFO] Running mypy type checking...")
     result2 = subprocess.run(["python", "-m", "mypy", "src"], check=False)
     
     if result1.returncode == 0 and result2.returncode == 0:
-        print("✅ All linting checks passed")
+        print("[SUCCESS] All linting checks passed")
         return 0
     else:
-        print("❌ Some linting checks failed")
+        print("[ERROR] Some linting checks failed")
         return 1
 
 if __name__ == "__main__":
@@ -363,15 +364,15 @@ if __name__ == "__main__":
         for script_name, script_content in scripts.items():
             script_path = Path(script_name)
             if not script_path.exists():
-                with open(script_path, "w") as f:
+                with open(script_path, "w", encoding='utf-8') as f:
                     f.write(script_content)
-                print(f"✅ Created {script_name}")
+                print(f"[SUCCESS] Created {script_name}")
             else:
-                print(f"✅ {script_name} already exists")
+                print(f"[SUCCESS] {script_name} already exists")
         
         return True
     except Exception as e:
-        print(f"❌ Failed to create development scripts: {e}")
+        print(f"[ERROR] Failed to create development scripts: {e}")
         return False
 
 
@@ -414,7 +415,7 @@ Example:
     
     args = parser.parse_args()
     
-    print("🚀 MoRAG Graph - Development Environment Setup")
+    print("[INFO] MoRAG Graph - Development Environment Setup")
     print("" + "="*50)
     
     # Get API key from args or environment
@@ -445,18 +446,18 @@ Example:
     # Step 6: Run code quality checks
     if not args.skip_quality_checks:
         if not run_code_quality_checks():
-            print("⚠️  Code quality checks failed, but setup can continue")
+            print("[WARNING] Code quality checks failed, but setup can continue")
     
     # Step 7: Run basic tests
     if not args.skip_tests:
         if not run_basic_tests(api_key):
-            print("⚠️  Basic tests failed, but setup can continue")
+            print("[WARNING] Basic tests failed, but setup can continue")
     
     print("" + "="*50)
     
     if success:
-        print("✅ Development environment setup completed successfully!")
-        print("\n📋 Next steps:")
+        print("[SUCCESS] Development environment setup completed successfully!")
+        print("\n[INFO] Next steps:")
         print("   1. Edit .env file and add your Gemini API key (if not already set)")
         print("   2. Run tests: python run_tests.py")
         print("   3. Run demo: python examples/extraction_demo.py --api-key YOUR_KEY")
@@ -464,7 +465,7 @@ Example:
         print("   5. Run linting: python lint_code.py")
         return 0
     else:
-        print("⚠️  Development environment setup completed with some issues")
+        print("[WARNING] Development environment setup completed with some issues")
         print("   Please review the output above and fix any issues")
         return 1
 
