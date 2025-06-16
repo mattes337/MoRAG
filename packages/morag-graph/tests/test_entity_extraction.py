@@ -36,21 +36,22 @@ EXPECTED_ENTITY_TYPES = [
 
 
 @pytest.fixture
-def openai_api_key() -> str:
-    """Get OpenAI API key from environment variables."""
-    api_key = os.getenv("OPENAI_API_KEY")
+def gemini_api_key() -> str:
+    """Get Gemini API key from environment variables."""
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        pytest.skip("OPENAI_API_KEY environment variable not set")
+        pytest.skip("GEMINI_API_KEY environment variable not set")
     return api_key
 
 
 @pytest.fixture
-def entity_extractor(openai_api_key: str) -> EntityExtractor:
+def entity_extractor(gemini_api_key: str) -> EntityExtractor:
     """Create an EntityExtractor instance for testing."""
     return EntityExtractor(
         llm_config={
-            "api_key": openai_api_key,
-            "model": "gpt-3.5-turbo",  # Use a less expensive model for testing
+            "provider": "gemini",
+            "api_key": gemini_api_key,
+            "model": "gemini-1.5-flash",  # Use Gemini Flash for testing
             "temperature": 0.0,  # Set to 0 for deterministic results
             "max_tokens": 1000
         }

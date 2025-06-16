@@ -25,7 +25,7 @@ pip install morag-graph
 ## Dependencies
 
 - Neo4J (>=5.15.0)
-- OpenAI API access for LLM-based extraction
+- Google Gemini API access for LLM-based extraction
 - morag-core package
 
 ## Usage

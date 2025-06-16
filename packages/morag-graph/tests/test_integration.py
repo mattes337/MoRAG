@@ -62,7 +62,7 @@ class IntegrationTestSuite:
         """Initialize the test suite.
         
         Args:
-            api_key: OpenAI API key for LLM calls
+            api_key: Gemini API key for LLM calls
         """
         self.api_key = api_key
         self.entity_extractor = None
@@ -77,15 +77,21 @@ class IntegrationTestSuite:
         
         # Initialize extractors
         self.entity_extractor = EntityExtractor(
-            api_key=self.api_key,
-            model="gpt-3.5-turbo",
-            temperature=0.1
+            llm_config={
+                "provider": "gemini",
+                "api_key": self.api_key,
+                "model": "gemini-1.5-flash",
+                "temperature": 0.1
+            }
         )
         
         self.relation_extractor = RelationExtractor(
-            api_key=self.api_key,
-            model="gpt-3.5-turbo",
-            temperature=0.1
+            llm_config={
+                "provider": "gemini",
+                "api_key": self.api_key,
+                "model": "gemini-1.5-flash",
+                "temperature": 0.1
+            }
         )
         
         # Initialize storage
@@ -411,10 +417,10 @@ class IntegrationTestSuite:
 # Pytest fixtures and tests
 @pytest.fixture
 def api_key():
-    """Get OpenAI API key from environment."""
-    key = os.getenv("OPENAI_API_KEY")
+    """Get Gemini API key from environment."""
+    key = os.getenv("GEMINI_API_KEY")
     if not key:
-        pytest.skip("OPENAI_API_KEY environment variable not set")
+        pytest.skip("GEMINI_API_KEY environment variable not set")
     return key
 
 

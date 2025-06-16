@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 class LLMConfig(BaseModel):
     """Configuration for LLM-based extraction."""
     
-    provider: str = "openai"  # openai, anthropic, etc.
-    model: str = "gpt-3.5-turbo"
+    provider: str = "gemini"  # openai, gemini, anthropic, etc.
+    model: str = "gemini-1.5-flash"  # gemini-1.5-flash, gemini-1.5-pro, gpt-3.5-turbo, etc.
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     temperature: float = 0.1
@@ -96,6 +96,8 @@ class BaseExtractor(ABC):
         """
         if self.config.provider == "openai":
             return await self._call_openai(messages)
+        elif self.config.provider == "gemini":
+            return await self._call_gemini(messages)
         else:
             raise ValueError(f"Unsupported LLM provider: {self.config.provider}")
     
@@ -135,6 +137,82 @@ class BaseExtractor(ABC):
             raise
         except Exception as e:
             logger.error(f"Error calling OpenAI API: {e}")
+            raise
+    
+    async def _call_gemini(self, messages: List[Dict[str, str]]) -> str:
+        """Call Google Gemini API.
+        
+        Args:
+            messages: List of messages for the LLM
+            
+        Returns:
+            LLM response text
+        """
+        # Convert messages to Gemini format
+        gemini_contents = []
+        
+        for message in messages:
+            role = message["role"]
+            content = message["content"]
+            
+            if role == "system":
+                # Gemini doesn't have system role, prepend to first user message
+                if gemini_contents and gemini_contents[-1]["role"] == "user":
+                    gemini_contents[-1]["parts"][0]["text"] = content + "\n\n" + gemini_contents[-1]["parts"][0]["text"]
+                else:
+                    gemini_contents.append({
+                        "role": "user",
+                        "parts": [{"text": content}]
+                    })
+            elif role == "user":
+                gemini_contents.append({
+                    "role": "user",
+                    "parts": [{"text": content}]
+                })
+            elif role == "assistant":
+                gemini_contents.append({
+                    "role": "model",
+                    "parts": [{"text": content}]
+                })
+        
+        payload = {
+            "contents": gemini_contents,
+            "generationConfig": {
+                "temperature": self.config.temperature,
+                "maxOutputTokens": self.config.max_tokens,
+            }
+        }
+        
+        base_url = self.config.base_url or "https://generativelanguage.googleapis.com/v1beta"
+        url = f"{base_url}/models/{self.config.model}:generateContent?key={self.config.api_key}"
+        
+        headers = {
+            "Content-Type": "application/json",
+        }
+        
+        try:
+            response = await self.client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if "candidates" not in data or not data["candidates"]:
+                raise ValueError("No candidates in Gemini response")
+            
+            candidate = data["candidates"][0]
+            
+            if "content" not in candidate or "parts" not in candidate["content"]:
+                raise ValueError("Invalid Gemini response structure")
+            
+            return candidate["content"]["parts"][0]["text"]
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error calling Gemini API: {e}")
+            if hasattr(e.response, 'text'):
+                logger.error(f"Response: {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"Error calling Gemini API: {e}")
             raise
     
     async def extract(self, text: str, **kwargs) -> Any:

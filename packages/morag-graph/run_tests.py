@@ -5,9 +5,9 @@ This script provides an easy way to run the entity and relation extraction tests
 It handles environment setup and provides clear output about test results.
 
 Usage:
-    python run_tests.py --api-key YOUR_OPENAI_API_KEY
+    python run_tests.py --api-key YOUR_GEMINI_API_KEY
     
-Or set OPENAI_API_KEY environment variable and run:
+Or set GEMINI_API_KEY environment variable and run:
     python run_tests.py
     
 Options:
@@ -40,7 +40,7 @@ def check_dependencies() -> bool:
     required_packages = [
         "pytest",
         "pytest-asyncio",
-        "openai",
+        "google-generativeai",
         "httpx",
         "pydantic",
         "python-dotenv",
@@ -70,22 +70,22 @@ def setup_environment(api_key: Optional[str] = None) -> bool:
     """Setup environment for testing.
     
     Args:
-        api_key: Optional OpenAI API key
+        api_key: Optional Gemini API key
         
     Returns:
         True if environment is properly set up, False otherwise
     """
     # Check API key
     if not api_key:
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY")
     
     if not api_key:
-        print("❌ OpenAI API key is required for testing.")
-        print("   Set it via --api-key argument or OPENAI_API_KEY environment variable.")
+        print("❌ Gemini API key is required for testing.")
+        print("   Set it via --api-key argument or GEMINI_API_KEY environment variable.")
         return False
     
     # Set environment variable for tests
-    os.environ["OPENAI_API_KEY"] = api_key
+    os.environ["GEMINI_API_KEY"] = api_key
     
     # Check if we're in the right directory
     current_dir = Path.cwd()
@@ -258,7 +258,7 @@ Examples:
     parser.add_argument(
         "--api-key",
         type=str,
-        help="OpenAI API key (can also be set via OPENAI_API_KEY environment variable)"
+        help="Gemini API key (can also be set via GEMINI_API_KEY environment variable)"
     )
     
     parser.add_argument(
@@ -294,8 +294,8 @@ Examples:
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-3.5-turbo",
-        help="LLM model to use for demo (default: gpt-3.5-turbo)"
+        default="gemini-1.5-flash",
+        help="LLM model to use for demo (default: gemini-1.5-flash)"
     )
     
     args = parser.parse_args()

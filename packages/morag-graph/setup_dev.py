@@ -5,7 +5,7 @@ This script helps set up the development environment for the morag-graph package
 including installing dependencies, setting up pre-commit hooks, and running initial tests.
 
 Usage:
-    python setup_dev.py [--api-key YOUR_OPENAI_API_KEY] [--skip-tests]
+    python setup_dev.py [--api-key YOUR_GEMINI_API_KEY] [--skip-tests]
 """
 
 import argparse
@@ -106,7 +106,7 @@ def install_package_in_development_mode() -> bool:
                 "structlog>=23.0.0",
                 "python-dotenv>=1.0.0",
                 "neo4j>=5.0.0",
-                "openai>=1.0.0",
+                "google-generativeai>=0.3.0",
                 "httpx>=0.24.0",
                 "aiofiles>=23.0.0"
             ]
@@ -135,7 +135,7 @@ def setup_environment_file(api_key: Optional[str] = None) -> bool:
     """Set up .env file for development.
     
     Args:
-        api_key: Optional OpenAI API key
+        api_key: Optional Gemini API key
         
     Returns:
         True if .env file was set up, False otherwise
@@ -153,8 +153,8 @@ def setup_environment_file(api_key: Optional[str] = None) -> bool:
     env_content = [
         "# Environment variables for morag-graph development",
         "",
-        "# OpenAI API Key (required for LLM-based extraction)",
-        f"OPENAI_API_KEY={api_key or 'your_openai_api_key_here'}",
+        "# Gemini API Key (required for LLM-based extraction)",
+        f"GEMINI_API_KEY={api_key or 'your_gemini_api_key_here'}",
         "",
         "# Neo4j Configuration (optional, for Neo4j storage backend)",
         "NEO4J_URI=bolt://localhost:7687",
@@ -172,7 +172,7 @@ def setup_environment_file(api_key: Optional[str] = None) -> bool:
         
         print(f"✅ Created .env file: {env_file.absolute()}")
         if not api_key:
-            print("⚠️  Please edit .env file and add your OpenAI API key")
+            print("⚠️  Please edit .env file and add your Gemini API key")
         
         return True
     except Exception as e:
@@ -390,14 +390,14 @@ This script will:
 6. Create helpful development scripts
 
 Example:
-  python setup_dev.py --api-key sk-your-openai-key
+  python setup_dev.py --api-key your-gemini-api-key
 """
     )
     
     parser.add_argument(
         "--api-key",
         type=str,
-        help="OpenAI API key for testing (can also be set via OPENAI_API_KEY env var)"
+        help="Gemini API key for testing (can also be set via GEMINI_API_KEY env var)"
     )
     
     parser.add_argument(
@@ -418,7 +418,7 @@ Example:
     print("" + "="*50)
     
     # Get API key from args or environment
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
+    api_key = args.api_key or os.getenv("GEMINI_API_KEY")
     
     success = True
     
@@ -457,7 +457,7 @@ Example:
     if success:
         print("✅ Development environment setup completed successfully!")
         print("\n📋 Next steps:")
-        print("   1. Edit .env file and add your OpenAI API key (if not already set)")
+        print("   1. Edit .env file and add your Gemini API key (if not already set)")
         print("   2. Run tests: python run_tests.py")
         print("   3. Run demo: python examples/extraction_demo.py --api-key YOUR_KEY")
         print("   4. Format code: python format_code.py")

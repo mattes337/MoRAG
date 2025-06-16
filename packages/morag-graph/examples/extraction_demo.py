@@ -8,9 +8,9 @@ This script shows how to:
 4. Query and visualize the extracted knowledge graph
 
 Usage:
-    python extraction_demo.py --api-key YOUR_OPENAI_API_KEY
+    python extraction_demo.py --api-key YOUR_GEMINI_API_KEY
     
-Or set OPENAI_API_KEY environment variable and run:
+Or set GEMINI_API_KEY environment variable and run:
     python extraction_demo.py
 """
 
@@ -94,11 +94,11 @@ SAMPLE_DOCUMENTS = {
 class ExtractionDemo:
     """Demonstration class for entity and relation extraction."""
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gemini-1.5-flash"):
         """Initialize the demo with API configuration.
         
         Args:
-            api_key: OpenAI API key
+            api_key: Google Gemini API key
             model: LLM model to use
         """
         self.api_key = api_key
@@ -106,6 +106,7 @@ class ExtractionDemo:
         
         # Initialize extractors
         llm_config = {
+            "provider": "gemini",
             "api_key": api_key,
             "model": model,
             "temperature": 0.1,  # Low temperature for consistent results
@@ -421,22 +422,22 @@ def main():
     parser.add_argument(
         "--api-key",
         type=str,
-        help="OpenAI API key (can also be set via OPENAI_API_KEY environment variable)"
+        help="Gemini API key (can also be set via GEMINI_API_KEY environment variable)"
     )
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-3.5-turbo",
-        help="LLM model to use (default: gpt-3.5-turbo)"
+        default="gemini-1.5-flash",
+        help="LLM model to use (default: gemini-1.5-flash)"
     )
     
     args = parser.parse_args()
     
     # Get API key
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
+    api_key = args.api_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        print("❌ Error: OpenAI API key is required.")
-        print("   Set it via --api-key argument or OPENAI_API_KEY environment variable.")
+        print("❌ Error: Gemini API key is required.")
+        print("   Set it via --api-key argument or GEMINI_API_KEY environment variable.")
         return 1
     
     # Run the demo
