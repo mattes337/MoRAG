@@ -1,9 +1,9 @@
-# Task 2.2: Graph Construction Pipeline
+# Task 2.1: Graph Construction Pipeline
 
 **Phase**: 2 - Core Graph Features  
 **Priority**: Critical  
-**Estimated Time**: 7-9 days total  
-**Dependencies**: Task 1.2.2 (Graph Storage Implementation), Task 2.1.2 (ML-Based Relation Extraction)
+**Estimated Time**: 6-8 days total  
+**Dependencies**: Task 1.2 (Core Graph Package), Task 1.3 (LLM-Based Entity and Relation Extraction)
 
 ## Overview
 

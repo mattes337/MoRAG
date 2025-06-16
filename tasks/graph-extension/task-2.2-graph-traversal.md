@@ -1,9 +1,9 @@
-# Task 2.3: Basic Graph Traversal
+# Task 2.2: Graph Traversal
 
 **Phase**: 2 - Core Graph Features  
 **Priority**: High  
 **Estimated Time**: 7-9 days total  
-**Dependencies**: Task 1.2.2 (Graph Storage Implementation)
+**Dependencies**: Task 1.2 (Core Graph Package), Task 2.1 (Graph Construction Pipeline)
 
 ## Overview
 

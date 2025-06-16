@@ -136,55 +136,64 @@ class GraphConnectionManager:
 
 ---
 
-### Task 1.1.2: Graph Schema Design
+### Task 1.1.2: Dynamic Graph Schema with LLM-Based Relation Discovery
 **Priority**: Critical  
-**Estimated Time**: 2-3 days  
+**Estimated Time**: 3-4 days  
 **Dependencies**: 1.1.1
 
 #### Implementation Steps
 
-1. **Entity Schema**
-   - Define entity node structure
-   - Create unique constraints and indexes
-   - Optimize for query performance
+1. **Minimal Base Schema**
+   - Define minimal entity and relationship structure
+   - Create flexible schema that supports dynamic relation types
+   - Optimize for extensibility and performance
 
-2. **Relationship Schema**
-   - Define relationship types and properties
-   - Create relationship indexes
-   - Design for traversal efficiency
+2. **LLM-Based Relation Discovery**
+   - Implement LLM service for dynamic relation extraction
+   - Create relation type registry for discovered relationships
+   - Design confidence scoring and validation system
 
-3. **Document Linkage Schema**
+3. **Dynamic Schema Evolution**
+   - Implement schema migration for new relation types
+   - Create relation type management system
+   - Enable real-time schema updates
+
+4. **Document Linkage Schema**
    - Link entities to source documents
    - Track provenance and confidence
    - Enable source attribution
 
 #### Code Examples
 
-**Entity Schema (Cypher)**:
+**Minimal Base Schema (Cypher)**:
 ```cypher
 // Create constraints for entities
 CREATE CONSTRAINT entity_id FOR (e:Entity) REQUIRE e.id IS UNIQUE;
-CREATE CONSTRAINT entity_name_type FOR (e:Entity) REQUIRE (e.name, e.type) IS UNIQUE;
+CREATE CONSTRAINT entity_name FOR (e:Entity) REQUIRE e.name IS UNIQUE;
 
 // Create indexes for performance
-CREATE INDEX entity_name FOR (e:Entity) ON (e.name);
 CREATE INDEX entity_type FOR (e:Entity) ON (e.type);
 CREATE INDEX entity_embedding FOR (e:Entity) ON (e.embedding);
 CREATE INDEX entity_created_at FOR (e:Entity) ON (e.created_at);
+CREATE INDEX entity_confidence FOR (e:Entity) ON (e.confidence);
 
 // Full-text search index
 CREATE FULLTEXT INDEX entity_search FOR (e:Entity) ON EACH [e.name, e.summary, e.aliases];
-```
 
-**Relationship Schema (Cypher)**:
-```cypher
-// Create constraints for relationships
-CREATE CONSTRAINT rel_id FOR ()-[r:RELATES_TO]-() REQUIRE r.id IS UNIQUE;
+// Dynamic relationship constraints (flexible schema)
+CREATE CONSTRAINT rel_id FOR ()-[r]-() REQUIRE r.id IS UNIQUE;
 
-// Create indexes for relationships
-CREATE INDEX rel_type FOR ()-[r:RELATES_TO]-() ON (r.relation_type);
-CREATE INDEX rel_confidence FOR ()-[r:RELATES_TO]-() ON (r.confidence);
-CREATE INDEX rel_created_at FOR ()-[r:RELATES_TO]-() ON (r.created_at);
+// Indexes for dynamic relationships
+CREATE INDEX rel_type FOR ()-[r]-() ON (r.relation_type);
+CREATE INDEX rel_confidence FOR ()-[r]-() ON (r.confidence);
+CREATE INDEX rel_created_at FOR ()-[r]-() ON (r.created_at);
+CREATE INDEX rel_source_chunk FOR ()-[r]-() ON (r.source_chunk_id);
+
+// Relation type registry
+CREATE CONSTRAINT relation_type_id FOR (rt:RelationType) REQUIRE rt.id IS UNIQUE;
+CREATE CONSTRAINT relation_type_name FOR (rt:RelationType) REQUIRE rt.name IS UNIQUE;
+CREATE INDEX relation_type_domain FOR (rt:RelationType) ON (rt.domain);
+CREATE INDEX relation_type_created FOR (rt:RelationType) ON (rt.created_at);
 ```
 
 **Document Linkage Schema (Cypher)**:
@@ -204,35 +213,49 @@ CREATE INDEX chunk_doc_id FOR (c:Chunk) ON (c.document_id);
 CREATE INDEX chunk_position FOR (c:Chunk) ON (c.position);
 ```
 
-**Schema Initialization Script**:
+**Dynamic Schema Initialization Script**:
 ```python
 # scripts/init_graph_schema.py
 import asyncio
+from typing import List, Dict, Any
 from morag_core.services.graph_connection import GraphConnectionManager
 from morag_core.config.graph_config import GraphDatabaseConfig
 
-class GraphSchemaInitializer:
+class DynamicGraphSchemaInitializer:
     def __init__(self, connection_manager: GraphConnectionManager):
         self.connection_manager = connection_manager
     
     async def initialize_schema(self):
-        """Initialize the complete graph schema"""
+        """Initialize the dynamic graph schema with minimal base structure"""
         schema_queries = [
             # Entity constraints and indexes
             "CREATE CONSTRAINT entity_id FOR (e:Entity) REQUIRE e.id IS UNIQUE",
-            "CREATE INDEX entity_name FOR (e:Entity) ON (e.name)",
+            "CREATE CONSTRAINT entity_name FOR (e:Entity) REQUIRE e.name IS UNIQUE",
             "CREATE INDEX entity_type FOR (e:Entity) ON (e.type)",
+            "CREATE INDEX entity_embedding FOR (e:Entity) ON (e.embedding)",
+            "CREATE INDEX entity_created_at FOR (e:Entity) ON (e.created_at)",
+            "CREATE INDEX entity_confidence FOR (e:Entity) ON (e.confidence)",
             "CREATE FULLTEXT INDEX entity_search FOR (e:Entity) ON EACH [e.name, e.summary, e.aliases]",
             
-            # Relationship constraints and indexes
-            "CREATE CONSTRAINT rel_id FOR ()-[r:RELATES_TO]-() REQUIRE r.id IS UNIQUE",
-            "CREATE INDEX rel_type FOR ()-[r:RELATES_TO]-() ON (r.relation_type)",
-            "CREATE INDEX rel_confidence FOR ()-[r:RELATES_TO]-() ON (r.confidence)",
+            # Dynamic relationship constraints (flexible schema)
+            "CREATE CONSTRAINT rel_id FOR ()-[r]-() REQUIRE r.id IS UNIQUE",
+            "CREATE INDEX rel_type FOR ()-[r]-() ON (r.relation_type)",
+            "CREATE INDEX rel_confidence FOR ()-[r]-() ON (r.confidence)",
+            "CREATE INDEX rel_created_at FOR ()-[r]-() ON (r.created_at)",
+            "CREATE INDEX rel_source_chunk FOR ()-[r]-() ON (r.source_chunk_id)",
+            
+            # Relation type registry
+            "CREATE CONSTRAINT relation_type_id FOR (rt:RelationType) REQUIRE rt.id IS UNIQUE",
+            "CREATE CONSTRAINT relation_type_name FOR (rt:RelationType) REQUIRE rt.name IS UNIQUE",
+            "CREATE INDEX relation_type_domain FOR (rt:RelationType) ON (rt.domain)",
+            "CREATE INDEX relation_type_created FOR (rt:RelationType) ON (rt.created_at)",
             
             # Document constraints and indexes
             "CREATE CONSTRAINT doc_id FOR (d:Document) REQUIRE d.id IS UNIQUE",
+            "CREATE CONSTRAINT doc_source FOR (d:Document) REQUIRE d.source_path IS UNIQUE",
             "CREATE INDEX doc_source FOR (d:Document) ON (d.source_path)",
             "CREATE INDEX doc_type FOR (d:Document) ON (d.document_type)",
+            "CREATE INDEX doc_created_at FOR (d:Document) ON (d.created_at)",
             
             # Chunk constraints and indexes
             "CREATE CONSTRAINT chunk_id FOR (c:Chunk) REQUIRE c.id IS UNIQUE",
@@ -247,15 +270,73 @@ class GraphSchemaInitializer:
                     print(f"✓ Executed: {query}")
                 except Exception as e:
                     print(f"⚠ Warning for '{query}': {e}")
+    
+    async def register_relation_type(self, relation_name: str, description: str, 
+                                   domain: str = "general", 
+                                   properties: Dict[str, Any] = None) -> str:
+        """Register a new relation type discovered by LLM"""
+        properties = properties or {}
+        
+        query = """
+        MERGE (rt:RelationType {name: $name})
+        ON CREATE SET 
+            rt.id = randomUUID(),
+            rt.description = $description,
+            rt.domain = $domain,
+            rt.properties = $properties,
+            rt.created_at = datetime(),
+            rt.usage_count = 0
+        ON MATCH SET 
+            rt.usage_count = rt.usage_count + 1,
+            rt.last_used = datetime()
+        RETURN rt.id as relation_type_id
+        """
+        
+        async with self.connection_manager.session() as session:
+            result = await session.run(query, {
+                "name": relation_name,
+                "description": description,
+                "domain": domain,
+                "properties": properties
+            })
+            record = await result.single()
+            return record["relation_type_id"]
+    
+    async def get_existing_relation_types(self) -> List[Dict[str, Any]]:
+        """Get all existing relation types for LLM context"""
+        query = """
+        MATCH (rt:RelationType)
+        RETURN rt.name as name, rt.description as description, 
+               rt.domain as domain, rt.usage_count as usage_count
+        ORDER BY rt.usage_count DESC, rt.created_at ASC
+        """
+        
+        async with self.connection_manager.session() as session:
+            result = await session.run(query)
+            return [dict(record) async for record in result]
 
 async def main():
     config = GraphDatabaseConfig()
     connection_manager = GraphConnectionManager(config)
-    initializer = GraphSchemaInitializer(connection_manager)
+    initializer = DynamicGraphSchemaInitializer(connection_manager)
     
     try:
         await initializer.initialize_schema()
-        print("Graph schema initialization completed successfully!")
+        print("Dynamic graph schema initialization completed successfully!")
+        
+        # Initialize with some common relation types
+        common_relations = [
+            ("RELATED_TO", "General relationship between entities", "general"),
+            ("PART_OF", "Entity is part of another entity", "structural"),
+            ("LOCATED_IN", "Entity is located within another entity", "spatial"),
+            ("CAUSED_BY", "Entity is caused by another entity", "causal"),
+            ("ENABLES", "Entity enables or facilitates another entity", "functional")
+        ]
+        
+        for name, desc, domain in common_relations:
+            await initializer.register_relation_type(name, desc, domain)
+            print(f"✓ Registered relation type: {name}")
+            
     finally:
         await connection_manager.close()
 
@@ -263,11 +344,257 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### Task 1.1.3: LLM-Based Relation Discovery Service
+**Priority**: Critical  
+**Estimated Time**: 2-3 days  
+**Dependencies**: 1.1.2
+
+#### Implementation Steps
+
+1. **LLM Integration**
+   - Create LLM service client
+   - Design relation extraction prompts
+   - Implement response parsing
+
+2. **Relation Type Management**
+   - Create relation type registry service
+   - Implement dynamic relation creation
+   - Design relation validation workflow
+
+3. **Schema Evolution**
+   - Implement schema update mechanisms
+   - Create relation type migration tools
+   - Design caching for performance
+
+#### Code Examples
+
+**LLM Relation Discovery Service**:
+```python
+# morag-graph/src/morag_graph/services/llm_relation_discovery.py
+from typing import List, Dict, Any, Optional, Tuple
+import asyncio
+import json
+import uuid
+from datetime import datetime
+
+from morag_core.services.llm_client import LLMClient
+from morag_core.config.llm_config import LLMConfig
+from morag_graph.storage.relation_registry import RelationTypeRegistry
+
+class LLMRelationDiscoveryService:
+    """Service for discovering relations between entities using LLM"""
+    
+    def __init__(self, llm_client: LLMClient, relation_registry: RelationTypeRegistry):
+        self.llm_client = llm_client
+        self.relation_registry = relation_registry
+        
+    async def discover_relations(self, text_chunk: str, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Discover relations between entities in a text chunk using LLM"""
+        if not entities or len(entities) < 2:
+            return []
+            
+        # Get existing relation types for context
+        existing_relations = await self.relation_registry.get_all_relation_types()
+        
+        # Prepare prompt for LLM
+        prompt = self._create_relation_discovery_prompt(text_chunk, entities, existing_relations)
+        
+        # Call LLM
+        response = await self.llm_client.generate_text(prompt)
+        
+        # Parse relations from LLM response
+        discovered_relations = self._parse_relations_from_llm(response, entities)
+        
+        # Register any new relation types
+        await self._register_new_relation_types(discovered_relations)
+        
+        return discovered_relations
+    
+    def _create_relation_discovery_prompt(self, text_chunk: str, 
+                                         entities: List[Dict[str, Any]],
+                                         existing_relations: List[Dict[str, Any]]) -> str:
+        """Create prompt for relation discovery"""
+        entity_names = [e["name"] for e in entities]
+        relation_types = [r["name"] for r in existing_relations]
+        relation_descriptions = {r["name"]: r["description"] for r in existing_relations}
+        
+        prompt = f"""Analyze the following text and identify relationships between the entities.
+
+Text: "{text_chunk}"
+
+Entities: {', '.join(entity_names)}
+
+Existing relationship types:
+{json.dumps(relation_descriptions, indent=2)}
+
+Instructions:
+1. Identify all relationships between the entities in the text.
+2. For each relationship, use an existing relationship type if appropriate.
+3. If no existing relationship type fits, create a new one with a clear name and description.
+4. Format your response as a JSON array of relationships with the following structure:
+   [{{"source": "EntityName1", "target": "EntityName2", "relation_type": "RELATION_NAME", "description": "Description of this specific relationship", "is_new_relation": false, "new_relation_description": null}}]
+5. For new relation types, set is_new_relation to true and provide a description in new_relation_description.
+
+Response:"""
+        
+        return prompt
+    
+    def _parse_relations_from_llm(self, llm_response: str, 
+                                entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Parse relations from LLM response"""
+        try:
+            # Extract JSON from response (handle potential text before/after JSON)
+            json_start = llm_response.find('[')
+            json_end = llm_response.rfind(']') + 1
+            if json_start == -1 or json_end == 0:
+                return []
+                
+            json_str = llm_response[json_start:json_end]
+            relations_data = json.loads(json_str)
+            
+            # Validate and format relations
+            entity_map = {e["name"]: e["id"] for e in entities}
+            validated_relations = []
+            
+            for rel in relations_data:
+                if rel["source"] in entity_map and rel["target"] in entity_map:
+                    validated_relations.append({
+                        "id": str(uuid.uuid4()),
+                        "source_id": entity_map[rel["source"]],
+                        "source_name": rel["source"],
+                        "target_id": entity_map[rel["target"]],
+                        "target_name": rel["target"],
+                        "relation_type": rel["relation_type"],
+                        "description": rel["description"],
+                        "is_new_relation": rel.get("is_new_relation", False),
+                        "new_relation_description": rel.get("new_relation_description"),
+                        "confidence": 0.85,  # Default confidence for LLM-discovered relations
+                        "created_at": datetime.now().isoformat()
+                    })
+            
+            return validated_relations
+        except Exception as e:
+            print(f"Error parsing LLM response: {e}")
+            return []
+    
+    async def _register_new_relation_types(self, relations: List[Dict[str, Any]]):
+        """Register any new relation types discovered by LLM"""
+        for relation in relations:
+            if relation.get("is_new_relation", False) and relation.get("new_relation_description"):
+                await self.relation_registry.register_relation_type(
+                    relation["relation_type"],
+                    relation["new_relation_description"],
+                    "llm_discovered"
+                )
+```
+
+**Relation Type Registry Service**:
+```python
+# morag-graph/src/morag_graph/storage/relation_registry.py
+from typing import List, Dict, Any, Optional
+import asyncio
+from datetime import datetime
+
+from morag_core.services.graph_connection import GraphConnectionManager
+
+class RelationTypeRegistry:
+    """Service for managing relation types in the graph database"""
+    
+    def __init__(self, connection_manager: GraphConnectionManager):
+        self.connection_manager = connection_manager
+        self._cache = {}
+        self._cache_timestamp = None
+        self._cache_ttl = 300  # 5 minutes cache TTL
+    
+    async def register_relation_type(self, name: str, description: str, 
+                                   domain: str = "general", 
+                                   properties: Dict[str, Any] = None) -> str:
+        """Register a new relation type or update an existing one"""
+        properties = properties or {}
+        
+        query = """
+        MERGE (rt:RelationType {name: $name})
+        ON CREATE SET 
+            rt.id = randomUUID(),
+            rt.description = $description,
+            rt.domain = $domain,
+            rt.properties = $properties,
+            rt.created_at = datetime(),
+            rt.usage_count = 0,
+            rt.source = 'llm'
+        ON MATCH SET 
+            rt.usage_count = rt.usage_count + 1,
+            rt.last_used = datetime()
+        RETURN rt.id as relation_type_id
+        """
+        
+        async with self.connection_manager.session() as session:
+            result = await session.run(query, {
+                "name": name,
+                "description": description,
+                "domain": domain,
+                "properties": properties
+            })
+            record = await result.single()
+            
+            # Invalidate cache
+            self._cache = {}
+            self._cache_timestamp = None
+            
+            return record["relation_type_id"]
+    
+    async def get_all_relation_types(self) -> List[Dict[str, Any]]:
+        """Get all registered relation types"""
+        # Check cache first
+        now = datetime.now().timestamp()
+        if self._cache and self._cache_timestamp and (now - self._cache_timestamp < self._cache_ttl):
+            return list(self._cache.values())
+        
+        query = """
+        MATCH (rt:RelationType)
+        RETURN rt.id as id, rt.name as name, rt.description as description, 
+               rt.domain as domain, rt.usage_count as usage_count,
+               rt.created_at as created_at, rt.source as source
+        ORDER BY rt.usage_count DESC, rt.created_at ASC
+        """
+        
+        async with self.connection_manager.session() as session:
+            result = await session.run(query)
+            relations = [dict(record) async for record in result]
+            
+            # Update cache
+            self._cache = {r["id"]: r for r in relations}
+            self._cache_timestamp = now
+            
+            return relations
+    
+    async def get_relation_type_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get a relation type by name"""
+        # Try cache first
+        if self._cache:
+            for rel in self._cache.values():
+                if rel["name"] == name:
+                    return rel
+        
+        query = """
+        MATCH (rt:RelationType {name: $name})
+        RETURN rt.id as id, rt.name as name, rt.description as description, 
+               rt.domain as domain, rt.usage_count as usage_count,
+               rt.created_at as created_at, rt.source as source
+        """
+        
+        async with self.connection_manager.session() as session:
+            result = await session.run(query, {"name": name})
+            record = await result.single()
+            return dict(record) if record else None
+```
+
 #### Deliverables
-- [ ] Graph schema definition
-- [ ] Index optimization
-- [ ] Schema migration scripts
-- [ ] Performance benchmarks for schema queries
+- [ ] Dynamic graph schema implementation
+- [ ] LLM relation discovery service
+- [ ] Relation type registry service
+- [ ] Schema evolution mechanisms
+- [ ] Performance benchmarks for dynamic schema
 
 ## Testing Requirements
 

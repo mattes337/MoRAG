@@ -1,9 +1,9 @@
 # Task 3.3: Enhanced Query Endpoints
 
-**Phase**: 3 - Retrieval Integration  
+**Phase**: 3 - API Integration  
 **Priority**: High  
 **Estimated Time**: 5-7 days total  
-**Dependencies**: Task 3.1 (Hybrid Retrieval), Task 3.2 (Sparse Vector Integration)
+**Dependencies**: Task 3.1 (API Integration), Task 3.2 (Sparse Vector Integration)
 
 ## Overview
 

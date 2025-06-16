@@ -1,9 +1,9 @@
 # Task 3.2: Sparse Vector Integration
 
-**Phase**: 3 - Retrieval Integration  
+**Phase**: 3 - API Integration  
 **Priority**: Medium  
 **Estimated Time**: 6-8 days total  
-**Dependencies**: Task 3.1 (Hybrid Retrieval System)
+**Dependencies**: Task 2.3 (Hybrid Retrieval System)
 
 ## Overview
 

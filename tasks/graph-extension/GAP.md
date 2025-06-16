@@ -38,37 +38,50 @@ This document analyzes the gap between the current MoRAG system capabilities and
 
 ### 🔴 Critical Missing Components
 
-#### 1. Knowledge Graph Infrastructure
-- **Missing**: Complete knowledge graph storage and management system
-- **Required**: Graph database (Neo4j, ArangoDB, or similar)
-- **Impact**: Core requirement for graph-augmented RAG
+#### 1. Knowledge Graph Infrastructure ✅ (In Progress)
+- **Status**: Dynamic graph database setup with LLM-based schema evolution
+- **Implementation**: Task 1.1 - Graph Database Setup with dynamic schema
+- **Priority**: Critical
+- **Estimated Effort**: 5-7 days
 
-#### 2. Entity Recognition & Extraction
-- **Missing**: Named Entity Recognition (NER) pipeline
-- **Required**: Entity identification from documents
-- **Impact**: Foundation for knowledge graph construction
+#### 2. LLM-Based Entity and Relation Extraction 🆕
+- **Status**: Replaces traditional NLP pipeline with LLM-based approach
+- **Implementation**: Task 1.4 - LLM-Based Entity and Relation Extraction
+- **Impact**: Domain-agnostic extraction without pre-trained models
+- **Priority**: Critical
+- **Estimated Effort**: 8-10 days
+- **Benefits**: 
+  - No domain-specific training required
+  - Dynamic entity type discovery
+  - Better handling of complex relationships
+  - Reduced maintenance overhead
 
-#### 3. Relation Extraction
-- **Missing**: Relationship identification between entities
-- **Required**: ML-based relation extraction models
-- **Impact**: Essential for building meaningful knowledge graphs
+#### 3. Graph Construction Pipeline
+- **Missing**: Automated pipeline to build and update the knowledge graph
+- **Impact**: Cannot systematically populate the graph from documents
+- **Priority**: Critical
+- **Estimated Effort**: 4-5 days
+- **Note**: Integrated with LLM extraction pipeline
 
-#### 4. Graph Construction Pipeline
-- **Missing**: Automated knowledge graph building from documents
-- **Required**: Entity linking, relation validation, graph updates
-- **Impact**: Core functionality for graph-augmented retrieval
+#### 4. Graph-Aware Query Processing
+- **Missing**: Query system that leverages graph relationships
+- **Impact**: Cannot perform multi-hop reasoning or relationship-based retrieval
+- **Priority**: Critical
+- **Estimated Effort**: 5-7 days
 
-#### 5. Graph-Aware Query Processing
-- **Missing**: Query entity identification and graph traversal
-- **Required**: Multi-hop reasoning capabilities
-- **Impact**: Enhanced retrieval precision and context
-
-#### 6. Hybrid Retrieval System
+#### 5. Hybrid Retrieval System
 - **Missing**: Combined vector + graph retrieval
 - **Required**: Unified retrieval orchestration
 - **Impact**: Core RAG enhancement functionality
 
 ### 🟡 Moderate Gaps
+
+#### 6. Entity Linking and Disambiguation
+- **Status**: Integrated into LLM extraction pipeline
+- **Implementation**: Automatic entity deduplication and linking in Task 1.4
+- **Impact**: Reduced through LLM's contextual understanding
+- **Priority**: Medium
+- **Estimated Effort**: Included in LLM pipeline (Task 1.4)
 
 #### 7. Sparse Vector Support
 - **Partial**: Dense vectors implemented
@@ -127,6 +140,32 @@ This document analyzes the gap between the current MoRAG system capabilities and
 - Multi-hop reasoning
 - Iterative context refinement
 - Performance optimization
+
+## Removed/Simplified Components (Due to LLM Approach)
+
+### Traditional NLP Pipeline Components ❌ (Replaced)
+- **Removed**: Named Entity Recognition (NER) models
+- **Removed**: Part-of-speech tagging
+- **Removed**: Dependency parsing for relation extraction
+- **Removed**: Rule-based relation extraction patterns
+- **Removed**: Domain-specific training data requirements
+- **Removed**: Coreference resolution systems
+- **Removed**: Advanced NLP processing complexity
+
+**Rationale**: LLM-based approach provides:
+- Domain-agnostic entity recognition
+- Contextual relationship understanding
+- Dynamic schema evolution
+- Reduced maintenance overhead
+- Better handling of nuanced relationships
+- Multilingual support out-of-the-box
+
+**Trade-offs**:
+- Higher per-document processing cost (LLM API calls)
+- Dependency on external LLM services
+- Potential latency in processing
+- Need for cost optimization strategies
+- Requires rate limiting and caching mechanisms
 
 ## Technical Debt & Risks
 

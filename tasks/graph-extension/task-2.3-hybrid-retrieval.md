@@ -1,9 +1,9 @@
-# Task 3.1: Hybrid Retrieval System
+# Task 2.3: Hybrid Retrieval System
 
-**Phase**: 3 - Retrieval Integration  
+**Phase**: 2 - Core Graph Features  
 **Priority**: High  
 **Estimated Time**: 10-12 days total  
-**Dependencies**: Task 2.3 (Graph Traversal), Task 1.3 (NLP Pipeline)
+**Dependencies**: Task 2.2 (Graph Traversal), Task 1.3 (LLM-Based Entity and Relation Extraction)
 
 ## Overview
 

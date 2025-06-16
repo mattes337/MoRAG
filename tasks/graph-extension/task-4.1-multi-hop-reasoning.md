@@ -3,7 +3,7 @@
 **Phase**: 4 - Advanced Features  
 **Priority**: High  
 **Estimated Time**: 9-11 days total  
-**Dependencies**: Task 3.1 (Hybrid Retrieval System)
+**Dependencies**: Task 2.3 (Hybrid Retrieval System), Task 3.3 (Enhanced Query Endpoints)
 
 ## Overview
 

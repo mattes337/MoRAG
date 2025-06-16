@@ -4,40 +4,71 @@ This directory contains the complete implementation plan for integrating graph-a
 
 ## Overview
 
-**Version**: 1.0  
+**Version**: 2.0  
 **Date**: December 2024  
-**Total Duration**: 16 weeks  
-**Phases**: 4 phases with 16 major task groups
+**Total Duration**: 14 weeks  
+**Phases**: 4 phases with 13 major task groups
+**Approach**: LLM-based entity and relation extraction
+
+## Task Overview
+
+### Phase 1: Foundation Infrastructure (Days 1-18)
+- **Task 1.1**: Graph Database Setup with Dynamic Schema (5-7 days)
+- **Task 1.2**: Core Graph Package (4-5 days)
+- **Task 1.3**: LLM-Based Entity and Relation Extraction (8-10 days)
+
+### Phase 2: Core Graph Features (Days 19-32)
+- **Task 2.1**: Graph Construction Pipeline (6-8 days)
+- **Task 2.2**: Graph Traversal (7-9 days)
+- **Task 2.3**: Hybrid Retrieval System (10-12 days)
+
+### Phase 3: API Integration (Days 33-45)
+- **Task 3.1**: API Integration (4-5 days)
+- **Task 3.2**: Sparse Vector Integration (6-8 days)
+- **Task 3.3**: Enhanced Query Endpoints (5-7 days)
+
+### Phase 4: Advanced Features (Days 46-60)
+- **Task 4.1**: Multi-hop Reasoning (9-11 days)
+- **Task 4.2**: Performance Optimization (8-10 days)
+- **Task 4.3**: Monitoring & Analytics (6-8 days)
+
+## Key Architectural Features
+- **LLM-First Approach**: Uses Large Language Models for entity and relation extraction
+- **Dynamic Schema**: Graph schema evolves automatically based on discovered entities and relations
+- **Domain Agnostic**: No pre-configuration required for new domains
+- **Simplified Dependencies**: Lightweight LLM clients instead of complex NLP pipelines
+- **Hybrid Retrieval**: Combines vector search with graph traversal
 
 ## Implementation Phases
 
-### Phase 1: Foundation Infrastructure (Weeks 1-4)
-Establishing the core graph database and NLP foundations.
+### Phase 1: Foundation Infrastructure (Weeks 1-3)
+Establishing the core graph database and LLM-based extraction foundations.
 
-### Phase 2: Core Graph Features (Weeks 5-8)
-Building relation extraction and graph construction capabilities.
+### Phase 2: Core Graph Features (Weeks 4-6)
+Building graph construction and traversal capabilities with LLM integration.
 
-### Phase 3: Retrieval Integration (Weeks 9-12)
-Integrating graph-guided retrieval with existing RAG system.
+### Phase 3: API Integration (Weeks 7-9)
+Integrating graph-guided retrieval with existing RAG system through enhanced APIs.
 
-### Phase 4: Advanced Features (Weeks 13-16)
-Implementing multi-hop reasoning and performance optimizations.
+### Phase 4: Advanced Features (Weeks 10-12)
+Implementing multi-hop reasoning, optimization, and monitoring capabilities.
 
 ## Task Files
 
 ### Phase 1: Foundation Infrastructure
-- [x] [`task-1.1-graph-database-setup.md`](./task-1.1-graph-database-setup.md) - Graph Database Selection & Setup
-- [x] [`task-1.2-core-graph-package.md`](./task-1.2-core-graph-package.md) - Create morag-graph Package
-- [x] [`task-1.3-nlp-pipeline-foundation.md`](./task-1.3-nlp-pipeline-foundation.md) - NLP Pipeline Foundation
+- [ ] [`task-1.1-graph-database-setup.md`](./task-1.1-graph-database-setup.md) - Graph Database Selection & Setup
+- [ ] [`task-1.2-core-graph-package.md`](./task-1.2-core-graph-package.md) - Create morag-graph Package
+- [ ] [`task-1.3-llm-based-extraction.md`](./task-1.3-llm-based-extraction.md) - LLM-Based Entity and Relation Extraction
 
 ### Phase 2: Core Graph Features
-- [ ] [`task-2.1-relation-extraction.md`](./task-2.1-relation-extraction.md) - Relation Extraction System
-- [ ] [`task-2.2-graph-construction.md`](./task-2.2-graph-construction.md) - Graph Construction Pipeline
-- [ ] [`task-2.3-graph-traversal.md`](./task-2.3-graph-traversal.md) - Basic Graph Traversal
+- [ ] [`task-2.1-graph-construction.md`](./task-2.1-graph-construction.md) - Graph Construction Pipeline
+- [ ] [`task-2.2-graph-traversal.md`](./task-2.2-graph-traversal.md) - Graph Traversal
+- [ ] [`task-2.3-hybrid-retrieval.md`](./task-2.3-hybrid-retrieval.md) - Hybrid Retrieval System
 
-### Phase 3: Retrieval Integration
-- [ ] [`task-3.1-hybrid-retrieval.md`](./task-3.1-hybrid-retrieval.md) - Hybrid Retrieval System
-- [ ] [`task-3.2-api-integration.md`](./task-3.2-api-integration.md) - API Integration
+### Phase 3: API Integration
+- [ ] [`task-3.1-api-integration.md`](./task-3.1-api-integration.md) - API Integration
+- [ ] [`task-3.2-sparse-vector-integration.md`](./task-3.2-sparse-vector-integration.md) - Sparse Vector Integration
+- [ ] [`task-3.3-enhanced-query-endpoints.md`](./task-3.3-enhanced-query-endpoints.md) - Enhanced Query Endpoints
 
 ### Phase 4: Advanced Features
 - [ ] [`task-4.1-multi-hop-reasoning.md`](./task-4.1-multi-hop-reasoning.md) - Multi-Hop Reasoning
@@ -46,55 +77,58 @@ Implementing multi-hop reasoning and performance optimizations.
 
 ## Progress Tracking
 
-### Overall Progress: 0/11 tasks completed (0%)
+### Overall Progress: 0/13 tasks completed (0%)
 
 #### Phase 1: Foundation Infrastructure (0/3 completed)
-- [ ] **Task 1.1**: Graph Database Setup
+- [ ] **Task 1.1**: Graph Database Setup (5-7 days)
   - [ ] 1.1.1: Graph Database Selection & Setup (3-5 days)
   - [ ] 1.1.2: Graph Schema Design (2-3 days)
-- [ ] **Task 1.2**: Core Graph Package Creation
+- [ ] **Task 1.2**: Core Graph Package Creation (4-5 days)
   - [ ] 1.2.1: Create morag-graph Package (2-3 days)
   - [ ] 1.2.2: Graph Storage Implementation (4-5 days)
-- [ ] **Task 1.3**: NLP Pipeline Foundation
-  - [ ] 1.3.1: Create morag-nlp Package (3-4 days)
-  - [ ] 1.3.2: Basic Entity Recognition (5-6 days)
+- [ ] **Task 1.3**: LLM-Based Entity and Relation Extraction (8-10 days)
+  - [ ] 1.3.1: LLM Entity Extraction Service (4-5 days)
+  - [ ] 1.3.2: LLM Relation Extraction Service (4-5 days)
 
 #### Phase 2: Core Graph Features (0/3 completed)
-- [ ] **Task 2.1**: Relation Extraction System
-  - [ ] 2.1.1: Rule-Based Relation Extraction (4-5 days)
-  - [ ] 2.1.2: ML-Based Relation Extraction (6-7 days)
-- [ ] **Task 2.2**: Graph Construction Pipeline
-  - [ ] 2.2.1: Document Processing Integration (4-5 days)
-  - [ ] 2.2.2: Incremental Graph Updates (3-4 days)
-- [ ] **Task 2.3**: Basic Graph Traversal
-  - [ ] 2.3.1: Graph Query Engine (4-5 days)
-  - [ ] 2.3.2: Graph Analytics (3-4 days)
+- [ ] **Task 2.1**: Graph Construction Pipeline (6-8 days)
+  - [ ] 2.1.1: Document Processing Integration (4-5 days)
+  - [ ] 2.1.2: Incremental Graph Updates (3-4 days)
+- [ ] **Task 2.2**: Graph Traversal (7-9 days)
+  - [ ] 2.2.1: Graph Query Engine (4-5 days)
+  - [ ] 2.2.2: Graph Analytics (3-4 days)
+- [ ] **Task 2.3**: Hybrid Retrieval System (10-12 days)
+  - [ ] 2.3.1: Query Entity Recognition (3-4 days)
+  - [ ] 2.3.2: Graph-Guided Retrieval (5-6 days)
+  - [ ] 2.3.3: Result Fusion (2-3 days)
 
-#### Phase 3: Retrieval Integration (0/2 completed)
-- [ ] **Task 3.1**: Hybrid Retrieval System
-  - [ ] 3.1.1: Query Entity Recognition (3-4 days)
-  - [ ] 3.1.2: Graph-Guided Retrieval (5-6 days)
-  - [ ] 3.1.3: Sparse Vector Integration (3-4 days)
-- [ ] **Task 3.2**: API Integration
-  - [ ] 3.2.1: Enhanced Query Endpoints (3-4 days)
-  - [ ] 3.2.2: Backward Compatibility (2-3 days)
+#### Phase 3: API Integration (0/3 completed)
+- [ ] **Task 3.1**: API Integration (4-5 days)
+  - [ ] 3.1.1: Enhanced Query Endpoints (2-3 days)
+  - [ ] 3.1.2: Backward Compatibility (2-3 days)
+- [ ] **Task 3.2**: Sparse Vector Integration (6-8 days)
+  - [ ] 3.2.1: BM25 Implementation (3-4 days)
+  - [ ] 3.2.2: Hybrid Scoring (3-4 days)
+- [ ] **Task 3.3**: Enhanced Query Endpoints (5-7 days)
+  - [ ] 3.3.1: New API Endpoints (3-4 days)
+  - [ ] 3.3.2: Response Models (2-3 days)
 
 #### Phase 4: Advanced Features (0/3 completed)
-- [ ] **Task 4.1**: Multi-Hop Reasoning
+- [ ] **Task 4.1**: Multi-Hop Reasoning (9-11 days)
   - [ ] 4.1.1: LLM-Guided Path Selection (5-6 days)
   - [ ] 4.1.2: Iterative Context Refinement (4-5 days)
-- [ ] **Task 4.2**: Performance Optimization
-  - [ ] 4.2.1: Caching Strategy (3-4 days)
+- [ ] **Task 4.2**: Performance Optimization (8-10 days)
+  - [ ] 4.2.1: Caching Strategy (4-5 days)
   - [ ] 4.2.2: Parallel Processing (4-5 days)
-- [ ] **Task 4.3**: Monitoring & Analytics
-  - [ ] 4.3.1: System Metrics (3-4 days)
-  - [ ] 4.3.2: Dashboard & Visualization (4-5 days)
+- [ ] **Task 4.3**: Monitoring & Analytics (6-8 days)
+  - [ ] 4.3.1: System Metrics Collection (3-4 days)
+  - [ ] 4.3.2: Dashboard & Visualization (3-4 days)
 
 ## Testing Strategy
 
 ### Testing Requirements
 - **Unit Testing**: 90%+ coverage using pytest, pytest-asyncio, pytest-cov
-- **Integration Testing**: Graph database, NLP pipeline, API integration
+- **Integration Testing**: Graph database, LLM services, API integration
 - **Performance Testing**: Load, stress, and scalability testing
 - **Quality Assurance**: Entity extraction accuracy, relation precision, answer quality
 
