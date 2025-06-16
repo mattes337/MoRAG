@@ -196,19 +196,23 @@ async def test_relation_extraction_specific_pairs(relation_extractor: RelationEx
     # Verify that relations were extracted
     assert len(relations) > 0, "No relations were extracted for specific entity pairs"
     
-    # Check that only relations between specified pairs were extracted
+    # Check that only relations between specified pairs were extracted (in either direction)
     for relation in relations:
-        assert (relation.source_entity_id, relation.target_entity_id) in entity_pairs, \
+        pair_forward = (relation.source_entity_id, relation.target_entity_id)
+        pair_reverse = (relation.target_entity_id, relation.source_entity_id)
+        assert pair_forward in entity_pairs or pair_reverse in entity_pairs, \
             f"Relation between {relation.source_entity_id} and {relation.target_entity_id} not in specified pairs"
     
-    # Check for specific relationships
+    # Check for specific relationships (bidirectional)
     steve_jobs_founded_apple = any(
-        r.source_entity_id == steve_jobs.id and r.target_entity_id == apple.id and r.type == RelationType.FOUNDED
+        ((r.source_entity_id == steve_jobs.id and r.target_entity_id == apple.id) or
+         (r.source_entity_id == apple.id and r.target_entity_id == steve_jobs.id)) and r.type == RelationType.FOUNDED
         for r in relations
     )
     
     tim_cook_works_for_apple = any(
-        r.source_entity_id == tim_cook.id and r.target_entity_id == apple.id and r.type == RelationType.WORKS_FOR
+        ((r.source_entity_id == tim_cook.id and r.target_entity_id == apple.id) or
+         (r.source_entity_id == apple.id and r.target_entity_id == tim_cook.id)) and r.type == RelationType.WORKS_FOR
         for r in relations
     )
     

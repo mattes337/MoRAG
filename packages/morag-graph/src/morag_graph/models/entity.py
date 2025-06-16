@@ -52,6 +52,16 @@ class Entity(BaseModel):
             return EntityType(v)
         return v
     
+    def __hash__(self) -> int:
+        """Make Entity hashable based on its ID."""
+        return hash(self.id)
+    
+    def __eq__(self, other) -> bool:
+        """Compare entities based on their ID."""
+        if not isinstance(other, Entity):
+            return False
+        return self.id == other.id
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert entity to dictionary for JSON serialization."""
         return self.model_dump()

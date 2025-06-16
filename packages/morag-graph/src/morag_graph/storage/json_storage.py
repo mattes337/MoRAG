@@ -261,6 +261,24 @@ class JsonStorage(BaseStorage):
         
         return entities
     
+    async def get_all_entities(self) -> List[Entity]:
+        """Get all entities.
+        
+        Returns:
+            List of all entities
+        """
+        self._ensure_connected()
+        return list(self._entities.values())
+    
+    async def get_all_relations(self) -> List[Relation]:
+        """Get all relations.
+        
+        Returns:
+            List of all relations
+        """
+        self._ensure_connected()
+        return list(self._relations.values())
+    
     async def search_entities(
         self, 
         query: str, 

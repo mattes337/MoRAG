@@ -33,6 +33,8 @@ class RelationType(str, Enum):
     FOUNDED = "FOUNDED"  # Person -> Organization (founding relationship)
     OWNS = "OWNS"  # Person/Organization -> Entity
     USES = "USES"  # Entity -> Entity
+    LEADS = "LEADS"  # Person -> Organization (leadership relationship)
+    COMPETES_WITH = "COMPETES_WITH"  # Organization -> Organization
     RELATED_TO = "RELATED_TO"  # Generic relation
     HAPPENED_ON = "HAPPENED_ON"  # Event -> Date/Time
     HAPPENED_AT = "HAPPENED_AT"  # Event -> Location

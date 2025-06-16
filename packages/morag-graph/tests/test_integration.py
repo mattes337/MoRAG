@@ -95,8 +95,10 @@ class IntegrationTestSuite:
         )
         
         # Initialize storage
-        storage_path = Path(self.temp_dir) / "test_graph.json"
-        self.storage = JsonStorage(str(storage_path))
+        storage_path = Path(self.temp_dir)
+        from morag_graph.storage.json_storage import JsonConfig
+        config = JsonConfig(storage_path=str(storage_path))
+        self.storage = JsonStorage(config)
         await self.storage.connect()
         
     async def teardown(self):

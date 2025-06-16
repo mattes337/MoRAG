@@ -62,6 +62,33 @@ class RelationExtractor(BaseExtractor):
             response = await self.call_llm(messages)
             relations = self.parse_response(response, text=text)
             
+            # Resolve entity IDs if entities are provided
+            if entities:
+                entity_name_to_id = {entity.name: entity.id for entity in entities}
+                resolved_relations = []
+                
+                for relation in relations:
+                    # Try to resolve entity names to IDs
+                    source_id = self._resolve_entity_id(
+                        relation.source_entity_id, entity_name_to_id
+                    )
+                    target_id = self._resolve_entity_id(
+                        relation.target_entity_id, entity_name_to_id
+                    )
+                    
+                    if source_id and target_id:
+                        relation.source_entity_id = source_id
+                        relation.target_entity_id = target_id
+                        resolved_relations.append(relation)
+                    else:
+                        logger.warning(
+                            f"Could not resolve entity IDs for relation: "
+                            f"{relation.attributes.get('source_entity_name')} -> "
+                            f"{relation.attributes.get('target_entity_name')}"
+                        )
+                
+                relations = resolved_relations
+            
             # Set document ID if provided
             if doc_id:
                 for relation in relations:
@@ -215,8 +242,8 @@ Return the relations as a JSON array as specified in the system prompt.
                 try:
                     relation_type = RelationType(relation_type)
                 except ValueError:
-                    # Keep as custom string if not in enum
-                    pass
+                    # Convert to CUSTOM if not in enum
+                    relation_type = RelationType.CUSTOM
             
             # For now, use entity names as IDs (will be resolved later)
             source_entity_id = data["source_entity"].strip()
@@ -265,12 +292,15 @@ Return the relations as a JSON array as specified in the system prompt.
         
         # Filter relations to only include specified pairs
         filtered_relations = []
+        entity_pair_set = set(entity_pairs)
+        
         for relation in all_relations:
-            for source_id, target_id in entity_pairs:
-                if (relation.source_entity_id == source_id and relation.target_entity_id == target_id) or \
-                   (relation.source_entity_id == target_id and relation.target_entity_id == source_id):
-                    filtered_relations.append(relation)
-                    break
+            # Check if this relation matches any of the specified pairs (in either direction)
+            relation_pair = (relation.source_entity_id, relation.target_entity_id)
+            reverse_pair = (relation.target_entity_id, relation.source_entity_id)
+            
+            if relation_pair in entity_pair_set or reverse_pair in entity_pair_set:
+                filtered_relations.append(relation)
         
         return filtered_relations
     

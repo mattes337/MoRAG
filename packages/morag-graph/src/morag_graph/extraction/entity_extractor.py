@@ -35,12 +35,13 @@ class EntityExtractor(BaseExtractor):
             
         super().__init__(config)
     
-    async def extract(self, text: str, doc_id: Optional[str] = None, **kwargs) -> List[Entity]:
+    async def extract(self, text: str, doc_id: Optional[str] = None, source_doc_id: Optional[str] = None, **kwargs) -> List[Entity]:
         """Extract entities from text.
         
         Args:
             text: Text to extract entities from
-            doc_id: Optional document ID to associate with entities
+            doc_id: Optional document ID to associate with entities (deprecated, use source_doc_id)
+            source_doc_id: Optional document ID to associate with entities
             **kwargs: Additional arguments
             
         Returns:
@@ -48,10 +49,11 @@ class EntityExtractor(BaseExtractor):
         """
         entities = await super().extract(text, **kwargs)
         
-        # Set document ID if provided
-        if doc_id:
+        # Set document ID if provided (prefer source_doc_id over doc_id)
+        document_id = source_doc_id or doc_id
+        if document_id:
             for entity in entities:
-                entity.source_doc_id = doc_id
+                entity.source_doc_id = document_id
                 
         return entities
     
@@ -180,8 +182,8 @@ Return the entities as a JSON array as specified in the system prompt.
                 try:
                     entity_type = EntityType(entity_type)
                 except ValueError:
-                    # Keep as custom string if not in enum
-                    pass
+                    # Convert to CUSTOM if not in enum
+                    entity_type = EntityType.CUSTOM
             
             # Create entity
             entity = Entity(
