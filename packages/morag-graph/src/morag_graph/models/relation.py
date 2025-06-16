@@ -1,0 +1,110 @@
+"""Relation model for graph-augmented RAG."""
+
+import uuid
+from typing import Dict, List, Optional, Any, Union, ClassVar
+
+from pydantic import BaseModel, Field, field_validator
+
+from .types import RelationType, RelationId, RelationAttributes, EntityId
+
+
+class Relation(BaseModel):
+    """Relation model representing an edge in the knowledge graph.
+    
+    A relation connects two entities and describes their relationship.
+    Each relation has a unique ID, source and target entities, a type, and optional attributes.
+    
+    Attributes:
+        id: Unique identifier for the relation
+        source_entity_id: ID of the source entity
+        target_entity_id: ID of the target entity
+        type: Type of the relation (e.g., WORKS_FOR, LOCATED_IN)
+        attributes: Additional attributes of the relation
+        source_text: Original text from which the relation was extracted
+        source_doc_id: ID of the document from which the relation was extracted
+        confidence: Confidence score of the relation extraction (0.0 to 1.0)
+        weight: Weight of the relation for graph algorithms (default: 1.0)
+    """
+    
+    id: RelationId = Field(default_factory=lambda: str(uuid.uuid4()))
+    source_entity_id: EntityId
+    target_entity_id: EntityId
+    type: Union[RelationType, str] = RelationType.CUSTOM
+    attributes: RelationAttributes = Field(default_factory=dict)
+    source_text: Optional[str] = None
+    source_doc_id: Optional[str] = None
+    confidence: float = 1.0
+    weight: float = 1.0
+    
+    # Class variables for Neo4J integration
+    _neo4j_type: ClassVar[str] = "RELATION"
+    
+    @field_validator('confidence')
+    @classmethod
+    def validate_confidence(cls, v: float) -> float:
+        """Validate that confidence is between 0.0 and 1.0."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"Confidence must be between 0.0 and 1.0, got {v}")
+        return v
+    
+    @field_validator('weight')
+    @classmethod
+    def validate_weight(cls, v: float) -> float:
+        """Validate that weight is positive."""
+        if v <= 0.0:
+            raise ValueError(f"Weight must be positive, got {v}")
+        return v
+    
+    @field_validator('type')
+    @classmethod
+    def validate_type(cls, v: Union[RelationType, str]) -> Union[RelationType, str]:
+        """Convert string type to RelationType enum if possible."""
+        if isinstance(v, str) and v in [e.value for e in RelationType]:
+            return RelationType(v)
+        return v
+    
+    @field_validator('source_entity_id', 'target_entity_id')
+    @classmethod
+    def validate_entity_ids(cls, v: EntityId) -> EntityId:
+        """Validate that entity IDs are not empty."""
+        if not v or not v.strip():
+            raise ValueError("Entity ID cannot be empty")
+        return v
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert relation to dictionary for JSON serialization."""
+        return self.model_dump()
+    
+    def to_neo4j_relationship(self) -> Dict[str, Any]:
+        """Convert relation to Neo4J relationship properties."""
+        properties = self.model_dump()
+        
+        # Convert type to string for Neo4J
+        if isinstance(properties['type'], RelationType):
+            properties['type'] = properties['type'].value
+            
+        # Remove entity IDs as they are handled by Neo4J relationship structure
+        properties.pop('source_entity_id', None)
+        properties.pop('target_entity_id', None)
+        
+        return properties
+    
+    @classmethod
+    def from_neo4j_relationship(
+        cls, 
+        relationship: Dict[str, Any], 
+        source_entity_id: EntityId, 
+        target_entity_id: EntityId
+    ) -> 'Relation':
+        """Create relation from Neo4J relationship properties."""
+        # Add entity IDs back
+        relationship['source_entity_id'] = source_entity_id
+        relationship['target_entity_id'] = target_entity_id
+        
+        return cls(**relationship)
+    
+    def get_neo4j_type(self) -> str:
+        """Get the Neo4J relationship type."""
+        if isinstance(self.type, RelationType):
+            return self.type.value
+        return str(self.type)

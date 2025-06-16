@@ -1,0 +1,253 @@
+"""Tests for entity extraction functionality."""
+
+import asyncio
+import json
+import os
+from typing import List, Dict, Any
+
+import pytest
+from dotenv import load_dotenv
+
+from morag_graph.extraction import EntityExtractor
+from morag_graph.models import Entity
+from morag_graph.models.types import EntityType
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Sample texts for testing entity extraction
+SAMPLE_TEXTS = [
+    """Apple Inc. is an American multinational technology company headquartered in Cupertino, California. 
+    Tim Cook is the CEO of Apple. The company was founded by Steve Jobs, Steve Wozniak, and Ronald Wayne in 1976.""",
+    
+    """The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars in Paris, France. 
+    It is named after the engineer Gustave Eiffel, whose company designed and built the tower from 1887 to 1889.""",
+    
+    """Python is a high-level, general-purpose programming language. Its design philosophy emphasizes code readability. 
+    Guido van Rossum created Python and first released it in 1991."""
+]
+
+# Expected entity types in the sample texts
+EXPECTED_ENTITY_TYPES = [
+    [EntityType.ORGANIZATION, EntityType.PERSON, EntityType.LOCATION],  # Apple text
+    [EntityType.LOCATION, EntityType.PERSON],  # Eiffel Tower text
+    [EntityType.TECHNOLOGY, EntityType.PERSON]  # Python text
+]
+
+
+@pytest.fixture
+def openai_api_key() -> str:
+    """Get OpenAI API key from environment variables."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        pytest.skip("OPENAI_API_KEY environment variable not set")
+    return api_key
+
+
+@pytest.fixture
+def entity_extractor(openai_api_key: str) -> EntityExtractor:
+    """Create an EntityExtractor instance for testing."""
+    return EntityExtractor(
+        llm_config={
+            "api_key": openai_api_key,
+            "model": "gpt-3.5-turbo",  # Use a less expensive model for testing
+            "temperature": 0.0,  # Set to 0 for deterministic results
+            "max_tokens": 1000
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_basic(entity_extractor: EntityExtractor):
+    """Test basic entity extraction functionality."""
+    # Extract entities from the first sample text
+    entities = await entity_extractor.extract(SAMPLE_TEXTS[0])
+    
+    # Verify that entities were extracted
+    assert len(entities) > 0, "No entities were extracted"
+    
+    # Check that we have the expected entity types
+    entity_types = {entity.type for entity in entities}
+    for expected_type in EXPECTED_ENTITY_TYPES[0]:
+        assert expected_type in entity_types, f"Expected entity type {expected_type} not found"
+    
+    # Check that specific entities were extracted
+    entity_names = {entity.name.lower() for entity in entities}
+    expected_names = {"apple", "tim cook", "steve jobs", "cupertino"}
+    for name in expected_names:
+        assert any(name in entity_name for entity_name in entity_names), f"Expected entity '{name}' not found"
+    
+    # Check that entities have required attributes
+    for entity in entities:
+        assert entity.id, "Entity is missing ID"
+        assert entity.name, "Entity is missing name"
+        assert entity.type, "Entity is missing type"
+        assert entity.confidence is not None, "Entity is missing confidence score"
+        assert entity.source_text, "Entity is missing source text"
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_with_context(entity_extractor: EntityExtractor):
+    """Test entity extraction with additional context."""
+    # Add context about technology companies
+    context = "Focus on technology companies and their founders."
+    
+    # Extract entities from the first sample text with context
+    entities = await entity_extractor.extract(SAMPLE_TEXTS[0], context=context)
+    
+    # Verify that entities were extracted
+    assert len(entities) > 0, "No entities were extracted"
+    
+    # Check that technology-related entities are present
+    tech_entities = [e for e in entities if e.type == EntityType.ORGANIZATION]
+    assert len(tech_entities) > 0, "No technology company entities found"
+    
+    # Check that Apple is identified as a technology company
+    apple_entities = [e for e in tech_entities if "apple" in e.name.lower()]
+    assert len(apple_entities) > 0, "Apple not identified as a technology company"
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_multiple_texts(entity_extractor: EntityExtractor):
+    """Test entity extraction from multiple texts."""
+    all_entities = []
+    
+    # Extract entities from all sample texts
+    for i, text in enumerate(SAMPLE_TEXTS):
+        entities = await entity_extractor.extract(text)
+        all_entities.append(entities)
+        
+        # Verify that entities were extracted
+        assert len(entities) > 0, f"No entities were extracted from text {i}"
+        
+        # Check that we have the expected entity types
+        entity_types = {entity.type for entity in entities}
+        for expected_type in EXPECTED_ENTITY_TYPES[i]:
+            assert expected_type in entity_types, f"Expected entity type {expected_type} not found in text {i}"
+    
+    # Check that we have different entities for different texts
+    assert len(set(e.id for entities in all_entities for e in entities)) >= sum(len(entities) for entities in all_entities) * 0.8, \
+        "Too many duplicate entities across different texts"
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_custom_type(entity_extractor: EntityExtractor):
+    """Test entity extraction with custom entity types."""
+    # Add custom entity type instructions
+    custom_instructions = "Also identify programming languages as TECHNOLOGY entities."
+    
+    # Extract entities from the Python text with custom instructions
+    entities = await entity_extractor.extract(
+        SAMPLE_TEXTS[2], 
+        custom_instructions=custom_instructions
+    )
+    
+    # Verify that entities were extracted
+    assert len(entities) > 0, "No entities were extracted"
+    
+    # Check that Python is identified as a TECHNOLOGY entity
+    tech_entities = [e for e in entities if e.type == EntityType.TECHNOLOGY]
+    assert len(tech_entities) > 0, "No TECHNOLOGY entities found"
+    
+    python_entities = [e for e in tech_entities if "python" in e.name.lower()]
+    assert len(python_entities) > 0, "Python not identified as a TECHNOLOGY entity"
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_with_document_id(entity_extractor: EntityExtractor):
+    """Test entity extraction with document ID."""
+    doc_id = "test-document-123"
+    
+    # Extract entities with document ID
+    entities = await entity_extractor.extract(SAMPLE_TEXTS[0], doc_id=doc_id)
+    
+    # Verify that entities were extracted
+    assert len(entities) > 0, "No entities were extracted"
+    
+    # Check that all entities have the correct document ID
+    for entity in entities:
+        assert entity.source_doc_id == doc_id, f"Entity {entity.id} has incorrect document ID"
+
+
+@pytest.mark.asyncio
+async def test_entity_serialization(entity_extractor: EntityExtractor):
+    """Test entity serialization to/from JSON."""
+    # Extract entities
+    entities = await entity_extractor.extract(SAMPLE_TEXTS[0])
+    assert len(entities) > 0, "No entities were extracted"
+    
+    # Serialize to JSON
+    entities_json = [entity.model_dump_json() for entity in entities]
+    
+    # Deserialize from JSON
+    deserialized_entities = [Entity.model_validate_json(entity_json) for entity_json in entities_json]
+    
+    # Check that deserialized entities match original entities
+    for original, deserialized in zip(entities, deserialized_entities):
+        assert original.id == deserialized.id
+        assert original.name == deserialized.name
+        assert original.type == deserialized.type
+        assert original.confidence == deserialized.confidence
+        assert original.source_text == deserialized.source_text
+        assert original.source_doc_id == deserialized.source_doc_id
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_batch(entity_extractor: EntityExtractor):
+    """Test batch entity extraction."""
+    # Extract entities from all texts in a batch
+    all_entities = await asyncio.gather(*[
+        entity_extractor.extract(text) for text in SAMPLE_TEXTS
+    ])
+    
+    # Verify that entities were extracted for each text
+    for i, entities in enumerate(all_entities):
+        assert len(entities) > 0, f"No entities were extracted from text {i}"
+        
+        # Check that we have the expected entity types
+        entity_types = {entity.type for entity in entities}
+        for expected_type in EXPECTED_ENTITY_TYPES[i]:
+            assert expected_type in entity_types, f"Expected entity type {expected_type} not found in text {i}"
+
+
+def test_entity_neo4j_conversion():
+    """Test entity conversion to/from Neo4J format."""
+    # Create a test entity
+    entity = Entity(
+        id="test-entity-1",
+        name="Test Entity",
+        type=EntityType.ORGANIZATION,
+        attributes={"industry": "Technology", "founded": 2020},
+        source_text="Test Entity is a technology company founded in 2020.",
+        source_doc_id="test-doc-1",
+        confidence=0.95
+    )
+    
+    # Convert to Neo4J node properties
+    node_props = entity.to_neo4j_node()
+    
+    # Check that all properties are present
+    assert node_props["id"] == entity.id
+    assert node_props["name"] == entity.name
+    assert node_props["type"] == entity.type.value
+    assert json.loads(node_props["attributes"]) == entity.attributes
+    assert node_props["source_text"] == entity.source_text
+    assert node_props["source_doc_id"] == entity.source_doc_id
+    assert node_props["confidence"] == entity.confidence
+    
+    # Convert back from Neo4J node properties
+    reconstructed = Entity.from_neo4j_node(node_props)
+    
+    # Check that reconstructed entity matches original
+    assert reconstructed.id == entity.id
+    assert reconstructed.name == entity.name
+    assert reconstructed.type == entity.type
+    assert reconstructed.attributes == entity.attributes
+    assert reconstructed.source_text == entity.source_text
+    assert reconstructed.source_doc_id == entity.source_doc_id
+    assert reconstructed.confidence == entity.confidence
+
+
+if __name__ == "__main__":
+    # This allows running the tests directly with asyncio
+    asyncio.run(pytest.main([__file__]))
