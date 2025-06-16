@@ -133,9 +133,9 @@ async def test_youtube_processing(url: str, extract_audio: bool = False,
         if result.success:
             print("✅ YouTube processing completed successfully!")
 
-            # Process audio if extracted and enhanced features are enabled
+            # Process audio if extracted (always process for transcription in processing mode)
             audio_processing_result = None
-            if result.audio_path and extract_audio and (enable_diarization or enable_topics):
+            if result.audio_path and extract_audio:
                 try:
                     print_section("Enhanced Audio Processing")
                     print("🔄 Processing extracted audio with enhanced features...")
