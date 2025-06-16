@@ -24,6 +24,9 @@ Options:
     --thumbnails               Generate thumbnails (opt-in, default: false)
     --thumbnail-count N        Number of thumbnails to generate (default: 3)
     --enable-ocr               Enable OCR on video frames
+    --enable-diarization       Enable speaker diarization for audio track
+    --enable-topics            Enable topic segmentation for audio track
+    --model-size SIZE          Whisper model size: tiny, base, small, medium, large (default: base)
     --help                     Show this help message
 """
 
@@ -70,7 +73,9 @@ def print_result(key: str, value: str, indent: int = 0):
 
 
 async def test_video_processing(video_file: Path, generate_thumbnails: bool = False,
-                               thumbnail_count: int = 3, enable_ocr: bool = False) -> bool:
+                               thumbnail_count: int = 3, enable_ocr: bool = False,
+                               enable_diarization: bool = False, enable_topics: bool = False,
+                               model_size: str = "base") -> bool:
     """Test video processing functionality."""
     print_header("MoRAG Video Processing Test")
 
@@ -89,16 +94,19 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
             generate_thumbnails=generate_thumbnails,
             thumbnail_count=thumbnail_count,
             extract_keyframes=False,  # Disable for faster processing
-            enable_enhanced_audio=True,
-            enable_speaker_diarization=False,  # Disable for faster processing
-            enable_topic_segmentation=False,  # Disable for faster processing
-            audio_model_size="base",  # Use base model for faster processing
+            enable_enhanced_audio=enable_diarization or enable_topics,
+            enable_speaker_diarization=enable_diarization,
+            enable_topic_segmentation=enable_topics,
+            audio_model_size=model_size,
             enable_ocr=enable_ocr
         )
         print_result("Video Configuration", "✅ Created successfully")
         print_result("Generate Thumbnails", "✅ Enabled" if generate_thumbnails else "❌ Disabled")
         print_result("Thumbnail Count", str(thumbnail_count) if generate_thumbnails else "N/A")
         print_result("OCR Enabled", "✅ Enabled" if enable_ocr else "❌ Disabled")
+        print_result("Speaker Diarization", "✅ Enabled" if enable_diarization else "❌ Disabled")
+        print_result("Topic Segmentation", "✅ Enabled" if enable_topics else "❌ Disabled")
+        print_result("Audio Model Size", model_size)
 
         # Initialize video processor
         processor = VideoProcessor(config)
@@ -135,7 +143,51 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
             if result.audio_processing_result:
                 audio_result = result.audio_processing_result
                 print_result("Transcript Length", f"{len(audio_result.transcript)} characters")
-                print_result("Segments Count", f"{len(audio_result.segments)}")
+                print_result("Segments Count", f"{len(audio_result.segments) if hasattr(audio_result, 'segments') and audio_result.segments else 0}")
+
+                # Show speaker diarization results
+                if enable_diarization and audio_result.metadata:
+                    speakers_info = audio_result.metadata.get('speakers', [])
+                    num_speakers = audio_result.metadata.get('num_speakers', 0)
+
+                    print_section("Speaker Diarization Results")
+                    print_result("Total Speakers", str(num_speakers))
+
+                    if speakers_info:
+                        print("📊 Speaker Information:")
+                        for speaker in speakers_info:
+                            if isinstance(speaker, dict):
+                                speaker_id = speaker.get('id', 'Unknown')
+                                speaker_name = speaker.get('name', f'Speaker {speaker_id}')
+                                print(f"  {speaker_name}")
+                            else:
+                                # Handle case where speaker is just a string ID
+                                print(f"  Speaker {speaker}")
+
+                    # Count segments with speaker information
+                    segments_with_speakers = len([seg for seg in audio_result.segments if seg.speaker]) if audio_result.segments else 0
+                    print_result("Segments with Speaker Info", f"{segments_with_speakers}/{len(audio_result.segments) if audio_result.segments else 0}")
+
+                # Show topic segmentation results
+                if enable_topics and audio_result.metadata:
+                    topics_info = audio_result.metadata.get('topics', [])
+                    num_topics = audio_result.metadata.get('num_topics', 0)
+
+                    print_section("Topic Segmentation Results")
+                    print_result("Total Topics", str(num_topics))
+
+                    if topics_info:
+                        print("📋 Topic Overview:")
+                        for topic in topics_info[:3]:  # Show first 3 topics
+                            topic_id = topic.get('id', 'Unknown')
+                            title = topic.get('title', f'Topic {topic_id}')
+                            duration = topic.get('duration', 0)
+                            duration_str = f"{duration:.1f}s" if duration else "N/A"
+                            print(f"  {title}: {duration_str}")
+
+                    # Count segments with topic information
+                    segments_with_topics = len([seg for seg in audio_result.segments if seg.topic_id is not None]) if audio_result.segments else 0
+                    print_result("Segments with Topic Info", f"{segments_with_topics}/{len(audio_result.segments) if audio_result.segments else 0}")
 
                 if audio_result.transcript:
                     print_section("Transcript Preview")
@@ -162,14 +214,96 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
 
         # Save results to file
         output_file = video_file.parent / f"{video_file.stem}_test_result.json"
+
+        # Prepare detailed audio processing result
+        audio_result_data = None
+        if result.audio_processing_result:
+            audio_result = result.audio_processing_result
+            audio_result_data = {
+                'transcript': audio_result.transcript,
+                'segments': [
+                    {
+                        'start': seg.start,
+                        'end': seg.end,
+                        'text': seg.text,
+                        'speaker': seg.speaker,
+                        'confidence': seg.confidence,
+                        'topic_id': seg.topic_id,
+                        'topic_label': seg.topic_label
+                    } for seg in audio_result.segments
+                ] if hasattr(audio_result, 'segments') and audio_result.segments else [],
+                'metadata': audio_result.metadata if hasattr(audio_result, 'metadata') else {},
+                'processing_time': audio_result.processing_time if hasattr(audio_result, 'processing_time') else 0.0,
+                'file_path': audio_result.file_path if hasattr(audio_result, 'file_path') else None,
+                'success': audio_result.success if hasattr(audio_result, 'success') else True,
+                'error_message': audio_result.error_message if hasattr(audio_result, 'error_message') else None
+            }
+
+            # Extract speaker information from metadata and segments
+            if audio_result.metadata and enable_diarization:
+                speakers_info = audio_result.metadata.get('speakers', [])
+                num_speakers = audio_result.metadata.get('num_speakers', 0)
+
+                if speakers_info or num_speakers > 0:
+                    audio_result_data['speaker_diarization'] = {
+                        'enabled': True,
+                        'total_speakers': num_speakers,
+                        'speakers': speakers_info,
+                        'segments_with_speakers': len([seg for seg in audio_result.segments if seg.speaker]) if audio_result.segments else 0
+                    }
+                else:
+                    audio_result_data['speaker_diarization'] = {
+                        'enabled': True,
+                        'total_speakers': 0,
+                        'speakers': [],
+                        'segments_with_speakers': 0,
+                        'note': 'Speaker diarization was enabled but no speakers were detected'
+                    }
+            else:
+                audio_result_data['speaker_diarization'] = {
+                    'enabled': False,
+                    'note': 'Speaker diarization was not enabled'
+                }
+
+            # Extract topic information from metadata and segments
+            if audio_result.metadata and enable_topics:
+                topics_info = audio_result.metadata.get('topics', [])
+                num_topics = audio_result.metadata.get('num_topics', 0)
+
+                if topics_info or num_topics > 0:
+                    audio_result_data['topic_segmentation'] = {
+                        'enabled': True,
+                        'total_topics': num_topics,
+                        'topics': topics_info,
+                        'segments_with_topics': len([seg for seg in audio_result.segments if seg.topic_id is not None]) if audio_result.segments else 0
+                    }
+                else:
+                    audio_result_data['topic_segmentation'] = {
+                        'enabled': True,
+                        'total_topics': 0,
+                        'topics': [],
+                        'segments_with_topics': 0,
+                        'note': 'Topic segmentation was enabled but no topics were detected'
+                    }
+            else:
+                audio_result_data['topic_segmentation'] = {
+                    'enabled': False,
+                    'note': 'Topic segmentation was not enabled'
+                }
+
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump({
                 'mode': 'processing',
                 'processing_time': result.processing_time,
-                'generate_thumbnails': generate_thumbnails,
-                'thumbnail_count': thumbnail_count,
-                'enable_ocr': enable_ocr,
-                'metadata': {
+                'configuration': {
+                    'generate_thumbnails': generate_thumbnails,
+                    'thumbnail_count': thumbnail_count,
+                    'enable_ocr': enable_ocr,
+                    'enable_diarization': enable_diarization,
+                    'enable_topics': enable_topics,
+                    'model_size': model_size
+                },
+                'video_metadata': {
                     'duration': metadata.duration,
                     'width': metadata.width,
                     'height': metadata.height,
@@ -182,10 +316,7 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
                 'audio_path': str(result.audio_path) if result.audio_path else None,
                 'thumbnails': [str(t) for t in result.thumbnails],
                 'keyframes': [str(k) for k in result.keyframes],
-                'audio_processing_result': {
-                    'transcript': result.audio_processing_result.transcript if result.audio_processing_result else None,
-                    'segments_count': len(result.audio_processing_result.segments) if result.audio_processing_result else 0
-                } if result.audio_processing_result else None,
+                'audio_processing_result': audio_result_data,
                 'ocr_results': result.ocr_results,
                 'temp_files': [str(f) for f in result.temp_files]
             }, f, indent=2, ensure_ascii=False)
@@ -294,6 +425,8 @@ Examples:
     python test-video.py my-video.mp4
     python test-video.py recording.avi --thumbnails --thumbnail-count 5
     python test-video.py presentation.mov --enable-ocr
+    python test-video.py meeting.mp4 --enable-diarization --enable-topics
+    python test-video.py lecture.mp4 --enable-diarization --model-size large
 
   Ingestion Mode (background processing + storage):
     python test-video.py my-video.mp4 --ingest
@@ -315,6 +448,12 @@ Note: Video processing may take several minutes for large files.
                        help='Number of thumbnails to generate (default: 3)')
     parser.add_argument('--enable-ocr', action='store_true',
                        help='Enable OCR on video frames')
+    parser.add_argument('--enable-diarization', action='store_true',
+                       help='Enable speaker diarization for audio track')
+    parser.add_argument('--enable-topics', action='store_true',
+                       help='Enable topic segmentation for audio track')
+    parser.add_argument('--model-size', choices=['tiny', 'base', 'small', 'medium', 'large'],
+                       default='base', help='Whisper model size (default: base)')
 
     args = parser.parse_args()
 
@@ -350,7 +489,10 @@ Note: Video processing may take several minutes for large files.
                 video_file,
                 generate_thumbnails=args.thumbnails,
                 thumbnail_count=args.thumbnail_count,
-                enable_ocr=args.enable_ocr
+                enable_ocr=args.enable_ocr,
+                enable_diarization=args.enable_diarization,
+                enable_topics=args.enable_topics,
+                model_size=args.model_size
             ))
             if success:
                 print("\n🎉 Video processing test completed successfully!")
