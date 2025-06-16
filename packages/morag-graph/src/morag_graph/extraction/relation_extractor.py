@@ -218,6 +218,14 @@ Known entities in the text:
 Focus on finding relationships between these entities, but also identify any other clear relationships.
 """
         
+        # Add context if provided
+        context = kwargs.get('context')
+        if context:
+            base_prompt += f"""
+
+Additional context: {context}
+"""
+        
         base_prompt += """
 
 Return the relations as a JSON array as specified in the system prompt.

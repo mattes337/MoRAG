@@ -159,18 +159,25 @@ Rules:
         
         Args:
             text: Text to extract entities from
-            **kwargs: Additional arguments (unused)
+            **kwargs: Additional arguments including context
             
         Returns:
             User prompt string
         """
-        return f"""
+        base_prompt = f"""
 Extract named entities from the following text:
 
 {text}
 
 Return the entities as a JSON array as specified in the system prompt.
 """
+        
+        # Add context if provided
+        context = kwargs.get('context')
+        if context:
+            base_prompt += f"\n\nAdditional context: {context}"
+        
+        return base_prompt
     
     def parse_response(self, response: str, text: str = "") -> List[Entity]:
         """Parse the LLM response into Entity objects.
@@ -225,12 +232,12 @@ Return the entities as a JSON array as specified in the system prompt.
             # Get entity type
             entity_type = data.get("type", "CUSTOM")
             if isinstance(entity_type, str):
-                # Try to convert to EntityType enum
+                # Try to convert to EntityType enum, but preserve custom strings
                 try:
                     entity_type = EntityType(entity_type)
                 except ValueError:
-                    # Convert to CUSTOM if not in enum
-                    entity_type = EntityType.CUSTOM
+                    # Keep the custom string type as-is
+                    pass
             
             # Create entity
             entity = Entity(
