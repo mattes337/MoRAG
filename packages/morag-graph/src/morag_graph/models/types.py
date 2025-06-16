@@ -35,6 +35,11 @@ class RelationType(str, Enum):
     USES = "USES"  # Entity -> Entity
     LEADS = "LEADS"  # Person -> Organization (leadership relationship)
     COMPETES_WITH = "COMPETES_WITH"  # Organization -> Organization
+    CAUSES = "CAUSES"  # Entity -> Entity (causal relationship)
+    TREATS = "TREATS"  # Treatment -> Condition
+    DIAGNOSED_WITH = "DIAGNOSED_WITH"  # Person -> Condition
+    ASSOCIATED_WITH = "ASSOCIATED_WITH"  # Entity -> Entity (association)
+    AFFECTS = "AFFECTS"  # Entity -> Entity (influence/impact)
     RELATED_TO = "RELATED_TO"  # Generic relation
     HAPPENED_ON = "HAPPENED_ON"  # Event -> Date/Time
     HAPPENED_AT = "HAPPENED_AT"  # Event -> Location

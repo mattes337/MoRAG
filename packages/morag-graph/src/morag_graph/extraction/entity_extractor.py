@@ -16,13 +16,55 @@ class EntityExtractor(BaseExtractor):
     It identifies named entities like persons, organizations, locations, concepts, etc.
     """
     
-    def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, chunk_size: int = 4000, **kwargs):
+    # Default entity types with descriptions
+    DEFAULT_ENTITY_TYPES = {
+        "PERSON": "Names of people",
+        "ORGANIZATION": "Companies, institutions, government bodies",
+        "LOCATION": "Cities, countries, addresses, geographical locations",
+        "DATE": "Specific dates, years, time periods",
+        "TIME": "Times of day, durations",
+        "MONEY": "Monetary amounts, currencies",
+        "PERCENT": "Percentages",
+        "FACILITY": "Buildings, airports, highways, bridges",
+        "PRODUCT": "Objects, vehicles, foods, etc.",
+        "EVENT": "Named hurricanes, battles, wars, sports events",
+        "WORK_OF_ART": "Titles of books, songs, movies",
+        "LAW": "Named documents, laws, acts",
+        "LANGUAGE": "Any named language",
+        "TECHNOLOGY": "Software, hardware, technical concepts",
+        "CONCEPT": "Abstract concepts, ideas, theories"
+    }
+    
+    def __init__(self, config: Union[LLMConfig, Dict[str, str]] = None, chunk_size: int = 4000, entity_types: Optional[Dict[str, str]] = None, **kwargs):
         """Initialize the entity extractor.
         
         Args:
             config: LLM configuration as LLMConfig object or dictionary
             chunk_size: Maximum characters per chunk for large texts (default: 4000)
+            entity_types: Optional dictionary of entity types and their descriptions.
+                         If None, uses DEFAULT_ENTITY_TYPES.
+                         If provided (including empty dict {}), uses EXACTLY those types.
+                         Format: {"TYPE_NAME": "description"}
             **kwargs: Additional configuration parameters (for backward compatibility)
+        
+        Examples:
+            # Use default types (general purpose)
+            extractor = EntityExtractor(config)
+            
+            # Use custom types (domain-specific)
+            medical_types = {
+                "DISEASE": "Medical condition or illness",
+                "TREATMENT": "Medical intervention or therapy",
+                "SYMPTOM": "Observable sign of disease"
+            }
+            extractor = EntityExtractor(config, entity_types=medical_types)
+            
+            # Use minimal types (highly focused)
+            minimal = {"PERSON": "Individual person"}
+            extractor = EntityExtractor(config, entity_types=minimal)
+            
+            # Use no types (maximum control)
+            extractor = EntityExtractor(config, entity_types={})
         """
         # Handle backward compatibility with llm_config parameter
         if config is None and 'llm_config' in kwargs:
@@ -36,6 +78,10 @@ class EntityExtractor(BaseExtractor):
             
         super().__init__(config)
         self.chunk_size = chunk_size
+        
+        # Set entity types (use provided or default)
+        # Use 'is None' check to allow empty dict for complete control
+        self.entity_types = entity_types if entity_types is not None else self.DEFAULT_ENTITY_TYPES
     
     async def extract(self, text: str, doc_id: Optional[str] = None, source_doc_id: Optional[str] = None, **kwargs) -> List[Entity]:
         """Extract entities from text with automatic chunking for large texts.
@@ -75,25 +121,14 @@ class EntityExtractor(BaseExtractor):
         Returns:
             System prompt string
         """
-        return """
+        # Build entity types list dynamically
+        entity_types_text = "\n".join([f"- {entity_type}: {description}" for entity_type, description in self.entity_types.items()])
+        
+        return f"""
 You are an expert entity extraction system. Your task is to identify and extract named entities from the given text.
 
 Extract entities of the following types:
-- PERSON: Names of people
-- ORGANIZATION: Companies, institutions, government bodies
-- LOCATION: Cities, countries, addresses, geographical locations
-- DATE: Specific dates, years, time periods
-- TIME: Times of day, durations
-- MONEY: Monetary amounts, currencies
-- PERCENT: Percentages
-- FACILITY: Buildings, airports, highways, bridges
-- PRODUCT: Objects, vehicles, foods, etc.
-- EVENT: Named hurricanes, battles, wars, sports events
-- WORK_OF_ART: Titles of books, songs, movies
-- LAW: Named documents, laws, acts
-- LANGUAGE: Any named language
-- TECHNOLOGY: Software, hardware, technical concepts
-- CONCEPT: Abstract concepts, ideas, theories
+{entity_types_text}
 
 For each entity, provide:
 1. name: The exact text of the entity as it appears
@@ -103,12 +138,12 @@ For each entity, provide:
 
 Return the results as a JSON array of objects with the following structure:
 [
-  {
+  {{
     "name": "entity name",
     "type": "ENTITY_TYPE",
     "context": "brief description",
     "confidence": 0.95
-  }
+  }}
 ]
 
 Rules:

@@ -16,12 +16,54 @@ class RelationExtractor(BaseExtractor):
     It identifies relationships like "works for", "located in", "part of", etc.
     """
     
-    def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, **kwargs):
+    # Default relation types with descriptions
+    DEFAULT_RELATION_TYPES = {
+        "WORKS_FOR": "Person works for an organization",
+        "LOCATED_IN": "Entity is located in a place",
+        "PART_OF": "Entity is part of another entity",
+        "CREATED_BY": "Entity was created by a person or organization",
+        "FOUNDED": "Person founded an organization",
+        "OWNS": "Person or organization owns an entity",
+        "USES": "Entity uses another entity",
+        "CAUSES": "Entity causes another entity (especially important for diseases, pathogens, symptoms)",
+        "TREATS": "Treatment or medication treats a condition",
+        "DIAGNOSED_WITH": "Person is diagnosed with a condition",
+        "ASSOCIATED_WITH": "Entity is associated with another entity",
+        "AFFECTS": "Entity affects or impacts another entity",
+        "RELATED_TO": "Generic relationship between entities",
+        "HAPPENED_ON": "Event happened on a specific date/time",
+        "HAPPENED_AT": "Event happened at a specific location",
+        "PARTICIPATED_IN": "Person or organization participated in an event"
+    }
+    
+    def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, relation_types: Optional[Dict[str, str]] = None, **kwargs):
         """Initialize the relation extractor.
         
         Args:
             config: LLM configuration as LLMConfig object or dictionary
+            relation_types: Optional dictionary of relation types and their descriptions.
+                          If None, uses DEFAULT_RELATION_TYPES.
+                          If provided (including empty dict {}), uses EXACTLY those types.
+                          Format: {"TYPE_NAME": "description"}
             **kwargs: Additional configuration parameters (for backward compatibility)
+        
+        Examples:
+            # Use default types (general purpose)
+            extractor = RelationExtractor(config)
+            
+            # Use custom types (domain-specific)
+            medical_types = {
+                "CAUSES": "Pathogen causes disease",
+                "TREATS": "Treatment treats condition"
+            }
+            extractor = RelationExtractor(config, relation_types=medical_types)
+            
+            # Use minimal types (highly focused)
+            minimal = {"CAUSES": "Causal relationship"}
+            extractor = RelationExtractor(config, relation_types=minimal)
+            
+            # Use no types (maximum control)
+            extractor = RelationExtractor(config, relation_types={})
         """
         # Handle backward compatibility with llm_config parameter
         if config is None and 'llm_config' in kwargs:
@@ -34,6 +76,10 @@ class RelationExtractor(BaseExtractor):
             config = LLMConfig()
             
         super().__init__(config)
+        
+        # Set relation types (use provided or default)
+        # Use 'is None' check to allow empty dict for complete control
+        self.relation_types = relation_types if relation_types is not None else self.DEFAULT_RELATION_TYPES
     
     async def extract(self, text: str, entities: Optional[List[Entity]] = None, doc_id: Optional[str] = None, **kwargs) -> List[Relation]:
         """Extract relations from text.
@@ -106,21 +152,14 @@ class RelationExtractor(BaseExtractor):
         Returns:
             System prompt string
         """
-        return """
-You are an expert relation extraction system. Your task is to identify relationships between entities in the given text.
+        # Build relation types list dynamically
+        relation_types_text = "\n".join([f"- {rel_type}: {description}" for rel_type, description in self.relation_types.items()])
+        
+        return f"""
+You are an expert relation extraction system. Your task is to identify relationships between entities in the given text. Be thorough and comprehensive in finding all possible relationships, especially in medical, scientific, and technical content.
 
 Extract relations of the following types:
-- WORKS_FOR: Person works for an organization
-- LOCATED_IN: Entity is located in a place
-- PART_OF: Entity is part of another entity
-- CREATED_BY: Entity was created by a person or organization
-- FOUNDED: Person founded an organization
-- OWNS: Person or organization owns an entity
-- USES: Entity uses another entity
-- RELATED_TO: Generic relationship between entities
-- HAPPENED_ON: Event happened on a specific date/time
-- HAPPENED_AT: Event happened at a specific location
-- PARTICIPATED_IN: Person or organization participated in an event
+{relation_types_text}
 
 For each relation, provide:
 1. source_entity: The name of the source entity (exactly as it appears in text)
@@ -131,18 +170,21 @@ For each relation, provide:
 
 Return the results as a JSON array of objects with the following structure:
 [
-  {
+  {{
     "source_entity": "source entity name",
     "target_entity": "target entity name",
     "relation_type": "RELATION_TYPE",
     "context": "text that indicates the relationship",
     "confidence": 0.95
-  }
+  }}
 ]
 
 Rules:
-- Only extract relations that are explicitly stated or strongly implied
-- Ensure both entities are clearly identifiable in the text
+- Extract ALL relations that are explicitly stated OR reasonably implied in the text
+- Pay special attention to causal relationships (CAUSES) and associations between medical terms
+- For medical/scientific content, be especially thorough in identifying relationships
+- Look for relationships between similar terms (e.g., a pathogen and the disease it causes)
+- Ensure both entities are identifiable in the text
 - If a relationship could be multiple types, choose the most specific one
 - Ensure confidence scores reflect the certainty of the extraction
 - Return an empty array if no relations are found
@@ -381,7 +423,49 @@ Return the relations as a JSON array as specified in the system prompt.
                 name.lower() in entity_name_lower):
                 return entity_id
         
+        # Enhanced fuzzy matching for similar terms (especially useful for German compound words)
+        # Check for root word matches (e.g., "Borrelien" and "Borreliose")
+        entity_root = entity_name_lower[:min(6, len(entity_name_lower))]  # First 6 chars as root
+        if len(entity_root) >= 4:  # Only for reasonably long roots
+            for name, entity_id in entity_name_to_id.items():
+                name_root = name.lower()[:min(6, len(name.lower()))]
+                if len(name_root) >= 4 and entity_root == name_root:
+                    return entity_id
+        
+        # Check for word similarity (Levenshtein-like approach for close matches)
+        for name, entity_id in entity_name_to_id.items():
+            if self._are_similar_words(entity_name_lower, name.lower()):
+                return entity_id
+        
         return None
+    
+    def _are_similar_words(self, word1: str, word2: str) -> bool:
+        """Check if two words are similar enough to be considered the same entity.
+        
+        Args:
+            word1: First word to compare
+            word2: Second word to compare
+            
+        Returns:
+            True if words are similar enough
+        """
+        # Skip very short words
+        if len(word1) < 4 or len(word2) < 4:
+            return False
+        
+        # Check if one word is a substring of another with reasonable length
+        if len(word1) >= 6 and len(word2) >= 6:
+            if word1[:6] == word2[:6]:  # Same first 6 characters
+                return True
+        
+        # Simple edit distance check for very similar words
+        if abs(len(word1) - len(word2)) <= 2:  # Similar length
+            differences = sum(c1 != c2 for c1, c2 in zip(word1, word2))
+            max_len = max(len(word1), len(word2))
+            if differences <= max_len * 0.2:  # Allow 20% character differences
+                return True
+        
+        return False
     
     async def extract_from_entity_pairs(
         self, 
