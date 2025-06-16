@@ -52,21 +52,22 @@ def check_dependencies() -> bool:
     Returns:
         True if all dependencies are available, False otherwise
     """
-    required_packages = [
-        "google-generativeai",
-        "httpx",
-        "pydantic",
-        "python-dotenv",
-        "aiofiles"
-    ]
+    # Map package names to their import names
+    required_packages = {
+        "google-generativeai": "google.generativeai",
+        "httpx": "httpx",
+        "pydantic": "pydantic",
+        "python-dotenv": "dotenv",
+        "aiofiles": "aiofiles"
+    }
     
     missing_packages = []
     
-    for package in required_packages:
+    for package_name, import_name in required_packages.items():
         try:
-            __import__(package.replace("-", "_"))
+            __import__(import_name)
         except ImportError:
-            missing_packages.append(package)
+            missing_packages.append(package_name)
     
     if missing_packages:
         print("❌ Missing required packages:")
@@ -187,7 +188,7 @@ async def extract_from_file(
                     "name": entity.name,
                     "type": entity.type.value,
                     "confidence": entity.confidence,
-                    "context": entity.context,
+                    "source_text": entity.source_text,
                     "source_doc_id": entity.source_doc_id,
                     "attributes": entity.attributes
                 }
@@ -236,7 +237,7 @@ async def extract_from_file(
                     "source_entity_id": relation.source_entity_id,
                     "target_entity_id": relation.target_entity_id,
                     "confidence": relation.confidence,
-                    "context": relation.context,
+                    "source_text": relation.source_text,
                     "source_doc_id": relation.source_doc_id,
                     "attributes": relation.attributes
                 }

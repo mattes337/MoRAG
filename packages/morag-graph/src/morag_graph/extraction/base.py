@@ -245,7 +245,7 @@ class BaseExtractor(ABC):
             return []
     
     def parse_json_response(self, response: str) -> Union[Dict, List]:
-        """Parse JSON response from LLM.
+        """Parse JSON response from LLM with improved error handling.
         
         Args:
             response: Raw LLM response
@@ -270,9 +270,69 @@ class BaseExtractor(ABC):
             
             response = response.strip()
             
-            return json.loads(response)
+            # Try to parse as-is first
+            try:
+                return json.loads(response)
+            except json.JSONDecodeError:
+                # If that fails, try to fix common issues
+                response = self._fix_common_json_issues(response)
+                return json.loads(response)
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
-            logger.error(f"Response: {response}")
+            logger.error(f"Response: {response[:500]}{'...' if len(response) > 500 else ''}")
             raise ValueError(f"Invalid JSON response: {e}")
+    
+    def _fix_common_json_issues(self, json_str: str) -> str:
+        """Fix common JSON formatting issues with enhanced error recovery.
+        
+        Args:
+            json_str: JSON string with potential issues
+            
+        Returns:
+            Fixed JSON string
+        """
+        import re
+        
+        # Remove any trailing text after the JSON (common with LLM responses)
+        # Find the last closing bracket/brace and truncate there
+        last_bracket = max(json_str.rfind(']'), json_str.rfind('}'))
+        if last_bracket != -1:
+            json_str = json_str[:last_bracket + 1]
+        
+        # Fix trailing commas before closing brackets/braces
+        json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
+        
+        # Fix unquoted property names (basic cases)
+        # This regex looks for word characters followed by colon, not already quoted
+        json_str = re.sub(r'(?<!["]) \b([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'"\1":', json_str)
+        
+        # Fix single quotes to double quotes (but be careful with apostrophes in values)
+        # Only replace single quotes that are clearly property delimiters
+        json_str = re.sub(r"(?<!\\)'([^']*)'(?=\s*:)", r'"\1"', json_str)  # Property names
+        json_str = re.sub(r"(?<!\\)'([^']*)'(?=\s*[,}\]])", r'"\1"', json_str)  # String values
+        
+        # Fix missing commas between objects/arrays
+        json_str = re.sub(r'}\s*{', r'},{', json_str)
+        json_str = re.sub(r']\s*\[', r'],[', json_str)
+        json_str = re.sub(r'}\s*\[', r'},[', json_str)
+        json_str = re.sub(r']\s*{', r'],[', json_str)
+        
+        # Fix incomplete objects at the end (common when LLM hits token limit)
+        # If we have an incomplete object, try to close it
+        if json_str.strip().endswith(','):
+            json_str = json_str.rstrip().rstrip(',')
+        
+        # Count brackets and braces to ensure they're balanced
+        open_brackets = json_str.count('[')
+        close_brackets = json_str.count(']')
+        open_braces = json_str.count('{')
+        close_braces = json_str.count('}')
+        
+        # Add missing closing brackets/braces
+        if open_brackets > close_brackets:
+            json_str += ']' * (open_brackets - close_brackets)
+        if open_braces > close_braces:
+            json_str += '}' * (open_braces - close_braces)
+        
+        return json_str
