@@ -33,11 +33,13 @@ This directory contains the complete implementation plan for integrating graph-a
 - **Task 4.3**: Monitoring & Analytics (6-8 days)
 
 ## Key Architectural Features
+- **Neo4J Graph Database**: Uses Neo4J as the primary graph database for scalability and performance
 - **LLM-First Approach**: Uses Large Language Models for entity and relation extraction
 - **Dynamic Schema**: Graph schema evolves automatically based on discovered entities and relations
 - **Domain Agnostic**: No pre-configuration required for new domains
 - **Simplified Dependencies**: Lightweight LLM clients instead of complex NLP pipelines
 - **Hybrid Retrieval**: Combines vector search with graph traversal
+- **JSON-First Development**: Start with extraction services that output JSON before database integration
 
 ## Implementation Phases
 
@@ -56,9 +58,9 @@ Implementing multi-hop reasoning, optimization, and monitoring capabilities.
 ## Task Files
 
 ### Phase 1: Foundation Infrastructure
-- [ ] [`task-1.1-graph-database-setup.md`](./task-1.1-graph-database-setup.md) - Graph Database Selection & Setup
-- [ ] [`task-1.2-core-graph-package.md`](./task-1.2-core-graph-package.md) - Create morag-graph Package
-- [ ] [`task-1.3-llm-based-extraction.md`](./task-1.3-llm-based-extraction.md) - LLM-Based Entity and Relation Extraction
+- [ ] [`task-1.1-graph-database-setup.md`](./task-1.1-graph-database-setup.md) - Neo4J Database Selection & Setup
+- [ ] [`task-1.2-core-graph-package.md`](./task-1.2-core-graph-package.md) - Create morag-graph Package with Neo4J
+- [ ] [`task-1.3-llm-based-extraction.md`](./task-1.3-llm-based-extraction.md) - LLM-Based Entity and Relation Extraction with JSON Output
 
 ### Phase 2: Core Graph Features
 - [ ] [`task-2.1-graph-construction.md`](./task-2.1-graph-construction.md) - Graph Construction Pipeline
@@ -80,15 +82,15 @@ Implementing multi-hop reasoning, optimization, and monitoring capabilities.
 ### Overall Progress: 0/13 tasks completed (0%)
 
 #### Phase 1: Foundation Infrastructure (0/3 completed)
-- [ ] **Task 1.1**: Graph Database Setup (5-7 days)
-  - [ ] 1.1.1: Graph Database Selection & Setup (3-5 days)
-  - [ ] 1.1.2: Graph Schema Design (2-3 days)
+- [ ] **Task 1.1**: Neo4J Database Setup (5-7 days)
+  - [ ] 1.1.1: Neo4J Database Selection & Setup (3-5 days)
+  - [ ] 1.1.2: Neo4J Schema Design (2-3 days)
 - [ ] **Task 1.2**: Core Graph Package Creation (4-5 days)
   - [ ] 1.2.1: Create morag-graph Package (2-3 days)
-  - [ ] 1.2.2: Graph Storage Implementation (4-5 days)
+  - [ ] 1.2.2: Neo4J Storage Implementation (4-5 days)
 - [ ] **Task 1.3**: LLM-Based Entity and Relation Extraction (8-10 days)
-  - [ ] 1.3.1: LLM Entity Extraction Service (4-5 days)
-  - [ ] 1.3.2: LLM Relation Extraction Service (4-5 days)
+  - [ ] 1.3.1: LLM Entity Extraction Service with JSON Output (4-5 days)
+  - [ ] 1.3.2: LLM Relation Extraction Service with JSON Output (4-5 days)
 
 #### Phase 2: Core Graph Features (0/3 completed)
 - [ ] **Task 2.1**: Graph Construction Pipeline (6-8 days)

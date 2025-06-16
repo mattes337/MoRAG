@@ -1,17 +1,17 @@
-# Task 1.2: Core Graph Package Creation
+# Task 1.2: Core Graph Package Creation with Neo4J
 
 **Phase**: 1 - Foundation Infrastructure  
 **Priority**: Critical  
-**Total Estimated Time**: 6-8 days  
-**Dependencies**: Task 1.1 (Graph Database Setup)
+**Total Estimated Time**: 5-6 days  
+**Dependencies**: Task 1.1 (Neo4J Database Setup)
 
 ## Overview
 
-This task creates the `morag-graph` package, which provides the core graph data models, storage interfaces, and basic operations for the graph-augmented RAG system.
+This task creates the `morag-graph` package with Neo4J-specific implementations, providing core graph data models, JSON serialization, and Neo4J storage interfaces for the graph-augmented RAG system. The package supports both JSON-first development and Neo4J integration.
 
 ## Subtasks
 
-### Task 1.2.1: Create morag-graph Package
+### Task 1.2.1: Create morag-graph Package with Neo4J Support
 **Priority**: Critical  
 **Estimated Time**: 2-3 days  
 **Dependencies**: 1.1.1
@@ -20,18 +20,19 @@ This task creates the `morag-graph` package, which provides the core graph data 
 
 1. **Package Structure Setup**
    - Create package directory structure
-   - Set up pyproject.toml with dependencies
+   - Set up pyproject.toml with Neo4J dependencies
    - Initialize core modules and interfaces
 
-2. **Core Data Models**
+2. **Core Data Models with JSON Support**
    - Define Entity, Relation, and Graph models
-   - Implement serialization/deserialization
+   - Implement JSON serialization/deserialization
    - Add validation and type checking
+   - Support both in-memory and Neo4J representations
 
-3. **Base Storage Interface**
-   - Define abstract storage interface
-   - Create common exceptions and types
-   - Implement base functionality
+3. **Neo4J Storage Interface**
+   - Define Neo4J-specific storage interface
+   - Create Cypher query builders
+   - Implement JSON-to-Neo4J conversion utilities
 
 #### Package Structure
 ```
@@ -397,28 +398,27 @@ class BaseGraphStorage(ABC):
 
 ---
 
-### Task 1.2.2: Graph Storage Implementation
+### Task 1.2.2: Neo4J Storage Implementation
 **Priority**: Critical  
-**Estimated Time**: 4-5 days  
+**Estimated Time**: 3-4 days  
 **Dependencies**: 1.2.1, 1.1.2
 
 #### Implementation Steps
 
-1. **Neo4j Storage Implementation**
-   - Implement BaseGraphStorage for Neo4j
-   - Handle connection management and transactions
-   - Optimize queries for performance
+1. **Neo4J Database Connector**
+   - Implement Neo4J connection pool with async support
+   - Create transaction management with Cypher
+   - Add error handling and retries specific to Neo4J
 
-2. **CRUD Operations**
-   - Entity creation, update, deletion
-   - Relation management
-   - Bulk operations for performance
-   - Transaction handling
+2. **JSON-to-Neo4J Operations**
+   - Implement CRUD operations for entities with JSON input/output
+   - Create relation management functions with Cypher
+   - Add batch operations support for efficient imports
 
-3. **Query Optimization**
-   - Index usage optimization
-   - Query plan analysis
-   - Caching strategies
+3. **Cypher Query Interface**
+   - Design Cypher query builder pattern
+   - Implement common graph traversal queries
+   - Create Neo4J-specific utilities
 
 #### Code Examples
 

@@ -1,27 +1,29 @@
-# Task 1.1: Graph Database Setup
+# Task 1.1: Neo4J Database Setup
 
 **Phase**: 1 - Foundation Infrastructure  
 **Priority**: Critical  
-**Total Estimated Time**: 5-8 days  
+**Total Estimated Time**: 5-7 days  
 **Dependencies**: None
 
 ## Overview
 
-This task establishes the graph database foundation for the graph-augmented RAG system. It includes database selection, Docker integration, and schema design.
+This task establishes the Neo4J graph database foundation for the graph-augmented RAG system. Neo4J has been selected as the graph database for its mature Python ecosystem, excellent performance, and robust Cypher query language.
 
 ## Subtasks
 
-### Task 1.1.1: Graph Database Selection & Setup
+### Task 1.1.1: Neo4J Database Setup
 **Priority**: Critical  
-**Estimated Time**: 3-5 days  
+**Estimated Time**: 2-3 days  
 **Dependencies**: None
 
 #### Implementation Steps
 
-1. **Research & Selection**
-   - Evaluate Neo4j vs ArangoDB vs TigerGraph
-   - Consider licensing, performance, and Python integration
-   - Document decision rationale
+1. **Neo4J Decision Rationale**
+   - Neo4J Community Edition provides excellent performance for our use case
+   - Mature Python driver (neo4j>=5.15.0) with async support
+   - Rich Cypher query language for complex graph operations
+   - Strong ecosystem and documentation
+   - APOC plugin support for advanced graph algorithms
 
 2. **Docker Integration**
    - Create `docker-compose.graph.yml`
@@ -29,10 +31,11 @@ This task establishes the graph database foundation for the graph-augmented RAG 
    - Configure persistent volumes for graph data
    - Set up authentication and security
 
-3. **Connection Library**
-   - Install appropriate Python driver (neo4j, python-arango)
+3. **Neo4J Python Driver Setup**
+   - Install neo4j>=5.15.0 Python driver
    - Create connection configuration in `morag-core`
    - Implement connection pooling and retry logic
+   - Configure async session management
 
 #### Code Examples
 
@@ -129,14 +132,14 @@ class GraphConnectionManager:
 ```
 
 #### Deliverables
-- [ ] Graph database running in Docker
-- [ ] Connection configuration
-- [ ] Basic connectivity tests
-- [ ] Documentation of database selection rationale
+- [ ] Neo4J database running in Docker with APOC plugin
+- [ ] Neo4J connection configuration and pooling
+- [ ] Basic connectivity and health check tests
+- [ ] Neo4J-specific configuration documentation
 
 ---
 
-### Task 1.1.2: Dynamic Graph Schema with LLM-Based Relation Discovery
+### Task 1.1.2: Neo4J Dynamic Schema with LLM-Based Relation Discovery
 **Priority**: Critical  
 **Estimated Time**: 3-4 days  
 **Dependencies**: 1.1.1
