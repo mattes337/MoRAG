@@ -397,8 +397,8 @@ class GraphTraversal:
         # Build adjacency list
         adjacency = defaultdict(set)
         for relation in relations:
-            source_id = str(relation.source_id)
-            target_id = str(relation.target_id)
+            source_id = str(relation.source_entity_id)
+            target_id = str(relation.target_entity_id)
             adjacency[source_id].add(target_id)
             adjacency[target_id].add(source_id)
         

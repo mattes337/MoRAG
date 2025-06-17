@@ -539,8 +539,8 @@ class GraphAnalytics:
         # Calculate degree statistics
         degree_counts = defaultdict(int)
         for relation in relations:
-            source_id = str(relation.source_id)
-            target_id = str(relation.target_id)
+            source_id = str(relation.source_entity_id)
+            target_id = str(relation.target_entity_id)
             degree_counts[source_id] += 1
             degree_counts[target_id] += 1
         

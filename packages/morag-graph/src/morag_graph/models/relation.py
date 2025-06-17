@@ -97,23 +97,50 @@ class Relation(BaseModel):
     @classmethod
     def from_neo4j_relationship(
         cls, 
-        relationship: Dict[str, Any], 
+        relationship: Any, 
         source_entity_id: EntityId, 
         target_entity_id: EntityId
     ) -> 'Relation':
         """Create relation from Neo4J relationship properties."""
-        # Make a copy to avoid modifying the original
-        relationship = relationship.copy()
+        # Convert Neo4j relationship object to dictionary
+        try:
+            if hasattr(relationship, 'items'):
+                # Neo4j relationship object - convert to dict
+                relationship_dict = dict(relationship.items())
+            elif isinstance(relationship, dict):
+                # Already a dictionary - make a copy
+                relationship_dict = relationship.copy()
+            else:
+                # Handle other types by converting to dict
+                relationship_dict = dict(relationship)
+        except (TypeError, ValueError) as e:
+            # If conversion fails, create minimal relationship dict
+            relationship_dict = {}
+            
+        # Ensure we have required fields with defaults
+        if 'id' not in relationship_dict:
+            relationship_dict['id'] = f"{source_entity_id}_{target_entity_id}_{hash(str(relationship))}"
+        if 'type' not in relationship_dict:
+            relationship_dict['type'] = 'RELATED_TO'
+        if 'confidence' not in relationship_dict:
+            relationship_dict['confidence'] = 1.0
+        if 'source_text' not in relationship_dict:
+            relationship_dict['source_text'] = ''
         
         # Deserialize attributes from JSON string
-        if 'attributes' in relationship and isinstance(relationship['attributes'], str):
-            relationship['attributes'] = json.loads(relationship['attributes'])
+        if 'attributes' in relationship_dict and isinstance(relationship_dict['attributes'], str):
+            try:
+                relationship_dict['attributes'] = json.loads(relationship_dict['attributes'])
+            except json.JSONDecodeError:
+                relationship_dict['attributes'] = {}
+        elif 'attributes' not in relationship_dict:
+            relationship_dict['attributes'] = {}
         
         # Add entity IDs back
-        relationship['source_entity_id'] = source_entity_id
-        relationship['target_entity_id'] = target_entity_id
+        relationship_dict['source_entity_id'] = source_entity_id
+        relationship_dict['target_entity_id'] = target_entity_id
         
-        return cls(**relationship)
+        return cls(**relationship_dict)
     
     def get_neo4j_type(self) -> str:
         """Get the Neo4J relationship type."""
