@@ -88,7 +88,10 @@ class Neo4jStorage(BaseStorage):
         
         async with self.driver.session(database=self.config.database) as session:
             result = await session.run(query, parameters or {})
-            return [record.data() for record in await result.fetch()]
+            records = []
+            async for record in result:
+                records.append(record.data())
+            return records
     
     async def store_entity(self, entity: Entity) -> EntityId:
         """Store an entity in Neo4J.
@@ -205,6 +208,25 @@ class Neo4jStorage(BaseStorage):
                 entities.append(entity)
             except Exception as e:
                 logger.warning(f"Failed to parse entity from Neo4J: {e}")
+        
+        return entities
+    
+    async def get_all_entities(self) -> List[Entity]:
+        """Get all entities from the storage.
+        
+        Returns:
+            List of all entities
+        """
+        query = "MATCH (e:Entity) RETURN e"
+        result = await self._execute_query(query)
+        
+        entities = []
+        for record in result:
+            try:
+                entity = Entity.from_neo4j_node(record["e"])
+                entities.append(entity)
+            except Exception as e:
+                logger.warning(f"Failed to parse entity: {e}")
         
         return entities
     
@@ -440,6 +462,33 @@ class Neo4jStorage(BaseStorage):
         query += f" RETURN {return_clause}"
         
         result = await self._execute_query(query, parameters)
+        
+        relations = []
+        for record in result:
+            try:
+                relation = Relation.from_neo4j_relationship(
+                    record["r"], 
+                    record["source_id"], 
+                    record["target_id"]
+                )
+                relations.append(relation)
+            except Exception as e:
+                logger.warning(f"Failed to parse relation: {e}")
+        
+        return relations
+    
+    async def get_all_relations(self) -> List[Relation]:
+        """Get all relations from the storage.
+        
+        Returns:
+            List of all relations
+        """
+        query = """
+        MATCH (source:Entity)-[r]->(target:Entity)
+        RETURN r, source.id as source_id, target.id as target_id
+        """
+        
+        result = await self._execute_query(query)
         
         relations = []
         for record in result:
