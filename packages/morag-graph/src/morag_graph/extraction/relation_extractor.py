@@ -82,7 +82,7 @@ class RelationExtractor(BaseExtractor):
         self.relation_types = relation_types if relation_types is not None else self.DEFAULT_RELATION_TYPES
     
     async def extract(self, text: str, entities: Optional[List[Entity]] = None, doc_id: Optional[str] = None, **kwargs) -> List[Relation]:
-        """Extract relations from text.
+        """Extract relations from text using chunked processing for better results.
         
         Args:
             text: Text to extract relations from
@@ -96,6 +96,19 @@ class RelationExtractor(BaseExtractor):
         if not text or not text.strip():
             return []
         
+        # Use chunked extraction for large texts
+        chunk_size = kwargs.get('chunk_size', 3000)  # Characters per chunk
+        overlap = kwargs.get('overlap', 500)  # Overlap between chunks
+        
+        if len(text) > chunk_size and entities:
+            logger.info(f"Using chunked extraction for large text ({len(text)} chars) with {len(entities)} entities")
+            return await self._extract_chunked(text, entities, doc_id, chunk_size, overlap, **kwargs)
+        else:
+            logger.info(f"Using single-pass extraction for text ({len(text)} chars)")
+            return await self._extract_single(text, entities, doc_id, **kwargs)
+    
+    async def _extract_single(self, text: str, entities: Optional[List[Entity]] = None, doc_id: Optional[str] = None, **kwargs) -> List[Relation]:
+        """Extract relations from text in a single pass."""
         system_prompt = self.get_system_prompt()
         user_prompt = self.get_user_prompt(text, entities=entities, **kwargs)
         
@@ -108,32 +121,11 @@ class RelationExtractor(BaseExtractor):
             response = await self.call_llm(messages)
             relations = self.parse_response(response, text=text)
             
+            logger.info(f"LLM found {len(relations)} potential relations before entity ID resolution")
+            
             # Resolve entity IDs if entities are provided
             if entities:
-                entity_name_to_id = {entity.name: entity.id for entity in entities}
-                resolved_relations = []
-                
-                for relation in relations:
-                    # Try to resolve entity names to IDs
-                    source_id = self._resolve_entity_id(
-                        relation.source_entity_id, entity_name_to_id
-                    )
-                    target_id = self._resolve_entity_id(
-                        relation.target_entity_id, entity_name_to_id
-                    )
-                    
-                    if source_id and target_id:
-                        relation.source_entity_id = source_id
-                        relation.target_entity_id = target_id
-                        resolved_relations.append(relation)
-                    else:
-                        logger.warning(
-                            f"Could not resolve entity IDs for relation: "
-                            f"{relation.attributes.get('source_entity_name')} -> "
-                            f"{relation.attributes.get('target_entity_name')}"
-                        )
-                
-                relations = resolved_relations
+                relations = self._resolve_relations(relations, entities)
             
             # Set document ID if provided
             if doc_id:
@@ -145,6 +137,150 @@ class RelationExtractor(BaseExtractor):
         except Exception as e:
             logger.error(f"Error during relation extraction: {e}")
             return []
+    
+    async def _extract_chunked(self, text: str, entities: List[Entity], doc_id: Optional[str] = None, chunk_size: int = 3000, overlap: int = 500, **kwargs) -> List[Relation]:
+        """Extract relations using chunked processing for better coverage."""
+        chunks = self._create_text_chunks(text, chunk_size, overlap)
+        all_relations = []
+        
+        logger.info(f"Processing {len(chunks)} text chunks for relation extraction")
+        
+        for i, chunk in enumerate(chunks):
+            logger.debug(f"Processing chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
+            
+            # Find entities that appear in this chunk
+            chunk_entities = self._find_entities_in_chunk(chunk, entities)
+            
+            if len(chunk_entities) < 2:
+                logger.debug(f"Chunk {i+1} has fewer than 2 entities, skipping")
+                continue
+            
+            logger.debug(f"Chunk {i+1} contains {len(chunk_entities)} entities")
+            
+            # Extract relations from this chunk
+            chunk_relations = await self._extract_single(chunk, chunk_entities, doc_id, **kwargs)
+            
+            if chunk_relations:
+                logger.debug(f"Chunk {i+1} yielded {len(chunk_relations)} relations")
+                all_relations.extend(chunk_relations)
+        
+        # Deduplicate relations
+        unique_relations = self._deduplicate_relations(all_relations)
+        
+        logger.info(f"Chunked extraction found {len(all_relations)} total relations, {len(unique_relations)} unique")
+        
+        return unique_relations
+    
+    def _create_text_chunks(self, text: str, chunk_size: int, overlap: int) -> List[str]:
+        """Split text into overlapping chunks."""
+        if len(text) <= chunk_size:
+            return [text]
+        
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            end = start + chunk_size
+            
+            # If this is not the last chunk, try to break at a sentence boundary
+            if end < len(text):
+                # Look for sentence endings within the last 200 characters
+                search_start = max(end - 200, start)
+                sentence_end = -1
+                
+                for punct in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
+                    pos = text.rfind(punct, search_start, end)
+                    if pos > sentence_end:
+                        sentence_end = pos + len(punct)
+                
+                if sentence_end > start:
+                    end = sentence_end
+            
+            chunks.append(text[start:end])
+            
+            if end >= len(text):
+                break
+            
+            # Move start position with overlap
+            start = end - overlap
+        
+        return chunks
+    
+    def _find_entities_in_chunk(self, chunk: str, entities: List[Entity]) -> List[Entity]:
+        """Find entities that appear in the given text chunk."""
+        chunk_lower = chunk.lower()
+        chunk_entities = []
+        
+        for entity in entities:
+            entity_name_lower = entity.name.lower()
+            
+            # Check if entity name appears in chunk
+            if entity_name_lower in chunk_lower:
+                chunk_entities.append(entity)
+                continue
+            
+            # Check for partial matches for compound terms
+            if len(entity_name_lower) > 10:  # Only for longer entity names
+                words = entity_name_lower.split()
+                if len(words) > 1:
+                    # Check if significant parts of the entity name appear
+                    significant_words = [w for w in words if len(w) > 3]
+                    if significant_words and all(w in chunk_lower for w in significant_words[:2]):
+                        chunk_entities.append(entity)
+        
+        return chunk_entities
+    
+    def _deduplicate_relations(self, relations: List[Relation]) -> List[Relation]:
+        """Remove duplicate relations and self-referencing loops based on source, target, and type."""
+        seen = set()
+        unique_relations = []
+        
+        for relation in relations:
+            # Skip self-referencing relations (loops)
+            if relation.source_entity_id == relation.target_entity_id:
+                logger.debug(f"Skipping self-referencing relation: {relation.source_entity_id} -> {relation.target_entity_id} ({relation.type.value})")
+                continue
+            
+            # Create a key for deduplication
+            key = (relation.source_entity_id, relation.target_entity_id, relation.type.value)
+            
+            if key not in seen:
+                seen.add(key)
+                unique_relations.append(relation)
+        
+        return unique_relations
+    
+    def _resolve_relations(self, relations: List[Relation], entities: List[Entity]) -> List[Relation]:
+        """Resolve entity IDs for relations."""
+        entity_name_to_id = {entity.name: entity.id for entity in entities}
+        resolved_relations = []
+        
+        for relation in relations:
+            logger.debug(f"Attempting to resolve relation: {relation.attributes.get('source_entity_name')} -> {relation.attributes.get('target_entity_name')}")
+            
+            # Try to resolve entity names to IDs
+            source_id = self._resolve_entity_id(
+                relation.source_entity_id, entity_name_to_id
+            )
+            target_id = self._resolve_entity_id(
+                relation.target_entity_id, entity_name_to_id
+            )
+            
+            if source_id and target_id:
+                relation.source_entity_id = source_id
+                relation.target_entity_id = target_id
+                resolved_relations.append(relation)
+                logger.debug(f"Successfully resolved relation: {relation.attributes.get('source_entity_name')} -> {relation.attributes.get('target_entity_name')}")
+            else:
+                logger.warning(
+                    f"Could not resolve entity IDs for relation: "
+                    f"{relation.attributes.get('source_entity_name')} -> "
+                    f"{relation.attributes.get('target_entity_name')} "
+                    f"(source_id: {source_id}, target_id: {target_id})"
+                )
+        
+        logger.info(f"Successfully resolved {len(resolved_relations)} out of {len(relations)} relations")
+        return resolved_relations
      
     def get_system_prompt(self) -> str:
         """Get the system prompt for relation extraction.
@@ -406,7 +542,7 @@ Return the relations as a JSON array as specified in the system prompt.
         entity_name: str, 
         entity_name_to_id: Dict[str, str]
     ) -> Optional[str]:
-        """Resolve entity name to ID using fuzzy matching.
+        """Resolve entity name to ID using enhanced fuzzy matching for medical/German terms.
         
         Args:
             entity_name: Name of the entity to resolve
@@ -415,6 +551,11 @@ Return the relations as a JSON array as specified in the system prompt.
         Returns:
             Entity ID if found, None otherwise
         """
+        if not entity_name or not entity_name.strip():
+            return None
+            
+        entity_name = entity_name.strip()
+        
         # Exact match
         if entity_name in entity_name_to_id:
             return entity_name_to_id[entity_name]
@@ -425,30 +566,63 @@ Return the relations as a JSON array as specified in the system prompt.
             if name.lower() == entity_name_lower:
                 return entity_id
         
-        # Partial match (entity name contains or is contained in known entity)
-        for name, entity_id in entity_name_to_id.items():
-            if (entity_name_lower in name.lower() or 
-                name.lower() in entity_name_lower):
-                return entity_id
+        # Medical term variations (e.g., "Arzt" should match "Dr. Armin Schwarzbach")
+        medical_mappings = {
+            'arzt': ['dr.', 'doktor', 'mediziner'],
+            'virus': ['viren', 'viral'],
+            'bakterie': ['bakterien', 'bakteriell'],
+            'infektion': ['infekt', 'infektionen'],
+            'krankheit': ['erkrankung', 'leiden'],
+        }
         
-        # Enhanced fuzzy matching for similar terms (especially useful for German compound words)
-        # Check for root word matches (e.g., "Borrelien" and "Borreliose")
-        entity_root = entity_name_lower[:min(6, len(entity_name_lower))]  # First 6 chars as root
-        if len(entity_root) >= 4:  # Only for reasonably long roots
-            for name, entity_id in entity_name_to_id.items():
-                name_root = name.lower()[:min(6, len(name.lower()))]
-                if len(name_root) >= 4 and entity_root == name_root:
+        # Check if entity_name is a medical term that could refer to existing entities
+        for base_term, variations in medical_mappings.items():
+            if entity_name_lower == base_term or entity_name_lower in variations:
+                for name, entity_id in entity_name_to_id.items():
+                    name_lower = name.lower()
+                    if any(var in name_lower for var in [base_term] + variations):
+                        logger.debug(f"Medical term mapping: '{entity_name}' -> '{name}'")
+                        return entity_id
+        
+        # Partial match (entity name contains or is contained in known entity)
+        # More flexible for compound German words
+        for name, entity_id in entity_name_to_id.items():
+            name_lower = name.lower()
+            # Check if one is contained in the other (minimum 4 chars to avoid false positives)
+            if len(entity_name_lower) >= 4 and len(name_lower) >= 4:
+                if (entity_name_lower in name_lower or name_lower in entity_name_lower):
+                    logger.debug(f"Partial match: '{entity_name}' <-> '{name}'")
                     return entity_id
         
-        # Check for word similarity (Levenshtein-like approach for close matches)
+        # Enhanced fuzzy matching for German medical terms
+        # Check for root word matches (e.g., "Borrelien" and "Borreliose")
+        if len(entity_name_lower) >= 5:
+            entity_root = entity_name_lower[:6]  # First 6 chars as root
+            for name, entity_id in entity_name_to_id.items():
+                if len(name.lower()) >= 5:
+                    name_root = name.lower()[:6]
+                    if entity_root == name_root:
+                        logger.debug(f"Root match: '{entity_name}' <-> '{name}' (root: {entity_root})")
+                        return entity_id
+        
+        # Check for word similarity (enhanced for medical terms)
         for name, entity_id in entity_name_to_id.items():
             if self._are_similar_words(entity_name_lower, name.lower()):
+                logger.debug(f"Similar words: '{entity_name}' <-> '{name}'")
                 return entity_id
+        
+        # Last resort: check if entity_name is a substring of any entity (for very specific terms)
+        if len(entity_name_lower) >= 6:  # Only for longer terms to avoid false positives
+            for name, entity_id in entity_name_to_id.items():
+                if entity_name_lower in name.lower():
+                    logger.debug(f"Substring match: '{entity_name}' found in '{name}'")
+                    return entity_id
         
         return None
     
     def _are_similar_words(self, word1: str, word2: str) -> bool:
         """Check if two words are similar enough to be considered the same entity.
+        Enhanced for German medical terminology.
         
         Args:
             word1: First word to compare
@@ -458,20 +632,63 @@ Return the relations as a JSON array as specified in the system prompt.
             True if words are similar enough
         """
         # Skip very short words
-        if len(word1) < 4 or len(word2) < 4:
+        if len(word1) < 3 or len(word2) < 3:
             return False
         
-        # Check if one word is a substring of another with reasonable length
-        if len(word1) >= 6 and len(word2) >= 6:
-            if word1[:6] == word2[:6]:  # Same first 6 characters
+        # Check for common German medical word patterns
+        # Remove common German suffixes/prefixes for comparison
+        def normalize_german_word(word):
+            # Remove common German medical suffixes
+            suffixes = ['-virus', '-bakterie', '-infektion', '-krankheit', '-syndrom', '-test']
+            for suffix in suffixes:
+                if word.endswith(suffix):
+                    word = word[:-len(suffix)]
+            
+            # Remove common prefixes
+            prefixes = ['dr.', 'prof.']
+            for prefix in prefixes:
+                if word.startswith(prefix):
+                    word = word[len(prefix):].strip()
+            
+            return word
+        
+        norm_word1 = normalize_german_word(word1)
+        norm_word2 = normalize_german_word(word2)
+        
+        # Check normalized versions
+        if norm_word1 == norm_word2 and len(norm_word1) >= 3:
+            return True
+        
+        # Check if one normalized word is contained in the other
+        if len(norm_word1) >= 4 and len(norm_word2) >= 4:
+            if norm_word1 in norm_word2 or norm_word2 in norm_word1:
                 return True
         
-        # Simple edit distance check for very similar words
-        if abs(len(word1) - len(word2)) <= 2:  # Similar length
+        # Check if one word is a substring of another with reasonable length
+        if len(word1) >= 5 and len(word2) >= 5:
+            if word1[:5] == word2[:5]:  # Same first 5 characters
+                return True
+        
+        # Enhanced edit distance check for medical terms
+        if abs(len(word1) - len(word2)) <= 3:  # Allow more length difference
             differences = sum(c1 != c2 for c1, c2 in zip(word1, word2))
             max_len = max(len(word1), len(word2))
-            if differences <= max_len * 0.2:  # Allow 20% character differences
+            if differences <= max_len * 0.25:  # Allow 25% character differences
                 return True
+        
+        # Check for common German compound word patterns
+        # Split on common separators and check parts
+        separators = ['-', ' ', '.']
+        for sep in separators:
+            if sep in word1 and sep in word2:
+                parts1 = [p.strip() for p in word1.split(sep) if p.strip()]
+                parts2 = [p.strip() for p in word2.split(sep) if p.strip()]
+                
+                # Check if any significant parts match
+                for p1 in parts1:
+                    for p2 in parts2:
+                        if len(p1) >= 4 and len(p2) >= 4 and p1 == p2:
+                            return True
         
         return False
     
