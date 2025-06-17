@@ -4,7 +4,7 @@
 
 **Last Updated**: January 2025
 **Status**: ✅ ALL API ISSUES RESOLVED
-**Total Completed Tasks**: 50
+**Total Completed Tasks**: 51
 **System Status**: 🚀 PRODUCTION READY
 
 ## 🎉 PROJECT COMPLETION
@@ -1122,6 +1122,20 @@ For detailed information about completed tasks and implementation history, see [
 - **Validation**: Each fix tested in isolation and integration scenarios
 - **Configuration Verification**: All settings properly loaded from environment variables
 - **Timeout Testing**: Verified worker loads correct timeout values (2h soft / 2.5h hard)
+
+### ✅ Task 51: Enhanced JSON Parsing Error Recovery (January 2025)
+- **Issue**: Entity extraction failing with JSON parsing errors ("Expecting ',' delimiter")
+- **Root Cause**: LLM responses containing malformed JSON due to token limits or incomplete responses
+- **Solution**: Enhanced JSON parsing with robust error recovery mechanisms
+- **Implementation**:
+  - Improved `parse_json_response()` method with multi-level error handling
+  - Added `_extract_partial_json()` method to recover valid objects from malformed JSON
+  - Enhanced `_fix_common_json_issues()` with better incomplete string handling
+  - Added comprehensive logging for debugging JSON parsing issues
+- **Files Modified**:
+  - `packages/morag-graph/src/morag_graph/extraction/base.py`: Enhanced JSON parsing logic
+- **Testing**: Verified with malformed JSON test cases and real extraction scenarios
+- **Result**: ✅ Entity extraction now successfully handles malformed JSON responses with graceful fallback
 
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents

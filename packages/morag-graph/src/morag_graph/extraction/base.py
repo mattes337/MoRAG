@@ -1,4 +1,4 @@
-"""Base extractor for LLM-based entity and relation extraction."""
+"""Base classes for extraction functionality."""
 
 import json
 import logging
@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Union
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -273,10 +273,25 @@ class BaseExtractor(ABC):
             # Try to parse as-is first
             try:
                 return json.loads(response)
-            except json.JSONDecodeError:
-                # If that fails, try to fix common issues
-                response = self._fix_common_json_issues(response)
-                return json.loads(response)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Initial JSON parse failed: {e}")
+                logger.debug(f"Original response: {response[:1000]}{'...' if len(response) > 1000 else ''}")
+                
+                # Try to fix common issues
+                fixed_response = self._fix_common_json_issues(response)
+                try:
+                    return json.loads(fixed_response)
+                except json.JSONDecodeError as e2:
+                    logger.warning(f"Fixed JSON parse failed: {e2}")
+                    logger.debug(f"Fixed response: {fixed_response[:1000]}{'...' if len(fixed_response) > 1000 else ''}")
+                    
+                    # Try to extract partial valid JSON
+                    partial_result = self._extract_partial_json(response)
+                    if partial_result:
+                        logger.info(f"Extracted {len(partial_result)} valid objects from partial JSON")
+                        return partial_result
+                    
+                    raise e2
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
@@ -323,6 +338,11 @@ class BaseExtractor(ABC):
         if json_str.strip().endswith(','):
             json_str = json_str.rstrip().rstrip(',')
         
+        # Handle incomplete strings at the end
+        if json_str.count('"') % 2 != 0:
+            # Odd number of quotes, likely incomplete string
+            json_str = json_str.rstrip() + '"'
+        
         # Count brackets and braces to ensure they're balanced
         open_brackets = json_str.count('[')
         close_brackets = json_str.count(']')
@@ -336,3 +356,40 @@ class BaseExtractor(ABC):
             json_str += '}' * (open_braces - close_braces)
         
         return json_str
+    
+    def _extract_partial_json(self, json_str: str) -> List[Dict]:
+        """Extract valid JSON objects from a malformed JSON string.
+        
+        Args:
+            json_str: Malformed JSON string
+            
+        Returns:
+            List of valid JSON objects extracted from the string
+        """
+        import re
+        
+        valid_objects = []
+        
+        # Try to find complete JSON objects in the string
+        # Look for patterns like {"key": "value", ...}
+        object_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+        
+        matches = re.finditer(object_pattern, json_str)
+        
+        for match in matches:
+            obj_str = match.group()
+            try:
+                # Try to parse this individual object
+                obj = json.loads(obj_str)
+                valid_objects.append(obj)
+            except json.JSONDecodeError:
+                # Try to fix this individual object
+                try:
+                    fixed_obj = self._fix_common_json_issues(obj_str)
+                    obj = json.loads(fixed_obj)
+                    valid_objects.append(obj)
+                except json.JSONDecodeError:
+                    # Skip this object if it can't be fixed
+                    continue
+        
+        return valid_objects
