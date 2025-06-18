@@ -34,6 +34,15 @@ docker-compose up -d
 http://localhost:8000/docs
 ```
 
+## 🔄 Active Development: Graph Extension
+
+### Graph-Augmented RAG Integration
+- ✅ **Qdrant-Neo4j Integration Concept**: Created comprehensive integration strategy document
+  - **File**: `tasks/graph-extension/QDRANT_NEO_INTEGRATION.md`
+  - **Focus**: Unified ID strategies, cross-system entity linking, hybrid retrieval
+  - **Key Features**: Deterministic chunk IDs, bidirectional references, selective vector storage
+  - **Performance**: Optimized for maximal RAG quality and performance
+
 ## 📊 Historical Summary
 
 For detailed information about completed tasks and implementation history, see [COMPLETED_TASKS.md](COMPLETED_TASKS.md).
