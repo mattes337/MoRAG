@@ -50,6 +50,22 @@ For detailed information about completed tasks and implementation history, see [
 
 ## 🚀 New Features (January 2025)
 
+### ✅ Multi-Database Support ✅ COMPLETED
+- **Feature**: Enhanced graph processing with support for multiple database configurations
+- **Implementation**: Replaced single `enable_graph_processing` boolean with flexible `databases` parameter supporting multiple database connections
+- **Key Changes**:
+  - Updated `DatabaseConfig` model with comprehensive connection parameters
+  - Modified all API endpoints to accept `databases` parameter instead of `enable_graph_processing`
+  - Enhanced server endpoints (`ingest_file`, `ingest_url`, `ingest_batch`, `ingest_remote_file`, `process_url`, `process_web_page`, `process_youtube_video`, `process_remote_file`) to handle database configurations
+  - Updated task processing to support multiple database ingestion
+  - Maintained backward compatibility through proper parameter handling
+- **Benefits**:
+  - Support for multiple graph databases simultaneously
+  - Flexible database configuration per request
+  - Better separation of concerns between vector and graph storage
+  - Enhanced scalability for multi-tenant scenarios
+- **Status**: ✅ **COMPLETED** - All endpoints updated, tests passing
+
 ### ✅ Document Processing Improvements ✅ COMPLETED
 - **Feature**: Comprehensive improvements to document processing and search functionality
 - **Implementation**: Completed all five major improvements for better chunking, search optimization, deduplication, and document management

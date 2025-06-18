@@ -12,10 +12,13 @@ from .models import Entity, Relation, Graph
 from .extraction import EntityExtractor, RelationExtractor
 
 # Storage backends
-from .storage import Neo4jStorage
+from .storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
 
 # Operations
 from .operations import GraphCRUD, GraphTraversal, GraphPath, GraphAnalytics
+
+# Database configuration models
+from .models.database_config import DatabaseType, DatabaseConfig, DatabaseResult
 
 __all__ = [
     "Entity",
@@ -24,6 +27,12 @@ __all__ = [
     "EntityExtractor",
     "RelationExtractor",
     "Neo4jStorage",
+    "QdrantStorage",
+    "Neo4jConfig",
+    "QdrantConfig",
+    "DatabaseType",
+    "DatabaseConfig",
+    "DatabaseResult",
     "GraphCRUD",
     "GraphTraversal",
     "GraphPath",

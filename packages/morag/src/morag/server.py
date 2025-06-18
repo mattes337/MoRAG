@@ -18,6 +18,7 @@ import structlog
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
+from morag_graph.models.database_config import DatabaseType, DatabaseConfig
 from morag.utils.file_upload import get_upload_handler, FileUploadError, validate_temp_directory_access
 from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
 from morag.worker import (
@@ -296,7 +297,7 @@ class ProcessURLRequest(BaseModel):
     url: str
     content_type: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
-    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class ProcessBatchRequest(BaseModel):
@@ -326,7 +327,7 @@ class IngestFileRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     use_docling: Optional[bool] = False
     remote: Optional[bool] = False  # Use remote processing for audio/video
-    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class IngestURLRequest(BaseModel):
@@ -335,14 +336,14 @@ class IngestURLRequest(BaseModel):
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
-    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class IngestBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     webhook_url: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
-    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class IngestRemoteFileRequest(BaseModel):
@@ -357,14 +358,14 @@ class IngestRemoteFileRequest(BaseModel):
     chunk_overlap: Optional[int] = None
     chunking_strategy: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
-    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class ProcessRemoteFileRequest(BaseModel):
     file_path: str  # UNC path or HTTP/HTTPS URL
     content_type: Optional[str] = None  # Auto-detect if not provided
     options: Optional[Dict[str, Any]] = None
-    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class IngestResponse(BaseModel):
@@ -489,10 +490,15 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_url(request: ProcessURLRequest):
         """Process content from a URL."""
         try:
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
             result = await get_morag_api().process_url(
                 request.url,
                 request.content_type,
-                request.options
+                options
             )
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
@@ -618,7 +624,12 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_web_page(request: ProcessURLRequest):
         """Process a web page."""
         try:
-            result = await get_morag_api().process_web_page(request.url, request.options)
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
+            result = await get_morag_api().process_web_page(request.url, options)
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
@@ -635,7 +646,12 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_youtube_video(request: ProcessURLRequest):
         """Process a YouTube video."""
         try:
-            result = await get_morag_api().process_youtube_video(request.url, request.options)
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
+            result = await get_morag_api().process_youtube_video(request.url, options)
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
@@ -694,7 +710,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunking_strategy: Optional[str] = Form(default=None),  # paragraph, sentence, word, character, etc.
         remote: Optional[bool] = Form(default=False),  # Use remote processing for audio/video
-        enable_graph_processing: Optional[bool] = Form(default=False)  # Enable graph processing with Neo4j
+        databases: Optional[str] = Form(default=None)  # JSON string of database configurations
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -707,6 +723,19 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 except json.JSONDecodeError as e:
                     logger.error("Invalid JSON in metadata", metadata=metadata, error=str(e))
                     raise HTTPException(status_code=400, detail=f"Invalid JSON in metadata: {str(e)}")
+
+            # Parse databases if provided
+            parsed_databases = None
+            if databases:
+                try:
+                    databases_data = json.loads(databases)
+                    parsed_databases = [DatabaseConfig(**db) for db in databases_data]
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON in databases", databases=databases, error=str(e))
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON in databases: {str(e)}")
+                except Exception as e:
+                    logger.error("Invalid database configuration", databases=databases, error=str(e))
+                    raise HTTPException(status_code=400, detail=f"Invalid database configuration: {str(e)}")
 
             # Save uploaded file using secure file upload handler
             upload_handler = get_upload_handler()
@@ -763,7 +792,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "chunk_overlap": chunk_overlap,
                 "chunking_strategy": chunking_strategy,
                 "remote": remote,  # Remote processing flag
-                "enable_graph_processing": enable_graph_processing,  # Graph processing flag
+                "databases": parsed_databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -815,7 +844,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "metadata": request.metadata or {},  # Ensure dict, not None
                 "remote": request.remote,  # Remote processing flag
-                "enable_graph_processing": request.enable_graph_processing,  # Graph processing flag
+                "databases": request.databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -846,7 +875,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             options = {
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "remote": request.remote,  # Remote processing flag
-                "enable_graph_processing": request.enable_graph_processing,  # Graph processing flag
+                "databases": request.databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -906,7 +935,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "chunk_overlap": request.chunk_overlap,
                 "chunking_strategy": request.chunking_strategy,
                 "remote": request.remote,  # Remote processing flag
-                "enable_graph_processing": request.enable_graph_processing,  # Graph processing flag
+                "databases": request.databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -978,11 +1007,16 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                        temp_path=str(temp_path),
                        content_type=content_type)
 
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
             # Submit to background task queue for processing (no storage)
             task = process_file_task.delay(
                 str(temp_path),
                 content_type,
-                request.options or {}
+                options
             )
 
             logger.info("Remote file processing task created",

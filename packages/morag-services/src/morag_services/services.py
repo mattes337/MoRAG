@@ -280,19 +280,21 @@ class MoRAGServices:
             # Extract options
             options = options or {}
             progress_callback = options.get('progress_callback')
+            database_configs = options.get('databases', [])
+            # Backward compatibility: check for enable_graph_processing
             enable_graph_processing = options.get('enable_graph_processing', False)
 
             # Get both formats: markdown for Qdrant, JSON for API response
             markdown_result = await self.document_service.process_document(
                 Path(document_path),
                 progress_callback=progress_callback,
-                **{k: v for k, v in options.items() if k not in ['progress_callback', 'enable_graph_processing']}
+                **{k: v for k, v in options.items() if k not in ['progress_callback', 'databases', 'enable_graph_processing']}
             )
 
             json_result = await self.document_service.process_document_to_json(
                 Path(document_path),
                 progress_callback=progress_callback,
-                **{k: v for k, v in options.items() if k not in ['progress_callback', 'enable_graph_processing']}
+                **{k: v for k, v in options.items() if k not in ['progress_callback', 'databases', 'enable_graph_processing']}
             )
 
             # Use markdown content for text_content (Qdrant storage)
@@ -311,9 +313,9 @@ class MoRAGServices:
                     # Use raw text if no chunks
                     text_content = markdown_result.document.raw_text or ""
 
-            # Process graph extraction if enabled
+            # Process graph extraction with multiple databases
             graph_result = None
-            if enable_graph_processing and text_content:
+            if (database_configs or enable_graph_processing) and text_content:
                 try:
                     # Extract document metadata for graph processing
                     document_metadata = {
@@ -322,17 +324,28 @@ class MoRAGServices:
                         **json_result.get("metadata", {})
                     }
                     
-                    graph_result = await self.graph_processor.process_document(
-                        markdown_content=text_content,
-                        document_path=document_path,
-                        document_metadata=document_metadata
-                    )
+                    if database_configs:
+                        # Use new multi-database approach
+                        graph_result = await self.graph_processor.process_document_multi_db(
+                            content=text_content,
+                            source_doc_id=document_path,
+                            database_configs=database_configs,
+                            metadata=document_metadata
+                        )
+                    else:
+                        # Backward compatibility: use single database approach
+                        graph_result = await self.graph_processor.process_document(
+                            markdown_content=text_content,
+                            document_path=document_path,
+                            document_metadata=document_metadata
+                        )
                     
                     logger.info("Graph processing completed", 
                                document_path=document_path,
                                success=graph_result.success,
                                entities_count=graph_result.entities_count,
-                               relations_count=graph_result.relations_count)
+                               relations_count=graph_result.relations_count,
+                               databases_processed=len(graph_result.database_results) if hasattr(graph_result, 'database_results') else 1)
                     
                 except Exception as e:
                     logger.warning("Graph processing failed, continuing with document processing",

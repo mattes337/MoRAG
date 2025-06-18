@@ -13,7 +13,8 @@ from pydantic import BaseModel
 
 try:
     from morag_graph import (
-        EntityExtractor, RelationExtractor, Neo4jStorage,
+        EntityExtractor, RelationExtractor, Neo4jStorage, QdrantStorage,
+        Neo4jConfig, QdrantConfig, DatabaseType, DatabaseConfig, DatabaseResult,
         Entity, Relation, FileIngestion
     )
     from morag_graph.extraction.base import LLMConfig
@@ -23,6 +24,12 @@ except ImportError:
     EntityExtractor = None
     RelationExtractor = None
     Neo4jStorage = None
+    QdrantStorage = None
+    Neo4jConfig = None
+    QdrantConfig = None
+    DatabaseType = None
+    DatabaseConfig = None
+    DatabaseResult = None
     Entity = None
     Relation = None
     FileIngestion = None
@@ -78,6 +85,7 @@ class GraphProcessingResult(BaseModel):
     processing_time: float = 0.0
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = {}
+    database_results: List[Dict[str, Any]] = []  # Results for each database
 
 
 class GraphProcessor:
@@ -148,6 +156,192 @@ class GraphProcessor:
     def is_enabled(self) -> bool:
         """Check if graph processing is enabled and available."""
         return self.config.enabled and GRAPH_AVAILABLE and self._storage is not None
+    
+    def _create_storage_from_config(self, db_config: DatabaseConfig):
+        """Create a storage instance from database configuration.
+        
+        Args:
+            db_config: Database configuration
+            
+        Returns:
+            Storage instance
+        """
+        if db_config.type == DatabaseType.NEO4J:
+            # Use provided config or fall back to defaults
+            neo4j_config = Neo4jConfig(
+                uri=db_config.hostname or self.config.neo4j_uri or "neo4j://localhost:7687",
+                username=db_config.username or self.config.neo4j_username or "neo4j",
+                password=db_config.password or self.config.neo4j_password or "password",
+                database=db_config.database_name or self.config.neo4j_database or "neo4j"
+            )
+            return Neo4jStorage(neo4j_config)
+            
+        elif db_config.type == DatabaseType.QDRANT:
+            # Use provided config or fall back to defaults
+            qdrant_config = QdrantConfig(
+                host=db_config.hostname or "localhost",
+                port=db_config.port or 6333,
+                api_key=db_config.password,  # Use password field for API key
+                collection_name=db_config.database_name or "morag_entities"
+            )
+            return QdrantStorage(qdrant_config)
+            
+        else:
+            raise ValueError(f"Unsupported database type: {db_config.type}")
+    
+    async def process_document_multi_db(
+        self,
+        content: str,
+        source_doc_id: str,
+        database_configs: List[DatabaseConfig],
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> GraphProcessingResult:
+        """Process a document and store in multiple databases.
+        
+        Args:
+            content: Document content to process
+            source_doc_id: Unique identifier for the source document
+            database_configs: List of database configurations
+            metadata: Optional metadata
+            
+        Returns:
+            GraphProcessingResult with results for each database
+        """
+        if not GRAPH_AVAILABLE:
+            return GraphProcessingResult(
+                success=False,
+                error_message="Graph processing not available - morag-graph package not installed"
+            )
+        
+        if not database_configs:
+            # Fall back to single database processing if no configs provided
+            if self.is_enabled():
+                return await self.process_document(content, source_doc_id, metadata)
+            else:
+                return GraphProcessingResult(
+                    success=False,
+                    error_message="No database configurations provided and default graph processing not enabled"
+                )
+        
+        start_time = asyncio.get_event_loop().time()
+        database_results = []
+        total_entities = 0
+        total_relations = 0
+        processed_databases = set()  # Track to prevent duplicates
+        
+        try:
+            # Extract entities and relations once
+            entities = await self._entity_extractor.extract_entities(content, source_doc_id)
+            relations = await self._relation_extractor.extract_relations(content, entities, source_doc_id)
+            
+            # Process each database configuration
+            for db_config in database_configs:
+                db_start_time = asyncio.get_event_loop().time()
+                
+                # Check for duplicate database configurations
+                connection_key = db_config.get_connection_key()
+                if connection_key in processed_databases:
+                    logger.warning(f"Skipping duplicate database configuration: {connection_key}")
+                    database_results.append({
+                        "database_type": db_config.type.value,
+                        "connection_key": connection_key,
+                        "success": False,
+                        "error_message": "Duplicate database configuration skipped",
+                        "entities_count": 0,
+                        "relations_count": 0,
+                        "processing_time": 0.0
+                    })
+                    continue
+                
+                processed_databases.add(connection_key)
+                
+                try:
+                    # Create storage instance for this database
+                    storage = self._create_storage_from_config(db_config)
+                    
+                    # Connect to database
+                    await storage.connect()
+                    
+                    try:
+                        # Store entities and relations
+                        entity_ids = await storage.store_entities(entities)
+                        relation_ids = await storage.store_relations(relations)
+                        
+                        db_processing_time = asyncio.get_event_loop().time() - db_start_time
+                        
+                        database_results.append({
+                            "database_type": db_config.type.value,
+                            "connection_key": connection_key,
+                            "success": True,
+                            "entities_count": len(entity_ids),
+                            "relations_count": len(relation_ids),
+                            "processing_time": db_processing_time,
+                            "metadata": {
+                                "entity_ids": entity_ids[:10],  # Limit for webhook size
+                                "relation_ids": relation_ids[:10]
+                            }
+                        })
+                        
+                        total_entities += len(entity_ids)
+                        total_relations += len(relation_ids)
+                        
+                        logger.info(
+                            f"Successfully processed document in {db_config.type.value} database",
+                            entities=len(entity_ids),
+                            relations=len(relation_ids),
+                            processing_time=db_processing_time
+                        )
+                        
+                    finally:
+                        # Always disconnect
+                        await storage.disconnect()
+                        
+                except Exception as e:
+                    db_processing_time = asyncio.get_event_loop().time() - db_start_time
+                    error_msg = f"Failed to process in {db_config.type.value} database: {str(e)}"
+                    logger.error(error_msg)
+                    
+                    database_results.append({
+                        "database_type": db_config.type.value,
+                        "connection_key": connection_key,
+                        "success": False,
+                        "error_message": error_msg,
+                        "entities_count": 0,
+                        "relations_count": 0,
+                        "processing_time": db_processing_time
+                    })
+            
+            total_processing_time = asyncio.get_event_loop().time() - start_time
+            
+            # Determine overall success
+            successful_dbs = sum(1 for result in database_results if result["success"])
+            overall_success = successful_dbs > 0
+            
+            return GraphProcessingResult(
+                success=overall_success,
+                entities_count=total_entities,
+                relations_count=total_relations,
+                chunks_processed=1,
+                processing_time=total_processing_time,
+                database_results=database_results,
+                metadata={
+                    "successful_databases": successful_dbs,
+                    "total_databases": len(database_configs),
+                    "processed_databases": list(processed_databases)
+                }
+            )
+            
+        except Exception as e:
+            total_processing_time = asyncio.get_event_loop().time() - start_time
+            error_msg = f"Graph processing failed: {str(e)}"
+            logger.error(error_msg)
+            
+            return GraphProcessingResult(
+                success=False,
+                processing_time=total_processing_time,
+                error_message=error_msg,
+                database_results=database_results
+            )
     
     def _chunk_by_structure(self, markdown_content: str) -> List[Tuple[str, Dict[str, Any]]]:
         """Chunk markdown content by structural elements.
