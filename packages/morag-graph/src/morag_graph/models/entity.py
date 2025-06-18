@@ -37,29 +37,44 @@ class Entity(BaseModel):
     _neo4j_label: ClassVar[str] = "Entity"
     
     def __init__(self, **data):
-        """Initialize entity with deterministic ID based on name and type."""
+        """Initialize entity with deterministic ID based on name, type, and source document."""
         if 'id' not in data or not data['id']:
-            # Generate deterministic ID based on name and type
+            # Generate deterministic ID based on name, type, and source document
             name = data.get('name', '')
             entity_type = data.get('type', EntityType.CUSTOM)
+            source_doc_id = data.get('source_doc_id', '')
             if isinstance(entity_type, EntityType):
                 entity_type = entity_type.value
-            data['id'] = self._generate_deterministic_id(name, entity_type)
+            data['id'] = self._generate_deterministic_id(name, entity_type, source_doc_id)
         super().__init__(**data)
     
+    def __setattr__(self, name: str, value):
+        """Override setattr to regenerate ID when source_doc_id changes."""
+        if name == 'source_doc_id' and hasattr(self, 'source_doc_id') and self.source_doc_id != value:
+            # Set the new value first
+            super().__setattr__(name, value)
+            # Regenerate ID with new source_doc_id
+            entity_type = self.type
+            if isinstance(entity_type, EntityType):
+                entity_type = entity_type.value
+            super().__setattr__('id', self._generate_deterministic_id(self.name, entity_type, value or ''))
+        else:
+            super().__setattr__(name, value)
+    
     @staticmethod
-    def _generate_deterministic_id(name: str, entity_type: str) -> str:
-        """Generate a deterministic ID based on entity name and type.
+    def _generate_deterministic_id(name: str, entity_type: str, source_doc_id: str = '') -> str:
+        """Generate a deterministic ID based on entity name, type, and source document.
         
-        This ensures that entities with the same name and type always get
-        the same ID, preventing duplicate nodes in the graph.
+        This ensures that entities with the same name and type from different documents
+        get unique IDs, while still allowing proper deduplication within the same document.
         """
         # Normalize inputs for consistent hashing
         normalized_name = name.strip().lower()
         normalized_type = str(entity_type).strip().lower()
+        normalized_source = str(source_doc_id).strip() if source_doc_id else ''
         
-        # Create a deterministic hash
-        content = f"{normalized_name}:{normalized_type}"
+        # Create a deterministic hash including source document
+        content = f"{normalized_name}:{normalized_type}:{normalized_source}"
         hash_object = hashlib.sha256(content.encode('utf-8'))
         return hash_object.hexdigest()[:32]  # Use first 32 characters for readability
     

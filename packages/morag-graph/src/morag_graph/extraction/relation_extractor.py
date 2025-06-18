@@ -430,7 +430,7 @@ Return the relations as a JSON array as specified in the system prompt.
                     # If not a valid enum value, try context-based detection
                     relation_type = self._detect_relation_type_from_context(data.get("context", ""), data["source_entity"], data["target_entity"])
                     if relation_type is None:
-                        relation_type = RelationType.RELATED_TO  # Use RELATED_TO instead of CUSTOM as fallback
+                        relation_type = RelationType.CUSTOM  # Use CUSTOM as fallback
             
             # For now, use entity names as IDs (will be resolved later)
             source_entity_id = data["source_entity"].strip()

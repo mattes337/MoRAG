@@ -113,8 +113,11 @@ class EntityExtractor(BaseExtractor):
             logger.info(f"Text length ({len(text)} chars) exceeds chunk size ({self.chunk_size}). Processing in chunks...")
             entities = await self._extract_chunked(text, **kwargs)
         
-        # Remove document-specific attributes to make entities generic
-        # No longer setting source_doc_id to make entities document-agnostic
+        # Set source document ID if provided
+        final_source_doc_id = source_doc_id or doc_id
+        if final_source_doc_id:
+            for entity in entities:
+                entity.source_doc_id = final_source_doc_id
         
         # Normalize entity types for consistency
         if self.normalize_types and self.normalizer:
@@ -296,13 +299,7 @@ Use this context to better understand the entities and their significance.
             self.get_user_prompt = get_user_prompt_with_context
         
         try:
-            entities = await self.extract(text)
-            
-            # Add minimal context to entities (remove document-specific attributes)
-            for entity in entities:
-                # Remove document-specific attributes to make entities generic
-                pass  # No longer adding source_doc_id or source_text
-            
+            entities = await self.extract(text, source_doc_id=source_doc_id)
             return entities
             
         finally:
@@ -408,7 +405,7 @@ Use this context to better understand the entities and their significance.
         return final_chunks
     
     def _deduplicate_entities(self, entities: List[Entity]) -> List[Entity]:
-        """Remove duplicate entities based on name and type.
+        """Remove duplicate entities based on name, type, and source document.
         
         Args:
             entities: List of entities that may contain duplicates
@@ -419,11 +416,11 @@ Use this context to better understand the entities and their significance.
         if not entities:
             return []
         
-        # Group entities by (name, type) key
+        # Group entities by (name, type, source_doc_id) key
         entity_groups = {}
         
         for entity in entities:
-            key = (entity.name.lower().strip(), entity.type)
+            key = (entity.name.lower().strip(), entity.type, entity.source_doc_id or '')
             
             if key not in entity_groups:
                 entity_groups[key] = []
