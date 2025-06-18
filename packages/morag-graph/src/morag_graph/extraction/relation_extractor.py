@@ -392,7 +392,7 @@ Return the relations as a JSON array as specified in the system prompt.
                     relation = self._create_relation_from_dict(item)
                     if relation:
                         # Set source text (first 500 chars as context)
-                        relation.source_text = text[:500] if text else ""
+                        relation.attributes["source_text"] = text[:500] if text else ""
                         relations.append(relation)
                 except Exception as e:
                     logger.warning(f"Failed to create relation from {item}: {e}")
@@ -526,7 +526,7 @@ Return the relations as a JSON array as specified in the system prompt.
                 relation.source_entity_id = source_id
                 relation.target_entity_id = target_id
                 relation.source_doc_id = source_doc_id
-                relation.source_text = text[:500]  # First 500 chars as context
+                relation.attributes["source_text"] = text[:500]  # First 500 chars as context
                 resolved_relations.append(relation)
             else:
                 logger.warning(
@@ -736,7 +736,7 @@ Return relations as a JSON array as specified in the system prompt.
             # Add context and resolve IDs
             for relation in relations:
                 relation.source_doc_id = source_doc_id
-                relation.source_text = text[:500]
+                relation.attributes["source_text"] = text[:500]
             
             return relations
             

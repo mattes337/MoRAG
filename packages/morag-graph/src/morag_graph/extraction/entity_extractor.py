@@ -202,7 +202,7 @@ Return the entities as a JSON array as specified in the system prompt.
                     entity = self._create_entity_from_dict(item)
                     if entity:
                         # Set source text (first 500 chars as context)
-                        entity.source_text = text[:500] if text else ""
+                        entity.attributes["source_text"] = text[:500] if text else ""
                         entities.append(entity)
                 except Exception as e:
                     logger.warning(f"Failed to create entity from {item}: {e}")
@@ -294,7 +294,7 @@ Use this context to better understand the entities and their significance.
             # Add source document ID and source text to entities
             for entity in entities:
                 entity.source_doc_id = source_doc_id
-                entity.source_text = text[:500]  # First 500 chars as context
+                entity.attributes["source_text"] = text[:500]  # First 500 chars as context
             
             return entities
             
@@ -328,7 +328,7 @@ Use this context to better understand the entities and their significance.
                     entity.attributes = entity.attributes or {}
                     entity.attributes["chunk_index"] = i
                     entity.attributes["total_chunks"] = len(chunks)
-                    entity.source_text = chunk[:500]  # First 500 chars of chunk as context
+                    entity.attributes["source_text"] = chunk[:500]  # First 500 chars of chunk as context
                 
                 all_entities.extend(chunk_entities)
                 

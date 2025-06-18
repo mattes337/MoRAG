@@ -130,7 +130,8 @@ class IntegrationTestSuite:
             
             print(f"   Found {len(entities)} entities")
             for entity in entities:
-                print(f"   • {entity.name} ({entity.type.value})")
+                entity_type = entity.type.value if hasattr(entity.type, 'value') else entity.type
+                print(f"   • {entity.name} ({entity_type})")
             
             all_entities.extend(entities)
         
@@ -165,7 +166,8 @@ class IntegrationTestSuite:
                 source_entity = next((e for e in entities if e.id == relation.source_entity_id), None)
                 target_entity = next((e for e in entities if e.id == relation.target_entity_id), None)
                 if source_entity and target_entity:
-                    print(f"   • {source_entity.name} --[{relation.type.value}]--> {target_entity.name}")
+                    relation_type = relation.type.value if hasattr(relation.type, 'value') else relation.type
+                    print(f"   • {source_entity.name} --[{relation_type}]--> {target_entity.name}")
             
             all_relations.extend(relations)
         
@@ -240,12 +242,12 @@ class IntegrationTestSuite:
         
         # Count entity types
         for entity in graph.entities.values():
-            entity_type = entity.type.value
+            entity_type = entity.type.value if hasattr(entity.type, 'value') else entity.type
             analysis["entity_types"][entity_type] = analysis["entity_types"].get(entity_type, 0) + 1
         
         # Count relation types
         for relation in graph.relations.values():
-            relation_type = relation.type.value
+            relation_type = relation.type.value if hasattr(relation.type, 'value') else relation.type
             analysis["relation_types"][relation_type] = analysis["relation_types"].get(relation_type, 0) + 1
         
         # Find most connected entities
@@ -260,9 +262,10 @@ class IntegrationTestSuite:
         for entity_id, connection_count in sorted_connections[:5]:  # Top 5
             entity = graph.entities.get(entity_id)
             if entity:
+                entity_type = entity.type.value if hasattr(entity.type, 'value') else entity.type
                 analysis["most_connected_entities"].append({
                     "name": entity.name,
-                    "type": entity.type.value,
+                    "type": entity_type,
                     "connections": connection_count
                 })
         
@@ -283,7 +286,7 @@ class IntegrationTestSuite:
                         "entity1": entity1.name,
                         "entity2": entity2.name,
                         "relation_count": len(relations),
-                        "relation_types": [r.type.value for r in relations]
+                        "relation_types": [r.type.value if hasattr(r.type, 'value') else r.type for r in relations]
                     })
         
         # Print analysis results
@@ -327,7 +330,8 @@ class IntegrationTestSuite:
                     if rel.source_entity_id == person.id:
                         target_entity = graph.entities.get(rel.target_entity_id)
                         if target_entity:
-                            roles.append(f"{rel.type.value} {target_entity.name}")
+                            rel_type = rel.type.value if hasattr(rel.type, 'value') else rel.type
+                            roles.append(f"{rel_type} {target_entity.name}")
             print(f"     • {person.name}: {', '.join(roles) if roles else 'No specific roles found'}")
         
         # Test 3: Find competitors
@@ -347,7 +351,8 @@ class IntegrationTestSuite:
             for neighbor_id in neighbors:
                 neighbor = graph.entities.get(neighbor_id)
                 if neighbor:
-                    print(f"     • {neighbor.name} ({neighbor.type.value})")
+                    neighbor_type = neighbor.type.value if hasattr(neighbor.type, 'value') else neighbor.type
+                    print(f"     • {neighbor.name} ({neighbor_type})")
     
     async def run_complete_workflow(self) -> Dict:
         """Run the complete integration test workflow.

@@ -188,22 +188,23 @@ class TestRelationExtractorAsyncDynamicTypes:
     @pytest.fixture
     def sample_entities(self):
         """Sample entities for relation extraction tests."""
-        return [
+        entities = [
             Entity(
                 id="entity_1",
                 name="John Doe",
                 type=EntityType.PERSON,
-                confidence=0.95,
-                source_text="John Doe"
+                confidence=0.95
             ),
             Entity(
                 id="entity_2",
                 name="Acme Corp",
                 type=EntityType.ORGANIZATION,
-                confidence=0.92,
-                source_text="Acme Corp"
+                confidence=0.92
             )
         ]
+        entities[0].attributes["source_text"] = "John Doe"
+        entities[1].attributes["source_text"] = "Acme Corp"
+        return entities
     
     @pytest.fixture
     def mock_llm_response_relations(self):
@@ -277,17 +278,17 @@ class TestRelationExtractorAsyncDynamicTypes:
                     id="entity_1",
                     name="Dr. Smith",
                     type=EntityType.PERSON,
-                    confidence=0.95,
-                    source_text="Dr. Smith"
+                    confidence=0.95
                 ),
                 Entity(
                     id="entity_2",
                     name="patient",
                     type=EntityType.PERSON,
-                    confidence=0.92,
-                    source_text="patient"
+                    confidence=0.92
                 )
             ]
+            entities[0].attributes["source_text"] = "Dr. Smith"
+            entities[1].attributes["source_text"] = "patient"
             
             text = "Dr. Smith treats the patient."
             relations = await extractor.extract(text, entities)
@@ -361,17 +362,17 @@ class TestRelationExtractorAsyncDynamicTypes:
                     id="entity_1",
                     name="John",
                     type=EntityType.PERSON,
-                    confidence=0.95,
-                    source_text="John"
+                    confidence=0.95
                 ),
                 Entity(
                     id="entity_2",
                     name="Acme Corp",
                     type=EntityType.ORGANIZATION,
-                    confidence=0.92,
-                    source_text="Acme Corp"
+                    confidence=0.92
                 )
             ]
+            entities[0].attributes["source_text"] = "John"
+            entities[1].attributes["source_text"] = "Acme Corp"
             
             text = "John collaborates with Acme Corp on projects."
             context = "Focus on professional relationships."
