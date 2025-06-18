@@ -63,21 +63,24 @@ async def ingest_to_neo4j(
     clear_existing: bool = False
 ) -> None:
     """Ingest graph data into Neo4j."""
-    storage = Neo4jStorage(
+    from src.morag_graph.storage.neo4j_storage import Neo4jConfig
+    
+    config = Neo4jConfig(
         uri=neo4j_uri,
-        user=neo4j_user,
+        username=neo4j_user,
         password=neo4j_password
     )
+    storage = Neo4jStorage(config)
     
     try:
-        # Test connection
-        await storage.test_connection()
+        # Connect to Neo4j
+        await storage.connect()
         print("✓ Neo4j connection successful")
         
         # Clear existing data if requested
         if clear_existing:
             print("Clearing existing data...")
-            await storage.clear_all()
+            await storage.clear()
             print("✓ Existing data cleared")
         
         # Store entities
@@ -93,7 +96,7 @@ async def ingest_to_neo4j(
         print("✓ Relations stored")
         
         # Print statistics
-        stats = await storage.get_graph_statistics()
+        stats = await storage.get_statistics()
         print("\n=== Graph Statistics ===")
         print(f"Total nodes: {stats.get('total_nodes', 0)}")
         print(f"Total relationships: {stats.get('total_relationships', 0)}")
@@ -101,7 +104,7 @@ async def ingest_to_neo4j(
         print(f"Relationship types: {stats.get('relationship_types', {})}")
         
     finally:
-        await storage.close()
+        await storage.disconnect()
 
 
 async def main():
