@@ -164,7 +164,7 @@ class FileIngestion:
             return False
     
     def _group_entities_into_chunks(self, entities: List[Entity]) -> List[tuple[str, List[Entity]]]:
-        """Group entities by their source text to create document chunks.
+        """Group entities by their chunk index to create document chunks.
         
         Args:
             entities: List of entities to group
@@ -172,14 +172,49 @@ class FileIngestion:
         Returns:
             List of tuples (chunk_text, entities_in_chunk)
         """
-        # Since entities don't have source_text in the new model,
-        # we'll create a single chunk with all entities
         if not entities:
             return []
         
-        # Create a single chunk containing all entities
-        chunk_text = f"Document content with {len(entities)} entities"
-        return [(chunk_text, entities)]
+        # Group entities by chunk_index from their attributes
+        chunks_map = {}
+        entities_without_chunk = []
+        
+        for entity in entities:
+            chunk_index = None
+            if entity.attributes and "chunk_index" in entity.attributes:
+                chunk_index = entity.attributes["chunk_index"]
+            
+            if chunk_index is not None:
+                if chunk_index not in chunks_map:
+                    chunks_map[chunk_index] = []
+                chunks_map[chunk_index].append(entity)
+            else:
+                entities_without_chunk.append(entity)
+        
+        # Convert to list of tuples, sorted by chunk index
+        result = []
+        for chunk_index in sorted(chunks_map.keys()):
+            chunk_entities = chunks_map[chunk_index]
+            # Use source_text from first entity's attributes if available, otherwise create descriptive text
+            chunk_text = ""
+            if chunk_entities and chunk_entities[0].attributes and 'source_text' in chunk_entities[0].attributes:
+                chunk_text = chunk_entities[0].attributes['source_text']
+            else:
+                chunk_text = f"Document chunk {chunk_index} with {len(chunk_entities)} entities"
+            
+            result.append((chunk_text, chunk_entities))
+        
+        # If there are entities without chunk information, create a separate chunk
+        if entities_without_chunk:
+            chunk_text = f"Document content with {len(entities_without_chunk)} entities (no chunk info)"
+            result.append((chunk_text, entities_without_chunk))
+        
+        # If no chunks were created (no chunk_index info), fall back to single chunk
+        if not result:
+            chunk_text = f"Document content with {len(entities)} entities"
+            result = [(chunk_text, entities)]
+        
+        return result
     
     async def ingest_file_entities_and_relations(
         self, 
