@@ -186,16 +186,16 @@ async def extract_from_file(
                 entity_dict = {
                     "id": entity.id,
                     "name": entity.name,
-                    "type": entity.type.value,
+                    "type": entity.type.value if hasattr(entity.type, 'value') else str(entity.type),
                     "confidence": entity.confidence,
-                    "source_text": entity.source_text,
+                    "source_text": entity.attributes.get("source_text", ""),
                     "source_doc_id": entity.source_doc_id,
                     "attributes": entity.attributes
                 }
                 entities_data.append(entity_dict)
                 
                 # Count entity types
-                entity_type = entity.type.value
+                entity_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
                 entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
             
             results["entities"] = entities_data
@@ -205,7 +205,7 @@ async def extract_from_file(
             if verbose:
                 print(f"✅ Found {len(entities)} entities:")
                 for entity in entities:
-                    print(f"  • {entity.name} ({entity.type.value}) - confidence: {entity.confidence:.2f}")
+                    print(f"  • {entity.name} ({entity.type.value if hasattr(entity.type, 'value') else str(entity.type)}) - confidence: {entity.confidence:.2f}")
         
         except Exception as e:
             print(f"❌ Error during entity extraction: {e}")
@@ -233,18 +233,18 @@ async def extract_from_file(
             for relation in relations:
                 relation_dict = {
                     "id": relation.id,
-                    "type": relation.type.value,
+                    "type": relation.type.value if hasattr(relation.type, 'value') else str(relation.type),
                     "source_entity_id": relation.source_entity_id,
                     "target_entity_id": relation.target_entity_id,
                     "confidence": relation.confidence,
-                    "source_text": relation.source_text,
+                    "source_text": relation.attributes.get("source_text", ""),
                     "source_doc_id": relation.source_doc_id,
                     "attributes": relation.attributes
                 }
                 relations_data.append(relation_dict)
                 
                 # Count relation types
-                relation_type = relation.type.value
+                relation_type = relation.type.value if hasattr(relation.type, 'value') else str(relation.type)
                 relation_types[relation_type] = relation_types.get(relation_type, 0) + 1
             
             results["relations"] = relations_data
@@ -258,7 +258,7 @@ async def extract_from_file(
                     target_entity = next((e for e in entities if e.id == relation.target_entity_id), None)
                     
                     if source_entity and target_entity:
-                        print(f"  • {source_entity.name} --[{relation.type.value}]--> {target_entity.name} (confidence: {relation.confidence:.2f})")
+                        print(f"  • {source_entity.name} --[{relation.type.value if hasattr(relation.type, 'value') else str(relation.type)}]--> {target_entity.name} (confidence: {relation.confidence:.2f})")
         
         except Exception as e:
             print(f"❌ Error during relation extraction: {e}")

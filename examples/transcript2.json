@@ -1,0 +1,1573 @@
+{
+  "source_file": "..\\..\\examples\\transcript2.txt",
+  "model": "gemini-1.5-flash",
+  "entities": [
+    {
+      "id": "92583dfe-200c-497d-b064-f53998670f0a",
+      "name": "Carolin Tietz",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst. Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht. Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca. Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ich p",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Interviewer of Alexander Wüst",
+        "extraction_method": "llm",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst. Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht. Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca. Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ich p",
+        "chunk_index": 1,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "name": "Alexander Wüst",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst. Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht. Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca. Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ich p",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Actor interviewed in the text",
+        "extraction_method": "llm",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst. Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht. Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca. Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ich p",
+        "chunk_index": 1,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "fb697aab-ad3f-4212-b390-ee6c170682bf",
+      "name": "Karl der Große",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A role played by Alexander Wüst; Mentioned as a possible past life identity.",
+        "extraction_method": "llm",
+        "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+        "chunk_index": 5,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "89dd49a0-2316-4900-927a-b69b18babd8a",
+      "name": "Ayahuasca",
+      "type": "PRODUCT",
+      "confidence": 0.98,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A shamanic substance used in rituals; A substance used in ceremonies, described as correcting trauma by allowing re-experiencing with adult consciousness.; A psychoactive substance mentioned in relation to altered perceptions of time and space.; A plant medicine used in shamanic rituals, described as having transformative effects.; A plant-based psychedelic brew used in ceremonies.; A plant-based psychedelic brew discussed in the context of shamanic practices and visionary experiences.",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "fb805491-828b-4281-bd91-ea83b8c146fe",
+      "name": "San Pedro",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "Das nimmt natürlich so ein bisschen den Druck aus dem Kessel des Erlebens dieser Situation, als Kind wird alles direkt auf dich ein und ist sehr, sehr massiv  und du kannst es eben dann nicht mehr korrigieren, da gibt es ja auch viel Forschung dazu, dass eben die, wie sagt man,  die neuralen Vernetzungen dann bei einem Traumata eben quasi schief oder nicht gut durchlaufen und das hat man eben herausgefunden,  bei Ayahuasca wird hier korrigiert, dass das Trauma noch mal ins Bewusstsein tritt, man",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A shamanic substance mentioned alongside Ayahuasca; A substance used by indigenous peoples in connection with Ayahuasca and spiritual experiences.",
+        "extraction_method": "llm",
+        "source_text": "Das nimmt natürlich so ein bisschen den Druck aus dem Kessel des Erlebens dieser Situation, als Kind wird alles direkt auf dich ein und ist sehr, sehr massiv  und du kannst es eben dann nicht mehr korrigieren, da gibt es ja auch viel Forschung dazu, dass eben die, wie sagt man,  die neuralen Vernetzungen dann bei einem Traumata eben quasi schief oder nicht gut durchlaufen und das hat man eben herausgefunden,  bei Ayahuasca wird hier korrigiert, dass das Trauma noch mal ins Bewusstsein tritt, man",
+        "chunk_index": 2,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "053f8fed-2672-404c-9c11-097e4056cf09",
+      "name": "Peru",
+      "type": "LOCATION",
+      "confidence": 0.98,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Country where Ayahuasca and San Pedro are used; Location where the author experienced Ayahuasca ceremonies with shamans.; A country mentioned in relation to shamanic experiences and the 'Tellerrand' (possibly referring to a specific location or experience in Peru).",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "bfd0b174-2b8c-4c21-908b-1697be7153b7",
+      "name": "Österreich",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "Wir machen es ja eigentlich jede Nacht, dass wir in eine höhere Ebene gehen sozusagen und Träume empfangen, Visionen empfangen und über schamanische Reisen kann man das ja eben auch bewusst herbeirufen. Also dass man wirklich auch das dann lenkt in eine bestimmte Richtung, also bei Leistungssporten ist es ja mittlerweile auch eine anerkannte Methode, ja so wie Hypnose quasi, dass man sich wirklich in einen außergewöhnlichen Zustand bringt und dann wirklich sein Netzwerk, sein neuronales Netzwerk",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Country where the interviewee practiced shamanism; The location of an Ayahuasca ceremony attended by a dying woman.",
+        "extraction_method": "llm",
+        "source_text": "Wir machen es ja eigentlich jede Nacht, dass wir in eine höhere Ebene gehen sozusagen und Träume empfangen, Visionen empfangen und über schamanische Reisen kann man das ja eben auch bewusst herbeirufen. Also dass man wirklich auch das dann lenkt in eine bestimmte Richtung, also bei Leistungssporten ist es ja mittlerweile auch eine anerkannte Methode, ja so wie Hypnose quasi, dass man sich wirklich in einen außergewöhnlichen Zustand bringt und dann wirklich sein Netzwerk, sein neuronales Netzwerk",
+        "chunk_index": 4,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "011cfe30-67c2-4f76-af28-6b7b11e24ac5",
+      "name": "Südamerika",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst. Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht. Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca. Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ich p",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Continent where Ayahuasca and San Pedro are used",
+        "extraction_method": "llm",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst. Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht. Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca. Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ich p",
+        "chunk_index": 1,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "29837314-d2fa-4a61-88c0-5e376553c3de",
+      "name": "Karl den Großen",
+      "type": "PERSON",
+      "confidence": 0.99,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "The historical figure whose life was being filmed in a docu-fiction.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "ca378720-6437-4ce3-990c-1d71dce91a12",
+      "name": "ARD",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "One of the broadcasters involved in the docu-fiction.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "6dfc6b0d-5449-4e69-94ee-6db0b42910d5",
+      "name": "Arte",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Another broadcaster involved in the docu-fiction.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "37aa52d6-c3f5-49b5-9941-2fe2f10f54fb",
+      "name": "Südtirol",
+      "type": "LOCATION",
+      "confidence": 0.98,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "The region where some filming took place.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "4965fba2-f34a-44aa-a51d-9797e0987191",
+      "name": "Seiser Alm",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Specific location in Südtirol where battle scenes were filmed.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "3ee3580e-98dd-4805-ba6c-c6fe83bfc205",
+      "name": "zwei Wochen",
+      "type": "TIME",
+      "confidence": 0.9,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Time elapsed between the vision and receiving the script.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "44d9cb65-d667-4b57-a221-bdf1c65b15b8",
+      "name": "zweieinhalb Wochen",
+      "type": "TIME",
+      "confidence": 0.9,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Alternative time elapsed between the vision and receiving the script.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "9a7738d5-1b72-447f-a78b-0859eb1abfc7",
+      "name": "zwei bis drei Wochen",
+      "type": "TIME",
+      "confidence": 0.9,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Time elapsed between the vision and seeing the filmed scene.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "6790ff17-d077-4cc2-805d-069b52d0ec1c",
+      "name": "zwei, drei Monate",
+      "type": "TIME",
+      "confidence": 0.9,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Time elapsed between seeing the scene and filming it.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "4580bcaa-7fd0-448f-8785-686732dfaca9",
+      "name": "drei, vier Monate",
+      "type": "TIME",
+      "confidence": 0.9,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Time elapsed between the vision and the reenactment of the scene.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "3a11c56e-e3db-42ed-820c-e4a4577acb60",
+      "name": "ein paar Stunden",
+      "type": "TIME",
+      "confidence": 0.85,
+      "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Duration of altered perception of time and space under the influence of Ayahuasca.",
+        "extraction_method": "llm",
+        "source_text": "und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich wa",
+        "chunk_index": 3,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "bb521bf9-a554-4af6-b575-d147abcb4cd7",
+      "name": "Krebs",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "Wir machen es ja eigentlich jede Nacht, dass wir in eine höhere Ebene gehen sozusagen und Träume empfangen, Visionen empfangen und über schamanische Reisen kann man das ja eben auch bewusst herbeirufen. Also dass man wirklich auch das dann lenkt in eine bestimmte Richtung, also bei Leistungssporten ist es ja mittlerweile auch eine anerkannte Methode, ja so wie Hypnose quasi, dass man sich wirklich in einen außergewöhnlichen Zustand bringt und dann wirklich sein Netzwerk, sein neuronales Netzwerk",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "The illness the woman in the story was suffering from.",
+        "extraction_method": "llm",
+        "source_text": "Wir machen es ja eigentlich jede Nacht, dass wir in eine höhere Ebene gehen sozusagen und Träume empfangen, Visionen empfangen und über schamanische Reisen kann man das ja eben auch bewusst herbeirufen. Also dass man wirklich auch das dann lenkt in eine bestimmte Richtung, also bei Leistungssporten ist es ja mittlerweile auch eine anerkannte Methode, ja so wie Hypnose quasi, dass man sich wirklich in einen außergewöhnlichen Zustand bringt und dann wirklich sein Netzwerk, sein neuronales Netzwerk",
+        "chunk_index": 4,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "fe5792b8-ef93-4132-a19f-484162172b86",
+      "name": "Netflix",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Streaming service mentioned in relation to violent films.",
+        "extraction_method": "llm",
+        "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+        "chunk_index": 5,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "1c2cc8a3-8793-43ca-932b-6adac24cba5f",
+      "name": "Stanford",
+      "type": "ORGANIZATION",
+      "confidence": 0.9,
+      "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "One of the universities associated with a long-term study on health, happiness, and longevity.",
+        "extraction_method": "llm",
+        "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+        "chunk_index": 5,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "79dcbd8c-067f-47a1-996e-013f16a47b9c",
+      "name": "Harvard",
+      "type": "ORGANIZATION",
+      "confidence": 0.9,
+      "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "One of the universities associated with a long-term study on health, happiness, and longevity.",
+        "extraction_method": "llm",
+        "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+        "chunk_index": 5,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "0b27fa1d-a354-4fdc-818a-85d69d59a3f1",
+      "name": "der kleine Hobbit",
+      "type": "WORK_OF_ART",
+      "confidence": 0.95,
+      "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A book mentioned that a child was reading.",
+        "extraction_method": "llm",
+        "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+        "chunk_index": 5,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "76008849-aaf1-4ec4-9b0e-9feab46f2aab",
+      "name": "Zweikriegen",
+      "type": "EVENT",
+      "confidence": 0.7,
+      "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Refers to World Wars, impacting collective field.",
+        "extraction_method": "llm",
+        "source_text": "Ja, also es ist ja auch eine Reinigung einfach auf geistiger Ebene. Also man man übergibt sich ja dann auch nicht immer. Also aber manchmal also besonders die Menschen, die noch besonders stark toxisch sind in den Gedanken. Aber es heißt ja so im Wortschatz oder im Volksmund. Ja, man kotzt den Dämonen aus. Was hast du auch für Erfahrungen gemacht, diese geistige Entgiftung? Ja, das ist ja auch hier ein Thema von dem Kongress, weil davon kommt ja auch ganz viel. Ich nenne es immer die toxische Se",
+        "chunk_index": 5,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "a3721d26-2243-409f-9823-409351c2f14e",
+      "name": "75 Jahren",
+      "type": "DATE",
+      "confidence": 0.95,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Duration of a study",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "db5c415a-55a1-45ec-9e42-02eaaf14d892",
+      "name": "sechs, siebenhundert Leute",
+      "type": "QUANTITY",
+      "confidence": 0.9,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Number of people involved in a study",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "6fafebbc-4149-487e-8d4e-42a442ce5a6e",
+      "name": "acht Jahre",
+      "type": "DATE",
+      "confidence": 0.8,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Time elapsed since a conversation",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "b8293675-6d70-42ba-aa2f-d2b96374c4df",
+      "name": "Max Reinhardt",
+      "type": "ORGANIZATION",
+      "confidence": 0.98,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Name of a theatre or acting school",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "76ca7f45-752e-444f-a85e-2240e543531b",
+      "name": "Method Acting",
+      "type": "CONCEPT",
+      "confidence": 0.99,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Acting technique",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "30126252-a8d8-4ba2-9661-bc9d38df49df",
+      "name": "Meißner Training",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Acting technique",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "2dce4f55-51c7-4ac4-bb00-df9039437314",
+      "name": "Alex",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A role or persona; One of the speakers in the conversation.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "537df08a-09c0-4fed-8c1c-5256a92d7d7f",
+      "name": "Caro",
+      "type": "PERSON",
+      "confidence": 0.9,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A role or persona",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "378716c3-9715-49f4-a9b7-ecc967240b91",
+      "name": "Baseball Cup",
+      "type": "EVENT",
+      "confidence": 0.85,
+      "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Hypothetical sporting event",
+        "extraction_method": "llm",
+        "source_text": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten. Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute. Von denen sind natürlich schon inzwischen einige verstorben. Aber zu diesem Zeitpunkt ist die Conclusio dieser Studie, dass es glückliche Beziehungen sind,  die glücklich machen und dann am gesündesten halten und am Ende des Tages eben auch am längsten einleben lassen. Weil das ist das aktive, proaktive, was wir jeden Tag erleben, den",
+        "chunk_index": 6,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "22cfb414-fe16-4c5e-8994-8a54a3493184",
+      "name": "Susan Betzen",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "American coaching woman, author of the book \"Truth\"",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "3c5914b6-c112-4da8-a644-676b7875967d",
+      "name": "New York",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Susan Betzen's location",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "07d94e8e-504c-4dd5-9353-5ae2d3275113",
+      "name": "Truth",
+      "type": "WORK_OF_ART",
+      "confidence": 0.9,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Title of a book by Susan Betzen",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "99c1a201-f6cd-46fa-b081-88b2eab5fdbc",
+      "name": "Berlin",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "City where Susan Betzen held courses",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "5cbe04be-f46c-4c5a-b2bc-04165ccc948e",
+      "name": "Hawaii",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Location of a vacation",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "39d00be5-9473-4e3b-8886-30bcf1597366",
+      "name": "Rich Dad, Poor Dad",
+      "type": "WORK_OF_ART",
+      "confidence": 1.0,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Title of a book about finances",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "032f47f6-f168-4880-bf67-c522704f597d",
+      "name": "Rainer Seminar",
+      "type": "ORGANIZATION",
+      "confidence": 0.9,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Acting school mentioned in the text",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "62c45d32-9f90-4ebd-8f7d-3dc91e32c21f",
+      "name": "14 Jahren",
+      "type": "DATE",
+      "confidence": 0.8,
+      "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Time period before a specific event",
+        "extraction_method": "llm",
+        "source_text": "Das hat mich immer am Schauspiel auch so fasziniert. Und da ist es dann eben auch eben diese unterbewusste Kraft. Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth. Verstehe im Moment. Das finde ich sehr geil. Für mich ist das die absolute Schauspielbibel. Nur weil diese Frau, ich habe sie auch mehr und mehrfach erlebt. Sie kam nach Berlin, hat Kurse gemacht. Ob jetzt guter Schauspieler sein oder guter Mensch, ich glaube, das eine be",
+        "chunk_index": 7,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "941bd836-9c3e-4d4c-b93a-0c4ab90a2f58",
+      "name": "Cusco",
+      "type": "LOCATION",
+      "confidence": 0.9,
+      "source_text": "Das heißt, dass die Leute teilweise total, naja, nicht mehr ausdrucksstark waren,  weil sie so eher nach innen gingen und noch tiefer. Und das ist natürlich auch falsch. Es ist so die Mitte. Ja, ja, ja, genau. Die Schauspielschule immer sehr auf Prächt, also auf Außenwirkung gearbeitet haben,  was am Ende des Tages ein anderes Extrem, aber auch eben sehr stark ist. Waren wir so grübeln und noch mehr grübeln und fühlen wir das auch wirklich? Und dann irgendwann siehst du halt nichts mehr, ja? Ja,",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Specific location in Peru where Ayahuasca ceremonies took place.",
+        "extraction_method": "llm",
+        "source_text": "Das heißt, dass die Leute teilweise total, naja, nicht mehr ausdrucksstark waren,  weil sie so eher nach innen gingen und noch tiefer. Und das ist natürlich auch falsch. Es ist so die Mitte. Ja, ja, ja, genau. Die Schauspielschule immer sehr auf Prächt, also auf Außenwirkung gearbeitet haben,  was am Ende des Tages ein anderes Extrem, aber auch eben sehr stark ist. Waren wir so grübeln und noch mehr grübeln und fühlen wir das auch wirklich? Und dann irgendwann siehst du halt nichts mehr, ja? Ja,",
+        "chunk_index": 8,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "ecd26529-6151-4194-a869-741246915e30",
+      "name": "Schamanen",
+      "type": "PERSON",
+      "confidence": 0.85,
+      "source_text": "Das heißt, dass die Leute teilweise total, naja, nicht mehr ausdrucksstark waren,  weil sie so eher nach innen gingen und noch tiefer. Und das ist natürlich auch falsch. Es ist so die Mitte. Ja, ja, ja, genau. Die Schauspielschule immer sehr auf Prächt, also auf Außenwirkung gearbeitet haben,  was am Ende des Tages ein anderes Extrem, aber auch eben sehr stark ist. Waren wir so grübeln und noch mehr grübeln und fühlen wir das auch wirklich? Und dann irgendwann siehst du halt nichts mehr, ja? Ja,",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Shamans who conducted Ayahuasca ceremonies in Peru.",
+        "extraction_method": "llm",
+        "source_text": "Das heißt, dass die Leute teilweise total, naja, nicht mehr ausdrucksstark waren,  weil sie so eher nach innen gingen und noch tiefer. Und das ist natürlich auch falsch. Es ist so die Mitte. Ja, ja, ja, genau. Die Schauspielschule immer sehr auf Prächt, also auf Außenwirkung gearbeitet haben,  was am Ende des Tages ein anderes Extrem, aber auch eben sehr stark ist. Waren wir so grübeln und noch mehr grübeln und fühlen wir das auch wirklich? Und dann irgendwann siehst du halt nichts mehr, ja? Ja,",
+        "chunk_index": 8,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "e5c5814b-83aa-4439-b60a-841d5bb130f6",
+      "name": "Deutschland",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Germany, mentioned as a country where certain substances are prohibited.",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "cfcafc92-2e75-436c-8af2-a82bf84550d3",
+      "name": "Buddha",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Referenced as the originator of a specific meditation practice.",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "0dd1064a-1fd4-4e91-a80c-70a430154d1a",
+      "name": "DMT",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "N,N-Dimethyltryptamine, a psychedelic compound discussed in relation to its potential production in the pineal gland and its role in visionary experiences.",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "a523d51d-e347-4837-bdf2-44a25511bad5",
+      "name": "Pinoline",
+      "type": "PRODUCT",
+      "confidence": 0.8,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A substance mentioned for its purported psychoactive effects.",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "db1ec19a-e370-47b7-8973-12ac31a593c1",
+      "name": "Dispenser",
+      "type": "PERSON",
+      "confidence": 0.8,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A person mentioned in relation to their work with Brasswerk and DMT, and their meditation practices.",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "df2545ce-812f-4eec-8378-f3d1105e9256",
+      "name": "Brasswerk",
+      "type": "ORGANIZATION",
+      "confidence": 0.7,
+      "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Possibly a company or group associated with Dispenser and their work with DMT.",
+        "extraction_method": "llm",
+        "source_text": "Aber dich auch in einen guten Stream zu kriegen, weil du eben hier und jetzt,  wenn du jetzt hier glücklich bist, dann schützt du Serotonin aus, dann aktivierst du die Heilkräfte. Und darum geht das so ein bisschen, glaube ich. Also einfach mal auch viele Sachen zu Seite zu räumen, gut sein zu lassen, loszulassen, loszulassen. Wenn das immer so einfach wäre, mit dem Loslassen, die Sache mit dem Loslassen, genau. Genau, das ist ein Freund von mir, mein Lehrer, ich muss mir ganz kurz das Kabel hie",
+        "chunk_index": 9,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "1c714fa5-7d35-4fde-8bf7-f85e17fe0b07",
+      "name": "CBD",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A non-psychoactive ingredient from cannabis, now available at Rossmann.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "ecddba41-5c9c-4c72-9b9d-38c95b8d5026",
+      "name": "Rossmann",
+      "type": "ORGANIZATION",
+      "confidence": 0.9,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A retailer where CBD is sold.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "66e23635-1ad2-4f21-9211-62e0e6f00685",
+      "name": "Master Cleanse",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A type of fasting method involving lemon, syrup, and cayenne pepper.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "ada6dcd2-c792-48f2-84c4-127060391708",
+      "name": "Ayurveda",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A system of traditional medicine, from which Brami originates.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "c1a82bd6-804e-4b19-99b2-453d838ae911",
+      "name": "Brami",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "An Ayurvedic medicine that improves concentration.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "05a48398-4c21-4cf1-89f3-bf6e5544572a",
+      "name": "Haritaki",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A substance that increases blood oxygen levels.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "181ea231-0d2e-4eb7-b48a-bd0cf51f9d6d",
+      "name": "Bacoba",
+      "type": "PRODUCT",
+      "confidence": 0.8,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A supplement mentioned alongside Brami.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "5aa02b83-fbbf-4af6-8e8a-98d6a39d8aee",
+      "name": "Spirulina",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A supplement mentioned along with other detoxifying agents.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "ecf94378-4d51-45ec-a002-a99c5f88ebce",
+      "name": "Chlorella",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A supplement mentioned along with other detoxifying agents.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "bc65a444-a847-4a17-96a4-8cc8592983ed",
+      "name": "Weizengras",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A supplement mentioned along with other detoxifying agents.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "d1c97f37-1ba0-4cca-a85e-4eb587aee4fc",
+      "name": "Fabian",
+      "type": "PERSON",
+      "confidence": 0.9,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A person who observes market trends in supplements.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "aabaa508-a85d-40ab-b4e8-7cb131f33dac",
+      "name": "Cannabis",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "The source of CBD.",
+        "extraction_method": "llm",
+        "source_text": "Das funktioniert auch sehr abgefahren. Es gibt ganz viele tolle, einfach machen, ich würde sagen ausprobieren, die verschiedensten Sachen. Und ja, ich glaube auch der Körper braucht vieles. Also wir hatten auch mal über CBD gesprochen. CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das. Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt. Finde ich faszinierend, habe ich auch immer da. Soll ich hier auch au",
+        "chunk_index": 10,
+        "total_chunks": 11
+      }
+    },
+    {
+      "id": "ba3153fe-fa77-42f1-b9df-583dadd837fd",
+      "name": "Kongresspaket",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "Natürlich kann man sich diese ganzen Infos auch nicht immer merken. Und ja, wir wissen alle, die Zeit ist knapp. Ja, man kommt gar nicht hinterher mit diesen ganzen Informationen, die ja so wichtig sind. Ja, aber die einen schon manchmal auch überfordern. Ja, deshalb das Schöne ist, du kannst das Kongresspaket auch kaufen, falls du es nicht schon getan hast und dir alles in Ruhe anschauen. Es ist quasi wie eine kleine Bibliothek an Büchern. Denke immer dran, nur im Kollektiv können wir Menschen ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "A package related to a congress, possibly containing information or materials.",
+        "extraction_method": "llm",
+        "source_text": "Natürlich kann man sich diese ganzen Infos auch nicht immer merken. Und ja, wir wissen alle, die Zeit ist knapp. Ja, man kommt gar nicht hinterher mit diesen ganzen Informationen, die ja so wichtig sind. Ja, aber die einen schon manchmal auch überfordern. Ja, deshalb das Schöne ist, du kannst das Kongresspaket auch kaufen, falls du es nicht schon getan hast und dir alles in Ruhe anschauen. Es ist quasi wie eine kleine Bibliothek an Büchern. Denke immer dran, nur im Kollektiv können wir Menschen ",
+        "chunk_index": 11,
+        "total_chunks": 11
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "59301d56-d1c9-40cf-b10f-ef983e3404d7",
+      "type": "CUSTOM",
+      "source_entity_id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "target_entity_id": "fb697aab-ad3f-4212-b390-ee6c170682bf",
+      "confidence": 0.9,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "seine bekannteste Rolle war Karl der Große",
+        "extraction_method": "llm",
+        "source_entity_name": "Alexander Wüst",
+        "target_entity_name": "Karl der Große",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "81e06ea4-16d8-4fca-bb2f-09c903d98b30",
+      "type": "USES",
+      "source_entity_id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "target_entity_id": "89dd49a0-2316-4900-927a-b69b18babd8a",
+      "confidence": 0.85,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca",
+        "extraction_method": "llm",
+        "source_entity_name": "Alexander Wüst",
+        "target_entity_name": "Ayahuasca",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "650772e9-0c1a-4271-b5a1-99eb0044cfb5",
+      "type": "USES",
+      "source_entity_id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "target_entity_id": "fb805491-828b-4281-bd91-ea83b8c146fe",
+      "confidence": 0.85,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "und wir uns mit Ayahuasca viel beschäftigt haben und San Pedro",
+        "extraction_method": "llm",
+        "source_entity_name": "Alexander Wüst",
+        "target_entity_name": "San Pedro",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "b54c1594-2743-4a3c-99ad-627ee8efbdfd",
+      "type": "CUSTOM",
+      "source_entity_id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "target_entity_id": "ecd26529-6151-4194-a869-741246915e30",
+      "confidence": 0.9,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Es war zu der Zeit, wo ich sehr viel Schamanismus betrieben habe",
+        "extraction_method": "llm",
+        "source_entity_name": "Alexander Wüst",
+        "target_entity_name": "Schamanismus",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "ef138dff-2adc-4b85-880e-0d2bb7df47ac",
+      "type": "LOCATED_IN",
+      "source_entity_id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "target_entity_id": "bfd0b174-2b8c-4c21-908b-1697be7153b7",
+      "confidence": 0.8,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "vor allem natürlich häufiger in Österreich",
+        "extraction_method": "llm",
+        "source_entity_name": "Alexander Wüst",
+        "target_entity_name": "Österreich",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "ed1cd6a4-aef6-441f-b239-95a513a17487",
+      "type": "LOCATED_IN",
+      "source_entity_id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "target_entity_id": "053f8fed-2672-404c-9c11-097e4056cf09",
+      "confidence": 0.8,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "aber vor allem auch in Peru war",
+        "extraction_method": "llm",
+        "source_entity_name": "Alexander Wüst",
+        "target_entity_name": "Peru",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "e31a8551-b044-403e-860c-66328e8f7f9f",
+      "type": "LOCATED_IN",
+      "source_entity_id": "89dd49a0-2316-4900-927a-b69b18babd8a",
+      "target_entity_id": "053f8fed-2672-404c-9c11-097e4056cf09",
+      "confidence": 0.9,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "wie es ja auch in Peru oder in ganz Südamerika genannt wird",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Peru",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "b411418f-7fb4-4b85-a269-46c09e85fa4f",
+      "type": "LOCATED_IN",
+      "source_entity_id": "89dd49a0-2316-4900-927a-b69b18babd8a",
+      "target_entity_id": "011cfe30-67c2-4f76-af28-6b7b11e24ac5",
+      "confidence": 0.9,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "wie es ja auch in Peru oder in ganz Südamerika genannt wird",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Südamerika",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "e8fd41a6-939f-44d0-820e-d769041b3561",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fb805491-828b-4281-bd91-ea83b8c146fe",
+      "target_entity_id": "053f8fed-2672-404c-9c11-097e4056cf09",
+      "confidence": 0.9,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "wie es ja auch in Peru oder in ganz Südamerika genannt wird",
+        "extraction_method": "llm",
+        "source_entity_name": "San Pedro",
+        "target_entity_name": "Peru",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "1dc38782-e972-4bb5-bc54-c3dec50a5e41",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fb805491-828b-4281-bd91-ea83b8c146fe",
+      "target_entity_id": "011cfe30-67c2-4f76-af28-6b7b11e24ac5",
+      "confidence": 0.9,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "wie es ja auch in Peru oder in ganz Südamerika genannt wird",
+        "extraction_method": "llm",
+        "source_entity_name": "San Pedro",
+        "target_entity_name": "Südamerika",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "2cd14fe0-c12b-472f-abac-566bf792e266",
+      "type": "CUSTOM",
+      "source_entity_id": "92583dfe-200c-497d-b064-f53998670f0a",
+      "target_entity_id": "e8860610-15a4-4be8-ae26-8040d86aee6e",
+      "confidence": 0.98,
+      "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.",
+        "extraction_method": "llm",
+        "source_entity_name": "Carolin Tietz",
+        "target_entity_name": "Alexander Wüst",
+        "source_text": "Hallo, mein Name ist Carolin Tietz und ich freue mich sehr, dir heute das folgende Interview zu zeigen, mit Alexander Wüst.  Er ist ein Schauspieler und seine bekannteste Rolle war Karl der Große, auch bei alles, was zählt hat, der mitgemacht.  Er erzählt uns in diesem Interview, wie er zu dieser Rolle kam und seine Fähigkeit zu visualisieren  und über seine langjährige Erfahrung mit Schamanenmedizin, zum Beispiel auch Ayahuasca.  Traumata aus der Kindheit habe ich auch viele Male erlebt, wie ic"
+      }
+    },
+    {
+      "id": "3281846c-9f1f-4ef8-81ce-2df8b45e8b5d",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "89dd49a0-2316-4900-927a-b69b18babd8a",
+      "target_entity_id": "fb805491-828b-4281-bd91-ea83b8c146fe",
+      "confidence": 0.9,
+      "source_text": "der eine Reaktion bekommen von der Außenwelt.  Also deswegen, das ist schon faszinierend, auch die Forschung dahinter, was man da inzwischen eben auch herausgefunden hat, was das mit dem Menschen machen kann.  Das geht eben einerseits in die Vergangenheit, wo unsere Traumata liegen, aber wenn man den größeren Zusammenhang von Ayahuasca und den indigenen Völkern,  die ja mit Ayahuasca und San Pedro sich auch mit ihren Geistern und mit höheren Ebenen des Bewusstseins verbinden,  wenn man es aus de",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "wenn man den größeren Zusammenhang von Ayahuasca und den indigenen Völkern,  die ja mit Ayahuasca und San Pedro sich auch mit ihren Geistern und mit höheren Ebenen des Bewusstseins verbinden",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "San Pedro",
+        "source_text": "der eine Reaktion bekommen von der Außenwelt.  Also deswegen, das ist schon faszinierend, auch die Forschung dahinter, was man da inzwischen eben auch herausgefunden hat, was das mit dem Menschen machen kann.  Das geht eben einerseits in die Vergangenheit, wo unsere Traumata liegen, aber wenn man den größeren Zusammenhang von Ayahuasca und den indigenen Völkern,  die ja mit Ayahuasca und San Pedro sich auch mit ihren Geistern und mit höheren Ebenen des Bewusstseins verbinden,  wenn man es aus de"
+      }
+    },
+    {
+      "id": "6d0297de-cf72-4dee-86a3-51339287b24d",
+      "type": "CUSTOM",
+      "source_entity_id": "fb697aab-ad3f-4212-b390-ee6c170682bf",
+      "target_entity_id": "29837314-d2fa-4a61-88c0-5e376553c3de",
+      "confidence": 1.0,
+      "source_text": "der eine Reaktion bekommen von der Außenwelt.  Also deswegen, das ist schon faszinierend, auch die Forschung dahinter, was man da inzwischen eben auch herausgefunden hat, was das mit dem Menschen machen kann.  Das geht eben einerseits in die Vergangenheit, wo unsere Traumata liegen, aber wenn man den größeren Zusammenhang von Ayahuasca und den indigenen Völkern,  die ja mit Ayahuasca und San Pedro sich auch mit ihren Geistern und mit höheren Ebenen des Bewusstseins verbinden,  wenn man es aus de",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Das geht eben einerseits in die Vergangenheit, wo unsere Traumata liegen, aber wenn man den größeren Zusammenhang von Ayahuasca und den indigenen Völkern,  die ja mit Ayahuasca und San Pedro sich auch mit ihren Geistern und mit höheren Ebenen des Bewusstseins verbinden,  wenn man es aus deren Perspektive sieht, ist eben Zeit auch relativ und man kann sowohl in die Vergangenheit als auch in die Zukunft reisen.  Bei einer Zeremonie weiß ich noch, wie ich auch so hyperreal, das habe ich wirklich total gespürt,  erst erlebte ich, wie ich in einem Käfig ganz tief unten eine Art Drachen oder wildes Tier spüren konnte  und versucht habe, da eine Idee zu kommen, was das denn in mir ist und plötzlich stand ich, im nächsten Moment stand ich auf einem Schlachtfeld.  Und so wie ich mich jetzt wahrnehme, so real war das für mich und ich konnte mich umschauen, es war ein riesiges Schlachtfeld,  es waren viele Jahrhunderte zuvor, also in der Vergangenheit, es war eine Schlacht um mich herum gewesen  und ich konnte die vielen Leichen und Verletzte sehen und ich hielt selber ein Schwert in der Hand und war in einer Rüstung,  eine Art Rüstung und Blut tropfte von meinem Schwert und ich wusste für mich, ich schaute mich um, es brannte etc.  und ich schaute mich um und ich wusste, dass ich dafür verantwortlich war, was dort passiert war  und ich wusste auch in dem gleichen Moment, dass es das Rat der Zeit gewesen war, dass es nicht meine persönliche Verantwortung war,  dass das geschehen war, sondern das waren komplexe Vorgänge, die dazu geführt hatten, dass ich Verantwortung und Mitverantwortung dafür trage,  dass das Schreckliche, was da geschehen war, stattgefunden hatte und ich wusste also, ich war der Machthaber dessen,  ich war der, der das angeführt hatte und durchgezogen hatte und dann plötzlich war ich wieder in der Realität, in der Zeremonie  und später als ich dann den Kreis verließ und wir begannen miteinander zu reden, verschiedene Leute, habe ich das allen erzählt,  dass ich eben diese Vision hatte, dass ich klar war, dass ich wusste, dass ich der Verantwortliche war und dass ich aber auch eben wusste,  dass das sozusagen nicht allein ich war böse und hatte alle abschlachten wollen, sondern nein, im Gegenteil, das war das Rat der Zeit gewesen,  was dazu geführt hatte und das habe ich vielen Leuten erzählt damals und konnte damit aber auch keine Ahnung, was damit anfangen,  vielleicht eine Erinnerung aus der Vergangenheit, anderes Leben, was auch immer und zwei Wochen später oder zweieinhalb Wochen später  kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten und dann las ich das und las irgendwann die Szene, die",
+        "extraction_method": "llm",
+        "source_entity_name": "Karl der Große",
+        "target_entity_name": "Karl den Großen",
+        "source_text": "der eine Reaktion bekommen von der Außenwelt.  Also deswegen, das ist schon faszinierend, auch die Forschung dahinter, was man da inzwischen eben auch herausgefunden hat, was das mit dem Menschen machen kann.  Das geht eben einerseits in die Vergangenheit, wo unsere Traumata liegen, aber wenn man den größeren Zusammenhang von Ayahuasca und den indigenen Völkern,  die ja mit Ayahuasca und San Pedro sich auch mit ihren Geistern und mit höheren Ebenen des Bewusstseins verbinden,  wenn man es aus de"
+      }
+    },
+    {
+      "id": "9302138e-701a-4656-9d81-eab62d654d4f",
+      "type": "PARTICIPATED_IN",
+      "source_entity_id": "ca378720-6437-4ce3-990c-1d71dce91a12",
+      "target_entity_id": "29837314-d2fa-4a61-88c0-5e376553c3de",
+      "confidence": 0.95,
+      "source_text": "führt hatte und das habe ich vielen Leuten erzählt damals und konnte damit aber auch keine Ahnung, was damit anfangen,  vielleicht eine Erinnerung aus der Vergangenheit, anderes Leben, was auch immer und zwei Wochen später oder zweieinhalb Wochen später  kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten und dann las ich das und las irgendwann die Szene, die",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten",
+        "extraction_method": "llm",
+        "source_entity_name": "ARD",
+        "target_entity_name": "Karl den Großen",
+        "source_text": "führt hatte und das habe ich vielen Leuten erzählt damals und konnte damit aber auch keine Ahnung, was damit anfangen,  vielleicht eine Erinnerung aus der Vergangenheit, anderes Leben, was auch immer und zwei Wochen später oder zweieinhalb Wochen später  kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten und dann las ich das und las irgendwann die Szene, die"
+      }
+    },
+    {
+      "id": "5ef7dfb7-c4ae-4cc0-90b6-7b7a6496bbc2",
+      "type": "PARTICIPATED_IN",
+      "source_entity_id": "6dfc6b0d-5449-4e69-94ee-6db0b42910d5",
+      "target_entity_id": "29837314-d2fa-4a61-88c0-5e376553c3de",
+      "confidence": 0.95,
+      "source_text": "führt hatte und das habe ich vielen Leuten erzählt damals und konnte damit aber auch keine Ahnung, was damit anfangen,  vielleicht eine Erinnerung aus der Vergangenheit, anderes Leben, was auch immer und zwei Wochen später oder zweieinhalb Wochen später  kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten und dann las ich das und las irgendwann die Szene, die",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten",
+        "extraction_method": "llm",
+        "source_entity_name": "Arte",
+        "target_entity_name": "Karl den Großen",
+        "source_text": "führt hatte und das habe ich vielen Leuten erzählt damals und konnte damit aber auch keine Ahnung, was damit anfangen,  vielleicht eine Erinnerung aus der Vergangenheit, anderes Leben, was auch immer und zwei Wochen später oder zweieinhalb Wochen später  kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten und dann las ich das und las irgendwann die Szene, die"
+      }
+    },
+    {
+      "id": "e62b659d-bf30-48c5-87c2-fe8a51c0fd4d",
+      "type": "LOCATED_IN",
+      "source_entity_id": "4965fba2-f34a-44aa-a51d-9797e0987191",
+      "target_entity_id": "37aa52d6-c3f5-49b5-9941-2fe2f10f54fb",
+      "confidence": 0.95,
+      "source_text": "führt hatte und das habe ich vielen Leuten erzählt damals und konnte damit aber auch keine Ahnung, was damit anfangen,  vielleicht eine Erinnerung aus der Vergangenheit, anderes Leben, was auch immer und zwei Wochen später oder zweieinhalb Wochen später  kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten und dann las ich das und las irgendwann die Szene, die",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "auch in Südtirol war es,  dort hat man auf der Seiser Alm, weil die so hoch liegt und immer gutes Wetter hat und man sehr viel blauen Himmel hat, hat man dort die großen Schlachtenszenen gedreht",
+        "extraction_method": "llm",
+        "source_entity_name": "Seiser Alm",
+        "target_entity_name": "Südtirol",
+        "source_text": "führt hatte und das habe ich vielen Leuten erzählt damals und konnte damit aber auch keine Ahnung, was damit anfangen,  vielleicht eine Erinnerung aus der Vergangenheit, anderes Leben, was auch immer und zwei Wochen später oder zweieinhalb Wochen später  kommt ein Drehbuch per Post, ohne dass es vorher Gespräche gab, das war eine Doku Fiction von ARD, Arte und einem französischen Sender zusammen,  die das Leben von Karl den Großen verfilmten und dann las ich das und las irgendwann die Szene, die"
+      }
+    },
+    {
+      "id": "24ca5e7b-a35c-4bd8-90da-f6ee4baaa65c",
+      "type": "RELATED_TO",
+      "source_entity_id": "1c2cc8a3-8793-43ca-932b-6adac24cba5f",
+      "target_entity_id": "79dcbd8c-067f-47a1-996e-013f16a47b9c",
+      "confidence": 0.8,
+      "source_text": "etzeln.  Also das ist schon fast Standard, dass es in Filmen auf Netflix und so weiter kommt.  Und das bleibt ja natürlich auch hängen in unserem Verstand.  Ja, also das sind ja auch Wunden, die wir uns eigentlich zufügen dann.  Wie gesagt, der ein oder andere Kampf macht ja auch Spaß, aber eben in dieser Masse.  Und gerade jetzt, wenn ich so Kinder, die groß werden, mir anschaue, stand ich im Buchladen  und dann hatten wir für den Freund meines Sohnes, den kleinen Hobbit, kauften wir das Buch. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Eine der längsten Studien, Menschheitsstudien, die es gibt, ist eine Stanford- oder Harvard-Studie  zu dem Thema Gesundheit, Glück, also Glück, Gesundheit und Langlebigkeit.",
+        "extraction_method": "llm",
+        "source_entity_name": "Stanford",
+        "target_entity_name": "Harvard",
+        "source_text": "etzeln.  Also das ist schon fast Standard, dass es in Filmen auf Netflix und so weiter kommt.  Und das bleibt ja natürlich auch hängen in unserem Verstand.  Ja, also das sind ja auch Wunden, die wir uns eigentlich zufügen dann.  Wie gesagt, der ein oder andere Kampf macht ja auch Spaß, aber eben in dieser Masse.  Und gerade jetzt, wenn ich so Kinder, die groß werden, mir anschaue, stand ich im Buchladen  und dann hatten wir für den Freund meines Sohnes, den kleinen Hobbit, kauften wir das Buch. "
+      }
+    },
+    {
+      "id": "ef7879de-0c8c-45ac-b957-f380631757bd",
+      "type": "HAPPENED_ON",
+      "source_entity_id": "1c2cc8a3-8793-43ca-932b-6adac24cba5f",
+      "target_entity_id": "a3721d26-2243-409f-9823-409351c2f14e",
+      "confidence": 0.9,
+      "source_text": "etzeln.  Also das ist schon fast Standard, dass es in Filmen auf Netflix und so weiter kommt.  Und das bleibt ja natürlich auch hängen in unserem Verstand.  Ja, also das sind ja auch Wunden, die wir uns eigentlich zufügen dann.  Wie gesagt, der ein oder andere Kampf macht ja auch Spaß, aber eben in dieser Masse.  Und gerade jetzt, wenn ich so Kinder, die groß werden, mir anschaue, stand ich im Buchladen  und dann hatten wir für den Freund meines Sohnes, den kleinen Hobbit, kauften wir das Buch. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Und in dieser Studie kommt eben nach jetzt 75 Jahren raus eine Auswertung Zehntausender von Akten.",
+        "extraction_method": "llm",
+        "source_entity_name": "Stanford- oder Harvard-Studie",
+        "target_entity_name": "75 Jahren",
+        "source_text": "etzeln.  Also das ist schon fast Standard, dass es in Filmen auf Netflix und so weiter kommt.  Und das bleibt ja natürlich auch hängen in unserem Verstand.  Ja, also das sind ja auch Wunden, die wir uns eigentlich zufügen dann.  Wie gesagt, der ein oder andere Kampf macht ja auch Spaß, aber eben in dieser Masse.  Und gerade jetzt, wenn ich so Kinder, die groß werden, mir anschaue, stand ich im Buchladen  und dann hatten wir für den Freund meines Sohnes, den kleinen Hobbit, kauften wir das Buch. "
+      }
+    },
+    {
+      "id": "3079bad0-86e3-4875-9dfa-349f6c66105f",
+      "type": "PARTICIPATED_IN",
+      "source_entity_id": "1c2cc8a3-8793-43ca-932b-6adac24cba5f",
+      "target_entity_id": "db5c415a-55a1-45ec-9e42-02eaaf14d892",
+      "confidence": 0.9,
+      "source_text": "etzeln.  Also das ist schon fast Standard, dass es in Filmen auf Netflix und so weiter kommt.  Und das bleibt ja natürlich auch hängen in unserem Verstand.  Ja, also das sind ja auch Wunden, die wir uns eigentlich zufügen dann.  Wie gesagt, der ein oder andere Kampf macht ja auch Spaß, aber eben in dieser Masse.  Und gerade jetzt, wenn ich so Kinder, die groß werden, mir anschaue, stand ich im Buchladen  und dann hatten wir für den Freund meines Sohnes, den kleinen Hobbit, kauften wir das Buch. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Das war mit 75 Jahren lang begleitet sechs, siebenhundert Leute.",
+        "extraction_method": "llm",
+        "source_entity_name": "Stanford- oder Harvard-Studie",
+        "target_entity_name": "sechs, siebenhundert Leute",
+        "source_text": "etzeln.  Also das ist schon fast Standard, dass es in Filmen auf Netflix und so weiter kommt.  Und das bleibt ja natürlich auch hängen in unserem Verstand.  Ja, also das sind ja auch Wunden, die wir uns eigentlich zufügen dann.  Wie gesagt, der ein oder andere Kampf macht ja auch Spaß, aber eben in dieser Masse.  Und gerade jetzt, wenn ich so Kinder, die groß werden, mir anschaue, stand ich im Buchladen  und dann hatten wir für den Freund meines Sohnes, den kleinen Hobbit, kauften wir das Buch. "
+      }
+    },
+    {
+      "id": "0b33ade7-20f7-4b6f-9a44-20a664b5e651",
+      "type": "CREATED_BY",
+      "source_entity_id": "22cfb414-fe16-4c5e-8994-8a54a3493184",
+      "target_entity_id": "07d94e8e-504c-4dd5-9353-5ae2d3275113",
+      "confidence": 0.95,
+      "source_text": " ich dich noch fragte, wie macht man das als Schauspieler?  Also ich habe das, ich habe ja keine Ausbildung als Schauspieler gemacht.  Aber als ich dann auf einmal immer mehr präsenter wurde, immer mehr nach draußen gegangen bin  und mich irgendwie so schützen musste und wollte, weil das war mir viel zu viel, auch die ganzen Social Media und so weiter.  Und da weiß ich noch, hast du zu mir gesagt, betrachte das Leben wie eine Bühne.  Wo du wie als Schauspieler sozusagen in eine Rolle schlüpfst. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth.",
+        "extraction_method": "llm",
+        "source_entity_name": "Susan Betzen",
+        "target_entity_name": "Truth",
+        "source_text": " ich dich noch fragte, wie macht man das als Schauspieler?  Also ich habe das, ich habe ja keine Ausbildung als Schauspieler gemacht.  Aber als ich dann auf einmal immer mehr präsenter wurde, immer mehr nach draußen gegangen bin  und mich irgendwie so schützen musste und wollte, weil das war mir viel zu viel, auch die ganzen Social Media und so weiter.  Und da weiß ich noch, hast du zu mir gesagt, betrachte das Leben wie eine Bühne.  Wo du wie als Schauspieler sozusagen in eine Rolle schlüpfst. "
+      }
+    },
+    {
+      "id": "128e42cf-6bac-4a35-a075-f66ca915ee2a",
+      "type": "LOCATED_IN",
+      "source_entity_id": "22cfb414-fe16-4c5e-8994-8a54a3493184",
+      "target_entity_id": "3c5914b6-c112-4da8-a644-676b7875967d",
+      "confidence": 0.95,
+      "source_text": " ich dich noch fragte, wie macht man das als Schauspieler?  Also ich habe das, ich habe ja keine Ausbildung als Schauspieler gemacht.  Aber als ich dann auf einmal immer mehr präsenter wurde, immer mehr nach draußen gegangen bin  und mich irgendwie so schützen musste und wollte, weil das war mir viel zu viel, auch die ganzen Social Media und so weiter.  Und da weiß ich noch, hast du zu mir gesagt, betrachte das Leben wie eine Bühne.  Wo du wie als Schauspieler sozusagen in eine Rolle schlüpfst. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth.",
+        "extraction_method": "llm",
+        "source_entity_name": "Susan Betzen",
+        "target_entity_name": "New York",
+        "source_text": " ich dich noch fragte, wie macht man das als Schauspieler?  Also ich habe das, ich habe ja keine Ausbildung als Schauspieler gemacht.  Aber als ich dann auf einmal immer mehr präsenter wurde, immer mehr nach draußen gegangen bin  und mich irgendwie so schützen musste und wollte, weil das war mir viel zu viel, auch die ganzen Social Media und so weiter.  Und da weiß ich noch, hast du zu mir gesagt, betrachte das Leben wie eine Bühne.  Wo du wie als Schauspieler sozusagen in eine Rolle schlüpfst. "
+      }
+    },
+    {
+      "id": "40eae12f-ba9f-4c5d-8c38-5382aed073f8",
+      "type": "HAPPENED_AT",
+      "source_entity_id": "22cfb414-fe16-4c5e-8994-8a54a3493184",
+      "target_entity_id": "99c1a201-f6cd-46fa-b081-88b2eab5fdbc",
+      "confidence": 0.85,
+      "source_text": "ich ein ganz anderer Typ.  Also wir meinen zwar immer eine Identität zu haben, das sind wir, gar nicht, aber das ist ja völliger Quatsch.  Wir könnten ja alles Mögliche sein. Das hat mich immer am Schauspiel auch so fasziniert.  Und da ist es dann eben auch eben diese unterbewusste Kraft.  Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth.  Verstehe im Moment.  Das finde ich sehr geil.  Für mich ist das die absolute Schauspielbibel. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Sie kam nach Berlin, hat Kurse gemacht.",
+        "extraction_method": "llm",
+        "source_entity_name": "Susan Betzen",
+        "target_entity_name": "Berlin",
+        "source_text": "ich ein ganz anderer Typ.  Also wir meinen zwar immer eine Identität zu haben, das sind wir, gar nicht, aber das ist ja völliger Quatsch.  Wir könnten ja alles Mögliche sein. Das hat mich immer am Schauspiel auch so fasziniert.  Und da ist es dann eben auch eben diese unterbewusste Kraft.  Das Buch meiner Lieblingscoach, amerikanischen Coachingfrau Susan Betzen aus New York und es heißt einfach Truth.  Verstehe im Moment.  Das finde ich sehr geil.  Für mich ist das die absolute Schauspielbibel. "
+      }
+    },
+    {
+      "id": "6649e2d7-0e3a-4443-a4fb-aa889f5f9f38",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "89dd49a0-2316-4900-927a-b69b18babd8a",
+      "target_entity_id": "053f8fed-2672-404c-9c11-097e4056cf09",
+      "confidence": 0.95,
+      "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Aber ich weiß eins, immer wenn das Ayahuasca, dann habe ich ganz irre Zeiten auch in Peru erlebt",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Peru",
+        "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. "
+      }
+    },
+    {
+      "id": "a12b051b-9c8e-48d7-b7f7-97306075703f",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "89dd49a0-2316-4900-927a-b69b18babd8a",
+      "target_entity_id": "ecd26529-6151-4194-a869-741246915e30",
+      "confidence": 0.9,
+      "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Aber ich weiß eins, immer wenn das Ayahuasca, dann habe ich ganz irre Zeiten auch in Peru erlebt,  mit den Schamanen vor Ort in den Bergen da oben in Cusco.",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Schamanen",
+        "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. "
+      }
+    },
+    {
+      "id": "0d2054d4-21c0-4a3d-818e-e117f7c2d3ff",
+      "type": "LOCATED_IN",
+      "source_entity_id": "ecd26529-6151-4194-a869-741246915e30",
+      "target_entity_id": "941bd836-9c3e-4d4c-b93a-0c4ab90a2f58",
+      "confidence": 0.9,
+      "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Aber ich weiß eins, immer wenn das Ayahuasca, dann habe ich ganz irre Zeiten auch in Peru erlebt,  mit den Schamanen vor Ort in den Bergen da oben in Cusco.",
+        "extraction_method": "llm",
+        "source_entity_name": "Schamanen",
+        "target_entity_name": "Cusco",
+        "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. "
+      }
+    },
+    {
+      "id": "b99a86f2-0c47-4baf-b1c7-d2d074c50af4",
+      "type": "LOCATED_IN",
+      "source_entity_id": "941bd836-9c3e-4d4c-b93a-0c4ab90a2f58",
+      "target_entity_id": "053f8fed-2672-404c-9c11-097e4056cf09",
+      "confidence": 0.95,
+      "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Aber ich weiß eins, immer wenn das Ayahuasca, dann habe ich ganz irre Zeiten auch in Peru erlebt,  mit den Schamanen vor Ort in den Bergen da oben in Cusco.",
+        "extraction_method": "llm",
+        "source_entity_name": "Cusco",
+        "target_entity_name": "Peru",
+        "source_text": "anzen Studiengänge  wird einem eigentlich komplett die Freiheit genommen, auf freie Kunst zu gestalten.  Das ist schon auch heftig.  Ja, es ist halt beides. Es ist halt diese Balance wieder.  Da kommen wir wieder in die Balance.  Wie der Alchemist, das ja dieses schöne Gleichnis mit dem Löffel und dem Tropfen Öl drauf.  Und dann geht er zur Party und soll am Ende berichten und hat alles verloren, das Öl verloren.  Und hat nur die Party gesehen, aber das Öl hat keinen Blick aufs Innere gehalten. "
+      }
+    },
+    {
+      "id": "c90da19a-2394-4ca6-aa35-3f98bc16924d",
+      "type": "USES",
+      "source_entity_id": "db1ec19a-e370-47b7-8973-12ac31a593c1",
+      "target_entity_id": "df2545ce-812f-4eec-8378-f3d1105e9256",
+      "confidence": 0.9,
+      "source_text": "s man so ein bisschen dieses verkrampfte, man ist so, das Leben sei so, dann...  Ja, ist wieder da.  Genau, dass man auf einmal merkt, boah, da ist so viel mehr, das ist so groß.  Und allein dieses Staunen relativiert eben viele von den kleinen Problemchen, die man hat.  Und da die Spannung rauszunehmen, ist ja am Ende des Tages häufig auch die Lösung.  Also ich sehe auch viele Leute, die unbedingt ihre Probleme lösen wollen und herausfinden wollen,  dass sie was denn mit ihnen falsch annehmen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Du bist ja auch mit Dispenser sehr vertraut. Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Dispenser",
+        "target_entity_name": "Brasswerk",
+        "source_text": "s man so ein bisschen dieses verkrampfte, man ist so, das Leben sei so, dann...  Ja, ist wieder da.  Genau, dass man auf einmal merkt, boah, da ist so viel mehr, das ist so groß.  Und allein dieses Staunen relativiert eben viele von den kleinen Problemchen, die man hat.  Und da die Spannung rauszunehmen, ist ja am Ende des Tages häufig auch die Lösung.  Also ich sehe auch viele Leute, die unbedingt ihre Probleme lösen wollen und herausfinden wollen,  dass sie was denn mit ihnen falsch annehmen. "
+      }
+    },
+    {
+      "id": "d89fc10e-5412-4f77-a057-4ea646f3a094",
+      "type": "CREATED_BY",
+      "source_entity_id": "db1ec19a-e370-47b7-8973-12ac31a593c1",
+      "target_entity_id": "0dd1064a-1fd4-4e91-a80c-70a430154d1a",
+      "confidence": 0.9,
+      "source_text": "s man so ein bisschen dieses verkrampfte, man ist so, das Leben sei so, dann...  Ja, ist wieder da.  Genau, dass man auf einmal merkt, boah, da ist so viel mehr, das ist so groß.  Und allein dieses Staunen relativiert eben viele von den kleinen Problemchen, die man hat.  Und da die Spannung rauszunehmen, ist ja am Ende des Tages häufig auch die Lösung.  Also ich sehe auch viele Leute, die unbedingt ihre Probleme lösen wollen und herausfinden wollen,  dass sie was denn mit ihnen falsch annehmen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Du bist ja auch mit Dispenser sehr vertraut. Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Dispenser",
+        "target_entity_name": "DMT",
+        "source_text": "s man so ein bisschen dieses verkrampfte, man ist so, das Leben sei so, dann...  Ja, ist wieder da.  Genau, dass man auf einmal merkt, boah, da ist so viel mehr, das ist so groß.  Und allein dieses Staunen relativiert eben viele von den kleinen Problemchen, die man hat.  Und da die Spannung rauszunehmen, ist ja am Ende des Tages häufig auch die Lösung.  Also ich sehe auch viele Leute, die unbedingt ihre Probleme lösen wollen und herausfinden wollen,  dass sie was denn mit ihnen falsch annehmen. "
+      }
+    },
+    {
+      "id": "386082c4-3b44-4ac4-b715-0f7c80cfe018",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "ecd26529-6151-4194-a869-741246915e30",
+      "target_entity_id": "053f8fed-2672-404c-9c11-097e4056cf09",
+      "confidence": 0.7,
+      "source_text": "s man so ein bisschen dieses verkrampfte, man ist so, das Leben sei so, dann...  Ja, ist wieder da.  Genau, dass man auf einmal merkt, boah, da ist so viel mehr, das ist so groß.  Und allein dieses Staunen relativiert eben viele von den kleinen Problemchen, die man hat.  Und da die Spannung rauszunehmen, ist ja am Ende des Tages häufig auch die Lösung.  Also ich sehe auch viele Leute, die unbedingt ihre Probleme lösen wollen und herausfinden wollen,  dass sie was denn mit ihnen falsch annehmen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Aber wie schaffen das denn die Menschen, weil es ist ja verboten hier in Deutschland, wie schaffen das denn die Menschen auch ohne sowas? Weil wir haben sowas natürlich ja auch als Botenstoffe in uns. Aber über so Schamanenmedizin oder Dschungelmedizin haben wir natürlich nochmal einen ganz anderen Zugang.",
+        "extraction_method": "llm",
+        "source_entity_name": "Schamanenmedizin",
+        "target_entity_name": "Peru",
+        "source_text": "s man so ein bisschen dieses verkrampfte, man ist so, das Leben sei so, dann...  Ja, ist wieder da.  Genau, dass man auf einmal merkt, boah, da ist so viel mehr, das ist so groß.  Und allein dieses Staunen relativiert eben viele von den kleinen Problemchen, die man hat.  Und da die Spannung rauszunehmen, ist ja am Ende des Tages häufig auch die Lösung.  Also ich sehe auch viele Leute, die unbedingt ihre Probleme lösen wollen und herausfinden wollen,  dass sie was denn mit ihnen falsch annehmen. "
+      }
+    },
+    {
+      "id": "618b23d6-dff7-4bd8-a0f9-84129518e788",
+      "type": "USES",
+      "source_entity_id": "db1ec19a-e370-47b7-8973-12ac31a593c1",
+      "target_entity_id": "0dd1064a-1fd4-4e91-a80c-70a430154d1a",
+      "confidence": 0.9,
+      "source_text": " haben sowas natürlich ja auch als Botenstoffe in uns.  Also Pinoline ist ja auch in dem Sinne weiß man nicht, aber dem wird eine psychoaktive Wirkung nachgesagt.  DMT ja auch. Wir wissen nicht, ob es in der Zibbeldrüse ist, aber es ist irgendwie in unserem Körper.  Und es sorgt dafür, dass wir Visionen empfangen können, wenn wir richtig auf Reise gehen.  Du bist ja auch mit Dispenser sehr vertraut.  Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Dispenser",
+        "target_entity_name": "DMT",
+        "source_text": " haben sowas natürlich ja auch als Botenstoffe in uns.  Also Pinoline ist ja auch in dem Sinne weiß man nicht, aber dem wird eine psychoaktive Wirkung nachgesagt.  DMT ja auch. Wir wissen nicht, ob es in der Zibbeldrüse ist, aber es ist irgendwie in unserem Körper.  Und es sorgt dafür, dass wir Visionen empfangen können, wenn wir richtig auf Reise gehen.  Du bist ja auch mit Dispenser sehr vertraut.  Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen. "
+      }
+    },
+    {
+      "id": "effbfa09-dfce-4470-8a55-1be3b7e7ab6c",
+      "type": "PART_OF",
+      "source_entity_id": "aabaa508-a85d-40ab-b4e8-7cb131f33dac",
+      "target_entity_id": "1c714fa5-7d35-4fde-8bf7-f85e17fe0b07",
+      "confidence": 0.95,
+      "source_text": " haben sowas natürlich ja auch als Botenstoffe in uns.  Also Pinoline ist ja auch in dem Sinne weiß man nicht, aber dem wird eine psychoaktive Wirkung nachgesagt.  DMT ja auch. Wir wissen nicht, ob es in der Zibbeldrüse ist, aber es ist irgendwie in unserem Körper.  Und es sorgt dafür, dass wir Visionen empfangen können, wenn wir richtig auf Reise gehen.  Du bist ja auch mit Dispenser sehr vertraut.  Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.",
+        "extraction_method": "llm",
+        "source_entity_name": "Cannabis",
+        "target_entity_name": "CBD",
+        "source_text": " haben sowas natürlich ja auch als Botenstoffe in uns.  Also Pinoline ist ja auch in dem Sinne weiß man nicht, aber dem wird eine psychoaktive Wirkung nachgesagt.  DMT ja auch. Wir wissen nicht, ob es in der Zibbeldrüse ist, aber es ist irgendwie in unserem Körper.  Und es sorgt dafür, dass wir Visionen empfangen können, wenn wir richtig auf Reise gehen.  Du bist ja auch mit Dispenser sehr vertraut.  Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen. "
+      }
+    },
+    {
+      "id": "2e8e11de-58bf-4031-ad6e-04e5d9346073",
+      "type": "CUSTOM",
+      "source_entity_id": "1c714fa5-7d35-4fde-8bf7-f85e17fe0b07",
+      "target_entity_id": "ecddba41-5c9c-4c72-9b9d-38c95b8d5026",
+      "confidence": 0.9,
+      "source_text": " haben sowas natürlich ja auch als Botenstoffe in uns.  Also Pinoline ist ja auch in dem Sinne weiß man nicht, aber dem wird eine psychoaktive Wirkung nachgesagt.  DMT ja auch. Wir wissen nicht, ob es in der Zibbeldrüse ist, aber es ist irgendwie in unserem Körper.  Und es sorgt dafür, dass wir Visionen empfangen können, wenn wir richtig auf Reise gehen.  Du bist ja auch mit Dispenser sehr vertraut.  Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.",
+        "extraction_method": "llm",
+        "source_entity_name": "CBD",
+        "target_entity_name": "Rossmann",
+        "source_text": " haben sowas natürlich ja auch als Botenstoffe in uns.  Also Pinoline ist ja auch in dem Sinne weiß man nicht, aber dem wird eine psychoaktive Wirkung nachgesagt.  DMT ja auch. Wir wissen nicht, ob es in der Zibbeldrüse ist, aber es ist irgendwie in unserem Körper.  Und es sorgt dafür, dass wir Visionen empfangen können, wenn wir richtig auf Reise gehen.  Du bist ja auch mit Dispenser sehr vertraut.  Ja, der versucht ja auch wirklich über Brasswerk, Schamanik Brasswerk wirklich DMT zu erzeugen. "
+      }
+    },
+    {
+      "id": "540788cd-d49f-49ad-8eb2-2b4dd746f8b9",
+      "type": "PART_OF",
+      "source_entity_id": "1c714fa5-7d35-4fde-8bf7-f85e17fe0b07",
+      "target_entity_id": "aabaa508-a85d-40ab-b4e8-7cb131f33dac",
+      "confidence": 0.95,
+      "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.",
+        "extraction_method": "llm",
+        "source_entity_name": "CBD",
+        "target_entity_name": "Cannabis",
+        "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. "
+      }
+    },
+    {
+      "id": "ffd13f9c-8831-41e4-9fcb-ec505e86dff7",
+      "type": "CUSTOM",
+      "source_entity_id": "c1a82bd6-804e-4b19-99b2-453d838ae911",
+      "target_entity_id": "ada6dcd2-c792-48f2-84c4-127060391708",
+      "confidence": 0.95,
+      "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Brami ist aus dem Ayurveda, also eine ayurvedische Medizin, die die Konzentration schärft.",
+        "extraction_method": "llm",
+        "source_entity_name": "Brami",
+        "target_entity_name": "Ayurveda",
+        "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. "
+      }
+    },
+    {
+      "id": "611009d7-9fd7-4143-8a6d-c796950e273f",
+      "type": "CUSTOM",
+      "source_entity_id": "d1c97f37-1ba0-4cca-a85e-4eb587aee4fc",
+      "target_entity_id": "05a48398-4c21-4cf1-89f3-bf6e5544572a",
+      "confidence": 0.8,
+      "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Und der gute Meister Fabian, den du auch noch kennst, der auch immer guckt,  was gerade der Markt an Alten und Neuen hergibt.",
+        "extraction_method": "llm",
+        "source_entity_name": "Fabian",
+        "target_entity_name": "Markt",
+        "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. "
+      }
+    },
+    {
+      "id": "177a5c79-918f-4320-a774-e1fbb8a423a4",
+      "type": "RELATED_TO",
+      "source_entity_id": "181ea231-0d2e-4eb7-b48a-bd0cf51f9d6d",
+      "target_entity_id": "c1a82bd6-804e-4b19-99b2-453d838ae911",
+      "confidence": 0.7,
+      "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Also das ist ja Brami, Bacoba.",
+        "extraction_method": "llm",
+        "source_entity_name": "Bacoba",
+        "target_entity_name": "Brami",
+        "source_text": "en, die verschiedensten Sachen.  Und ja, ich glaube auch der Körper braucht vieles.  Also wir hatten auch mal über CBD gesprochen.  CBD ist ja jetzt auch immer mehr entkommen und langsam verbreitet sich das.  Das ist ja quasi der nicht-high-machende Wirkstoff aus Cannabis, den es jetzt auch inzwischen bei Rossmann & Co. gibt.  Finde ich faszinierend, habe ich auch immer da.  Soll ich hier auch auf dem Schreibtisch immer stehen?  Ist ja auch letztendlich dazu da, um ein bisschen Druck zu nehmen. "
+      }
+    },
+    {
+      "id": "9783fe4f-c26d-443a-aed5-77862aade1d4",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "2dce4f55-51c7-4ac4-bb00-df9039437314",
+      "target_entity_id": "ba3153fe-fa77-42f1-b9df-583dadd837fd",
+      "confidence": 0.8,
+      "source_text": "außen.  Das macht auch alle Sinn, sich da entsprechend seinem aktuellen Zustand und was man so meint,  was einem guttut, sich damit anzudecken.  Ich finde es gut.  Aber wie gesagt, bei dir ist ja ein Komplex, du hast da ja schon eigentlich alles drin, was du brauchst.  Hast du die Box eigentlich?  Habe ich dir die mitgebracht?  Ja, du hast sie mir mitgebracht und ich habe die auch schon lange durch mich hin durchgeflossen.  Deswegen sehe ich mit meinen 73 Jahren ja auch noch so gut aus.  Schön. ",
+      "source_doc_id": "..\\..\\examples\\transcript2.txt",
+      "attributes": {
+        "context": "Aber wie gesagt, bei dir ist ja ein Komplex, du hast da ja schon eigentlich alles drin, was du brauchst.  Hast du die Box eigentlich?  Habe ich dir die mitgebracht?  Ja, du hast sie mir mitgebracht und ich habe die auch schon lange durch mich hin durchgeflossen.  Deswegen sehe ich mit meinen 73 Jahren ja auch noch so gut aus.  Schön.  Dann hoffen wir doch, dass wir die 150 schaffen.  Ach Alex, das war wieder eine Freude mit dir erzählt zu haben und geplaudert zu haben.",
+        "extraction_method": "llm",
+        "source_entity_name": "Alex",
+        "target_entity_name": "Kongresspaket",
+        "source_text": "außen.  Das macht auch alle Sinn, sich da entsprechend seinem aktuellen Zustand und was man so meint,  was einem guttut, sich damit anzudecken.  Ich finde es gut.  Aber wie gesagt, bei dir ist ja ein Komplex, du hast da ja schon eigentlich alles drin, was du brauchst.  Hast du die Box eigentlich?  Habe ich dir die mitgebracht?  Ja, du hast sie mir mitgebracht und ich habe die auch schon lange durch mich hin durchgeflossen.  Deswegen sehe ich mit meinen 73 Jahren ja auch noch so gut aus.  Schön. "
+      }
+    }
+  ],
+  "statistics": {
+    "entity_count": 63,
+    "relation_count": 37,
+    "entity_types": {
+      "PERSON": 11,
+      "PRODUCT": 13,
+      "LOCATION": 10,
+      "ORGANIZATION": 9,
+      "TIME": 6,
+      "CONCEPT": 5,
+      "WORK_OF_ART": 3,
+      "EVENT": 2,
+      "DATE": 3,
+      "QUANTITY": 1
+    },
+    "relation_types": {
+      "CUSTOM": 7,
+      "USES": 4,
+      "LOCATED_IN": 10,
+      "ASSOCIATED_WITH": 5,
+      "PARTICIPATED_IN": 3,
+      "RELATED_TO": 2,
+      "HAPPENED_ON": 1,
+      "CREATED_BY": 2,
+      "HAPPENED_AT": 1,
+      "PART_OF": 2
+    }
+  }
+}
