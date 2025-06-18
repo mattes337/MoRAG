@@ -32,8 +32,6 @@ class Relation(BaseModel):
     target_entity_id: EntityId
     type: Union[RelationType, str] = RelationType.CUSTOM
     attributes: RelationAttributes = Field(default_factory=dict)
-    source_text: Optional[str] = None
-    source_doc_id: Optional[str] = None
     confidence: float = 1.0
     weight: float = 1.0
     

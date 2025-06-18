@@ -44,6 +44,8 @@ class RelationType(str, Enum):
     HAPPENED_ON = "HAPPENED_ON"  # Event -> Date/Time
     HAPPENED_AT = "HAPPENED_AT"  # Event -> Location
     PARTICIPATED_IN = "PARTICIPATED_IN"  # Person/Organization -> Event
+    CONTAINS = "CONTAINS"  # Document -> DocumentChunk
+    MENTIONS = "MENTIONS"  # DocumentChunk -> Entity
     CUSTOM = "CUSTOM"  # For dynamic/custom relation types
 
 

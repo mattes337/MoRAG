@@ -12,8 +12,9 @@ from typing import Dict, List, Optional, Any, Set
 
 from pydantic import BaseModel
 
-from ..models import Entity, Relation
+from ..models import Entity, Relation, Document, DocumentChunk
 from ..storage.base import BaseStorage
+from ..models.types import RelationType
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,26 @@ class FileIngestion:
             logger.warning(f"Error checking if file already ingested: {e}")
             return False
     
+    def _group_entities_into_chunks(self, entities: List[Entity]) -> List[tuple[str, List[Entity]]]:
+        """Group entities by their source text to create document chunks.
+        
+        Args:
+            entities: List of entities to group
+            
+        Returns:
+            List of tuples (chunk_text, entities_in_chunk)
+        """
+        # Group entities by source_text
+        chunks_map = {}
+        for entity in entities:
+            source_text = getattr(entity, 'source_text', None) or "Unknown source"
+            if source_text not in chunks_map:
+                chunks_map[source_text] = []
+            chunks_map[source_text].append(entity)
+        
+        # Convert to list of tuples
+        return list(chunks_map.items())
+    
     async def ingest_file_entities_and_relations(
         self, 
         file_path: Path,
@@ -169,7 +190,9 @@ class FileIngestion:
         relations: List[Relation],
         force_reingest: bool = False
     ) -> Dict[str, Any]:
-        """Ingest entities and relations from a file with duplicate prevention.
+        """Ingest entities and relations from a file using the new document structure.
+        
+        Creates Document -> DocumentChunk -> Entity relationships.
         
         Args:
             file_path: Path to the source file
@@ -194,61 +217,99 @@ class FileIngestion:
                     'relations_stored': 0
                 }
             
-            # Update entities with file metadata
-            updated_entities = []
-            for entity in entities:
-                # Create a copy with updated source_doc_id
-                entity_dict = entity.model_dump()
-                entity_dict['source_doc_id'] = file_metadata.source_doc_id
-                
-                # Add file metadata to attributes
-                if 'attributes' not in entity_dict:
-                    entity_dict['attributes'] = {}
-                entity_dict['attributes'].update({
+            # Create Document node
+            document = Document(
+                id=file_metadata.source_doc_id,
+                title=file_metadata.file_name,
+                content="",  # Will be populated from chunks
+                source_path=file_metadata.file_path,
+                checksum=file_metadata.checksum,
+                mime_type=file_metadata.mime_type,
+                size=file_metadata.file_size,
+                created_at=file_metadata.last_modified,
+                ingested_at=file_metadata.ingestion_timestamp,
+                metadata={
                     'file_name': file_metadata.file_name,
                     'file_checksum': file_metadata.checksum,
                     'ingestion_timestamp': file_metadata.ingestion_timestamp.isoformat()
-                })
-                
-                updated_entities.append(Entity(**entity_dict))
+                }
+            )
             
-            # Update relations with file metadata
-            updated_relations = []
+            # Store Document
+            document_id = await self.storage.store_document(document)
+            logger.info(f"Stored document: {document_id}")
+            
+            # Group entities by their source text to create chunks
+            chunks_data = self._group_entities_into_chunks(entities)
+            
+            # Create and store DocumentChunks
+            chunk_ids = []
+            for chunk_index, (chunk_text, chunk_entities) in enumerate(chunks_data):
+                chunk = DocumentChunk(
+                    id=f"{document_id}_chunk_{chunk_index}",
+                    document_id=document_id,
+                    index=chunk_index,
+                    text=chunk_text,
+                    start_position=0,  # Could be calculated if needed
+                    end_position=len(chunk_text),
+                    chunk_type="text",
+                    metadata={
+                        'entity_count': len(chunk_entities),
+                        'extraction_method': 'llm_based'
+                    }
+                )
+                
+                chunk_id = await self.storage.store_document_chunk(chunk)
+                chunk_ids.append(chunk_id)
+                
+                # Create Document -> CONTAINS -> DocumentChunk relationship
+                await self.storage.create_document_contains_chunk_relation(document_id, chunk_id)
+                
+                # Store entities (without document-specific fields)
+                clean_entities = []
+                for entity in chunk_entities:
+                    entity_dict = entity.model_dump()
+                    # Remove document-specific fields that are now handled by the document structure
+                    entity_dict.pop('source_text', None)
+                    entity_dict.pop('source_doc_id', None)
+                    clean_entities.append(Entity(**entity_dict))
+                
+                entity_ids = await self.storage.store_entities(clean_entities)
+                
+                # Create DocumentChunk -> MENTIONS -> Entity relationships
+                for entity in chunk_entities:
+                    await self.storage.create_chunk_mentions_entity_relation(
+                        chunk_id, 
+                        entity.id, 
+                        entity.source_text or chunk_text
+                    )
+            
+            # Store entity-to-entity relations (without document-specific fields)
+            clean_relations = []
             for relation in relations:
-                # Create a copy with updated source_doc_id
                 relation_dict = relation.model_dump()
-                relation_dict['source_doc_id'] = file_metadata.source_doc_id
-                
-                # Add file metadata to attributes
-                if 'attributes' not in relation_dict:
-                    relation_dict['attributes'] = {}
-                relation_dict['attributes'].update({
-                    'file_name': file_metadata.file_name,
-                    'file_checksum': file_metadata.checksum,
-                    'ingestion_timestamp': file_metadata.ingestion_timestamp.isoformat()
-                })
-                
-                updated_relations.append(Relation(**relation_dict))
+                # Remove document-specific fields
+                relation_dict.pop('source_text', None)
+                relation_dict.pop('source_doc_id', None)
+                clean_relations.append(Relation(**relation_dict))
             
-            # Store entities and relations
-            logger.info(f"Storing {len(updated_entities)} entities and {len(updated_relations)} relations from {file_metadata.file_name}")
-            
-            entity_ids = await self.storage.store_entities(updated_entities)
-            relation_ids = await self.storage.store_relations(updated_relations)
+            relation_ids = await self.storage.store_relations(clean_relations)
             
             # Update cache
             self._ingested_files[file_metadata.file_path] = file_metadata
             self._checksum_to_file[file_metadata.checksum] = file_metadata.file_path
             
-            logger.info(f"Successfully ingested file {file_metadata.file_name}")
+            logger.info(f"Successfully ingested file {file_metadata.file_name} with new document structure")
+            logger.info(f"Created 1 document, {len(chunk_ids)} chunks, {len(entities)} entities, {len(relations)} relations")
             
             return {
                 'status': 'success',
                 'file_metadata': file_metadata,
-                'entities_stored': len(entity_ids),
-                'relations_stored': len(relation_ids),
-                'entity_ids': entity_ids,
-                'relation_ids': relation_ids
+                'document_id': document_id,
+                'chunks_created': len(chunk_ids),
+                'entities_stored': len(entities),
+                'relations_stored': len(relations),
+                'chunk_ids': chunk_ids
             }
             
         except Exception as e:

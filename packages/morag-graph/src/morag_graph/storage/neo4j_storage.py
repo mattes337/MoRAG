@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Any, Set
 from neo4j import AsyncGraphDatabase, AsyncDriver, AsyncSession
 from pydantic import BaseModel
 
-from ..models import Entity, Relation, Graph
+from ..models import Entity, Relation, Graph, Document, DocumentChunk
 from ..models.types import EntityId, RelationId
 from .base import BaseStorage
 
@@ -726,3 +726,100 @@ class Neo4jStorage(BaseStorage):
                 stats[stat_name] = 0 if "count" in stat_name else []
         
         return stats
+    
+    async def store_document(self, document: Document) -> str:
+        """Store a document in Neo4J.
+        
+        Args:
+            document: Document to store
+            
+        Returns:
+            ID of the stored document
+        """
+        properties = document.to_neo4j_node()
+        labels = properties.pop('_labels', ['Document'])
+        
+        # Create labels string for Cypher
+        labels_str = ':'.join(labels)
+        
+        query = f"""
+        MERGE (d:{labels_str} {{id: $id}})
+        SET d += $properties
+        RETURN d.id as id
+        """
+        
+        parameters = {
+            "id": document.id,
+            "properties": properties
+        }
+        
+        result = await self._execute_query(query, parameters)
+        return result[0]["id"] if result else document.id
+    
+    async def store_document_chunk(self, chunk: DocumentChunk) -> str:
+        """Store a document chunk in Neo4J.
+        
+        Args:
+            chunk: DocumentChunk to store
+            
+        Returns:
+            ID of the stored chunk
+        """
+        properties = chunk.to_neo4j_node()
+        labels = properties.pop('_labels', ['DocumentChunk'])
+        
+        # Create labels string for Cypher
+        labels_str = ':'.join(labels)
+        
+        query = f"""
+        MERGE (c:{labels_str} {{id: $id}})
+        SET c += $properties
+        RETURN c.id as id
+        """
+        
+        parameters = {
+            "id": chunk.id,
+            "properties": properties
+        }
+        
+        result = await self._execute_query(query, parameters)
+        return result[0]["id"] if result else chunk.id
+    
+    async def create_document_contains_chunk_relation(self, document_id: str, chunk_id: str) -> None:
+        """Create a CONTAINS relationship between a document and a chunk.
+        
+        Args:
+            document_id: ID of the document
+            chunk_id: ID of the chunk
+        """
+        query = """
+        MATCH (d:Document {id: $document_id})
+        MATCH (c:DocumentChunk {id: $chunk_id})
+        MERGE (d)-[:CONTAINS]->(c)
+        """
+        
+        await self._execute_query(query, {
+            "document_id": document_id,
+            "chunk_id": chunk_id
+        })
+    
+    async def create_chunk_mentions_entity_relation(self, chunk_id: str, entity_id: str, context: str) -> None:
+        """Create a MENTIONS relationship between a chunk and an entity.
+        
+        Args:
+            chunk_id: ID of the chunk
+            entity_id: ID of the entity
+            context: Context where the entity is mentioned
+        """
+        query = """
+        MATCH (c:DocumentChunk {id: $chunk_id})
+        MATCH (e:Entity {id: $entity_id})
+        MERGE (c)-[r:MENTIONS]->(e)
+        SET r.context = $context
+        """
+        
+        await self._execute_query(query, {
+            "chunk_id": chunk_id,
+            "entity_id": entity_id,
+            "context": context
+        })

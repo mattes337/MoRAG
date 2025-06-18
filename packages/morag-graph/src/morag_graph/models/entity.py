@@ -14,14 +14,14 @@ class Entity(BaseModel):
     
     An entity can be a person, organization, location, concept, etc.
     Each entity has a unique ID, a name, a type, and optional attributes.
+    Entities are global and can be referenced from multiple documents through
+    DocumentChunk -> MENTIONS -> Entity relationships.
     
     Attributes:
         id: Unique identifier for the entity
         name: Human-readable name of the entity
         type: Type of the entity (e.g., PERSON, ORGANIZATION)
         attributes: Additional attributes of the entity
-        source_text: Original text from which the entity was extracted
-        source_doc_id: ID of the document from which the entity was extracted
         confidence: Confidence score of the entity extraction (0.0 to 1.0)
     """
     
@@ -29,8 +29,6 @@ class Entity(BaseModel):
     name: str
     type: Union[EntityType, str] = EntityType.CUSTOM
     attributes: EntityAttributes = Field(default_factory=dict)
-    source_text: Optional[str] = None
-    source_doc_id: Optional[str] = None
     confidence: float = 1.0
     
     # Class variables for Neo4J integration
