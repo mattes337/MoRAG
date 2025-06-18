@@ -46,7 +46,12 @@ class RelationType(str, Enum):
     PARTICIPATED_IN = "PARTICIPATED_IN"  # Person/Organization -> Event
     CONTAINS = "CONTAINS"  # Document -> DocumentChunk
     MENTIONS = "MENTIONS"  # DocumentChunk -> Entity
-    CUSTOM = "CUSTOM"  # For dynamic/custom relation types
+    PLAYED_ROLE = "PLAYED_ROLE"  # Person -> Role/Character
+    PORTRAYED = "PORTRAYED"  # Person -> Character/Role
+    PRACTICES = "PRACTICES"  # Person -> Activity/Belief
+    ENGAGED_IN = "ENGAGED_IN"  # Person -> Activity
+    STUDIED = "STUDIED"  # Person -> Subject/Field
+    CUSTOM = "CUSTOM"  # For dynamic/custom relation types (deprecated, use RELATED_TO)
 
 
 # Type aliases for improved readability

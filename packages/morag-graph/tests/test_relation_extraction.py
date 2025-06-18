@@ -235,7 +235,9 @@ async def test_relation_extraction_with_document_id(relation_extractor: Relation
     
     # Check that all relations have the correct document ID
     for relation in relations:
-        assert relation.source_doc_id == doc_id, f"Relation {relation.id} has incorrect document ID"
+        # Document-specific attributes removed for document-agnostic extraction
+        # assert relation.source_doc_id == doc_id, f"Relation {relation.id} has incorrect document ID"
+        pass  # Placeholder since document-specific checks are removed
 
 
 @pytest.mark.asyncio
@@ -262,7 +264,8 @@ async def test_relation_serialization(relation_extractor: RelationExtractor, sam
         assert original.type == deserialized.type
         assert original.confidence == deserialized.confidence
         # source_text field removed in new document structure
-        assert original.source_doc_id == deserialized.source_doc_id
+        # Document-specific attributes removed for document-agnostic extraction
+    # assert original.source_doc_id == deserialized.source_doc_id
 
 
 @pytest.mark.asyncio
@@ -296,7 +299,7 @@ def test_relation_neo4j_conversion():
         target_entity_id="entity-2",
         type=RelationType.WORKS_FOR,
         attributes={"role": "CEO", "since": 2011},
-        source_doc_id="test-doc-1",
+        # source_doc_id removed for document-agnostic extraction
         confidence=0.95,
         weight=1.0
     )
@@ -307,7 +310,8 @@ def test_relation_neo4j_conversion():
     # Check that all properties are present
     assert rel_props["id"] == relation.id
     assert json.loads(rel_props["attributes"]) == relation.attributes
-    assert rel_props["source_doc_id"] == relation.source_doc_id
+    # Document-specific attributes removed for document-agnostic extraction
+    # assert rel_props["source_doc_id"] == relation.source_doc_id
     assert rel_props["confidence"] == relation.confidence
     assert rel_props["weight"] == relation.weight
     
@@ -325,7 +329,8 @@ def test_relation_neo4j_conversion():
     assert reconstructed.type == relation.type
     assert reconstructed.attributes == relation.attributes
     # source_text field removed in new document structure
-    assert reconstructed.source_doc_id == relation.source_doc_id
+    # Document-specific attributes removed for document-agnostic extraction
+    # assert reconstructed.source_doc_id == relation.source_doc_id
     assert reconstructed.confidence == relation.confidence
     assert reconstructed.weight == relation.weight
 

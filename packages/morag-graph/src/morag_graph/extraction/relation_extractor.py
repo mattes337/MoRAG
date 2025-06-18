@@ -128,9 +128,8 @@ class RelationExtractor(BaseExtractor):
                 relations = self._resolve_relations(relations, entities)
             
             # Set document ID if provided
-            if doc_id:
-                for relation in relations:
-                    relation.source_doc_id = doc_id
+            # Remove document-specific attributes to make relations generic
+            # No longer setting source_doc_id based on doc_id
                     
             return relations
             
@@ -391,8 +390,8 @@ Return the relations as a JSON array as specified in the system prompt.
                 try:
                     relation = self._create_relation_from_dict(item)
                     if relation:
-                        # Set source text (first 500 chars as context)
-                        relation.attributes["source_text"] = text[:500] if text else ""
+                        # Remove document-specific attributes to make relations generic
+                        # No longer adding source_text
                         relations.append(relation)
                 except Exception as e:
                     logger.warning(f"Failed to create relation from {item}: {e}")
@@ -428,8 +427,10 @@ Return the relations as a JSON array as specified in the system prompt.
                 try:
                     relation_type = RelationType(relation_type)
                 except ValueError:
-                    # Convert to CUSTOM if not in enum
-                    relation_type = RelationType.CUSTOM
+                    # If not a valid enum value, try context-based detection
+                    relation_type = self._detect_relation_type_from_context(data.get("context", ""), data["source_entity"], data["target_entity"])
+                    if relation_type is None:
+                        relation_type = RelationType.RELATED_TO  # Use RELATED_TO instead of CUSTOM as fallback
             
             # For now, use entity names as IDs (will be resolved later)
             source_entity_id = data["source_entity"].strip()
@@ -454,6 +455,34 @@ Return the relations as a JSON array as specified in the system prompt.
         except Exception as e:
             logger.error(f"Error creating relation from data {data}: {e}")
             return None
+    
+    def _detect_relation_type_from_context(self, context: str, source_entity: str, target_entity: str) -> Optional[RelationType]:
+        """Detect relation type based on context patterns."""
+        context_lower = context.lower()
+        
+        # German context patterns
+        if "rolle war" in context_lower or "spielte" in context_lower:
+            return RelationType.PLAYED_ROLE
+        elif "darstellte" in context_lower or "verkörperte" in context_lower:
+            return RelationType.PORTRAYED
+        elif "betrieben habe" in context_lower or "praktiziert" in context_lower:
+            return RelationType.PRACTICES
+        elif "beschäftigte sich" in context_lower or "engagierte sich" in context_lower:
+            return RelationType.ENGAGED_IN
+        elif "studierte" in context_lower or "lernte" in context_lower:
+            return RelationType.STUDIED
+        
+        # English context patterns
+        elif "played role" in context_lower or "acted as" in context_lower:
+            return RelationType.PLAYED_ROLE
+        elif "portrayed" in context_lower or "depicted" in context_lower:
+            return RelationType.PORTRAYED
+        elif "practices" in context_lower or "engaged in" in context_lower:
+            return RelationType.PRACTICES
+        elif "studied" in context_lower or "learned" in context_lower:
+            return RelationType.STUDIED
+        
+        return None
     
     async def extract_for_entity_pairs(
         self,

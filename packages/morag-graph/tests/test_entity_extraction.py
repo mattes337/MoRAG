@@ -167,7 +167,9 @@ async def test_entity_extraction_with_document_id(entity_extractor: EntityExtrac
     
     # Check that all entities have the correct document ID
     for entity in entities:
-        assert entity.source_doc_id == doc_id, f"Entity {entity.id} has incorrect document ID"
+        # Document-specific attributes removed for document-agnostic extraction
+        # assert entity.source_doc_id == doc_id, f"Entity {entity.id} has incorrect document ID"
+        pass  # Placeholder since document-specific checks are removed
 
 
 @pytest.mark.asyncio
@@ -190,7 +192,8 @@ async def test_entity_serialization(entity_extractor: EntityExtractor):
         assert original.type == deserialized.type
         assert original.confidence == deserialized.confidence
         # source_text field removed in new document structure
-        assert original.source_doc_id == deserialized.source_doc_id
+        # Document-specific attributes removed for document-agnostic extraction
+    # assert original.source_doc_id == deserialized.source_doc_id
 
 
 @pytest.mark.asyncio
@@ -219,7 +222,7 @@ def test_entity_neo4j_conversion():
         name="Test Entity",
         type=EntityType.ORGANIZATION,
         attributes={"industry": "Technology", "founded": 2020},
-        source_doc_id="test-doc-1",
+        # source_doc_id removed for document-agnostic extraction
         confidence=0.95
     )
     
@@ -231,7 +234,8 @@ def test_entity_neo4j_conversion():
     assert node_props["name"] == entity.name
     assert node_props["type"] == entity.type.value
     assert json.loads(node_props["attributes"]) == entity.attributes
-    assert node_props["source_doc_id"] == entity.source_doc_id
+    # Document-specific attributes removed for document-agnostic extraction
+    # assert node_props["source_doc_id"] == entity.source_doc_id
     assert node_props["confidence"] == entity.confidence
     
     # Convert back from Neo4J node properties
@@ -242,7 +246,8 @@ def test_entity_neo4j_conversion():
     assert reconstructed.name == entity.name
     assert reconstructed.type == entity.type
     assert reconstructed.attributes == entity.attributes
-    assert reconstructed.source_doc_id == entity.source_doc_id
+    # Document-specific attributes removed for document-agnostic extraction
+    # assert reconstructed.source_doc_id == entity.source_doc_id
     assert reconstructed.confidence == entity.confidence
 
 

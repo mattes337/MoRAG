@@ -107,11 +107,8 @@ class EntityExtractor(BaseExtractor):
             logger.info(f"Text length ({len(text)} chars) exceeds chunk size ({self.chunk_size}). Processing in chunks...")
             entities = await self._extract_chunked(text, **kwargs)
         
-        # Set document ID if provided (prefer source_doc_id over doc_id)
-        document_id = source_doc_id or doc_id
-        if document_id:
-            for entity in entities:
-                entity.source_doc_id = document_id
+        # Remove document-specific attributes to make entities generic
+        # No longer setting source_doc_id to make entities document-agnostic
                 
         return entities
     
@@ -201,8 +198,8 @@ Return the entities as a JSON array as specified in the system prompt.
                 try:
                     entity = self._create_entity_from_dict(item)
                     if entity:
-                        # Set source text (first 500 chars as context)
-                        entity.attributes["source_text"] = text[:500] if text else ""
+                        # Remove document-specific attributes to make entities generic
+                        # No longer adding source_text
                         entities.append(entity)
                 except Exception as e:
                     logger.warning(f"Failed to create entity from {item}: {e}")
@@ -291,10 +288,10 @@ Use this context to better understand the entities and their significance.
         try:
             entities = await self.extract(text)
             
-            # Add source document ID and source text to entities
+            # Add minimal context to entities (remove document-specific attributes)
             for entity in entities:
-                entity.source_doc_id = source_doc_id
-                entity.attributes["source_text"] = text[:500]  # First 500 chars as context
+                # Remove document-specific attributes to make entities generic
+                pass  # No longer adding source_doc_id or source_text
             
             return entities
             
@@ -323,12 +320,10 @@ Use this context to better understand the entities and their significance.
                 logger.info(f"Processing chunk {i}/{len(chunks)} ({len(chunk)} chars)...")
                 chunk_entities = await super().extract(chunk, **kwargs)
                 
-                # Add chunk information to entities
+                # Add minimal context to entities (remove document-specific attributes)
                 for entity in chunk_entities:
                     entity.attributes = entity.attributes or {}
-                    entity.attributes["chunk_index"] = i
-                    entity.attributes["total_chunks"] = len(chunks)
-                    entity.attributes["source_text"] = chunk[:500]  # First 500 chars of chunk as context
+                    # Remove chunk_index, total_chunks, and source_text to make entities generic
                 
                 all_entities.extend(chunk_entities)
                 
