@@ -73,13 +73,6 @@ python run_extraction.py input.txt --output extracted_data.json
 python run_ingestion.py extracted_data.json --neo4j-password your_password --clear
 ```
 
-#### Convert Legacy CUSTOM Relations
-
-```bash
-# Convert CUSTOM relations to meaningful types
-python convert_custom_relations.py extracted_data.json
-```
-
 ## Key Improvements
 
 ### Document-Agnostic Extraction
@@ -101,12 +94,6 @@ New relation types have been added to replace generic `CUSTOM` relations:
 - `STUDIED`: Person -> Subject/Field
 
 The system now uses context-aware detection to automatically suggest appropriate relation types based on textual context.
-
-### Improved Fallback Strategy
-
-Instead of defaulting to `CUSTOM` relations, the system now:
-1. Attempts context-based relation type detection
-2. Falls back to `RELATED_TO` for better semantic meaning
 
 ## License
 
