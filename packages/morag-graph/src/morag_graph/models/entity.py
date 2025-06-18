@@ -2,6 +2,7 @@
 
 import json
 import uuid
+import hashlib
 from typing import Dict, List, Optional, Any, Union, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
@@ -25,7 +26,7 @@ class Entity(BaseModel):
         confidence: Confidence score of the entity extraction (0.0 to 1.0)
     """
     
-    id: EntityId = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: EntityId = Field(default="")
     name: str
     type: Union[EntityType, str] = EntityType.CUSTOM
     attributes: EntityAttributes = Field(default_factory=dict)
@@ -34,6 +35,33 @@ class Entity(BaseModel):
     
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "Entity"
+    
+    def __init__(self, **data):
+        """Initialize entity with deterministic ID based on name and type."""
+        if 'id' not in data or not data['id']:
+            # Generate deterministic ID based on name and type
+            name = data.get('name', '')
+            entity_type = data.get('type', EntityType.CUSTOM)
+            if isinstance(entity_type, EntityType):
+                entity_type = entity_type.value
+            data['id'] = self._generate_deterministic_id(name, entity_type)
+        super().__init__(**data)
+    
+    @staticmethod
+    def _generate_deterministic_id(name: str, entity_type: str) -> str:
+        """Generate a deterministic ID based on entity name and type.
+        
+        This ensures that entities with the same name and type always get
+        the same ID, preventing duplicate nodes in the graph.
+        """
+        # Normalize inputs for consistent hashing
+        normalized_name = name.strip().lower()
+        normalized_type = str(entity_type).strip().lower()
+        
+        # Create a deterministic hash
+        content = f"{normalized_name}:{normalized_type}"
+        hash_object = hashlib.sha256(content.encode('utf-8'))
+        return hash_object.hexdigest()[:32]  # Use first 32 characters for readability
     
     @field_validator('confidence')
     @classmethod

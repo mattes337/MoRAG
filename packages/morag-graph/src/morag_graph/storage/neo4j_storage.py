@@ -96,6 +96,10 @@ class Neo4jStorage(BaseStorage):
     async def store_entity(self, entity: Entity) -> EntityId:
         """Store an entity in Neo4J.
         
+        Uses MERGE based on name and type to prevent duplicate entities.
+        If an entity with the same name and type exists, it will be updated
+        with new attributes and the highest confidence score.
+        
         Args:
             entity: Entity to store
             
@@ -108,13 +112,24 @@ class Neo4jStorage(BaseStorage):
         # Create labels string for Cypher
         labels_str = ':'.join(labels)
         
+        # MERGE based on name and type to prevent duplicates
         query = f"""
-        MERGE (e:{labels_str} {{id: $id}})
-        SET e += $properties
+        MERGE (e:{labels_str} {{name: $name, type: $type}})
+        ON CREATE SET e += $properties
+        ON MATCH SET 
+            e.confidence = CASE WHEN e.confidence > $confidence THEN e.confidence ELSE $confidence END,
+            e.attributes = $attributes,
+            e.source_doc_id = CASE WHEN e.source_doc_id IS NULL THEN $source_doc_id ELSE e.source_doc_id END,
+            e.id = $id
         RETURN e.id as id
         """
         
         parameters = {
+            "name": entity.name,
+            "type": str(entity.type.value if hasattr(entity.type, 'value') else entity.type),
+            "confidence": entity.confidence,
+            "attributes": properties.get('attributes', '{}'),
+            "source_doc_id": entity.source_doc_id,
             "id": entity.id,
             "properties": properties
         }
@@ -125,6 +140,9 @@ class Neo4jStorage(BaseStorage):
     async def store_entities(self, entities: List[Entity]) -> List[EntityId]:
         """Store multiple entities in Neo4J.
         
+        Uses MERGE based on name and type to prevent duplicate entities.
+        Falls back to individual entity storage for proper deduplication.
+        
         Args:
             entities: List of entities to store
             
@@ -134,30 +152,9 @@ class Neo4jStorage(BaseStorage):
         if not entities:
             return []
         
-        # Prepare batch data
-        entity_data = []
-        for entity in entities:
-            properties = entity.to_neo4j_node()
-            labels = properties.pop('_labels', ['Entity'])
-            entity_data.append({
-                "id": entity.id,
-                "labels": labels,
-                "properties": properties
-            })
-        
-        query = """
-        UNWIND $entities as entity_data
-        CALL apoc.create.node(entity_data.labels, entity_data.properties) YIELD node
-        RETURN node.id as id
-        """
-        
-        try:
-            result = await self._execute_query(query, {"entities": entity_data})
-            return [record["id"] for record in result]
-        except Exception as e:
-            # Fallback to individual inserts if APOC is not available
-            logger.warning(f"Batch insert failed, falling back to individual inserts: {e}")
-            return [await self.store_entity(entity) for entity in entities]
+        # Use individual store_entity calls to ensure proper MERGE logic
+        # This is more reliable than batch operations for deduplication
+        return [await self.store_entity(entity) for entity in entities]
     
     async def get_entity(self, entity_id: EntityId) -> Optional[Entity]:
         """Get an entity by ID.

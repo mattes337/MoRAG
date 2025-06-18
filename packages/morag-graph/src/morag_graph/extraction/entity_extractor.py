@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Any, Union
 
 from ..models import Entity, EntityType
 from .base import BaseExtractor, LLMConfig
+from .entity_normalizer import EntityTypeNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ class EntityExtractor(BaseExtractor):
         "CONCEPT": "Abstract concepts, ideas, theories"
     }
     
-    def __init__(self, config: Union[LLMConfig, Dict[str, str]] = None, chunk_size: int = 4000, entity_types: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(self, config: Union[LLMConfig, Dict[str, str]] = None, chunk_size: int = 4000, entity_types: Optional[Dict[str, str]] = None, normalize_types: bool = True, **kwargs):
         """Initialize the entity extractor.
         
         Args:
@@ -45,6 +46,7 @@ class EntityExtractor(BaseExtractor):
                          If None, uses DEFAULT_ENTITY_TYPES.
                          If provided (including empty dict {}), uses EXACTLY those types.
                          Format: {"TYPE_NAME": "description"}
+            normalize_types: Whether to normalize entity types for consistency (default: True)
             **kwargs: Additional configuration parameters (for backward compatibility)
         
         Examples:
@@ -82,6 +84,10 @@ class EntityExtractor(BaseExtractor):
         # Set entity types (use provided or default)
         # Use 'is None' check to allow empty dict for complete control
         self.entity_types = entity_types if entity_types is not None else self.DEFAULT_ENTITY_TYPES
+        
+        # Initialize entity type normalizer
+        self.normalize_types = normalize_types
+        self.normalizer = EntityTypeNormalizer() if normalize_types else None
     
     async def extract(self, text: str, doc_id: Optional[str] = None, source_doc_id: Optional[str] = None, **kwargs) -> List[Entity]:
         """Extract entities from text with automatic chunking for large texts.
@@ -109,6 +115,10 @@ class EntityExtractor(BaseExtractor):
         
         # Remove document-specific attributes to make entities generic
         # No longer setting source_doc_id to make entities document-agnostic
+        
+        # Normalize entity types for consistency
+        if self.normalize_types and self.normalizer:
+            entities = self.normalizer.normalize_entities(entities)
                 
         return entities
     
