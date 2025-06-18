@@ -26,6 +26,9 @@ from morag_embedding import EmbeddingService
 from morag_web.service import WebService
 from morag_youtube.service import YouTubeService
 
+# Import graph processing
+from .graph_processor import GraphProcessor, GraphProcessingConfig, GraphProcessingResult
+
 logger = structlog.get_logger(__name__)
 
 @dataclass
@@ -63,6 +66,7 @@ class ProcessingResult(BaseModel):
     success: bool = True
     error_message: Optional[str] = None
     raw_result: Optional[Any] = None
+    graph_result: Optional[GraphProcessingResult] = None
 
 class MoRAGServices:
     """Unified service layer for MoRAG system.
@@ -71,11 +75,12 @@ class MoRAGServices:
     making it easy to work with multiple content types through a single interface.
     """
     
-    def __init__(self, config: Optional[ServiceConfig] = None):
+    def __init__(self, config: Optional[ServiceConfig] = None, graph_config: Optional[GraphProcessingConfig] = None):
         """Initialize MoRAG services.
         
         Args:
             config: Configuration for services
+            graph_config: Configuration for graph processing
         """
         self.config = config or ServiceConfig()
         
@@ -87,6 +92,9 @@ class MoRAGServices:
         self.embedding_service = EmbeddingService()
         self.web_service = WebService()
         self.youtube_service = YouTubeService()
+        
+        # Initialize graph processor
+        self.graph_processor = GraphProcessor(graph_config)
 
         # Initialize AI services for search functionality
         self._vector_storage = None
@@ -96,7 +104,7 @@ class MoRAGServices:
         # Create semaphore for concurrent processing
         self.semaphore = asyncio.Semaphore(self.config.max_concurrent_tasks)
 
-        logger.info("MoRAG Services initialized")
+        logger.info("MoRAG Services initialized", graph_enabled=self.graph_processor.is_enabled())
 
     def _initialize_search_services(self):
         """Initialize search-related services (embedding and vector storage)."""
@@ -263,26 +271,28 @@ class MoRAGServices:
 
         Args:
             document_path: Path to document file
-            options: Processing options
+            options: Processing options (can include 'enable_graph_processing')
 
         Returns:
             ProcessingResult with extracted text and metadata
         """
         try:
-            # Extract progress callback from options if available
-            progress_callback = (options or {}).get('progress_callback')
+            # Extract options
+            options = options or {}
+            progress_callback = options.get('progress_callback')
+            enable_graph_processing = options.get('enable_graph_processing', False)
 
             # Get both formats: markdown for Qdrant, JSON for API response
             markdown_result = await self.document_service.process_document(
                 Path(document_path),
                 progress_callback=progress_callback,
-                **(options or {})
+                **{k: v for k, v in options.items() if k not in ['progress_callback', 'enable_graph_processing']}
             )
 
             json_result = await self.document_service.process_document_to_json(
                 Path(document_path),
                 progress_callback=progress_callback,
-                **(options or {})
+                **{k: v for k, v in options.items() if k not in ['progress_callback', 'enable_graph_processing']}
             )
 
             # Use markdown content for text_content (Qdrant storage)
@@ -301,6 +311,38 @@ class MoRAGServices:
                     # Use raw text if no chunks
                     text_content = markdown_result.document.raw_text or ""
 
+            # Process graph extraction if enabled
+            graph_result = None
+            if enable_graph_processing and text_content:
+                try:
+                    # Extract document metadata for graph processing
+                    document_metadata = {
+                        'file_path': document_path,
+                        'content_type': ContentType.DOCUMENT,
+                        **json_result.get("metadata", {})
+                    }
+                    
+                    graph_result = await self.graph_processor.process_document(
+                        markdown_content=text_content,
+                        document_path=document_path,
+                        document_metadata=document_metadata
+                    )
+                    
+                    logger.info("Graph processing completed", 
+                               document_path=document_path,
+                               success=graph_result.success,
+                               entities_count=graph_result.entities_count,
+                               relations_count=graph_result.relations_count)
+                    
+                except Exception as e:
+                    logger.warning("Graph processing failed, continuing with document processing",
+                                 document_path=document_path,
+                                 error=str(e))
+                    graph_result = GraphProcessingResult(
+                        success=False,
+                        error_message=f"Graph processing failed: {str(e)}"
+                    )
+
             return ProcessingResult(
                 content_type=ContentType.DOCUMENT,
                 content_path=document_path,
@@ -310,7 +352,8 @@ class MoRAGServices:
                 processing_time=json_result.get("metadata", {}).get("processing_time", 0.0),
                 success=True,
                 error_message=json_result.get("error"),
-                raw_result=json_result  # JSON for API response
+                raw_result=json_result,  # JSON for API response
+                graph_result=graph_result  # Graph processing result
             )
         except Exception as e:
             logger.exception(f"Error processing document", document_path=document_path)

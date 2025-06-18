@@ -296,6 +296,7 @@ class ProcessURLRequest(BaseModel):
     url: str
     content_type: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
+    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
 
 
 class ProcessBatchRequest(BaseModel):
@@ -325,6 +326,7 @@ class IngestFileRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     use_docling: Optional[bool] = False
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
 
 
 class IngestURLRequest(BaseModel):
@@ -333,12 +335,14 @@ class IngestURLRequest(BaseModel):
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
 
 
 class IngestBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     webhook_url: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
 
 
 class IngestRemoteFileRequest(BaseModel):
@@ -353,12 +357,14 @@ class IngestRemoteFileRequest(BaseModel):
     chunk_overlap: Optional[int] = None
     chunking_strategy: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
 
 
 class ProcessRemoteFileRequest(BaseModel):
     file_path: str  # UNC path or HTTP/HTTPS URL
     content_type: Optional[str] = None  # Auto-detect if not provided
     options: Optional[Dict[str, Any]] = None
+    enable_graph_processing: Optional[bool] = False  # Enable graph processing with Neo4j
 
 
 class IngestResponse(BaseModel):
@@ -687,7 +693,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         chunk_size: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunking_strategy: Optional[str] = Form(default=None),  # paragraph, sentence, word, character, etc.
-        remote: Optional[bool] = Form(default=False)  # Use remote processing for audio/video
+        remote: Optional[bool] = Form(default=False),  # Use remote processing for audio/video
+        enable_graph_processing: Optional[bool] = Form(default=False)  # Enable graph processing with Neo4j
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -756,6 +763,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "chunk_overlap": chunk_overlap,
                 "chunking_strategy": chunking_strategy,
                 "remote": remote,  # Remote processing flag
+                "enable_graph_processing": enable_graph_processing,  # Graph processing flag
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -807,6 +815,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "metadata": request.metadata or {},  # Ensure dict, not None
                 "remote": request.remote,  # Remote processing flag
+                "enable_graph_processing": request.enable_graph_processing,  # Graph processing flag
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -837,6 +846,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             options = {
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "remote": request.remote,  # Remote processing flag
+                "enable_graph_processing": request.enable_graph_processing,  # Graph processing flag
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -896,6 +906,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "chunk_overlap": request.chunk_overlap,
                 "chunking_strategy": request.chunking_strategy,
                 "remote": request.remote,  # Remote processing flag
+                "enable_graph_processing": request.enable_graph_processing,  # Graph processing flag
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
