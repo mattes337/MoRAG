@@ -698,16 +698,24 @@ class Neo4jStorage(BaseStorage):
             Dictionary containing statistics
         """
         queries = {
+            "total_nodes": "MATCH (n) RETURN count(n) as count",
+            "total_relationships": "MATCH ()-[r]->() RETURN count(r) as count",
+            "node_types": """
+                MATCH (n) 
+                RETURN labels(n)[0] as type, count(n) as count 
+                ORDER BY count DESC
+            """,
+            "relationship_types": """
+                MATCH ()-[r]->() 
+                RETURN type(r) as type, count(r) as count 
+                ORDER BY count DESC
+            """,
             "entity_count": "MATCH (e:Entity) RETURN count(e) as count",
-            "relation_count": "MATCH ()-[r]->() RETURN count(r) as count",
+            "document_count": "MATCH (d:Document) RETURN count(d) as count",
+            "chunk_count": "MATCH (c:DocumentChunk) RETURN count(c) as count",
             "entity_types": """
                 MATCH (e:Entity) 
                 RETURN e.type as type, count(e) as count 
-                ORDER BY count DESC
-            """,
-            "relation_types": """
-                MATCH ()-[r]->() 
-                RETURN type(r) as type, count(r) as count 
                 ORDER BY count DESC
             """
         }
@@ -717,13 +725,16 @@ class Neo4jStorage(BaseStorage):
         for stat_name, query in queries.items():
             try:
                 result = await self._execute_query(query)
-                if stat_name in ["entity_count", "relation_count"]:
+                if stat_name in ["total_nodes", "total_relationships", "entity_count", "document_count", "chunk_count"]:
                     stats[stat_name] = result[0]["count"] if result else 0
+                elif stat_name in ["node_types", "relationship_types", "entity_types"]:
+                    # Convert list of dicts to dict for easier reading
+                    stats[stat_name] = {item["type"]: item["count"] for item in result} if result else {}
                 else:
                     stats[stat_name] = result
             except Exception as e:
                 logger.warning(f"Failed to get {stat_name}: {e}")
-                stats[stat_name] = 0 if "count" in stat_name else []
+                stats[stat_name] = 0 if "count" in stat_name else {}
         
         return stats
     
