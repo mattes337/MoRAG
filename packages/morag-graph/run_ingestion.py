@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """Production script for ingesting extracted knowledge graph data into Neo4j.
-This script loads entities and relations from a JSON file and stores them in Neo4j
-with proper Document and DocumentChunk structure, exactly like normal ingestion.
+This script loads entities and relations from a JSON file and uses the FileIngestion
+class to properly ingest them with Document and DocumentChunk structure.
 """
 
 import json
 import argparse
 import asyncio
-import hashlib
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, List
 
-from src.morag_graph.storage.neo4j_storage import Neo4jStorage
-from src.morag_graph.models import Entity, Relation, Graph, Document, DocumentChunk
+from src.morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
+from src.morag_graph.models import Entity, Relation
+from src.morag_graph.ingestion import FileIngestion
 
 
 def load_extracted_data(file_path: Path) -> Dict[str, Any]:
@@ -25,11 +24,12 @@ def load_extracted_data(file_path: Path) -> Dict[str, Any]:
         raise Exception(f"Failed to load data from {file_path}: {e}")
 
 
-def create_graph_from_data(data: Dict[str, Any]) -> Graph:
-    """Create a Graph object from loaded data."""
-    graph = Graph()
+def parse_entities_and_relations(data: Dict[str, Any]) -> tuple[List[Entity], List[Relation]]:
+    """Parse entities and relations from loaded data."""
+    entities = []
+    relations = []
     
-    # Add entities
+    # Parse entities
     if "entities" in data:
         for entity_data in data["entities"]:
             entity = Entity(
@@ -39,9 +39,9 @@ def create_graph_from_data(data: Dict[str, Any]) -> Graph:
                 confidence=entity_data.get("confidence", 1.0),
                 attributes=entity_data.get("attributes", {})
             )
-            graph.add_entity(entity)
+            entities.append(entity)
     
-    # Add relations
+    # Parse relations
     if "relations" in data:
         for relation_data in data["relations"]:
             relation = Relation(
@@ -52,93 +52,24 @@ def create_graph_from_data(data: Dict[str, Any]) -> Graph:
                 confidence=relation_data.get("confidence", 1.0),
                 attributes=relation_data.get("attributes", {})
             )
-            graph.add_relation(relation)
+            relations.append(relation)
     
-    return graph
+    return entities, relations
 
 
-def create_document_from_file(file_path: Path, data: Dict[str, Any]) -> Document:
-    """Create a Document node from the source file and extracted data."""
-    # Calculate file checksum
-    file_content = file_path.read_bytes()
-    checksum = hashlib.sha256(file_content).hexdigest()
-    
-    # Get file stats
-    file_stats = file_path.stat()
-    
-    # Create document ID based on file path and checksum
-    document_id = f"doc_{checksum[:16]}"
-    
-    document = Document(
-        id=document_id,
-        source_file=str(file_path),
-        file_name=file_path.name,
-        file_size=file_stats.st_size,
-        checksum=checksum,
-        mime_type="application/json",
-        ingestion_timestamp=datetime.now(),
-        last_modified=datetime.fromtimestamp(file_stats.st_mtime),
-        model=data.get("model", "unknown"),
-        metadata={
-            'file_name': file_path.name,
-            'file_checksum': checksum,
-            'ingestion_timestamp': datetime.now().isoformat(),
-            'extraction_source': 'json_file'
-        }
-    )
-    
-    return document
 
-
-def group_entities_into_chunks(entities: List[Entity]) -> List[Tuple[str, List[Entity]]]:
-    """Group entities by their context to create document chunks.
-    
-    This mimics the chunking logic from file_ingestion.py but works with
-    entities that may not have explicit chunk information.
-    """
-    # Group entities by their context or attributes
-    chunks_data = []
-    
-    # For now, create chunks based on entity context or group all entities
-    # This could be enhanced to use actual text chunks if available
-    context_groups = {}
-    
-    for entity in entities:
-        # Try to group by context from attributes
-        context = entity.attributes.get('context', 'default')
-        if context not in context_groups:
-            context_groups[context] = []
-        context_groups[context].append(entity)
-    
-    # Convert groups to chunks
-    for context, group_entities in context_groups.items():
-        # Create chunk text from entity contexts
-        chunk_text = f"Document section containing entities: {', '.join([e.name for e in group_entities])}"
-        if context != 'default':
-            chunk_text = f"Context: {context}. " + chunk_text
-        
-        chunks_data.append((chunk_text, group_entities))
-    
-    # If no context grouping worked, create a single chunk with all entities
-    if not chunks_data:
-        chunk_text = f"Document content with {len(entities)} entities"
-        chunks_data.append((chunk_text, entities))
-    
-    return chunks_data
 
 
 async def ingest_to_neo4j(
     file_path: Path,
-    data: Dict[str, Any],
-    graph: Graph,
+    entities: List[Entity],
+    relations: List[Relation],
     neo4j_uri: str,
     neo4j_user: str,
     neo4j_password: str,
     clear_existing: bool = False
 ) -> None:
-    """Ingest graph data into Neo4j with proper Document and DocumentChunk structure."""
-    from src.morag_graph.storage.neo4j_storage import Neo4jConfig
-    
+    """Ingest entities and relations into Neo4j using FileIngestion class."""
     config = Neo4jConfig(
         uri=neo4j_uri,
         username=neo4j_user,
@@ -157,61 +88,25 @@ async def ingest_to_neo4j(
             await storage.clear()
             print("✓ Existing data cleared")
         
-        # Create and store Document node
-        document = create_document_from_file(file_path, data)
-        document_id = await storage.store_document(document)
-        print(f"✓ Document stored: {document_id}")
+        # Use FileIngestion class to handle the ingestion
+        file_ingestion = FileIngestion(storage)
         
-        # Group entities into chunks
-        entities_list = list(graph.entities.values())
-        relations_list = list(graph.relations.values())
-        chunks_data = group_entities_into_chunks(entities_list)
+        # Ingest entities and relations using the standard process
+        result = await file_ingestion.ingest_file_entities_and_relations(
+            file_path=file_path,
+            entities=entities,
+            relations=relations,
+            force_reingest=True  # Always ingest since we're processing extracted data
+        )
         
-        # Create and store DocumentChunks with relationships
-        chunk_ids = []
-        total_entities_stored = 0
-        
-        for chunk_index, (chunk_text, chunk_entities) in enumerate(chunks_data):
-            # Create DocumentChunk
-            chunk = DocumentChunk(
-                id=f"{document_id}_chunk_{chunk_index}",
-                document_id=document_id,
-                chunk_index=chunk_index,
-                text=chunk_text,
-                start_position=0,
-                end_position=len(chunk_text),
-                chunk_type="text",
-                metadata={
-                    'entity_count': len(chunk_entities),
-                    'extraction_method': 'llm_based'
-                }
-            )
-            
-            # Store DocumentChunk
-            chunk_id = await storage.store_document_chunk(chunk)
-            chunk_ids.append(chunk_id)
-            
-            # Create Document -> CONTAINS -> DocumentChunk relationship
-            await storage.create_document_contains_chunk_relation(document_id, chunk_id)
-            
-            # Store entities in this chunk
-            entity_ids = await storage.store_entities(chunk_entities)
-            total_entities_stored += len(chunk_entities)
-            
-            # Create DocumentChunk -> MENTIONS -> Entity relationships
-            for entity in chunk_entities:
-                await storage.create_chunk_mentions_entity_relation(
-                    chunk_id, 
-                    entity.id, 
-                    chunk_text  # Use chunk text as context
-                )
-        
-        print(f"✓ Created {len(chunk_ids)} document chunks")
-        print(f"✓ Stored {total_entities_stored} entities")
-        
-        # Store entity-to-entity relations
-        relation_ids = await storage.store_relations(relations_list)
-        print(f"✓ Stored {len(relations_list)} relations")
+        if result['status'] == 'success':
+            print(f"✓ Document stored: {result['document_id']}")
+            print(f"✓ Created {result['chunks_created']} document chunks")
+            print(f"✓ Stored {result['entities_stored']} entities")
+            print(f"✓ Stored {result['relations_stored']} relations")
+        else:
+            print(f"✗ Ingestion failed: {result.get('error', 'Unknown error')}")
+            return
         
         # Print statistics
         stats = await storage.get_statistics()
@@ -221,7 +116,7 @@ async def ingest_to_neo4j(
         print(f"Node types: {stats.get('node_types', {})}")
         print(f"Relationship types: {stats.get('relationship_types', {})}")
         
-        print(f"\n✓ Successfully created 1 document, {len(chunk_ids)} chunks, {total_entities_stored} entities, {len(relations_list)} relations")
+        print(f"\n✓ Successfully ingested file with {result['entities_stored']} entities and {result['relations_stored']} relations")
         
     finally:
         await storage.disconnect()
@@ -247,17 +142,17 @@ async def main():
         print(f"Loading data from {input_path}...")
         data = load_extracted_data(input_path)
         
-        # Create graph
-        print("Creating graph from data...")
-        graph = create_graph_from_data(data)
-        print(f"✓ Graph created with {len(graph.entities)} entities and {len(graph.relations)} relations")
+        # Parse entities and relations
+        print("Parsing entities and relations from data...")
+        entities, relations = parse_entities_and_relations(data)
+        print(f"✓ Parsed {len(entities)} entities and {len(relations)} relations")
         
         # Ingest to Neo4j
         print("\nIngesting to Neo4j...")
         await ingest_to_neo4j(
             file_path=input_path,
-            data=data,
-            graph=graph,
+            entities=entities,
+            relations=relations,
             neo4j_uri=args.neo4j_uri,
             neo4j_user=args.neo4j_user,
             neo4j_password=args.neo4j_password,
