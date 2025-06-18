@@ -84,7 +84,7 @@ async def test_entity_extraction_basic(entity_extractor: EntityExtractor):
         assert entity.name, "Entity is missing name"
         assert entity.type, "Entity is missing type"
         assert entity.confidence is not None, "Entity is missing confidence score"
-        assert entity.source_text, "Entity is missing source text"
+        # source_text field removed in new document structure
 
 
 @pytest.mark.asyncio
@@ -189,7 +189,7 @@ async def test_entity_serialization(entity_extractor: EntityExtractor):
         assert original.name == deserialized.name
         assert original.type == deserialized.type
         assert original.confidence == deserialized.confidence
-        assert original.source_text == deserialized.source_text
+        # source_text field removed in new document structure
         assert original.source_doc_id == deserialized.source_doc_id
 
 
@@ -219,7 +219,6 @@ def test_entity_neo4j_conversion():
         name="Test Entity",
         type=EntityType.ORGANIZATION,
         attributes={"industry": "Technology", "founded": 2020},
-        source_text="Test Entity is a technology company founded in 2020.",
         source_doc_id="test-doc-1",
         confidence=0.95
     )
@@ -232,7 +231,6 @@ def test_entity_neo4j_conversion():
     assert node_props["name"] == entity.name
     assert node_props["type"] == entity.type.value
     assert json.loads(node_props["attributes"]) == entity.attributes
-    assert node_props["source_text"] == entity.source_text
     assert node_props["source_doc_id"] == entity.source_doc_id
     assert node_props["confidence"] == entity.confidence
     
@@ -244,7 +242,6 @@ def test_entity_neo4j_conversion():
     assert reconstructed.name == entity.name
     assert reconstructed.type == entity.type
     assert reconstructed.attributes == entity.attributes
-    assert reconstructed.source_text == entity.source_text
     assert reconstructed.source_doc_id == entity.source_doc_id
     assert reconstructed.confidence == entity.confidence
 

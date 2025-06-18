@@ -172,16 +172,14 @@ class FileIngestion:
         Returns:
             List of tuples (chunk_text, entities_in_chunk)
         """
-        # Group entities by source_text
-        chunks_map = {}
-        for entity in entities:
-            source_text = getattr(entity, 'source_text', None) or "Unknown source"
-            if source_text not in chunks_map:
-                chunks_map[source_text] = []
-            chunks_map[source_text].append(entity)
+        # Since entities don't have source_text in the new model,
+        # we'll create a single chunk with all entities
+        if not entities:
+            return []
         
-        # Convert to list of tuples
-        return list(chunks_map.items())
+        # Create a single chunk containing all entities
+        chunk_text = f"Document content with {len(entities)} entities"
+        return [(chunk_text, entities)]
     
     async def ingest_file_entities_and_relations(
         self, 
@@ -220,14 +218,13 @@ class FileIngestion:
             # Create Document node
             document = Document(
                 id=file_metadata.source_doc_id,
-                title=file_metadata.file_name,
-                content="",  # Will be populated from chunks
-                source_path=file_metadata.file_path,
+                source_file=file_metadata.file_path,
+                file_name=file_metadata.file_name,
+                file_size=file_metadata.file_size,
                 checksum=file_metadata.checksum,
                 mime_type=file_metadata.mime_type,
-                size=file_metadata.file_size,
-                created_at=file_metadata.last_modified,
-                ingested_at=file_metadata.ingestion_timestamp,
+                ingestion_timestamp=file_metadata.ingestion_timestamp,
+                last_modified=file_metadata.last_modified,
                 metadata={
                     'file_name': file_metadata.file_name,
                     'file_checksum': file_metadata.checksum,
@@ -248,7 +245,7 @@ class FileIngestion:
                 chunk = DocumentChunk(
                     id=f"{document_id}_chunk_{chunk_index}",
                     document_id=document_id,
-                    index=chunk_index,
+                    chunk_index=chunk_index,
                     text=chunk_text,
                     start_position=0,  # Could be calculated if needed
                     end_position=len(chunk_text),
@@ -265,35 +262,19 @@ class FileIngestion:
                 # Create Document -> CONTAINS -> DocumentChunk relationship
                 await self.storage.create_document_contains_chunk_relation(document_id, chunk_id)
                 
-                # Store entities (without document-specific fields)
-                clean_entities = []
-                for entity in chunk_entities:
-                    entity_dict = entity.model_dump()
-                    # Remove document-specific fields that are now handled by the document structure
-                    entity_dict.pop('source_text', None)
-                    entity_dict.pop('source_doc_id', None)
-                    clean_entities.append(Entity(**entity_dict))
-                
-                entity_ids = await self.storage.store_entities(clean_entities)
+                # Store entities (they are already clean in the new model)
+                entity_ids = await self.storage.store_entities(chunk_entities)
                 
                 # Create DocumentChunk -> MENTIONS -> Entity relationships
                 for entity in chunk_entities:
                     await self.storage.create_chunk_mentions_entity_relation(
                         chunk_id, 
                         entity.id, 
-                        entity.source_text or chunk_text
+                        chunk_text  # Use chunk text as context
                     )
             
-            # Store entity-to-entity relations (without document-specific fields)
-            clean_relations = []
-            for relation in relations:
-                relation_dict = relation.model_dump()
-                # Remove document-specific fields
-                relation_dict.pop('source_text', None)
-                relation_dict.pop('source_doc_id', None)
-                clean_relations.append(Relation(**relation_dict))
-            
-            relation_ids = await self.storage.store_relations(clean_relations)
+            # Store entity-to-entity relations (they are already clean in the new model)
+            relation_ids = await self.storage.store_relations(relations)
             
             # Update cache
             self._ingested_files[file_metadata.file_path] = file_metadata

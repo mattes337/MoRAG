@@ -106,7 +106,6 @@ async def test_relation_extraction_basic(relation_extractor: RelationExtractor, 
         assert relation.target_entity_id, "Relation is missing target entity ID"
         assert relation.type, "Relation is missing type"
         assert relation.confidence is not None, "Relation is missing confidence score"
-        assert relation.source_text, "Relation is missing source text"
 
 
 @pytest.mark.asyncio
@@ -262,7 +261,7 @@ async def test_relation_serialization(relation_extractor: RelationExtractor, sam
         assert original.target_entity_id == deserialized.target_entity_id
         assert original.type == deserialized.type
         assert original.confidence == deserialized.confidence
-        assert original.source_text == deserialized.source_text
+        # source_text field removed in new document structure
         assert original.source_doc_id == deserialized.source_doc_id
 
 
@@ -297,7 +296,6 @@ def test_relation_neo4j_conversion():
         target_entity_id="entity-2",
         type=RelationType.WORKS_FOR,
         attributes={"role": "CEO", "since": 2011},
-        source_text="Tim Cook is the CEO of Apple since 2011.",
         source_doc_id="test-doc-1",
         confidence=0.95,
         weight=1.0
@@ -309,7 +307,6 @@ def test_relation_neo4j_conversion():
     # Check that all properties are present
     assert rel_props["id"] == relation.id
     assert json.loads(rel_props["attributes"]) == relation.attributes
-    assert rel_props["source_text"] == relation.source_text
     assert rel_props["source_doc_id"] == relation.source_doc_id
     assert rel_props["confidence"] == relation.confidence
     assert rel_props["weight"] == relation.weight
@@ -327,7 +324,7 @@ def test_relation_neo4j_conversion():
     assert reconstructed.target_entity_id == relation.target_entity_id
     assert reconstructed.type == relation.type
     assert reconstructed.attributes == relation.attributes
-    assert reconstructed.source_text == relation.source_text
+    # source_text field removed in new document structure
     assert reconstructed.source_doc_id == relation.source_doc_id
     assert reconstructed.confidence == relation.confidence
     assert reconstructed.weight == relation.weight

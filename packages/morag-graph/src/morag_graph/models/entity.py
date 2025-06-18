@@ -29,6 +29,7 @@ class Entity(BaseModel):
     name: str
     type: Union[EntityType, str] = EntityType.CUSTOM
     attributes: EntityAttributes = Field(default_factory=dict)
+    source_doc_id: Optional[str] = None
     confidence: float = 1.0
     
     # Class variables for Neo4J integration
