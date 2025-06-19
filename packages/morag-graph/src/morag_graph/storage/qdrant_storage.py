@@ -617,6 +617,164 @@ class QdrantStorage(BaseStorage):
             logger.error(f"Failed to delete entity {entity_id}: {e}")
             return False
     
+    # Checksum management methods
+    async def get_document_checksum(self, document_id: str) -> Optional[str]:
+        """Get the stored checksum for a document.
+        
+        Args:
+            document_id: Document ID
+            
+        Returns:
+            Stored checksum if found, None otherwise
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        try:
+            # Use a special collection or namespace for checksums
+            checksum_id = f"checksum_{document_id}"
+            points = await self.client.retrieve(
+                collection_name=self.config.collection_name,
+                ids=[checksum_id],
+                with_payload=True
+            )
+            
+            if points and len(points) > 0:
+                return points[0].payload.get("checksum")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to get document checksum for {document_id}: {e}")
+            return None
+    
+    async def store_document_checksum(self, document_id: str, checksum: str) -> None:
+        """Store the checksum for a document.
+        
+        Args:
+            document_id: Document ID
+            checksum: Document checksum
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        try:
+            from datetime import datetime
+            
+            checksum_id = f"checksum_{document_id}"
+            
+            # Create a point for the checksum with a dummy vector
+            point = PointStruct(
+                id=checksum_id,
+                vector=[0.0] * self.config.vector_size,  # Dummy vector
+                payload={
+                    "type": "document_checksum",
+                    "document_id": document_id,
+                    "checksum": checksum,
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+            )
+            
+            await self.client.upsert(
+                collection_name=self.config.collection_name,
+                points=[point]
+            )
+            
+            logger.debug(f"Stored checksum for document {document_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to store document checksum for {document_id}: {e}")
+            raise
+    
+    async def delete_document_checksum(self, document_id: str) -> None:
+        """Delete the checksum for a document.
+        
+        Args:
+            document_id: Document ID
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        try:
+            checksum_id = f"checksum_{document_id}"
+            await self.client.delete(
+                collection_name=self.config.collection_name,
+                points_selector=[checksum_id]
+            )
+            
+            logger.debug(f"Deleted checksum for document {document_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to delete document checksum for {document_id}: {e}")
+            # Don't raise here as this is cleanup
+    
+    async def get_entities_by_document(self, document_id: str) -> List[Entity]:
+        """Get all entities associated with a document.
+        
+        Args:
+            document_id: Document ID
+            
+        Returns:
+            List of entities associated with the document
+        """
+        print(f"\nDEBUG: get_entities_by_document called with document_id={document_id}")
+        print(f"DEBUG: client is {self.client}")
+        
+        if not self.client:
+            print("DEBUG: No client, raising RuntimeError")
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        try:
+            # Search for entities with matching source_doc_id
+            search_result = await self.client.scroll(
+                collection_name=self.config.collection_name,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="source_doc_id",
+                            match=MatchValue(value=document_id)
+                        )
+                    ],
+                    must_not=[
+                        FieldCondition(
+                            key="type",
+                            match=MatchValue(value="document_checksum")
+                        )
+                    ]
+                ),
+                limit=1000,  # Adjust as needed
+                with_payload=True,
+                with_vectors=True
+            )
+            
+            entities = []
+            for point in search_result[0]:  # search_result is (points, next_page_offset)
+                payload = point.payload
+                # Skip checksum entries
+                if payload.get("type") == "document_checksum":
+                    continue
+                    
+                entity = Entity(
+                    id=str(point.id),
+                    name=payload.get("name", ""),
+                    type=payload.get("type", ""),
+                    description=payload.get("description"),
+                    attributes=payload.get("attributes", {}),
+                    source_doc_id=payload.get("source_doc_id"),
+                    confidence=payload.get("confidence", 1.0),
+                    embedding=point.vector
+                )
+                entities.append(entity)
+            
+            logger.debug(f"Retrieved {len(entities)} entities for document {document_id}")
+            return entities
+            
+        except Exception as e:
+            logger.error(f"Failed to get entities for document {document_id}: {e}")
+            print(f"\nDEBUG: Exception in get_entities_by_document: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
     # Note: Qdrant doesn't have native graph relations like Neo4j
     # Relations would need to be stored as metadata or in a separate collection
     # For now, implementing minimal relation support
@@ -657,6 +815,137 @@ class QdrantStorage(BaseStorage):
     async def delete_relation(self, relation_id: RelationId) -> bool:
         """Delete a relation."""
         return True
+    
+    async def update_relation(self, relation: Relation) -> bool:
+        """Update an existing relation (simplified for Qdrant)."""
+        logger.debug(f"Relation update in Qdrant is simplified: {relation.id}")
+        return True
+    
+    async def get_neighbors(
+        self, 
+        entity_id: EntityId,
+        relation_type: Optional[str] = None,
+        max_depth: int = 1
+    ) -> List[Entity]:
+        """Get neighboring entities (simplified for Qdrant)."""
+        # Qdrant doesn't have native graph traversal
+        # This would require custom implementation based on stored relations
+        logger.debug(f"Neighbor search in Qdrant is simplified for entity: {entity_id}")
+        return []
+    
+    async def find_path(
+        self, 
+        source_entity_id: EntityId,
+        target_entity_id: EntityId,
+        max_depth: int = 3
+    ) -> List[List[EntityId]]:
+        """Find paths between two entities (simplified for Qdrant)."""
+        # Qdrant doesn't have native graph pathfinding
+        logger.debug(f"Path finding in Qdrant is simplified: {source_entity_id} -> {target_entity_id}")
+        return []
+    
+    async def store_graph(self, graph: Graph) -> None:
+        """Store an entire graph."""
+        # Store all entities
+        if graph.entities:
+            await self.store_entities(list(graph.entities.values()))
+        
+        # Store all relations (simplified)
+        if graph.relations:
+            await self.store_relations(list(graph.relations.values()))
+        
+        logger.info(f"Stored graph with {len(graph.entities)} entities and {len(graph.relations)} relations")
+    
+    async def get_graph(
+        self, 
+        entity_ids: Optional[List[EntityId]] = None
+    ) -> Graph:
+        """Get a graph or subgraph."""
+        from ..models import Graph
+        
+        if entity_ids:
+            entities = await self.get_entities(entity_ids)
+        else:
+            # Get all entities (simplified - in practice you'd want pagination)
+            entities = []
+            try:
+                search_result = await self.client.scroll(
+                    collection_name=self.config.collection_name,
+                    limit=10000,  # Large limit to get all entities
+                    with_payload=True,
+                    with_vectors=True
+                )
+                
+                for point in search_result[0]:
+                    payload = point.payload
+                    # Skip checksum entries
+                    if payload.get("type") == "document_checksum":
+                        continue
+                        
+                    entity = Entity(
+                        id=str(point.id),
+                        name=payload.get("name", ""),
+                        type=payload.get("type", ""),
+                        description=payload.get("description"),
+                        attributes=payload.get("attributes", {}),
+                        source_doc_id=payload.get("source_doc_id"),
+                        confidence=payload.get("confidence", 1.0),
+                        embedding=point.vector
+                    )
+                    entities.append(entity)
+            except Exception as e:
+                logger.error(f"Failed to get all entities: {e}")
+        
+        # Create graph with entities (relations are simplified in Qdrant)
+        graph = Graph()
+        for entity in entities:
+            graph.add_entity(entity)
+        
+        return graph
+    
+    async def clear(self) -> None:
+        """Clear all data from the storage."""
+        await self.clear_all()
+    
+    async def get_statistics(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        try:
+            # Get collection info
+            collection_info = await self.client.get_collection(self.config.collection_name)
+            
+            # Count entities (excluding checksums)
+            search_result = await self.client.scroll(
+                collection_name=self.config.collection_name,
+                scroll_filter=Filter(
+                    must_not=[
+                        FieldCondition(
+                            key="type",
+                            match=MatchValue(value="document_checksum")
+                        )
+                    ]
+                ),
+                limit=1,  # We just want the count
+                with_payload=False,
+                with_vectors=False
+            )
+            
+            # Get total points count from collection info
+            total_points = collection_info.points_count if hasattr(collection_info, 'points_count') else 0
+            
+            return {
+                "total_points": total_points,
+                "collection_name": self.config.collection_name,
+                "vector_size": self.config.vector_size,
+                "host": self.config.host,
+                "port": self.config.port
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get statistics: {e}")
+            return {}
     
     async def clear_all(self) -> bool:
         """Clear all data from Qdrant collection."""
