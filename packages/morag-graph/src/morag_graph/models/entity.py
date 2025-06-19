@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Any, Union, ClassVar
 from pydantic import BaseModel, Field, field_validator
 
 from .types import EntityType, EntityId, EntityAttributes
+from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
 class Entity(BaseModel):
@@ -37,46 +38,45 @@ class Entity(BaseModel):
     _neo4j_label: ClassVar[str] = "Entity"
     
     def __init__(self, **data):
-        """Initialize entity with deterministic ID based on name, type, and source document."""
+        """Initialize entity with unified deterministic ID based on name, type, and source document."""
         if 'id' not in data or not data['id']:
-            # Generate deterministic ID based on name, type, and source document
+            # Generate unified deterministic ID based on name, type, and source document
             name = data.get('name', '')
             entity_type = data.get('type', EntityType.CUSTOM)
             source_doc_id = data.get('source_doc_id', '')
             if isinstance(entity_type, EntityType):
                 entity_type = entity_type.value
-            data['id'] = self._generate_deterministic_id(name, entity_type, source_doc_id)
+            data['id'] = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
         super().__init__(**data)
     
-    def __setattr__(self, name: str, value):
+    @field_validator('id')
+    @classmethod
+    def validate_id_format(cls, v):
+        """Validate entity ID format."""
+        if v and not IDValidator.validate_entity_id(v):
+            raise ValueError(f"Invalid entity ID format: {v}")
+        return v
+    
+    def __setattr__(self, name, value):
         """Override setattr to regenerate ID when source_doc_id changes."""
         if name == 'source_doc_id' and hasattr(self, 'source_doc_id') and self.source_doc_id != value:
             # Set the new value first
             super().__setattr__(name, value)
-            # Regenerate ID with new source_doc_id
+            # Regenerate ID with new source_doc_id using unified generator
             entity_type = self.type
             if isinstance(entity_type, EntityType):
                 entity_type = entity_type.value
-            super().__setattr__('id', self._generate_deterministic_id(self.name, entity_type, value or ''))
+            super().__setattr__('id', UnifiedIDGenerator.generate_entity_id(self.name, entity_type, value or ''))
         else:
             super().__setattr__(name, value)
     
-    @staticmethod
-    def _generate_deterministic_id(name: str, entity_type: str, source_doc_id: str = '') -> str:
-        """Generate a deterministic ID based on entity name, type, and source document.
-        
-        This ensures that entities with the same name and type from different documents
-        get unique IDs, while still allowing proper deduplication within the same document.
-        """
-        # Normalize inputs for consistent hashing
-        normalized_name = name.strip().lower()
-        normalized_type = str(entity_type).strip().lower()
-        normalized_source = str(source_doc_id).strip() if source_doc_id else ''
-        
-        # Create a deterministic hash including source document
-        content = f"{normalized_name}:{normalized_type}:{normalized_source}"
-        hash_object = hashlib.sha256(content.encode('utf-8'))
-        return hash_object.hexdigest()[:32]  # Use first 32 characters for readability
+    def get_unified_id(self) -> str:
+        """Get unified entity ID."""
+        return self.id
+    
+    def is_unified_format(self) -> bool:
+        """Check if using unified ID format."""
+        return IDValidator.validate_entity_id(self.id)
     
     @field_validator('confidence')
     @classmethod

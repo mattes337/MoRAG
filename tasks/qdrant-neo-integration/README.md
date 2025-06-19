@@ -18,7 +18,7 @@ Based on the [Qdrant-Neo4j Integration Concept](../graph-extension/QDRANT_NEO_IN
 The implementation is divided into 4 phases over 4 weeks, with each phase building upon the previous one.
 
 ### Phase 1: ID Unification (Week 1)
-- [ ] **Task 1.1**: [Unified ID Architecture](./task-1.1-unified-id-architecture.md)
+- [X] **Task 1.1**: [Unified ID Architecture](./task-1.1-unified-id-architecture.md)
 - [ ] **Task 1.2**: [Document and Chunk ID Standardization](./task-1.2-document-chunk-id-standardization.md)
 - [ ] **Task 1.3**: [Entity ID Integration](./task-1.3-entity-id-integration.md)
 

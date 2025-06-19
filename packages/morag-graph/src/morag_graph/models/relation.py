@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Any, Union, ClassVar
 from pydantic import BaseModel, Field, field_validator
 
 from .types import RelationType, RelationId, RelationAttributes, EntityId
+from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
 class Relation(BaseModel):
@@ -27,7 +28,7 @@ class Relation(BaseModel):
         weight: Weight of the relation for graph algorithms (default: 1.0)
     """
     
-    id: RelationId = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: RelationId = Field(default="")
     source_entity_id: EntityId
     target_entity_id: EntityId
     type: Union[RelationType, str] = RelationType.CUSTOM
@@ -38,6 +39,36 @@ class Relation(BaseModel):
     
     # Class variables for Neo4J integration
     _neo4j_type: ClassVar[str] = "RELATION"
+    
+    def __init__(self, **data):
+        """Initialize relation with unified ID generation."""
+        # Generate unified relation ID if not provided
+        if 'id' not in data or not data['id']:
+            relation_type = data.get('type', RelationType.CUSTOM)
+            if isinstance(relation_type, RelationType):
+                relation_type = relation_type.value
+            data['id'] = UnifiedIDGenerator.generate_relation_id(
+                source_entity_id=data['source_entity_id'],
+                target_entity_id=data['target_entity_id'],
+                relation_type=relation_type
+            )
+        super().__init__(**data)
+    
+    @field_validator('id')
+    @classmethod
+    def validate_id_format(cls, v):
+        """Validate relation ID format."""
+        if v and not IDValidator.validate_relation_id(v):
+            raise ValueError(f"Invalid relation ID format: {v}")
+        return v
+    
+    def get_unified_id(self) -> str:
+        """Get unified relation ID."""
+        return self.id
+    
+    def is_unified_format(self) -> bool:
+        """Check if using unified ID format."""
+        return IDValidator.validate_relation_id(self.id)
     
     @field_validator('confidence')
     @classmethod

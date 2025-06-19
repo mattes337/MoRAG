@@ -10,9 +10,10 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any, ClassVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .types import EntityId
+from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
 class Document(BaseModel):
@@ -35,7 +36,7 @@ class Document(BaseModel):
         metadata: Additional metadata about the document
     """
     
-    id: EntityId = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: EntityId = Field(default="")
     source_file: str
     file_name: Optional[str] = None
     file_size: Optional[int] = None
@@ -48,6 +49,32 @@ class Document(BaseModel):
     
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "Document"
+    
+    def __init__(self, **data):
+        """Initialize document with unified ID generation."""
+        # Generate unified ID if not provided
+        if 'id' not in data or not data['id']:
+            data['id'] = UnifiedIDGenerator.generate_document_id(
+                source_file=data.get('source_file', ''),
+                checksum=data.get('checksum')
+            )
+        super().__init__(**data)
+    
+    @field_validator('id')
+    @classmethod
+    def validate_id_format(cls, v):
+        """Validate document ID format."""
+        if v and not IDValidator.validate_document_id(v):
+            raise ValueError(f"Invalid document ID format: {v}")
+        return v
+    
+    def get_unified_id(self) -> str:
+        """Get unified document ID."""
+        return self.id
+    
+    def is_unified_format(self) -> bool:
+        """Check if using unified ID format."""
+        return IDValidator.validate_document_id(self.id)
     
     def __hash__(self) -> int:
         """Make Document hashable based on its ID."""

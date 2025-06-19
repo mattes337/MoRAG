@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Any, ClassVar
 from pydantic import BaseModel, Field, field_validator
 
 from .types import EntityId
+from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
 class DocumentChunk(BaseModel):
@@ -33,7 +34,7 @@ class DocumentChunk(BaseModel):
         metadata: Additional metadata about the chunk
     """
     
-    id: EntityId = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: EntityId = Field(default="")
     document_id: EntityId
     chunk_index: int
     text: str
@@ -44,6 +45,36 @@ class DocumentChunk(BaseModel):
     
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "DocumentChunk"
+    
+    def __init__(self, **data):
+        """Initialize document chunk with unified ID generation."""
+        # Generate unified chunk ID if not provided
+        if 'id' not in data or not data['id']:
+            data['id'] = UnifiedIDGenerator.generate_chunk_id(
+                document_id=data['document_id'],
+                chunk_index=data['chunk_index']
+            )
+        super().__init__(**data)
+    
+    @field_validator('id')
+    @classmethod
+    def validate_id_format(cls, v):
+        """Validate chunk ID format."""
+        if v and not IDValidator.validate_chunk_id(v):
+            raise ValueError(f"Invalid chunk ID format: {v}")
+        return v
+    
+    def get_unified_id(self) -> str:
+        """Get unified chunk ID."""
+        return self.id
+    
+    def get_document_id_from_chunk(self) -> str:
+        """Extract document ID from chunk ID."""
+        return UnifiedIDGenerator.extract_document_id_from_chunk(self.id)
+    
+    def get_chunk_index_from_id(self) -> int:
+        """Extract chunk index from chunk ID."""
+        return UnifiedIDGenerator.extract_chunk_index_from_chunk(self.id)
     
     @field_validator('chunk_index')
     @classmethod
