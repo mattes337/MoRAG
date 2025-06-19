@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from ..models import Entity, Relation, Graph
 from ..models.types import EntityId, RelationId
+from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 from .base import BaseStorage
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,230 @@ class QdrantStorage(BaseStorage):
         
         logger.debug(f"Stored {len(entities)} entities in Qdrant")
         return entity_ids
+    
+    async def store_chunk_vector_with_unified_id(self, 
+                                                chunk_id: str,
+                                                vector: List[float],
+                                                metadata: Dict[str, Any]) -> str:
+        """Store chunk vector with unified ID format.
+        
+        Args:
+            chunk_id: Unified chunk ID
+            vector: Vector embedding
+            metadata: Additional metadata
+            
+        Returns:
+            Stored chunk ID
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        # Validate chunk ID format
+        if not IDValidator.validate_chunk_id(chunk_id):
+            raise ValueError(f"Invalid chunk ID format: {chunk_id}")
+        
+        # Extract document ID from chunk ID
+        document_id = UnifiedIDGenerator.extract_document_id_from_chunk(chunk_id)
+        chunk_index = UnifiedIDGenerator.extract_chunk_index_from_chunk(chunk_id)
+        
+        # Prepare enhanced metadata
+        enhanced_metadata = {
+            'document_id': document_id,
+            'chunk_id': chunk_id,
+            'chunk_index': chunk_index,
+            'neo4j_chunk_id': chunk_id,  # Cross-reference
+            'unified_id_format': True,
+            **metadata
+        }
+        
+        # Create point for insertion
+        point = PointStruct(
+            id=chunk_id,  # Use chunk_id as point ID
+            vector=vector,
+            payload=enhanced_metadata
+        )
+        
+        # Upsert the point
+        await self.client.upsert(
+            collection_name=self.config.collection_name,
+            points=[point]
+        )
+        
+        logger.debug(f"Stored chunk vector {chunk_id} in Qdrant")
+        return chunk_id
+    
+    async def get_chunk_vectors_by_document_id(self, document_id: str) -> List[Dict[str, Any]]:
+        """Get all chunk vectors for a document.
+        
+        Args:
+            document_id: Document ID
+            
+        Returns:
+            List of chunk vector data
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        # Search for vectors with matching document_id
+        search_result = await self.client.scroll(
+            collection_name=self.config.collection_name,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id)
+                    )
+                ]
+            ),
+            limit=1000  # Adjust as needed
+        )
+        
+        chunks = []
+        for point in search_result[0]:  # search_result is (points, next_page_offset)
+            chunks.append({
+                'chunk_id': point.id,
+                'vector': point.vector,
+                'metadata': point.payload
+            })
+        
+        logger.debug(f"Retrieved {len(chunks)} chunk vectors for document {document_id}")
+        return chunks
+    
+    async def update_chunk_vector_metadata(self, chunk_id: str, metadata: Dict[str, Any]) -> bool:
+        """Update metadata for a chunk vector.
+        
+        Args:
+            chunk_id: Chunk ID
+            metadata: New metadata to merge
+            
+        Returns:
+            True if successful
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        try:
+            # Get existing point
+            existing_points = await self.client.retrieve(
+                collection_name=self.config.collection_name,
+                ids=[chunk_id],
+                with_payload=True
+            )
+            
+            if not existing_points:
+                logger.warning(f"Chunk {chunk_id} not found for metadata update")
+                return False
+            
+            existing_point = existing_points[0]
+            
+            # Merge metadata
+            updated_payload = {**existing_point.payload, **metadata}
+            
+            # Update the point
+            await self.client.set_payload(
+                collection_name=self.config.collection_name,
+                payload=updated_payload,
+                points=[chunk_id]
+            )
+            
+            logger.debug(f"Updated metadata for chunk {chunk_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to update metadata for chunk {chunk_id}: {e}")
+            return False
+     
+    async def store_chunk_vector_with_entities(self, 
+                                             chunk_id: str,
+                                             vector: List[float],
+                                             metadata: Dict[str, Any],
+                                             entity_ids: List[str]) -> str:
+        """Store chunk vector with entity references.
+        
+        Args:
+            chunk_id: Unified chunk ID
+            vector: Vector embedding
+            metadata: Additional metadata
+            entity_ids: List of entity IDs referenced in this chunk
+            
+        Returns:
+            Stored chunk ID
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        # Validate chunk ID format
+        if not IDValidator.validate_chunk_id(chunk_id):
+            raise ValueError(f"Invalid chunk ID format: {chunk_id}")
+        
+        # Extract document ID from chunk ID
+        document_id = UnifiedIDGenerator.extract_document_id_from_chunk(chunk_id)
+        chunk_index = UnifiedIDGenerator.extract_chunk_index_from_chunk(chunk_id)
+        
+        # Prepare enhanced metadata with entity references
+        enhanced_metadata = {
+            'document_id': document_id,
+            'chunk_id': chunk_id,
+            'chunk_index': chunk_index,
+            'neo4j_chunk_id': chunk_id,  # Cross-reference
+            'unified_id_format': True,
+            'entity_ids': entity_ids,  # Entity references
+            'entity_count': len(entity_ids),
+            **metadata
+        }
+        
+        # Create point for insertion
+        point = PointStruct(
+            id=chunk_id,  # Use chunk_id as point ID
+            vector=vector,
+            payload=enhanced_metadata
+        )
+        
+        # Upsert the point
+        await self.client.upsert(
+            collection_name=self.config.collection_name,
+            points=[point]
+        )
+        
+        logger.debug(f"Stored chunk vector {chunk_id} with {len(entity_ids)} entity references in Qdrant")
+        return chunk_id
+    
+    async def get_chunks_by_entity_id(self, entity_id: str) -> List[Dict[str, Any]]:
+        """Get all chunks that reference a specific entity.
+        
+        Args:
+            entity_id: Entity ID to search for
+            
+        Returns:
+            List of chunk data containing the entity
+        """
+        if not self.client:
+            raise RuntimeError("Not connected to Qdrant database")
+        
+        # Search for vectors with entity_id in entity_ids array
+        search_result = await self.client.scroll(
+            collection_name=self.config.collection_name,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="entity_ids",
+                        match=MatchValue(value=entity_id)
+                    )
+                ]
+            ),
+            limit=1000  # Adjust as needed
+        )
+        
+        chunks = []
+        for point in search_result[0]:  # search_result is (points, next_page_offset)
+            chunks.append({
+                'chunk_id': point.id,
+                'vector': point.vector,
+                'metadata': point.payload
+            })
+        
+        logger.debug(f"Retrieved {len(chunks)} chunks referencing entity {entity_id}")
+        return chunks
     
     async def get_entity(self, entity_id: EntityId) -> Optional[Entity]:
         """Get an entity by ID from Qdrant.

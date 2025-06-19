@@ -3,7 +3,7 @@
 import json
 import uuid
 import hashlib
-from typing import Dict, List, Optional, Any, Union, ClassVar
+from typing import Dict, List, Optional, Any, Union, ClassVar, Set
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -33,6 +33,10 @@ class Entity(BaseModel):
     attributes: EntityAttributes = Field(default_factory=dict)
     source_doc_id: Optional[str] = None
     confidence: float = 1.0
+    
+    # Cross-system integration fields
+    mentioned_in_chunks: Set[str] = Field(default_factory=set, description="Set of chunk IDs where this entity is mentioned")
+    qdrant_vector_ids: Set[str] = Field(default_factory=set, description="Set of Qdrant vector IDs associated with this entity")
     
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "Entity"
@@ -78,6 +82,72 @@ class Entity(BaseModel):
         """Check if using unified ID format."""
         return IDValidator.validate_entity_id(self.id)
     
+    def add_chunk_reference(self, chunk_id: str) -> None:
+        """Add a reference to a chunk where this entity is mentioned.
+        
+        Args:
+            chunk_id: Unified chunk ID
+        """
+        if not IDValidator.validate_chunk_id(chunk_id):
+            raise ValueError(f"Invalid chunk ID format: {chunk_id}")
+        self.mentioned_in_chunks.add(chunk_id)
+    
+    def remove_chunk_reference(self, chunk_id: str) -> None:
+        """Remove a reference to a chunk.
+        
+        Args:
+            chunk_id: Unified chunk ID
+        """
+        self.mentioned_in_chunks.discard(chunk_id)
+    
+    def add_qdrant_vector_id(self, vector_id: str) -> None:
+        """Add a Qdrant vector ID associated with this entity.
+        
+        Args:
+            vector_id: Qdrant vector ID
+        """
+        self.qdrant_vector_ids.add(vector_id)
+    
+    def remove_qdrant_vector_id(self, vector_id: str) -> None:
+        """Remove a Qdrant vector ID.
+        
+        Args:
+            vector_id: Qdrant vector ID
+        """
+        self.qdrant_vector_ids.discard(vector_id)
+    
+    def get_document_ids_from_chunks(self) -> Set[str]:
+        """Get unique document IDs from all referenced chunks.
+        
+        Returns:
+            Set of document IDs
+        """
+        document_ids = set()
+        for chunk_id in self.mentioned_in_chunks:
+            try:
+                doc_id = UnifiedIDGenerator.extract_document_id_from_chunk(chunk_id)
+                document_ids.add(doc_id)
+            except ValueError:
+                # Skip invalid chunk IDs
+                continue
+        return document_ids
+    
+    def get_chunk_count(self) -> int:
+        """Get the number of chunks this entity is mentioned in.
+        
+        Returns:
+            Number of chunks
+        """
+        return len(self.mentioned_in_chunks)
+    
+    def get_qdrant_vector_count(self) -> int:
+        """Get the number of Qdrant vectors associated with this entity.
+        
+        Returns:
+            Number of Qdrant vectors
+        """
+        return len(self.qdrant_vector_ids)
+    
     @field_validator('confidence')
     @classmethod
     def validate_confidence(cls, v: float) -> float:
@@ -119,6 +189,13 @@ class Entity(BaseModel):
         # Serialize attributes to JSON string for Neo4J storage
         if 'attributes' in properties:
             properties['attributes'] = json.dumps(properties['attributes'])
+        
+        # Convert sets to lists for Neo4J storage
+        if 'mentioned_in_chunks' in properties:
+            properties['mentioned_in_chunks'] = list(properties['mentioned_in_chunks'])
+        
+        if 'qdrant_vector_ids' in properties:
+            properties['qdrant_vector_ids'] = list(properties['qdrant_vector_ids'])
             
         # Add label for Neo4J
         properties['_labels'] = [self._neo4j_label, properties['type']]
@@ -134,6 +211,13 @@ class Entity(BaseModel):
         # Deserialize attributes from JSON string
         if 'attributes' in node and isinstance(node['attributes'], str):
             node['attributes'] = json.loads(node['attributes'])
+        
+        # Convert lists back to sets
+        if 'mentioned_in_chunks' in node and isinstance(node['mentioned_in_chunks'], list):
+            node['mentioned_in_chunks'] = set(node['mentioned_in_chunks'])
+        
+        if 'qdrant_vector_ids' in node and isinstance(node['qdrant_vector_ids'], list):
+            node['qdrant_vector_ids'] = set(node['qdrant_vector_ids'])
         
         # Remove Neo4J specific properties
         if '_labels' in node:

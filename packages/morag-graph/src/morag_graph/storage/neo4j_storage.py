@@ -2,12 +2,14 @@
 
 import logging
 from typing import Dict, List, Optional, Any, Set
+from datetime import datetime
 
 from neo4j import AsyncGraphDatabase, AsyncDriver, AsyncSession
 from pydantic import BaseModel
 
 from ..models import Entity, Relation, Graph, Document, DocumentChunk
 from ..models.types import EntityId, RelationId
+from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 from .base import BaseStorage
 
 logger = logging.getLogger(__name__)
@@ -93,6 +95,215 @@ class Neo4jStorage(BaseStorage):
                 records.append(record.data())
             return records
     
+    async def store_document_with_unified_id(self, document: Document) -> str:
+        """Store document with unified ID format.
+        
+        Args:
+            document: Document instance with unified ID
+            
+        Returns:
+            Document ID
+        """
+        # Validate ID format
+        if not IDValidator.validate_document_id(document.id):
+            raise ValueError(f"Invalid document ID format: {document.id}")
+        
+        # Store document with unified ID
+        query = """
+        MERGE (d:Document {id: $id})
+        SET d.source_file = $source_file,
+            d.file_name = $file_name,
+            d.checksum = $checksum,
+            d.ingestion_timestamp = $ingestion_timestamp,
+            d.metadata = $metadata,
+            d.unified_id_format = true
+        RETURN d.id as document_id
+        """
+        
+        result = await self._execute_query(
+            query,
+            {
+                "id": document.id,
+                "source_file": document.source_file,
+                "file_name": document.file_name,
+                "checksum": document.checksum,
+                "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
+                "metadata": document.metadata or {}
+            }
+        )
+        
+        return result[0]['document_id']
+    
+    async def store_chunk_with_unified_id(self, chunk: DocumentChunk) -> str:
+        """Store document chunk with unified ID format.
+        
+        Args:
+            chunk: DocumentChunk instance with unified ID
+            
+        Returns:
+            Chunk ID
+        """
+        # Validate ID formats
+        if not IDValidator.validate_chunk_id(chunk.id):
+            raise ValueError(f"Invalid chunk ID format: {chunk.id}")
+        
+        if not IDValidator.validate_document_id(chunk.document_id):
+            raise ValueError(f"Invalid document ID format: {chunk.document_id}")
+        
+        # Verify document exists
+        doc_check = await self._execute_query(
+            "MATCH (d:Document {id: $doc_id}) RETURN d.id",
+            {"doc_id": chunk.document_id}
+        )
+        
+        if not doc_check:
+            raise ValueError(f"Document {chunk.document_id} not found")
+        
+        # Store chunk with unified ID
+        query = """
+        MATCH (d:Document {id: $document_id})
+        MERGE (c:DocumentChunk {id: $id})
+        SET c.document_id = $document_id,
+            c.chunk_index = $chunk_index,
+            c.text = $text,
+            c.metadata = $metadata,
+            c.unified_id_format = true
+        MERGE (d)-[:HAS_CHUNK]->(c)
+        RETURN c.id as chunk_id
+        """
+        
+        result = await self._execute_query(
+            query,
+            {
+                "id": chunk.id,
+                "document_id": chunk.document_id,
+                "chunk_index": chunk.chunk_index,
+                "text": chunk.text,
+                "metadata": chunk.metadata or {}
+            }
+        )
+        
+        return result[0]['chunk_id']
+    
+    async def get_document_by_unified_id(self, document_id: str) -> Optional[Document]:
+        """Retrieve document by unified ID.
+        
+        Args:
+            document_id: Unified document ID
+            
+        Returns:
+            Document instance or None
+        """
+        if not IDValidator.validate_document_id(document_id):
+            raise ValueError(f"Invalid document ID format: {document_id}")
+        
+        query = """
+        MATCH (d:Document {id: $id})
+        RETURN d.id as id,
+               d.source_file as source_file,
+               d.file_name as file_name,
+               d.checksum as checksum,
+               d.ingestion_timestamp as ingestion_timestamp,
+               d.metadata as metadata
+        """
+        
+        result = await self._execute_query(query, {"id": document_id})
+        
+        if not result:
+            return None
+        
+        doc_data = result[0]
+        return Document(
+            id=doc_data['id'],
+            source_file=doc_data['source_file'],
+            file_name=doc_data['file_name'],
+            checksum=doc_data['checksum'],
+            ingestion_timestamp=datetime.fromisoformat(doc_data['ingestion_timestamp']),
+            metadata=doc_data['metadata']
+        )
+    
+    async def get_chunks_by_document_id(self, document_id: str) -> List[DocumentChunk]:
+        """Get all chunks for a document by unified ID.
+        
+        Args:
+            document_id: Unified document ID
+            
+        Returns:
+            List of DocumentChunk instances
+        """
+        if not IDValidator.validate_document_id(document_id):
+            raise ValueError(f"Invalid document ID format: {document_id}")
+        
+        query = """
+        MATCH (d:Document {id: $document_id})-[:HAS_CHUNK]->(c:DocumentChunk)
+        RETURN c.id as id,
+               c.document_id as document_id,
+               c.chunk_index as chunk_index,
+               c.text as text,
+               c.metadata as metadata
+        ORDER BY c.chunk_index
+        """
+        
+        result = await self._execute_query(query, {"document_id": document_id})
+        
+        chunks = []
+        for chunk_data in result:
+            chunks.append(DocumentChunk(
+                id=chunk_data['id'],
+                document_id=chunk_data['document_id'],
+                chunk_index=chunk_data['chunk_index'],
+                text=chunk_data['text'],
+                metadata=chunk_data['metadata']
+            ))
+        
+        return chunks
+    
+    async def validate_id_consistency(self) -> Dict[str, Any]:
+        """Validate ID consistency across the database.
+        
+        Returns:
+            Validation report
+        """
+        # Check for documents with invalid ID formats
+        doc_query = """
+        MATCH (d:Document)
+        WHERE NOT d.id STARTS WITH 'doc_'
+        RETURN count(d) as invalid_docs, collect(d.id)[0..10] as sample_ids
+        """
+        
+        # Check for chunks with invalid ID formats
+        chunk_query = """
+        MATCH (c:DocumentChunk)
+        WHERE NOT c.id CONTAINS ':chunk:'
+        RETURN count(c) as invalid_chunks, collect(c.id)[0..10] as sample_ids
+        """
+        
+        # Check for orphaned chunks
+        orphan_query = """
+        MATCH (c:DocumentChunk)
+        WHERE NOT EXISTS((c)<-[:HAS_CHUNK]-(:Document))
+        RETURN count(c) as orphaned_chunks, collect(c.id)[0..10] as sample_ids
+        """
+        
+        doc_result = await self._execute_query(doc_query)
+        chunk_result = await self._execute_query(chunk_query)
+        orphan_result = await self._execute_query(orphan_query)
+        
+        return {
+            "invalid_documents": {
+                "count": doc_result[0]['invalid_docs'],
+                "sample_ids": doc_result[0]['sample_ids']
+            },
+            "invalid_chunks": {
+                "count": chunk_result[0]['invalid_chunks'],
+                "sample_ids": chunk_result[0]['sample_ids']
+            },
+            "orphaned_chunks": {
+                "count": orphan_result[0]['orphaned_chunks'],
+                "sample_ids": orphan_result[0]['sample_ids']
+            }
+        }
+    
     async def store_entity(self, entity: Entity) -> EntityId:
         """Store an entity in Neo4J.
         
@@ -155,6 +366,130 @@ class Neo4jStorage(BaseStorage):
         # Use individual store_entity calls to ensure proper MERGE logic
         # This is more reliable than batch operations for deduplication
         return [await self.store_entity(entity) for entity in entities]
+    
+    async def store_entity_with_chunk_references(self, entity: Entity, chunk_ids: List[str]) -> EntityId:
+        """Store entity with references to chunks where it's mentioned.
+        
+        Args:
+            entity: Entity instance
+            chunk_ids: List of chunk IDs where entity is mentioned
+            
+        Returns:
+            Entity ID
+        """
+        # Validate chunk IDs
+        for chunk_id in chunk_ids:
+            if not IDValidator.validate_chunk_id(chunk_id):
+                raise ValueError(f"Invalid chunk ID format: {chunk_id}")
+        
+        # Add chunk references to entity
+        for chunk_id in chunk_ids:
+            entity.add_chunk_reference(chunk_id)
+        
+        # Store the entity
+        entity_id = await self.store_entity(entity)
+        
+        # Create relationships with chunks
+        for chunk_id in chunk_ids:
+            await self._create_entity_chunk_relationship(entity_id, chunk_id)
+        
+        return entity_id
+    
+    async def _create_entity_chunk_relationship(self, entity_id: EntityId, chunk_id: str) -> None:
+        """Create MENTIONED_IN relationship between entity and chunk.
+        
+        Args:
+            entity_id: Entity ID
+            chunk_id: Chunk ID
+        """
+        query = """
+        MATCH (e:Entity {id: $entity_id})
+        MATCH (c:DocumentChunk {id: $chunk_id})
+        MERGE (e)-[:MENTIONED_IN]->(c)
+        """
+        
+        await self._execute_query(
+            query,
+            {
+                "entity_id": entity_id,
+                "chunk_id": chunk_id
+            }
+        )
+    
+    async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
+        """Get all entities mentioned in a specific chunk.
+        
+        Args:
+            chunk_id: Chunk ID
+            
+        Returns:
+            List of Entity instances
+        """
+        if not IDValidator.validate_chunk_id(chunk_id):
+            raise ValueError(f"Invalid chunk ID format: {chunk_id}")
+        
+        query = """
+        MATCH (e:Entity)-[:MENTIONED_IN]->(c:DocumentChunk {id: $chunk_id})
+        RETURN e
+        """
+        
+        result = await self._execute_query(query, {"chunk_id": chunk_id})
+        
+        entities = []
+        for record in result:
+            entity_data = dict(record['e'])
+            entities.append(Entity.from_neo4j_node(entity_data))
+        
+        return entities
+    
+    async def get_chunks_by_entity_id(self, entity_id: EntityId) -> List[str]:
+        """Get all chunk IDs where an entity is mentioned.
+        
+        Args:
+            entity_id: Entity ID
+            
+        Returns:
+            List of chunk IDs
+        """
+        query = """
+        MATCH (e:Entity {id: $entity_id})-[:MENTIONED_IN]->(c:DocumentChunk)
+        RETURN c.id as chunk_id
+        ORDER BY c.chunk_index
+        """
+        
+        result = await self._execute_query(query, {"entity_id": entity_id})
+        
+        return [record['chunk_id'] for record in result]
+    
+    async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
+        """Update entity's chunk references by replacing all existing relationships.
+        
+        Args:
+            entity_id: Entity ID
+            chunk_ids: New list of chunk IDs
+        """
+        # Validate chunk IDs
+        for chunk_id in chunk_ids:
+            if not IDValidator.validate_chunk_id(chunk_id):
+                raise ValueError(f"Invalid chunk ID format: {chunk_id}")
+        
+        # Remove all existing relationships
+        delete_query = """
+        MATCH (e:Entity {id: $entity_id})-[r:MENTIONED_IN]->()
+        DELETE r
+        """
+        
+        await self._execute_query(delete_query, {"entity_id": entity_id})
+        
+        # Create new relationships
+        for chunk_id in chunk_ids:
+            await self._create_entity_chunk_relationship(entity_id, chunk_id)
+        
+        # Update entity's mentioned_in_chunks field
+        entity = await self.get_entity(entity_id)
+        if entity:
+            entity.mentioned_in_chunks = set(chunk_ids)
+            await self.store_entity(entity)
     
     async def get_entity(self, entity_id: EntityId) -> Optional[Entity]:
         """Get an entity by ID.
