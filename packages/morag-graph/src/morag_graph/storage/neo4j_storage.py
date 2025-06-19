@@ -1166,3 +1166,87 @@ class Neo4jStorage(BaseStorage):
             "entity_id": entity_id,
             "context": context
         })
+    
+    # Checksum management methods
+    
+    async def get_document_checksum(self, document_id: str) -> Optional[str]:
+        """Get stored checksum for a document.
+        
+        Args:
+            document_id: Document identifier
+            
+        Returns:
+            Stored checksum if found, None otherwise
+        """
+        query = """
+        MATCH (d:Document {id: $document_id})
+        RETURN d.checksum as checksum
+        """
+        
+        result = await self._execute_query(query, {"document_id": document_id})
+        return result[0]["checksum"] if result and result[0]["checksum"] else None
+    
+    async def store_document_checksum(self, document_id: str, checksum: str) -> None:
+        """Store document checksum.
+        
+        Args:
+            document_id: Document identifier
+            checksum: Document checksum to store
+        """
+        query = """
+        MERGE (d:Document {id: $document_id})
+        SET d.checksum = $checksum, d.checksum_updated = datetime()
+        """
+        
+        await self._execute_query(query, {
+            "document_id": document_id,
+            "checksum": checksum
+        })
+    
+    async def delete_document_checksum(self, document_id: str) -> None:
+        """Remove stored checksum for a document.
+        
+        Args:
+            document_id: Document identifier
+        """
+        query = """
+        MATCH (d:Document {id: $document_id})
+        REMOVE d.checksum, d.checksum_updated
+        """
+        
+        await self._execute_query(query, {"document_id": document_id})
+    
+    async def get_entities_by_document(self, document_id: str) -> List[Entity]:
+        """Get all entities associated with a document.
+        
+        Args:
+            document_id: Document identifier
+            
+        Returns:
+            List of entities from this document
+        """
+        query = """
+        MATCH (d:Document {id: $document_id})-[:CONTAINS]->(c:DocumentChunk)-[:MENTIONS]->(e:Entity)
+        RETURN DISTINCT e
+        UNION
+        MATCH (e:Entity {source_doc_id: $document_id})
+        RETURN e
+        """
+        
+        result = await self._execute_query(query, {"document_id": document_id})
+        entities = []
+        
+        for record in result:
+            entity_data = dict(record["e"])
+            # Convert Neo4j node to Entity model
+            entity = Entity(
+                id=entity_data["id"],
+                name=entity_data["name"],
+                type=entity_data["type"],
+                description=entity_data.get("description"),
+                properties=entity_data.get("properties", {}),
+                source_doc_id=entity_data.get("source_doc_id")
+            )
+            entities.append(entity)
+        
+        return entities

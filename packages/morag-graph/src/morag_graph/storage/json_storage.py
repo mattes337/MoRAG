@@ -42,10 +42,12 @@ class JsonStorage(BaseStorage):
         self.storage_path = Path(config.storage_path)
         self.entities_file = self.storage_path / config.entities_file
         self.relations_file = self.storage_path / config.relations_file
+        self.checksums_file = self.storage_path / "document_checksums.json"
         
         # In-memory cache
         self._entities: Dict[EntityId, Entity] = {}
         self._relations: Dict[RelationId, Relation] = {}
+        self._document_checksums: Dict[str, str] = {}
         self._connected = False
     
     async def connect(self) -> None:
@@ -57,6 +59,7 @@ class JsonStorage(BaseStorage):
             # Load existing data
             await self._load_entities()
             await self._load_relations()
+            await self._load_checksums()
             
             self._connected = True
             logger.info(f"Connected to JSON storage at {self.storage_path}")
@@ -70,6 +73,7 @@ class JsonStorage(BaseStorage):
         if self._connected and self.config.auto_save:
             await self._save_entities()
             await self._save_relations()
+            await self._save_checksums()
         
         self._connected = False
         logger.info("Disconnected from JSON storage")
@@ -755,3 +759,84 @@ class JsonStorage(BaseStorage):
             "storage_path": str(self.storage_path),
             "auto_save": self.config.auto_save
         }
+    
+    # Checksum management methods
+    
+    async def get_document_checksum(self, document_id: str) -> Optional[str]:
+        """Get stored checksum for a document.
+        
+        Args:
+            document_id: Document identifier
+            
+        Returns:
+            Stored checksum if found, None otherwise
+        """
+        self._ensure_connected()
+        return self._document_checksums.get(document_id)
+    
+    async def store_document_checksum(self, document_id: str, checksum: str) -> None:
+        """Store document checksum.
+        
+        Args:
+            document_id: Document identifier
+            checksum: Document checksum to store
+        """
+        self._ensure_connected()
+        self._document_checksums[document_id] = checksum
+        
+        if self.config.auto_save:
+            await self._save_checksums()
+    
+    async def delete_document_checksum(self, document_id: str) -> None:
+        """Remove stored checksum for a document.
+        
+        Args:
+            document_id: Document identifier
+        """
+        self._ensure_connected()
+        if document_id in self._document_checksums:
+            del self._document_checksums[document_id]
+            
+            if self.config.auto_save:
+                await self._save_checksums()
+    
+    async def get_entities_by_document(self, document_id: str) -> List[Entity]:
+        """Get all entities associated with a document.
+        
+        Args:
+            document_id: Document identifier
+            
+        Returns:
+            List of entities from this document
+        """
+        self._ensure_connected()
+        
+        entities = []
+        for entity in self._entities.values():
+            if hasattr(entity, 'source_doc_id') and entity.source_doc_id == document_id:
+                entities.append(entity)
+        
+        return entities
+    
+    async def _save_checksums(self) -> None:
+        """Save document checksums to file."""
+        try:
+            async with aiofiles.open(self.checksums_file, 'w') as f:
+                await f.write(json.dumps(self._document_checksums, indent=2))
+        except Exception as e:
+            logger.error(f"Failed to save checksums: {e}")
+            raise
+    
+    async def _load_checksums(self) -> None:
+        """Load document checksums from file."""
+        if not self.checksums_file.exists():
+            self._document_checksums = {}
+            return
+        
+        try:
+            async with aiofiles.open(self.checksums_file, 'r') as f:
+                content = await f.read()
+                self._document_checksums = json.loads(content) if content.strip() else {}
+        except Exception as e:
+            logger.warning(f"Failed to load checksums, starting with empty cache: {e}")
+            self._document_checksums = {}

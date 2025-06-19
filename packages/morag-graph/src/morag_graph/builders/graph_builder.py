@@ -14,6 +14,8 @@ from ..models.entity import Entity
 from ..models.relation import Relation
 from ..models.document import Document
 from ..models.document_chunk import DocumentChunk
+from ..updates.checksum_manager import DocumentChecksumManager
+from ..updates.cleanup_manager import DocumentCleanupManager, CleanupResult
 
 
 class GraphBuildError(Exception):
@@ -33,6 +35,8 @@ class GraphBuildResult:
     chunks_processed: int = 0
     errors: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    skipped: bool = False
+    cleanup_result: Optional[CleanupResult] = None
 
 
 class GraphBuilder:
@@ -70,6 +74,10 @@ class GraphBuilder:
             config=llm_config,
             relation_types=relation_types
         )
+        
+        # Initialize checksum and cleanup managers
+        self.checksum_manager = DocumentChecksumManager(storage)
+        self.cleanup_manager = DocumentCleanupManager(storage)
     
     async def process_document(
         self,
@@ -78,6 +86,9 @@ class GraphBuilder:
         metadata: Optional[Dict[str, Any]] = None
     ) -> GraphBuildResult:
         """Process a document and build graph entities and relations.
+        
+        Uses checksum-based change detection to avoid reprocessing unchanged documents.
+        If document content has changed, removes all existing data before reprocessing.
         
         Args:
             content: Document content to process
@@ -96,6 +107,25 @@ class GraphBuilder:
         try:
             self.logger.info(f"Starting graph processing for document {document_id}")
             
+            # Check if document needs processing based on checksum
+            needs_update = await self.checksum_manager.needs_update(
+                document_id, content, metadata
+            )
+            
+            if not needs_update:
+                # Document unchanged, skip processing
+                processing_time = time.time() - start_time
+                self.logger.info(f"Document {document_id} unchanged, skipped processing")
+                
+                return GraphBuildResult(
+                    document_id=document_id,
+                    processing_time=processing_time,
+                    skipped=True
+                )
+            
+            # Document changed, cleanup existing data first
+            cleanup_result = await self.cleanup_manager.cleanup_document_data(document_id)
+            
             # Extract entities from content
             entities = await self.entity_extractor.extract(
                 content,
@@ -108,20 +138,23 @@ class GraphBuilder:
                 entities=entities
             )
             
-            # Note: Entity and Relation models don't have metadata fields
-            # Metadata is handled at the document/chunk level
-            
             # Store entities and relations
             result = await self._store_entities_and_relations(
                 entities, relations, document_id
             )
             
+            # Store new checksum
+            new_checksum = self.checksum_manager.calculate_document_checksum(content, metadata)
+            await self.checksum_manager.store_document_checksum(document_id, new_checksum)
+            
             processing_time = time.time() - start_time
             result.processing_time = processing_time
+            result.cleanup_result = cleanup_result
             
             self.logger.info(
                 f"Completed graph processing for document {document_id}: "
                 f"{result.entities_created} entities, {result.relations_created} relations "
+                f"(cleaned up {cleanup_result.entities_deleted} entities, {cleanup_result.relations_deleted} relations) "
                 f"in {processing_time:.2f}s"
             )
             

@@ -82,6 +82,7 @@ This task implements the graph construction pipeline that processes documents an
        entity_ids: List[str]
        relation_ids: List[str]
        errors: List[str] = field(default_factory=list)
+       skipped: bool = False
    ```
 
 2. **Integration with Existing Pipeline**
@@ -140,151 +141,160 @@ This task implements the graph construction pipeline that processes documents an
 - Parallel processing support
 - Error handling and logging
 
-### 2.2.2: Incremental Graph Updates
-**Estimated Time**: 3-4 days  
+### 2.2.2: Checksum-Based Document Updates
+**Estimated Time**: 2-3 days  
 **Priority**: High
 
 #### Implementation Steps
 
-1. **Change Detection System**
+1. **Document Checksum Manager**
    ```python
-   # src/morag_graph/updates/change_detector.py
-   from typing import Set, List, Tuple
-   from morag_graph.models import Entity, Relation, Graph
+   # src/morag_graph/updates/checksum_manager.py
+   import hashlib
+   from typing import Optional
+   from morag_core.models import ProcessedDocument
+   from morag_graph.storage.base import BaseGraphStorage
    
-   class GraphUpdateManager:
+   class DocumentChecksumManager:
        def __init__(self, graph_storage: BaseGraphStorage):
            self.graph_storage = graph_storage
            self.logger = logging.getLogger(__name__)
        
-       async def detect_changes(self, new_document: ProcessedDocument, existing_entities: List[Entity]) -> ChangeSet:
-           """Detect changes between new document and existing graph."""
-           # Extract entities from new document
-           new_entities = await self.nlp_processor.extract_entities(new_document.content)
+       def calculate_document_checksum(self, document: ProcessedDocument) -> str:
+           """Calculate SHA-256 checksum of document content."""
+           content = f"{document.content}{document.metadata}"
+           return hashlib.sha256(content.encode('utf-8')).hexdigest()
+       
+       async def get_stored_checksum(self, document_id: str) -> Optional[str]:
+           """Get stored checksum for a document from graph database."""
+           return await self.graph_storage.get_document_checksum(document_id)
+       
+       async def store_document_checksum(self, document_id: str, checksum: str) -> None:
+           """Store document checksum in graph database."""
+           await self.graph_storage.store_document_checksum(document_id, checksum)
+       
+       async def needs_update(self, document: ProcessedDocument) -> bool:
+           """Check if document needs to be updated based on checksum comparison."""
+           current_checksum = self.calculate_document_checksum(document)
+           stored_checksum = await self.get_stored_checksum(document.id)
            
-           # Compare with existing entities
-           changes = ChangeSet()
+           if stored_checksum is None:
+               self.logger.info(f"Document {document.id} not found in graph, needs processing")
+               return True
            
-           for new_entity in new_entities:
-               existing_match = self._find_matching_entity(new_entity, existing_entities)
+           if current_checksum != stored_checksum:
+               self.logger.info(f"Document {document.id} checksum changed, needs reprocessing")
+               return True
+           
+           self.logger.info(f"Document {document.id} unchanged, skipping")
+           return False
+   ```
+
+2. **Document Cleanup Manager**
+   ```python
+   # src/morag_graph/updates/cleanup_manager.py
+   from typing import List
+   from morag_graph.storage.base import BaseGraphStorage
+   
+   class DocumentCleanupManager:
+       def __init__(self, graph_storage: BaseGraphStorage):
+           self.graph_storage = graph_storage
+           self.logger = logging.getLogger(__name__)
+       
+       async def cleanup_document_data(self, document_id: str) -> CleanupResult:
+           """Remove all entities and relations associated with a document."""
+           try:
+               # Find all entities linked to this document
+               entities = await self.graph_storage.find_entities_by_document(document_id)
+               entity_ids = [entity.id for entity in entities]
                
-               if existing_match:
-                   if self._entity_changed(new_entity, existing_match):
-                       changes.modified_entities.append((existing_match.id, new_entity))
-               else:
-                   changes.new_entities.append(new_entity)
-           
-           return changes
-       
-       async def apply_changes(self, changes: ChangeSet) -> UpdateResult:
-           """Apply incremental updates to graph."""
-           result = UpdateResult()
-           
-           # Create new entities
-           for entity in changes.new_entities:
-               entity_id = await self.graph_storage.create_entity(entity)
-               result.entities_created.append(entity_id)
-           
-           # Update modified entities
-           for entity_id, updated_entity in changes.modified_entities:
-               await self.graph_storage.update_entity(entity_id, updated_entity)
-               result.entities_updated.append(entity_id)
-           
-           # Handle relation updates
-           await self._update_relations(changes, result)
-           
-           return result
-       
-       def _find_matching_entity(self, new_entity: Entity, existing_entities: List[Entity]) -> Optional[Entity]:
-           """Find matching entity using similarity metrics."""
-           best_match = None
-           best_score = 0.0
-           
-           for existing_entity in existing_entities:
-               score = self._calculate_similarity(new_entity, existing_entity)
-               if score > 0.8 and score > best_score:  # Threshold for matching
-                   best_match = existing_entity
-                   best_score = score
-           
-           return best_match
-       
-       def _calculate_similarity(self, entity1: Entity, entity2: Entity) -> float:
-           """Calculate similarity between two entities."""
-           # Name similarity
-           name_sim = self._string_similarity(entity1.name, entity2.name)
-           
-           # Type similarity
-           type_sim = 1.0 if entity1.type == entity2.type else 0.0
-           
-           # Embedding similarity (if available)
-           embedding_sim = 0.0
-           if entity1.embedding and entity2.embedding:
-               embedding_sim = self._cosine_similarity(entity1.embedding, entity2.embedding)
-           
-           # Weighted combination
-           return 0.4 * name_sim + 0.3 * type_sim + 0.3 * embedding_sim
+               # Find all relations linked to this document
+               relations = await self.graph_storage.find_relations_by_document(document_id)
+               relation_ids = [relation.id for relation in relations]
+               
+               # Delete relations first (to maintain referential integrity)
+               if relation_ids:
+                   await self.graph_storage.delete_relations(relation_ids)
+               
+               # Delete entities
+               if entity_ids:
+                   await self.graph_storage.delete_entities(entity_ids)
+               
+               # Remove document checksum
+               await self.graph_storage.delete_document_checksum(document_id)
+               
+               self.logger.info(f"Cleaned up document {document_id}: {len(entity_ids)} entities, {len(relation_ids)} relations")
+               
+               return CleanupResult(
+                   document_id=document_id,
+                   entities_deleted=len(entity_ids),
+                   relations_deleted=len(relation_ids)
+               )
+               
+           except Exception as e:
+               self.logger.error(f"Error cleaning up document {document_id}: {str(e)}")
+               raise
    
    @dataclass
-   class ChangeSet:
-       new_entities: List[Entity] = field(default_factory=list)
-       modified_entities: List[Tuple[str, Entity]] = field(default_factory=list)
-       new_relations: List[Relation] = field(default_factory=list)
-       modified_relations: List[Tuple[str, Relation]] = field(default_factory=list)
-   
-   @dataclass
-   class UpdateResult:
-       entities_created: List[str] = field(default_factory=list)
-       entities_updated: List[str] = field(default_factory=list)
-       relations_created: List[str] = field(default_factory=list)
-       relations_updated: List[str] = field(default_factory=list)
+   class CleanupResult:
+       document_id: str
+       entities_deleted: int
+       relations_deleted: int
    ```
 
-2. **Conflict Resolution**
+3. **Updated Graph Builder with Checksum Logic**
    ```python
-   class ConflictResolver:
-       def resolve_entity_conflict(self, existing: Entity, new: Entity) -> Entity:
-           """Resolve conflicts between existing and new entity data."""
-           resolved = Entity(
-               id=existing.id,
-               name=self._resolve_name_conflict(existing.name, new.name),
-               type=existing.type,  # Keep existing type
-               summary=self._merge_summaries(existing.summary, new.summary),
-               embedding=new.embedding if new.embedding else existing.embedding,
-               metadata=self._merge_metadata(existing.metadata, new.metadata),
-               source_documents=list(set(existing.source_documents + new.source_documents)),
-               created_at=existing.created_at,
-               updated_at=datetime.utcnow()
-           )
-           return resolved
+   # Updated GraphBuilder class
+   class GraphBuilder:
+       def __init__(self, graph_storage: BaseGraphStorage, nlp_processor: NLPProcessor):
+           self.graph_storage = graph_storage
+           self.nlp_processor = nlp_processor
+           self.checksum_manager = DocumentChecksumManager(graph_storage)
+           self.cleanup_manager = DocumentCleanupManager(graph_storage)
+           self.logger = logging.getLogger(__name__)
        
-       def _resolve_name_conflict(self, existing_name: str, new_name: str) -> str:
-           """Choose the better name based on length and completeness."""
-           if len(new_name) > len(existing_name) and new_name.lower() not in existing_name.lower():
-               return new_name
-           return existing_name
-   ```
-
-3. **Performance Optimization**
-   ```python
-   class BatchUpdateManager:
-       async def batch_update_entities(self, updates: List[Tuple[str, Entity]]) -> List[str]:
-           """Perform batch updates for better performance."""
-           batch_size = 100
-           updated_ids = []
-           
-           for i in range(0, len(updates), batch_size):
-               batch = updates[i:i + batch_size]
-               batch_ids = await self.graph_storage.batch_update_entities(batch)
-               updated_ids.extend(batch_ids)
-           
-           return updated_ids
+       async def process_document(self, document: ProcessedDocument) -> GraphBuildResult:
+           """Process a document with checksum-based change detection."""
+           try:
+               # Check if document needs processing
+               if not await self.checksum_manager.needs_update(document):
+                   return GraphBuildResult(
+                       document_id=document.id,
+                       entities_created=0,
+                       relations_created=0,
+                       entity_ids=[],
+                       relation_ids=[],
+                       skipped=True
+                   )
+               
+               # Clean up existing data for this document
+               cleanup_result = await self.cleanup_manager.cleanup_document_data(document.id)
+               self.logger.info(f"Cleaned up existing data: {cleanup_result.entities_deleted} entities, {cleanup_result.relations_deleted} relations")
+               
+               # Extract entities and relations
+               entities = await self.nlp_processor.extract_entities(document.content)
+               relations = await self.nlp_processor.extract_relations(document.content, entities)
+               
+               # Store in graph
+               result = await self._store_entities_and_relations(entities, relations, document)
+               
+               # Store new checksum
+               checksum = self.checksum_manager.calculate_document_checksum(document)
+               await self.checksum_manager.store_document_checksum(document.id, checksum)
+               
+               self.logger.info(f"Processed document {document.id}: {len(entities)} entities, {len(relations)} relations")
+               return result
+               
+           except Exception as e:
+               self.logger.error(f"Error processing document {document.id}: {str(e)}")
+               raise GraphBuildError(f"Failed to process document: {str(e)}")
    ```
 
 #### Deliverables
-- Change detection system
-- Conflict resolution mechanisms
-- Batch update optimization
-- Performance monitoring
+- Document checksum management system
+- Document cleanup and deletion mechanisms
+- Efficient skip logic for unchanged documents
+- Performance monitoring and logging
 
 ## Testing Requirements
 
@@ -313,14 +323,46 @@ class TestGraphBuilder:
         assert len(results) == len(sample_documents)
         assert all(isinstance(r, GraphBuildResult) for r in results)
 
-class TestGraphUpdateManager:
+class TestDocumentChecksumManager:
     @pytest.mark.asyncio
-    async def test_detect_changes(self, update_manager, new_document, existing_entities):
-        changes = await update_manager.detect_changes(new_document, existing_entities)
+    async def test_checksum_calculation(self, checksum_manager, sample_document):
+        checksum = checksum_manager.calculate_document_checksum(sample_document)
+        assert isinstance(checksum, str)
+        assert len(checksum) == 64  # SHA-256 hex digest length
+    
+    @pytest.mark.asyncio
+    async def test_needs_update_new_document(self, checksum_manager, sample_document):
+        # Mock no existing checksum
+        checksum_manager.graph_storage.get_document_checksum = AsyncMock(return_value=None)
+        needs_update = await checksum_manager.needs_update(sample_document)
+        assert needs_update is True
+    
+    @pytest.mark.asyncio
+    async def test_needs_update_unchanged_document(self, checksum_manager, sample_document):
+        # Mock existing matching checksum
+        current_checksum = checksum_manager.calculate_document_checksum(sample_document)
+        checksum_manager.graph_storage.get_document_checksum = AsyncMock(return_value=current_checksum)
+        needs_update = await checksum_manager.needs_update(sample_document)
+        assert needs_update is False
+
+class TestDocumentCleanupManager:
+    @pytest.mark.asyncio
+    async def test_cleanup_document_data(self, cleanup_manager, sample_document_id):
+        # Mock entities and relations
+        mock_entities = [Mock(id="entity1"), Mock(id="entity2")]
+        mock_relations = [Mock(id="relation1")]
         
-        assert isinstance(changes, ChangeSet)
-        assert len(changes.new_entities) >= 0
-        assert len(changes.modified_entities) >= 0
+        cleanup_manager.graph_storage.find_entities_by_document = AsyncMock(return_value=mock_entities)
+        cleanup_manager.graph_storage.find_relations_by_document = AsyncMock(return_value=mock_relations)
+        cleanup_manager.graph_storage.delete_relations = AsyncMock()
+        cleanup_manager.graph_storage.delete_entities = AsyncMock()
+        cleanup_manager.graph_storage.delete_document_checksum = AsyncMock()
+        
+        result = await cleanup_manager.cleanup_document_data(sample_document_id)
+        
+        assert result.entities_deleted == 2
+        assert result.relations_deleted == 1
+        assert result.document_id == sample_document_id
 ```
 
 ### Integration Tests
@@ -348,18 +390,19 @@ class TestGraphPipeline:
 
 - [ ] Graph builder successfully processes documents and creates entities/relations
 - [ ] Integration with existing document processing pipeline works seamlessly
-- [ ] Incremental updates detect and apply changes correctly
-- [ ] Conflict resolution maintains data integrity
-- [ ] Performance meets requirements (< 5 seconds per document)
+- [ ] Checksum-based change detection correctly identifies unchanged documents
+- [ ] Document cleanup properly removes all associated entities and relations
+- [ ] Performance meets requirements (< 5 seconds per document, < 1 second for unchanged documents)
 - [ ] Error handling gracefully manages failures
 - [ ] Unit test coverage > 90%
 - [ ] Integration tests pass
 
 ## Performance Targets
 
-- **Document Processing**: < 5 seconds per document
+- **Document Processing**: < 5 seconds per new/changed document
+- **Unchanged Document Detection**: < 1 second per document
 - **Batch Processing**: > 100 documents per minute
-- **Update Detection**: < 2 seconds per document
+- **Document Cleanup**: < 3 seconds per document
 - **Memory Usage**: < 1GB for processing 1000 documents
 
 ## Next Steps
