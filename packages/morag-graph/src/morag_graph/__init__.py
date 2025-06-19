@@ -17,6 +17,9 @@ from .storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
 # Operations
 from .operations import GraphCRUD, GraphTraversal, GraphPath, GraphAnalytics
 
+# Builders
+from .builders import GraphBuilder, GraphBuildResult, GraphBuildError
+
 # Database configuration models
 from .models.database_config import DatabaseType, DatabaseConfig, DatabaseResult
 
@@ -37,4 +40,7 @@ __all__ = [
     "GraphTraversal",
     "GraphPath",
     "GraphAnalytics",
+    "GraphBuilder",
+    "GraphBuildResult",
+    "GraphBuildError",
 ]
