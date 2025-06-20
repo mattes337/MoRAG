@@ -276,13 +276,18 @@ async def store_content_in_vector_db(
         raise
 
 
-async def test_audio_ingestion(audio_file: Path, webhook_url: Optional[str] = None,
-                              metadata: Optional[Dict[str, Any]] = None,
-                              model_size: str = "base",
-                              enable_diarization: bool = False,
-                              enable_topics: bool = False) -> bool:
-    """Test audio ingestion functionality using direct processing."""
-    print_header("MoRAG Audio Ingestion Test (Direct Processing)")
+async def test_audio_ingestion(
+    audio_file: Path, 
+    webhook_url: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None, 
+    model_size: str = "base",
+    enable_diarization: bool = False, 
+    enable_topics: bool = False,
+    use_qdrant: bool = True,
+    use_neo4j: bool = False
+) -> bool:
+    """Test audio ingestion functionality with graph extraction and dual database storage."""
+    print_header("MoRAG Audio Ingestion Test")
 
     if not audio_file.exists():
         print(f"❌ Error: Audio file not found: {audio_file}")
@@ -290,14 +295,14 @@ async def test_audio_ingestion(audio_file: Path, webhook_url: Optional[str] = No
 
     print_result("Input File", str(audio_file))
     print_result("File Size", f"{audio_file.stat().st_size / 1024 / 1024:.2f} MB")
-    print_result("Webhook URL", webhook_url or "None")
-    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
-    print_result("Model Size", model_size)
-    print_result("Speaker Diarization", "✅ Enabled" if enable_diarization else "❌ Disabled")
-    print_result("Topic Segmentation", "✅ Enabled" if enable_topics else "❌ Disabled")
+    print_result("Webhook URL", webhook_url or "Not provided")
+    print_result("Custom Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+    print_result("Qdrant Storage", "✅ Enabled" if use_qdrant else "❌ Disabled")
+    print_result("Neo4j Storage", "✅ Enabled" if use_neo4j else "❌ Disabled")
 
+    start_time = time.time()
+    
     try:
-        print_section("Processing Audio")
         print("🔄 Starting audio processing and ingestion...")
 
         # Initialize audio configuration
@@ -323,62 +328,176 @@ async def test_audio_ingestion(audio_file: Path, webhook_url: Optional[str] = No
             return False
 
         print("✅ Audio processing completed successfully!")
+        processing_time = time.time() - start_time
         print_result("Processing Time", f"{result.processing_time:.2f} seconds")
         print_result("Transcript Length", f"{len(result.transcript)} characters")
 
-        # Prepare metadata for vector storage
-        vector_metadata = {
-            "source_type": "audio",
-            "source_path": str(audio_file),
-            "processing_time": result.processing_time,
-            "model_size": model_size,
-            "enable_diarization": enable_diarization,
-            "enable_topics": enable_topics,
-            "transcript_length": len(result.transcript),
-            "segments_count": len(result.segments),
-            **(result.metadata or {}),
-            **(metadata or {})
-        }
+        # Extract entities and relations
+        print_section("Graph Extraction")
+        print("🔄 Extracting entities and relations...")
+        
+        try:
+            from graph_extraction import GraphExtractionService
+            extraction_service = GraphExtractionService()
+            entities, relations = await extraction_service.extract_entities_and_relations(
+                text=result.transcript,
+                doc_id=f"audio_{audio_file.stem}",
+                context=f"Audio transcription from {audio_file.name}"
+            )
+            print_result("Entities Extracted", f"{len(entities)}")
+            print_result("Relations Extracted", f"{len(relations)}")
+        except Exception as e:
+            print(f"⚠️ Warning: Graph extraction failed: {e}")
+            entities, relations = [], []
 
-        print_section("Storing in Vector Database")
-        print("🔄 Storing transcript in vector database...")
-
-        # Store transcript in vector database
-        point_ids = await store_content_in_vector_db(
-            result.transcript,
-            vector_metadata
+        # Create intermediate files
+        print_section("Creating Intermediate Files")
+        
+        # Prepare segments data
+        segments_data = []
+        for segment in result.segments:
+            segments_data.append({
+                'start': segment.start,
+                'end': segment.end,
+                'text': segment.text,
+                'speaker': getattr(segment, 'speaker', None),
+                'confidence': getattr(segment, 'confidence', None)
+            })
+        
+        # Create processing metadata
+        proc_metadata = create_processing_metadata(
+            content_type=ContentType.AUDIO,
+            source_path=str(audio_file),
+            processing_time=processing_time,
+            mode=ProcessingMode.INGESTION,
+            model_info={
+                'model_size': model_size,
+                'enable_diarization': enable_diarization,
+                'enable_topics': enable_topics
+            },
+            options={
+                'vad_filter': True,
+                'word_timestamps': True,
+                'include_metadata': True,
+                'use_qdrant': use_qdrant,
+                'use_neo4j': use_neo4j
+            }
         )
+        
+        # Create intermediate JSON
+        intermediate = IntermediateJSON(
+            content_type=ContentType.AUDIO.value,
+            source_path=str(audio_file),
+            title=f"Audio Transcription: {audio_file.name}",
+            text_content=result.transcript,
+            metadata=proc_metadata,
+            entities=entities,
+            relations=relations,
+            segments=segments_data,
+            custom_metadata=metadata
+        )
+        
+        # Get output paths
+        output_paths = get_output_paths(audio_file, ProcessingMode.INGESTION)
+        
+        # Save intermediate JSON
+        intermediate.to_json(output_paths['intermediate_json'])
+        print_result("Intermediate JSON", str(output_paths['intermediate_json']))
+        
+        # Generate and save intermediate markdown
+        MarkdownGenerator.save_markdown(intermediate, output_paths['intermediate_md'])
+        print_result("Intermediate Markdown", str(output_paths['intermediate_md']))
 
+        # Database ingestion
+        print_section("Database Ingestion")
+        
+        ingestion_results = {'qdrant': None, 'neo4j': None}
+        
+        if use_qdrant or use_neo4j:
+            print("🔄 Starting database ingestion...")
+            
+            # Prepare metadata for ingestion
+            ingestion_metadata = {
+                "source_type": "audio",
+                "source_path": str(audio_file),
+                "processing_time": result.processing_time,
+                "model_size": model_size,
+                "enable_diarization": enable_diarization,
+                "enable_topics": enable_topics,
+                "transcript_length": len(result.transcript),
+                "segments_count": len(result.segments),
+                "entities_count": len(entities),
+                "relations_count": len(relations),
+                **(result.metadata or {}),
+                **(metadata or {})
+            }
+            
+            try:
+                graph_results = await extract_and_ingest(
+                    text_content=result.transcript,
+                    doc_id=f"audio_{audio_file.stem}",
+                    context=f"Audio transcription from {audio_file.name}",
+                    use_qdrant=use_qdrant,
+                    use_neo4j=use_neo4j,
+                    metadata=ingestion_metadata
+                )
+                
+                ingestion_results = graph_results.get('ingestion', {})
+                
+                if use_qdrant and ingestion_results.get('qdrant'):
+                    if ingestion_results['qdrant'].get('success'):
+                        print_result("Qdrant Ingestion", "✅ Success")
+                        print_result("Qdrant Chunks", str(ingestion_results['qdrant'].get('chunks_count', 0)))
+                    else:
+                        print_result("Qdrant Ingestion", f"❌ Failed: {ingestion_results['qdrant'].get('error', 'Unknown error')}")
+                
+                if use_neo4j and ingestion_results.get('neo4j'):
+                    if ingestion_results['neo4j'].get('success'):
+                        print_result("Neo4j Ingestion", "✅ Success")
+                        print_result("Neo4j Entities", str(ingestion_results['neo4j'].get('entities_stored', 0)))
+                        print_result("Neo4j Relations", str(ingestion_results['neo4j'].get('relations_stored', 0)))
+                    else:
+                        print_result("Neo4j Ingestion", f"❌ Failed: {ingestion_results['neo4j'].get('error', 'Unknown error')}")
+                        
+            except Exception as e:
+                print(f"⚠️ Warning: Database ingestion failed: {e}")
+                ingestion_results = {'error': str(e)}
+        
         print("✅ Audio ingestion completed successfully!")
 
         print_section("Ingestion Results")
         print_result("Status", "✅ Success")
-        print_result("Chunks Processed", str(len(point_ids)))
-        print_result("Vector Points Created", str(len(point_ids)))
+        print_result("Total Processing Time", f"{processing_time:.2f} seconds")
         print_result("Transcript Length", str(len(result.transcript)))
+        print_result("Segments Count", str(len(result.segments)))
+        print_result("Entities Extracted", str(len(entities)))
+        print_result("Relations Extracted", str(len(relations)))
 
         # Save ingestion result
-        output_file = audio_file.parent / f"{audio_file.stem}_ingest_result.json"
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_paths['result_json'], 'w', encoding='utf-8') as f:
             json.dump({
-                'mode': 'direct_ingestion',
+                'mode': 'ingestion',
                 'success': True,
-                'processing_time': result.processing_time,
-                'chunks_processed': len(point_ids),
-                'vector_point_ids': point_ids,
+                'processing_time': processing_time,
                 'transcript_length': len(result.transcript),
                 'segments_count': len(result.segments),
+                'entities_count': len(entities),
+                'relations_count': len(relations),
                 'model_size': model_size,
                 'enable_diarization': enable_diarization,
                 'enable_topics': enable_topics,
+                'use_qdrant': use_qdrant,
+                'use_neo4j': use_neo4j,
                 'webhook_url': webhook_url,
-                'metadata': vector_metadata,
+                'ingestion_results': ingestion_results,
+                'metadata': ingestion_metadata,
                 'file_path': str(audio_file)
             }, f, indent=2, ensure_ascii=False)
 
-        print_section("Output")
-        print_result("Ingestion result saved to", str(output_file))
-        print_result("Vector Points", f"{len(point_ids)} chunks stored in Qdrant")
+        print_section("Output Files")
+        print_result("Intermediate JSON", str(output_paths['intermediate_json']))
+        print_result("Intermediate Markdown", str(output_paths['intermediate_md']))
+        print_result("Ingestion Result", str(output_paths['result_json']))
 
         return True
 
