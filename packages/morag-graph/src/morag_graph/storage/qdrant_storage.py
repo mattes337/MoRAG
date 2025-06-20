@@ -716,31 +716,35 @@ class QdrantStorage(BaseStorage):
         Returns:
             List of entities associated with the document
         """
-        print(f"\nDEBUG: get_entities_by_document called with document_id={document_id}")
-        print(f"DEBUG: client is {self.client}")
-        
         if not self.client:
-            print("DEBUG: No client, raising RuntimeError")
             raise RuntimeError("Not connected to Qdrant database")
         
         try:
+            
+            # Create filter to get entities by source_doc_id, excluding checksum entries
+            must_conditions = [
+                FieldCondition(
+                    key="source_doc_id",
+                    match=MatchValue(value=document_id)
+                )
+            ]
+            
+            must_not_conditions = [
+                FieldCondition(
+                    key="type",
+                    match=MatchValue(value="document_checksum")
+                )
+            ]
+            
+            filter_condition = Filter(
+                must=must_conditions,
+                must_not=must_not_conditions
+            )
+            
             # Search for entities with matching source_doc_id
             search_result = await self.client.scroll(
                 collection_name=self.config.collection_name,
-                scroll_filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="source_doc_id",
-                            match=MatchValue(value=document_id)
-                        )
-                    ],
-                    must_not=[
-                        FieldCondition(
-                            key="type",
-                            match=MatchValue(value="document_checksum")
-                        )
-                    ]
-                ),
+                scroll_filter=filter_condition,
                 limit=1000,  # Adjust as needed
                 with_payload=True,
                 with_vectors=True
@@ -769,10 +773,7 @@ class QdrantStorage(BaseStorage):
             return entities
             
         except Exception as e:
-            logger.error(f"Failed to get entities for document {document_id}: {e}")
-            print(f"\nDEBUG: Exception in get_entities_by_document: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Error getting entities by document: {e}")
             return []
     
     # Note: Qdrant doesn't have native graph relations like Neo4j

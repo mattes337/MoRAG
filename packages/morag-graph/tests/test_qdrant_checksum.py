@@ -67,59 +67,47 @@ class MockQdrantClient:
     
     async def scroll(self, collection_name, scroll_filter=None, limit=None, with_payload=True, with_vectors=True, offset=None):
         """Mock scroll method that filters points based on the provided filter."""
-        print(f"\nDEBUG: scroll called with filter: {scroll_filter}")
-        print(f"DEBUG: Available points: {list(self.points.keys())}")
-        
+        # Mock scroll method
         filtered_points = []
         
-        for point_id, point in self.points.items():
-            print(f"\nDEBUG: Checking point {point_id}")
-            print(f"  Payload: {point.payload}")
-            
-            if scroll_filter:
-                # Handle must conditions
-                must_conditions = getattr(scroll_filter, 'must', [])
-                must_match = True
+        # If no filter, return all points
+        if not scroll_filter:
+            filtered_points = list(self.points.values())
+        else:
+            # Apply filter logic
+            for point in self.points.values():
+                matches = True
                 
-                print(f"  Must conditions: {len(must_conditions)}")
-                for condition in must_conditions:
-                    key = condition.key
-                    value = condition.match.value
-                    point_value = point.payload.get(key)
-                    print(f"    Must: {key}={value}, point has {key}={point_value}")
-                    
-                    if point_value != value:
-                        must_match = False
-                        print(f"    Must condition failed")
-                        break
+                # Check must conditions
+                if hasattr(scroll_filter, 'must') and scroll_filter.must:
+                    for condition in scroll_filter.must:
+                        if hasattr(condition, 'key') and hasattr(condition, 'match'):
+                            key = condition.key
+                            expected_value = condition.match.value if hasattr(condition.match, 'value') else condition.match
+                            actual_value = point.payload.get(key)
+                            if actual_value != expected_value:
+                                matches = False
+                                break
                 
-                # Handle must_not conditions  
-                must_not_conditions = getattr(scroll_filter, 'must_not', [])
-                must_not_match = True
+                # Check must_not conditions
+                if matches and hasattr(scroll_filter, 'must_not') and scroll_filter.must_not:
+                    for condition in scroll_filter.must_not:
+                        if hasattr(condition, 'key') and hasattr(condition, 'match'):
+                            key = condition.key
+                            expected_value = condition.match.value if hasattr(condition.match, 'value') else condition.match
+                            actual_value = point.payload.get(key)
+                            if actual_value == expected_value:
+                                matches = False
+                                break
                 
-                print(f"  Must_not conditions: {len(must_not_conditions)}")
-                for condition in must_not_conditions:
-                    key = condition.key
-                    value = condition.match.value
-                    point_value = point.payload.get(key)
-                    print(f"    Must_not: {key}={value}, point has {key}={point_value}")
-                    
-                    if point_value == value:
-                        must_not_match = False
-                        print(f"    Must_not condition failed")
-                        break
-                
-                print(f"  Final: must_match={must_match}, must_not_match={must_not_match}")
-                if must_match and must_not_match:
+                if matches:
                     filtered_points.append(point)
-                    print(f"  -> INCLUDED")
-                else:
-                    print(f"  -> EXCLUDED")
-            else:
-                filtered_points.append(point)
         
-        print(f"\nDEBUG: Returning {len(filtered_points)} points")
-        return filtered_points[:limit] if limit else filtered_points, None
+        # Apply limit
+        if limit and len(filtered_points) > limit:
+            filtered_points = filtered_points[:limit]
+        
+        return (filtered_points, None)  # Return tuple (points, next_page_offset)
     
     async def close(self):
         """Mock close."""
@@ -230,7 +218,6 @@ class TestQdrantStorageChecksum:
     @pytest.mark.asyncio
     async def test_get_entities_by_document(self, qdrant_storage, mock_qdrant_client):
         """Test getting entities by document ID."""
-        print("\n=== TEST START: test_get_entities_by_document ===")
         with patch('morag_graph.storage.qdrant_storage.AsyncQdrantClient', return_value=mock_qdrant_client), \
              patch('morag_graph.storage.qdrant_storage.PointStruct', MockPointStruct), \
              patch('morag_graph.storage.qdrant_storage.Filter', MockFilter), \
@@ -240,11 +227,10 @@ class TestQdrantStorageChecksum:
             qdrant_storage.client = mock_qdrant_client
             
             document_id = "test_doc_123"
-            print(f"Using document_id: {document_id}")
             
             # Create test entities
             entity1 = MockPointStruct(
-                id="entity1",
+                id="ent_john_doe_person_test_doc_123",
                 vector=[0.1] * 384,
                 payload={
                     "name": "John Doe",
@@ -255,7 +241,7 @@ class TestQdrantStorageChecksum:
             )
             
             entity2 = MockPointStruct(
-                id="entity2",
+                id="ent_acme_corp_organization_test_doc_123",
                 vector=[0.2] * 384,
                 payload={
                     "name": "Acme Corp",
@@ -267,7 +253,7 @@ class TestQdrantStorageChecksum:
             
             # Entity from different document (should not be returned)
             entity3 = MockPointStruct(
-                id="entity3",
+                id="ent_other_entity_person_other_doc",
                 vector=[0.3] * 384,
                 payload={
                     "name": "Other Entity",
@@ -289,20 +275,13 @@ class TestQdrantStorageChecksum:
             )
             
             # Add to mock client
-            mock_qdrant_client.points["entity1"] = entity1
-            mock_qdrant_client.points["entity2"] = entity2
-            mock_qdrant_client.points["entity3"] = entity3
+            mock_qdrant_client.points["ent_john_doe_person_test_doc_123"] = entity1
+            mock_qdrant_client.points["ent_acme_corp_organization_test_doc_123"] = entity2
+            mock_qdrant_client.points["ent_other_entity_person_other_doc"] = entity3
             mock_qdrant_client.points[f"checksum_{document_id}"] = checksum_point
-            
-            # The MockQdrantClient should now handle the filter correctly
             
             # Get entities by document
             entities = await qdrant_storage.get_entities_by_document(document_id)
-            
-            # Debug: print what we got
-            print(f"\nDebug: Got {len(entities)} entities")
-            for e in entities:
-                print(f"  Entity: {e.name}, type: {e.type}, doc_id: {e.source_doc_id}")
             
             # Should return only entities from the specified document (excluding checksum)
             assert len(entities) == 2, f"Expected 2 entities, got {len(entities)}"
@@ -314,7 +293,7 @@ class TestQdrantStorageChecksum:
             
             # Verify entity properties
             john_entity = next(e for e in entities if e.name == "John Doe")
-            assert john_entity.id == "entity1"
+            assert john_entity.id == "ent_john_doe_person_test_doc_123"
             assert john_entity.type == "PERSON"
             assert john_entity.source_doc_id == document_id
             assert john_entity.confidence == 0.9
