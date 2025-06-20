@@ -530,6 +530,10 @@ Examples:
     parser.add_argument('audio_file', help='Path to audio file')
     parser.add_argument('--ingest', action='store_true',
                        help='Enable ingestion mode (background processing + storage)')
+    parser.add_argument('--qdrant', action='store_true',
+                       help='Store in Qdrant vector database (ingestion mode only)')
+    parser.add_argument('--neo4j', action='store_true',
+                       help='Store in Neo4j graph database (ingestion mode only)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
     parser.add_argument('--model-size', choices=['tiny', 'base', 'small', 'medium', 'large'],
