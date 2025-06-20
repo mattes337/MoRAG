@@ -1,7 +1,7 @@
 """Embedding services for MoRAG using various AI providers."""
 
-import google.genai as genai
-from google.genai import types
+import google.generativeai as genai
+from google.generativeai import types
 from typing import List, Dict, Any, Optional
 import structlog
 import asyncio

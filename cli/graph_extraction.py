@@ -25,7 +25,7 @@ except ImportError as e:
     print("  pip install -e packages/morag-graph")
     raise
 
-from .common_schema import Entity, Relation
+from common_schema import Entity, Relation
 
 
 class GraphExtractionService:

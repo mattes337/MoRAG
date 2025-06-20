@@ -202,9 +202,22 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
         return False
 
 
-async def test_video_ingestion(video_file: Path, webhook_url: Optional[str] = None,
-                              metadata: Optional[Dict[str, Any]] = None) -> bool:
-    """Test video ingestion functionality."""
+async def test_video_ingestion(
+    video_file: Path,
+    webhook_url: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> bool:
+    """
+    Test video ingestion via direct API calls.
+    
+    Args:
+        video_file: Path to video file
+        webhook_url: Optional webhook URL for completion notifications
+        metadata: Optional metadata dictionary
+        
+    Returns:
+        True if ingestion was successful, False otherwise
+    """
     print_header("MoRAG Video Ingestion Test")
 
     if not video_file.exists():
@@ -218,64 +231,81 @@ async def test_video_ingestion(video_file: Path, webhook_url: Optional[str] = No
     print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
 
     try:
-        print_section("Submitting Ingestion Task")
+        from morag.api import MoRAGAPI
+        from graph_extraction import extract_and_ingest
+        import uuid
+        
+        print_section("Processing Video File")
         print("🔄 Starting video ingestion...")
         print("   This may take a while for large videos...")
-
-        # Prepare form data
-        files = {'file': open(video_file, 'rb')}
-        data = {'source_type': 'video'}
-
-        if webhook_url:
-            data['webhook_url'] = webhook_url
-        if metadata:
-            data['metadata'] = json.dumps(metadata)
-
-        # Submit to ingestion API
-        response = requests.post(
-            'http://localhost:8000/api/v1/ingest/file',
-            files=files,
-            data=data,
-            timeout=30
-        )
-
-        files['file'].close()
-
-        if response.status_code == 200:
-            result = response.json()
-            print("✅ Video ingestion task submitted successfully!")
-
+        
+        # Initialize the API
+        api = MoRAGAPI()
+        
+        # Prepare options
+        options = {
+            'store_in_vector_db': True,
+            'metadata': metadata or {},
+            'webhook_url': webhook_url
+        }
+        
+        # Process the video file
+        result = await api.process_file(str(video_file), 'video', options)
+        
+        if result.success:
+            print("✅ Video processing completed successfully!")
+            
+            # Generate a task ID for compatibility
+            task_id = str(uuid.uuid4())
+            
+            # Perform ingestion to vector database and graph database
+            if result.text_content:
+                print_section("Ingesting to Databases")
+                print("📊 Ingesting content to databases...")
+                await extract_and_ingest(
+                    text_content=result.text_content,
+                    doc_id=task_id,
+                    metadata=metadata or {},
+                    use_qdrant=True,
+                    use_neo4j=True
+                )
+                print("✅ Content ingested to vector and graph databases!")
+            
             print_section("Ingestion Results")
             print_result("Status", "✅ Success")
-            print_result("Task ID", result.get('task_id', 'Unknown'))
-            print_result("Message", result.get('message', 'Task created'))
-            print_result("Estimated Time", f"{result.get('estimated_time', 'Unknown')} seconds")
-
+            print_result("Task ID", task_id)
+            print_result("Content Length", f"{len(result.text_content or '')} characters")
+            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+            
+            if webhook_url:
+                print_result("Webhook URL", f"Would notify: {webhook_url}")
+            
             # Save ingestion result
+            ingestion_result = {
+                'mode': 'ingestion',
+                'task_id': task_id,
+                'success': True,
+                'content_length': len(result.text_content or ''),
+                'metadata': result.metadata,
+                'processing_time': result.processing_time,
+                'webhook_url': webhook_url,
+                'file_path': str(video_file)
+            }
+            
             output_file = video_file.parent / f"{video_file.stem}_ingest_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'mode': 'ingestion',
-                    'task_id': result.get('task_id'),
-                    'status': result.get('status'),
-                    'message': result.get('message'),
-                    'estimated_time': result.get('estimated_time'),
-                    'webhook_url': webhook_url,
-                    'metadata': metadata,
-                    'file_path': str(video_file)
-                }, f, indent=2, ensure_ascii=False)
-
+                json.dump(ingestion_result, f, indent=2, ensure_ascii=False)
+            
             print_section("Output")
             print_result("Ingestion result saved to", str(output_file))
-            print_result("Monitor task status", f"curl http://localhost:8000/api/v1/status/{result.get('task_id')}")
-
+            
             return True
         else:
             print("❌ Video ingestion failed!")
-            print_result("Status Code", str(response.status_code))
-            print_result("Error", response.text)
+            if result.error_message:
+                print_result("Error", result.error_message)
             return False
-
+            
     except Exception as e:
         print(f"❌ Error during video ingestion: {e}")
         import traceback

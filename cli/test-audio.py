@@ -300,6 +300,7 @@ async def test_audio_ingestion(
     print_result("Qdrant Storage", "✅ Enabled" if use_qdrant else "❌ Disabled")
     print_result("Neo4j Storage", "✅ Enabled" if use_neo4j else "❌ Disabled")
 
+    import time
     start_time = time.time()
     
     try:
@@ -337,7 +338,7 @@ async def test_audio_ingestion(
         print("🔄 Extracting entities and relations...")
         
         try:
-            from graph_extraction import GraphExtractionService
+            from morag_graph.graph_extraction import GraphExtractionService
             extraction_service = GraphExtractionService()
             entities, relations = await extraction_service.extract_entities_and_relations(
                 text=result.transcript,
@@ -365,6 +366,11 @@ async def test_audio_ingestion(
             })
         
         # Create processing metadata
+        from morag_core.models import ContentType, ProcessingMode
+        from morag_core.utils import create_processing_metadata, get_output_paths
+        from morag_core.intermediate import IntermediateJSON
+        from morag_core.markdown import MarkdownGenerator
+        
         proc_metadata = create_processing_metadata(
             content_type=ContentType.AUDIO,
             source_path=str(audio_file),
@@ -433,6 +439,8 @@ async def test_audio_ingestion(
             }
             
             try:
+                from morag_graph.graph_extraction import extract_and_ingest
+                
                 graph_results = await extract_and_ingest(
                     text_content=result.transcript,
                     doc_id=f"audio_{audio_file.stem}",

@@ -214,7 +214,7 @@ async def test_web_processing(url: str) -> bool:
 
 async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
                             metadata: Optional[Dict[str, Any]] = None) -> bool:
-    """Test web ingestion functionality."""
+    """Test web ingestion functionality via direct API calls."""
     print_header("MoRAG Web Ingestion Test")
 
     if not validate_url(url):
@@ -226,63 +226,79 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
     print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
 
     try:
-        print_section("Submitting Ingestion Task")
-        print("🔄 Starting web ingestion...")
+        from morag.api import MoRAGAPI
+        from morag_graph.graph_extraction import extract_and_ingest
+        import uuid
+        
+        print_section("Processing Web Content")
+        print("🔄 Starting web processing...")
 
-        # Prepare request data
-        data = {
-            'source_type': 'web',
-            'url': url
+        # Initialize the API
+        api = MoRAGAPI()
+        
+        # Prepare options
+        options = {
+            'store_in_vector_db': True,
+            'metadata': metadata or {},
+            'webhook_url': webhook_url
         }
-
-        if webhook_url:
-            data['webhook_url'] = webhook_url
-        if metadata:
-            data['metadata'] = metadata
-
-        # Submit to ingestion API
-        response = requests.post(
-            'http://localhost:8000/api/v1/ingest/url',
-            json=data,
-            timeout=30
-        )
-
-        if response.status_code == 200:
-            result = response.json()
-            print("✅ Web ingestion task submitted successfully!")
-
+        
+        # Process the web URL
+        result = await api.process_url(url, 'web', options)
+        
+        if result.success:
+            print("✅ Web processing completed successfully!")
+            
+            # Generate a task ID for compatibility
+            task_id = str(uuid.uuid4())
+            
+            # Perform ingestion to vector database and graph database
+            if result.text_content:
+                print_section("Ingesting to Databases")
+                print("📊 Ingesting content to databases...")
+                await extract_and_ingest(
+                    result.text_content,
+                    metadata or {},
+                    document_id=task_id
+                )
+                print("✅ Content ingested to vector and graph databases!")
+            
             print_section("Ingestion Results")
             print_result("Status", "✅ Success")
-            print_result("Task ID", result.get('task_id', 'Unknown'))
-            print_result("Message", result.get('message', 'Task created'))
-            print_result("Estimated Time", f"{result.get('estimated_time', 'Unknown')} seconds")
+            print_result("Task ID", task_id)
+            print_result("Content Length", f"{len(result.text_content or '')} characters")
+            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+            
+            if webhook_url:
+                print_result("Webhook URL", f"Would notify: {webhook_url}")
 
             # Create safe filename from URL
             safe_filename = urllib.parse.quote(url, safe='').replace('%', '_')[:50]
 
             # Save ingestion result
+            ingestion_result = {
+                'mode': 'ingestion',
+                'task_id': task_id,
+                'success': True,
+                'content_length': len(result.text_content or ''),
+                'metadata': result.metadata,
+                'processing_time': result.processing_time,
+                'webhook_url': webhook_url,
+                'url': url
+            }
+            
             output_file = Path(f"uploads/web_{safe_filename}_ingest_result.json")
             with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'mode': 'ingestion',
-                    'task_id': result.get('task_id'),
-                    'status': result.get('status'),
-                    'message': result.get('message'),
-                    'estimated_time': result.get('estimated_time'),
-                    'webhook_url': webhook_url,
-                    'metadata': metadata,
-                    'url': url
-                }, f, indent=2, ensure_ascii=False)
+                json.dump(ingestion_result, f, indent=2, ensure_ascii=False)
 
             print_section("Output")
             print_result("Ingestion result saved to", str(output_file))
-            print_result("Monitor task status", f"curl http://localhost:8000/api/v1/status/{result.get('task_id')}")
 
             return True
         else:
-            print("❌ Web ingestion failed!")
-            print_result("Status Code", str(response.status_code))
-            print_result("Error", response.text)
+            print("❌ Web processing failed!")
+            if result.error_message:
+                print_result("Error", result.error_message)
             return False
 
     except Exception as e:
