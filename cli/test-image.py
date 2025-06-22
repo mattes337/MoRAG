@@ -40,6 +40,11 @@ import requests
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# Load environment variables from the project root
+from dotenv import load_dotenv
+env_path = project_root / '.env'
+load_dotenv(env_path)
+
 try:
     from morag_image import ImageProcessor
     from morag_image.processor import ImageConfig

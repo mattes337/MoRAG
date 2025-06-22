@@ -11,6 +11,16 @@ from pathlib import Path
 # Add project paths
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# Load environment variables from the project root
+from dotenv import load_dotenv
+env_path = project_root / '.env'
+load_dotenv(env_path)
+
+# Load environment variables from the project root
+from dotenv import load_dotenv
+env_path = project_root / '.env'
+load_dotenv(env_path)
 sys.path.insert(0, str(project_root / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
 
