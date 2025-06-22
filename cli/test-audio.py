@@ -338,9 +338,8 @@ async def test_audio_ingestion(
         print("🔄 Extracting entities and relations...")
         
         try:
-            from morag_graph.graph_extraction import GraphExtractionService
-            extraction_service = GraphExtractionService()
-            entities, relations = await extraction_service.extract_entities_and_relations(
+            from graph_extraction import extract_entities_and_relations
+            entities, relations = await extract_entities_and_relations(
                 text=result.transcript,
                 doc_id=f"audio_{audio_file.stem}",
                 context=f"Audio transcription from {audio_file.name}"
@@ -366,7 +365,7 @@ async def test_audio_ingestion(
             })
         
         # Create processing metadata
-        from morag_core.models import ContentType, ProcessingMode
+        from common_schema import ContentType, ProcessingMode
         from morag_core.utils import create_processing_metadata, get_output_paths
         from morag_core.intermediate import IntermediateJSON
         from morag_core.markdown import MarkdownGenerator
@@ -439,7 +438,7 @@ async def test_audio_ingestion(
             }
             
             try:
-                from morag_graph.graph_extraction import extract_and_ingest
+                from graph_extraction import extract_and_ingest
                 
                 graph_results = await extract_and_ingest(
                     text_content=result.transcript,

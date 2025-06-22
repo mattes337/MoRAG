@@ -202,8 +202,8 @@ class SystemTester:
         
         # Look for sample files in common locations
         sample_files = {
-            "audio": ["uploads/Sprache.mp3", "uploads/recording.m4a"],
-            "document": ["uploads/super saftiger Schoko Schmand Kuchen fur ein ganzes Blech - 2014-02-08.pdf"],
+            "audio": ["uploads/test_audio.wav", "uploads/Sprache.mp3", "uploads/recording.m4a"],
+            "document": ["uploads/test_document.pdf", "uploads/super saftiger Schoko Schmand Kuchen fur ein ganzes Blech - 2014-02-08.pdf"],
             "video": ["uploads/test_video.mp4"],
         }
         

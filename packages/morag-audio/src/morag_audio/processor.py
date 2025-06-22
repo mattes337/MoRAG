@@ -292,19 +292,24 @@ class AudioProcessor:
         
         try:
             import mutagen
-            from pydub import AudioSegment as PydubSegment
             
             # Basic file info
             metadata["filename"] = file_path.name
             metadata["file_size"] = file_path.stat().st_size
             metadata["file_extension"] = file_path.suffix.lower()[1:]
             
-            # Extract audio properties
-            audio = PydubSegment.from_file(file_path)
-            metadata["duration"] = len(audio) / 1000.0  # Convert ms to seconds
-            metadata["channels"] = audio.channels
-            metadata["sample_rate"] = audio.frame_rate
-            metadata["bit_depth"] = audio.sample_width * 8
+            # Try to extract audio properties with pydub (may fail on Python 3.13+ due to missing audioop)
+            try:
+                from pydub import AudioSegment as PydubSegment
+                audio = PydubSegment.from_file(file_path)
+                metadata["duration"] = len(audio) / 1000.0  # Convert ms to seconds
+                metadata["channels"] = audio.channels
+                metadata["sample_rate"] = audio.frame_rate
+                metadata["bit_depth"] = audio.sample_width * 8
+            except (ImportError, ModuleNotFoundError) as pydub_error:
+                logger.debug("Could not extract audio properties with pydub", error=str(pydub_error))
+                # Fallback: try to get basic info from file extension and size
+                metadata["pydub_unavailable"] = str(pydub_error)
             
             # Try to get additional metadata from mutagen
             try:

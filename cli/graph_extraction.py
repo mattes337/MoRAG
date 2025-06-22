@@ -28,6 +28,29 @@ except ImportError as e:
 from common_schema import Entity, Relation
 
 
+async def extract_entities_and_relations(
+    text: str,
+    doc_id: str,
+    context: Optional[str] = None
+) -> Tuple[List[Entity], List[Relation]]:
+    """Standalone function to extract entities and relations from text.
+    
+    Args:
+        text: Text content to analyze
+        doc_id: Document identifier
+        context: Additional context for extraction
+        
+    Returns:
+        Tuple of (entities, relations)
+    """
+    extraction_service = GraphExtractionService()
+    return await extraction_service.extract_entities_and_relations(
+        text=text,
+        doc_id=doc_id,
+        context=context
+    )
+
+
 class GraphExtractionService:
     """Service for extracting entities and relations from text content."""
     

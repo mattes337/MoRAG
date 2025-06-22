@@ -24,6 +24,13 @@ from .validation import (
     validate_email,
     sanitize_filename,
 )
+from .processing import (
+    ContentType,
+    ProcessingMode,
+    ProcessingMetadata,
+    create_processing_metadata,
+    get_output_paths,
+)
 
 __all__ = [
     # Device utilities
@@ -46,4 +53,10 @@ __all__ = [
     "validate_url",
     "validate_email",
     "sanitize_filename",
+    # Processing
+    "ContentType",
+    "ProcessingMode",
+    "ProcessingMetadata",
+    "create_processing_metadata",
+    "get_output_paths",
 ]
