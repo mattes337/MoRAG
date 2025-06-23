@@ -34,9 +34,15 @@ class GraphExtractor:
         llm_config = LLMConfig(
             provider="gemini",
             api_key=os.getenv('GEMINI_API_KEY'),
-            model=os.getenv('GEMINI_MODEL', 'gemini-2.0-flash'),
+            model=os.getenv('GEMINI_MODEL', 'gemini-1.5-flash'),  # Use same default as run_extraction.py
             temperature=0.1,
-            max_tokens=2000
+            max_tokens=2000,
+            # Retry configuration
+            max_retries=int(os.getenv('MORAG_GRAPH_MAX_RETRIES', '5')),
+            base_delay=float(os.getenv('MORAG_GRAPH_BASE_DELAY', '1.0')),
+            max_delay=float(os.getenv('MORAG_GRAPH_MAX_DELAY', '60.0')),
+            exponential_base=float(os.getenv('MORAG_GRAPH_EXPONENTIAL_BASE', '2.0')),
+            jitter=os.getenv('MORAG_GRAPH_JITTER', 'true').lower() == 'true'
         )
         
         self.entity_extractor = EntityExtractor(llm_config)
@@ -76,9 +82,9 @@ class GraphExtractor:
             
             logger.info("Entities extracted", count=len(entities))
             
-            # Extract relations
+            # Extract relations using extract_with_entities for better entity resolution
             logger.info("Extracting relations from content")
-            
+
             relations = await self.relation_extractor.extract_with_entities(
                 text=content,
                 entities=entities,

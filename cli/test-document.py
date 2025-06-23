@@ -77,7 +77,11 @@ def print_section(title: str):
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
-    print(f"{spaces}📋 {key}: {value}")
+    try:
+        print(f"{spaces}📋 {key}: {value}")
+    except UnicodeEncodeError:
+        # Fallback for terminals that don't support Unicode
+        print(f"{spaces}[INFO] {key}: {value}")
 
 
 async def test_document_processing(document_file: Path, chunking_strategy: str = "paragraph",
@@ -114,10 +118,16 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
         )
 
         if result.success:
-            print("✅ Document processing completed successfully!")
+            try:
+                print("✅ Document processing completed successfully!")
+            except UnicodeEncodeError:
+                print("[SUCCESS] Document processing completed successfully!")
 
             print_section("Processing Results")
-            print_result("Status", "✅ Success")
+            try:
+                print_result("Status", "✅ Success")
+            except UnicodeEncodeError:
+                print_result("Status", "[SUCCESS]")
             print_result("Processing Time", f"{result.processing_time:.2f} seconds")
 
             if result.metadata:
@@ -188,12 +198,18 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
             return True
 
         else:
-            print("❌ Document processing failed!")
+            try:
+                print("❌ Document processing failed!")
+            except UnicodeEncodeError:
+                print("[ERROR] Document processing failed!")
             print_result("Error", result.error_message or "Unknown error")
             return False
 
     except Exception as e:
-        print(f"❌ Error during document processing: {e}")
+        try:
+            print(f"❌ Error during document processing: {e}")
+        except UnicodeEncodeError:
+            print(f"[ERROR] Error during document processing: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -372,7 +388,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         # Initialize ingestion coordinator
         coordinator = IngestionCoordinator()
 
-        # Perform comprehensive ingestion
+        # Perform comprehensive ingestion (let coordinator generate proper document ID)
         ingestion_result = await coordinator.ingest_content(
             content=result.document.raw_text if result.document else result.content,
             source_path=str(document_file),
@@ -382,7 +398,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
             databases=database_configs,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            document_id=str(uuid.uuid4()),
+            document_id=None,  # Let coordinator generate unified document ID
             replace_existing=False
         )
 
@@ -532,7 +548,10 @@ Examples:
         print("\n⏹️  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        try:
+            print(f"\n❌ Fatal error: {e}")
+        except UnicodeEncodeError:
+            print(f"\n[FATAL ERROR]: {e}")
         sys.exit(1)
 
 

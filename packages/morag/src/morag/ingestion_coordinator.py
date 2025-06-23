@@ -129,8 +129,11 @@ class IngestionCoordinator:
         )
         
         # Step 4: Extract entities and relations for graph databases
+        # Use the same chunk settings as embeddings to ensure consistency
+        effective_chunk_size = embeddings_data['chunk_size']
+        effective_chunk_overlap = embeddings_data['chunk_overlap']
         graph_data = await self._extract_graph_data(
-            content, source_path, document_id, metadata
+            content, source_path, document_id, metadata, effective_chunk_size, effective_chunk_overlap
         )
         
         # Step 5: Create complete ingest_result.json data
@@ -213,7 +216,10 @@ class IngestionCoordinator:
         
     def _generate_document_id(self, source_path: str, content: str) -> str:
         """Generate a unique document ID."""
-        return UnifiedIDGenerator.generate_document_id(source_path, content)
+        # Generate a checksum from the content for deterministic IDs
+        import hashlib
+        content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
+        return UnifiedIDGenerator.generate_document_id(source_path, content_hash)
         
     async def _generate_embeddings_and_metadata(
         self,
@@ -301,18 +307,25 @@ class IngestionCoordinator:
         content: str,
         source_path: str,
         document_id: str,
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
+        chunk_size: int = 4000,
+        chunk_overlap: int = 200
     ) -> Dict[str, Any]:
-        """Extract entities and relations for graph databases."""
+        """Extract entities and relations for graph databases using full document approach."""
         try:
-            # Extract entities and relations using graph extractor
+            logger.info(f"Extracting graph data from full document ({len(content)} chars)")
+
+            # Extract entities and relations from the entire document at once
+            # This matches the approach used in run_extraction.py
             extraction_result = await self.graph_extractor.extract_entities_and_relations(
                 content, source_path
             )
 
-            entities = []
-            relations = []
+            all_entities = []
+            all_relations = []
+            chunk_entity_mapping = {}  # Keep for compatibility but will be empty
 
+            # Process entities from the full document
             if extraction_result.get('entities'):
                 for entity_data in extraction_result['entities']:
                     # Prepare attributes with description if available
@@ -321,15 +334,16 @@ class IngestionCoordinator:
                         entity_attributes['description'] = entity_data['description']
 
                     entity = Entity(
-                        id=entity_data.get('id') or str(uuid.uuid4()),
+                        # Let Entity model generate unified ID automatically
                         name=entity_data['name'],
                         type=entity_data.get('type', 'UNKNOWN'),
                         attributes=entity_attributes,
                         source_doc_id=document_id,
                         confidence=entity_data.get('confidence', 0.8)
                     )
-                    entities.append(entity)
+                    all_entities.append(entity)
 
+            # Process relations from the full document
             if extraction_result.get('relations'):
                 for relation_data in extraction_result['relations']:
                     # Prepare attributes with description if available
@@ -338,7 +352,7 @@ class IngestionCoordinator:
                         relation_attributes['description'] = relation_data['description']
 
                     relation = Relation(
-                        id=relation_data.get('id') or str(uuid.uuid4()),
+                        # Let Relation model generate unified ID automatically
                         source_entity_id=relation_data['source_entity_id'],
                         target_entity_id=relation_data['target_entity_id'],
                         type=relation_data['relation_type'],
@@ -346,12 +360,19 @@ class IngestionCoordinator:
                         source_doc_id=document_id,
                         confidence=relation_data.get('confidence', 0.8)
                     )
-                    relations.append(relation)
+                    all_relations.append(relation)
+
+            logger.info(f"Extracted {len(all_entities)} entities and {len(all_relations)} relations from full document")
 
             return {
-                'entities': entities,
-                'relations': relations,
-                'extraction_metadata': extraction_result.get('metadata', {})
+                'entities': all_entities,
+                'relations': all_relations,
+                'chunk_entity_mapping': chunk_entity_mapping,
+                'extraction_metadata': {
+                    'total_entities': len(all_entities),
+                    'total_relations': len(all_relations),
+                    'extraction_method': 'full_document'
+                }
             }
 
         except Exception as e:
@@ -359,6 +380,7 @@ class IngestionCoordinator:
             return {
                 'entities': [],
                 'relations': [],
+                'chunk_entity_mapping': {},
                 'extraction_metadata': {'error': str(e)}
             }
 
@@ -719,7 +741,7 @@ class IngestionCoordinator:
         embeddings_data: Dict[str, Any],
         document_id: str
     ) -> Dict[str, Any]:
-        """Write graph data to Neo4j."""
+        """Write graph data to Neo4j with proper relationships."""
         neo4j_config = Neo4jConfig(
             uri=db_config.hostname or 'bolt://localhost:7687',
             username=db_config.username or 'neo4j',
@@ -743,8 +765,10 @@ class IngestionCoordinator:
 
             document_id_stored = await neo4j_storage.store_document(document)
 
-            # Store document chunks
+            # Store document chunks and create document-chunk relationships
             chunk_ids = []
+            chunk_id_to_index = {}  # Map chunk_id to chunk_index for entity relationships
+
             for i, (chunk_text, chunk_meta) in enumerate(
                 zip(embeddings_data['chunks'], embeddings_data['chunk_metadata'])
             ):
@@ -758,6 +782,12 @@ class IngestionCoordinator:
 
                 chunk_id_stored = await neo4j_storage.store_document_chunk(chunk)
                 chunk_ids.append(chunk_id_stored)
+                chunk_id_to_index[chunk_id_stored] = i
+
+                # Create document -> CONTAINS -> chunk relationship
+                await neo4j_storage.create_document_contains_chunk_relation(
+                    document_id_stored, chunk_id_stored
+                )
 
             # Store entities
             entity_ids = []
@@ -771,6 +801,44 @@ class IngestionCoordinator:
                 relation_id_stored = await neo4j_storage.store_relation(relation)
                 relation_ids.append(relation_id_stored)
 
+            # Create chunk-entity relationships using chunk_entity_mapping
+            chunk_entity_mapping = graph_data.get('chunk_entity_mapping', {})
+            chunk_entity_relationships_created = 0
+
+            logger.info(f"Creating chunk-entity relationships: {len(chunk_entity_mapping)} chunks with entities, {len(chunk_ids)} total chunks")
+
+            for chunk_index_str, entity_ids_in_chunk in chunk_entity_mapping.items():
+                chunk_index = int(chunk_index_str)
+
+                # Find the chunk_id for this chunk_index
+                chunk_id = None
+                for cid, cidx in chunk_id_to_index.items():
+                    if cidx == chunk_index:
+                        chunk_id = cid
+                        break
+
+                if chunk_id:
+                    # Get the chunk text for context
+                    chunk_text = embeddings_data['chunks'][chunk_index] if chunk_index < len(embeddings_data['chunks']) else ""
+                    context = chunk_text[:500] + "..." if len(chunk_text) > 500 else chunk_text
+
+                    logger.debug(f"Creating relationships for chunk {chunk_index} (id: {chunk_id}) with {len(entity_ids_in_chunk)} entities")
+
+                    # Create chunk -> MENTIONS -> entity relationships
+                    for entity_id in entity_ids_in_chunk:
+                        try:
+                            await neo4j_storage.create_chunk_mentions_entity_relation(
+                                chunk_id, entity_id, context
+                            )
+                            chunk_entity_relationships_created += 1
+                            logger.debug(f"Created relationship: chunk {chunk_id} -> entity {entity_id}")
+                        except Exception as e:
+                            logger.warning(f"Failed to create chunk-entity relationship: chunk {chunk_id} -> entity {entity_id}: {e}")
+                else:
+                    logger.warning(f"Could not find chunk_id for chunk_index {chunk_index}. Available chunks: {list(chunk_id_to_index.values())}")
+
+            logger.info(f"Created {chunk_entity_relationships_created} chunk-entity relationships")
+
             await neo4j_storage.disconnect()
 
             return {
@@ -779,6 +847,7 @@ class IngestionCoordinator:
                 'chunks_stored': len(chunk_ids),
                 'entities_stored': len(entity_ids),
                 'relations_stored': len(relation_ids),
+                'chunk_entity_relationships': chunk_entity_relationships_created,
                 'database': neo4j_config.database
             }
 

@@ -253,10 +253,20 @@ class RelationExtractor(BaseExtractor):
         """Resolve entity IDs for relations."""
         entity_name_to_id = {entity.name: entity.id for entity in entities}
         resolved_relations = []
-        
+
+        # Debug: Log all available entities
+        logger.info(f"Available entities for resolution ({len(entities)} total):")
+        for entity in entities[:10]:  # Log first 10 entities
+            logger.info(f"  Entity: '{entity.name}' -> ID: {entity.id}")
+        if len(entities) > 10:
+            logger.info(f"  ... and {len(entities) - 10} more entities")
+
         for relation in relations:
-            logger.debug(f"Attempting to resolve relation: {relation.attributes.get('source_entity_name')} -> {relation.attributes.get('target_entity_name')}")
-            
+            source_name = relation.attributes.get('source_entity_name', relation.source_entity_id)
+            target_name = relation.attributes.get('target_entity_name', relation.target_entity_id)
+
+            logger.info(f"Attempting to resolve relation: '{source_name}' -> '{target_name}'")
+
             # Try to resolve entity names to IDs
             source_id = self._resolve_entity_id(
                 relation.source_entity_id, entity_name_to_id
@@ -264,20 +274,22 @@ class RelationExtractor(BaseExtractor):
             target_id = self._resolve_entity_id(
                 relation.target_entity_id, entity_name_to_id
             )
-            
+
             if source_id and target_id:
                 relation.source_entity_id = source_id
                 relation.target_entity_id = target_id
                 resolved_relations.append(relation)
-                logger.debug(f"Successfully resolved relation: {relation.attributes.get('source_entity_name')} -> {relation.attributes.get('target_entity_name')}")
+                logger.info(f"✅ Successfully resolved relation: '{source_name}' -> '{target_name}' (IDs: {source_id} -> {target_id})")
             else:
                 logger.warning(
-                    f"Could not resolve entity IDs for relation: "
-                    f"{relation.attributes.get('source_entity_name')} -> "
-                    f"{relation.attributes.get('target_entity_name')} "
+                    f"❌ Could not resolve entity IDs for relation: "
+                    f"'{source_name}' -> '{target_name}' "
                     f"(source_id: {source_id}, target_id: {target_id})"
                 )
-        
+                # Debug: Show exact search attempts
+                logger.warning(f"   Searched for source: '{relation.source_entity_id}' in {len(entity_name_to_id)} entities")
+                logger.warning(f"   Searched for target: '{relation.target_entity_id}' in {len(entity_name_to_id)} entities")
+
         logger.info(f"Successfully resolved {len(resolved_relations)} out of {len(relations)} relations")
         return resolved_relations
      
@@ -567,51 +579,50 @@ Return the relations as a JSON array as specified in the system prompt.
         return resolved_relations
     
     def _resolve_entity_id(
-        self, 
-        entity_name: str, 
+        self,
+        entity_name: str,
         entity_name_to_id: Dict[str, str]
     ) -> Optional[str]:
         """Resolve entity name to ID using enhanced fuzzy matching for medical/German terms.
-        
+
         Args:
             entity_name: Name of the entity to resolve
             entity_name_to_id: Mapping of entity names to IDs
-            
+
         Returns:
             Entity ID if found, None otherwise
         """
         if not entity_name or not entity_name.strip():
+            logger.debug(f"Empty entity name provided for resolution")
             return None
-            
+
+        # Normalize entity name (remove extra whitespace, quotes, etc.)
         entity_name = entity_name.strip()
-        
-        # Exact match
-        if entity_name in entity_name_to_id:
-            return entity_name_to_id[entity_name]
-        
-        # Case-insensitive match
-        entity_name_lower = entity_name.lower()
+        # Remove common quote variations that LLMs might add
+        entity_name = entity_name.strip('"\'""''')
+        # Normalize whitespace
+        entity_name = ' '.join(entity_name.split())
+
+        logger.debug(f"Resolving entity: '{entity_name}' against {len(entity_name_to_id)} available entities")
+
+        # Create normalized entity mapping for better matching
+        normalized_entity_map = {}
         for name, entity_id in entity_name_to_id.items():
-            if name.lower() == entity_name_lower:
+            normalized_name = name.strip().strip('"\'""''')
+            normalized_name = ' '.join(normalized_name.split())
+            normalized_entity_map[normalized_name] = entity_id
+
+        # Exact match (normalized)
+        if entity_name in normalized_entity_map:
+            logger.info(f"✅ Exact match found for '{entity_name}' -> {normalized_entity_map[entity_name]}")
+            return normalized_entity_map[entity_name]
+
+        # Case-insensitive match (normalized)
+        entity_name_lower = entity_name.lower()
+        for normalized_name, entity_id in normalized_entity_map.items():
+            if normalized_name.lower() == entity_name_lower:
+                logger.info(f"✅ Case-insensitive match found for '{entity_name}' -> '{normalized_name}' -> {entity_id}")
                 return entity_id
-        
-        # Medical term variations (e.g., "Arzt" should match "Dr. Armin Schwarzbach")
-        medical_mappings = {
-            'arzt': ['dr.', 'doktor', 'mediziner'],
-            'virus': ['viren', 'viral'],
-            'bakterie': ['bakterien', 'bakteriell'],
-            'infektion': ['infekt', 'infektionen'],
-            'krankheit': ['erkrankung', 'leiden'],
-        }
-        
-        # Check if entity_name is a medical term that could refer to existing entities
-        for base_term, variations in medical_mappings.items():
-            if entity_name_lower == base_term or entity_name_lower in variations:
-                for name, entity_id in entity_name_to_id.items():
-                    name_lower = name.lower()
-                    if any(var in name_lower for var in [base_term] + variations):
-                        logger.debug(f"Medical term mapping: '{entity_name}' -> '{name}'")
-                        return entity_id
         
         # Partial match (entity name contains or is contained in known entity)
         # More flexible for compound German words
@@ -646,7 +657,21 @@ Return the relations as a JSON array as specified in the system prompt.
                 if entity_name_lower in name.lower():
                     logger.debug(f"Substring match: '{entity_name}' found in '{name}'")
                     return entity_id
-        
+
+        # Debug: Log failure details with normalized comparison
+        logger.warning(f"❌ Failed to resolve entity '{entity_name}'. Normalized search term: '{entity_name}'")
+        logger.warning(f"Available normalized entities (first 5):")
+        for i, (normalized_name, entity_id) in enumerate(normalized_entity_map.items()):
+            if i < 5:  # Show first 5 entities
+                logger.warning(f"   '{normalized_name}' -> {entity_id}")
+                # Show character-by-character comparison for debugging
+                if len(normalized_name) == len(entity_name):
+                    differences = [i for i, (c1, c2) in enumerate(zip(entity_name, normalized_name)) if c1 != c2]
+                    if differences:
+                        logger.warning(f"     Character differences at positions: {differences}")
+        if len(normalized_entity_map) > 5:
+            logger.warning(f"   ... and {len(normalized_entity_map) - 5} more entities")
+
         return None
     
     def _are_similar_words(self, word1: str, word2: str) -> bool:

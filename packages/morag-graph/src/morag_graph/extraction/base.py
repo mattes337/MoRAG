@@ -2,6 +2,8 @@
 
 import json
 import logging
+import asyncio
+import random
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any, Union
 
@@ -13,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class LLMConfig(BaseModel):
     """Configuration for LLM-based extraction."""
-    
+
     provider: str = "gemini"  # openai, gemini, anthropic, etc.
     model: str = "gemini-1.5-flash"  # gemini-1.5-flash, gemini-1.5-pro, gpt-3.5-turbo, etc.
     api_key: Optional[str] = None
@@ -21,6 +23,13 @@ class LLMConfig(BaseModel):
     temperature: float = 0.1
     max_tokens: int = 2000
     timeout: int = 30
+
+    # Retry configuration
+    max_retries: int = 5
+    base_delay: float = 1.0
+    max_delay: float = 60.0
+    exponential_base: float = 2.0
+    jitter: bool = True
 
 
 class BaseExtractor(ABC):
@@ -47,6 +56,54 @@ class BaseExtractor(ABC):
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.client.aclose()
+
+    def _calculate_delay(self, attempt: int) -> float:
+        """Calculate delay for exponential backoff with jitter.
+
+        Args:
+            attempt: Current attempt number (1-based)
+
+        Returns:
+            Delay in seconds
+        """
+        delay = self.config.base_delay * (self.config.exponential_base ** (attempt - 1))
+        delay = min(delay, self.config.max_delay)
+
+        if self.config.jitter:
+            # Add random jitter (±25% of delay)
+            jitter = delay * 0.25 * (2 * random.random() - 1)
+            delay += jitter
+
+        return max(0, delay)
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Check if an error is retryable.
+
+        Args:
+            error: Exception to check
+
+        Returns:
+            True if error is retryable
+        """
+        error_str = str(error).lower()
+
+        # Retryable HTTP status codes and error messages
+        retryable_conditions = [
+            "503",  # Service Unavailable
+            "502",  # Bad Gateway
+            "504",  # Gateway Timeout
+            "429",  # Too Many Requests
+            "500",  # Internal Server Error (sometimes retryable)
+            "overloaded",
+            "rate limit",
+            "quota",
+            "timeout",
+            "connection",
+            "network",
+            "unavailable"
+        ]
+
+        return any(condition in error_str for condition in retryable_conditions)
     
     @abstractmethod
     def get_system_prompt(self) -> str:
@@ -102,11 +159,11 @@ class BaseExtractor(ABC):
             raise ValueError(f"Unsupported LLM provider: {self.config.provider}")
     
     async def _call_openai(self, messages: List[Dict[str, str]]) -> str:
-        """Call OpenAI API.
-        
+        """Call OpenAI API with exponential backoff retry logic.
+
         Args:
             messages: List of messages for the LLM
-            
+
         Returns:
             LLM response text
         """
@@ -114,47 +171,70 @@ class BaseExtractor(ABC):
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
         }
-        
+
         payload = {
             "model": self.config.model,
             "messages": messages,
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
         }
-        
+
         base_url = self.config.base_url or "https://api.openai.com/v1"
         url = f"{base_url}/chat/completions"
-        
-        try:
-            response = await self.client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
-            
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error calling OpenAI API: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
-            raise
+
+        last_error = None
+
+        for attempt in range(1, self.config.max_retries + 1):
+            try:
+                response = await self.client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Success! Return the result
+                if attempt > 1:
+                    logger.info(f"OpenAI API call succeeded on attempt {attempt}")
+
+                return data["choices"][0]["message"]["content"]
+
+            except Exception as e:
+                last_error = e
+
+                # Log the error
+                if isinstance(e, httpx.HTTPStatusError):
+                    logger.warning(f"HTTP error calling OpenAI API (attempt {attempt}/{self.config.max_retries}): {e}")
+                else:
+                    logger.warning(f"Error calling OpenAI API (attempt {attempt}/{self.config.max_retries}): {e}")
+
+                # Check if this is the last attempt or if error is not retryable
+                if attempt >= self.config.max_retries or not self._is_retryable_error(e):
+                    break
+
+                # Calculate delay and wait before retry
+                delay = self._calculate_delay(attempt)
+                logger.info(f"Retrying OpenAI API call in {delay:.2f} seconds (attempt {attempt + 1}/{self.config.max_retries})")
+                await asyncio.sleep(delay)
+
+        # All retries exhausted, raise the last error
+        logger.error(f"OpenAI API call failed after {self.config.max_retries} attempts")
+        raise last_error
     
     async def _call_gemini(self, messages: List[Dict[str, str]]) -> str:
-        """Call Google Gemini API.
-        
+        """Call Google Gemini API with exponential backoff retry logic.
+
         Args:
             messages: List of messages for the LLM
-            
+
         Returns:
             LLM response text
         """
         # Convert messages to Gemini format
         gemini_contents = []
-        
+
         for message in messages:
             role = message["role"]
             content = message["content"]
-            
+
             if role == "system":
                 # Gemini doesn't have system role, prepend to first user message
                 if gemini_contents and gemini_contents[-1]["role"] == "user":
@@ -174,7 +254,7 @@ class BaseExtractor(ABC):
                     "role": "model",
                     "parts": [{"text": content}]
                 })
-        
+
         payload = {
             "contents": gemini_contents,
             "generationConfig": {
@@ -182,38 +262,60 @@ class BaseExtractor(ABC):
                 "maxOutputTokens": self.config.max_tokens,
             }
         }
-        
+
         base_url = self.config.base_url or "https://generativelanguage.googleapis.com/v1beta"
         url = f"{base_url}/models/{self.config.model}:generateContent?key={self.config.api_key}"
-        
+
         headers = {
             "Content-Type": "application/json",
         }
-        
-        try:
-            response = await self.client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if "candidates" not in data or not data["candidates"]:
-                raise ValueError("No candidates in Gemini response")
-            
-            candidate = data["candidates"][0]
-            
-            if "content" not in candidate or "parts" not in candidate["content"]:
-                raise ValueError("Invalid Gemini response structure")
-            
-            return candidate["content"]["parts"][0]["text"]
-            
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error calling Gemini API: {e}")
-            if hasattr(e.response, 'text'):
-                logger.error(f"Response: {e.response.text}")
-            raise
-        except Exception as e:
-            logger.error(f"Error calling Gemini API: {e}")
-            raise
+
+        last_error = None
+
+        for attempt in range(1, self.config.max_retries + 1):
+            try:
+                response = await self.client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+
+                data = response.json()
+
+                if "candidates" not in data or not data["candidates"]:
+                    raise ValueError("No candidates in Gemini response")
+
+                candidate = data["candidates"][0]
+
+                if "content" not in candidate or "parts" not in candidate["content"]:
+                    raise ValueError("Invalid Gemini response structure")
+
+                # Success! Return the result
+                if attempt > 1:
+                    logger.info(f"Gemini API call succeeded on attempt {attempt}")
+
+                return candidate["content"]["parts"][0]["text"]
+
+            except Exception as e:
+                last_error = e
+
+                # Log the error with response details if available
+                if isinstance(e, httpx.HTTPStatusError):
+                    logger.warning(f"HTTP error calling Gemini API (attempt {attempt}/{self.config.max_retries}): {e}")
+                    if hasattr(e.response, 'text'):
+                        logger.warning(f"Response: {e.response.text}")
+                else:
+                    logger.warning(f"Error calling Gemini API (attempt {attempt}/{self.config.max_retries}): {e}")
+
+                # Check if this is the last attempt or if error is not retryable
+                if attempt >= self.config.max_retries or not self._is_retryable_error(e):
+                    break
+
+                # Calculate delay and wait before retry
+                delay = self._calculate_delay(attempt)
+                logger.info(f"Retrying Gemini API call in {delay:.2f} seconds (attempt {attempt + 1}/{self.config.max_retries})")
+                await asyncio.sleep(delay)
+
+        # All retries exhausted, raise the last error
+        logger.error(f"Gemini API call failed after {self.config.max_retries} attempts")
+        raise last_error
     
     async def extract(self, text: str, **kwargs) -> Any:
         """Extract entities or relations from text.

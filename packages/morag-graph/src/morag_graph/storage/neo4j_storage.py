@@ -652,16 +652,44 @@ class Neo4jStorage(BaseStorage):
     
     async def store_relation(self, relation: Relation) -> RelationId:
         """Store a relation in Neo4J.
-        
+
         Args:
             relation: Relation to store
-            
+
         Returns:
             ID of the stored relation
         """
         properties = relation.to_neo4j_relationship()
         relation_type = relation.get_neo4j_type()
-        
+
+        # First check if both entities exist
+        check_query = """
+        OPTIONAL MATCH (source:Entity {id: $source_id})
+        OPTIONAL MATCH (target:Entity {id: $target_id})
+        RETURN source.id as source_exists, target.id as target_exists
+        """
+
+        check_result = await self._execute_query(check_query, {
+            "source_id": relation.source_entity_id,
+            "target_id": relation.target_entity_id
+        })
+
+        if not check_result:
+            logger.warning(f"Failed to check entity existence for relation {relation.id}")
+            return relation.id
+
+        source_exists = check_result[0]["source_exists"] is not None
+        target_exists = check_result[0]["target_exists"] is not None
+
+        if not source_exists:
+            logger.warning(f"Source entity {relation.source_entity_id} does not exist for relation {relation.id}")
+            return relation.id
+
+        if not target_exists:
+            logger.warning(f"Target entity {relation.target_entity_id} does not exist for relation {relation.id}")
+            return relation.id
+
+        # Both entities exist, create the relation
         query = f"""
         MATCH (source:Entity {{id: $source_id}})
         MATCH (target:Entity {{id: $target_id}})
@@ -669,16 +697,21 @@ class Neo4jStorage(BaseStorage):
         SET r += $properties
         RETURN r.id as id
         """
-        
+
         parameters = {
             "source_id": relation.source_entity_id,
             "target_id": relation.target_entity_id,
             "relation_id": relation.id,
             "properties": properties
         }
-        
+
         result = await self._execute_query(query, parameters)
-        return result[0]["id"] if result else relation.id
+        if result:
+            logger.debug(f"Successfully stored relation {relation.id}: {relation.source_entity_id} -> {relation.target_entity_id}")
+            return result[0]["id"]
+        else:
+            logger.warning(f"Failed to store relation {relation.id}")
+            return relation.id
     
     async def store_relations(self, relations: List[Relation]) -> List[RelationId]:
         """Store multiple relations in Neo4J.

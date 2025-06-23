@@ -111,7 +111,7 @@ class GraphExtractionService:
                     name=entity.name,
                     type=entity.type.value if hasattr(entity.type, 'value') else str(entity.type),
                     confidence=entity.confidence,
-                    properties=entity.properties or {},
+                    attributes=getattr(entity, 'attributes', {}) or {},
                     source_span=getattr(entity, 'source_span', None)
                 )
                 for entity in graph_entities
@@ -133,7 +133,7 @@ class GraphExtractionService:
                     target_entity_id=relation.target_entity_id,
                     type=relation.type.value if hasattr(relation.type, 'value') else str(relation.type),
                     confidence=relation.confidence,
-                    properties=relation.properties or {},
+                    attributes=getattr(relation, 'attributes', {}) or {},
                     source_span=getattr(relation, 'source_span', None)
                 )
                 for relation in graph_relations
@@ -309,7 +309,7 @@ class DatabaseIngestionService:
                     name=entity.name,
                     type=entity.type,
                     confidence=entity.confidence,
-                    properties=entity.properties
+                    attributes=getattr(entity, 'attributes', {}) or {}
                 )
                 graph_entities.append(graph_entity)
             
@@ -322,7 +322,7 @@ class DatabaseIngestionService:
                     target_entity_id=relation.target_entity_id,
                     type=relation.type,
                     confidence=relation.confidence,
-                    properties=relation.properties
+                    attributes=getattr(relation, 'attributes', {}) or {}
                 )
                 graph_relations.append(graph_relation)
             

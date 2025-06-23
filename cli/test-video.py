@@ -43,7 +43,7 @@ sys.path.insert(0, str(project_root))
 # Load environment variables from the project root
 from dotenv import load_dotenv
 env_path = project_root / '.env'
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 try:
     from morag_video import VideoProcessor, VideoConfig
@@ -291,7 +291,7 @@ async def test_video_ingestion(
             # Initialize ingestion coordinator
             coordinator = IngestionCoordinator()
 
-            # Perform comprehensive ingestion
+            # Perform comprehensive ingestion (let coordinator generate proper document ID)
             ingestion_result = await coordinator.ingest_content(
                 content=result.text_content,
                 source_path=str(video_file),
@@ -299,7 +299,7 @@ async def test_video_ingestion(
                 metadata=metadata or {},
                 processing_result=result,
                 databases=database_configs,
-                document_id=str(uuid.uuid4()),
+                document_id=None,  # Let coordinator generate proper unified ID
                 replace_existing=False
             )
 
