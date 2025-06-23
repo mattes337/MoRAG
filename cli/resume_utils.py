@@ -159,19 +159,172 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
         
         # Initialize ingestion coordinator
         coordinator = IngestionCoordinator()
-        
+
+        # Transform ingestion data back to embeddings_data format
+        # Handle both ingest_result.json and ingest_data.json formats
+        if 'vector_data' in ingestion_data:
+            # This is ingest_data.json format
+            vector_data = ingestion_data.get('vector_data', {})
+            chunks_data = vector_data.get('chunks', [])
+
+            # Extract chunks, embeddings, and metadata from ingestion data
+            chunks = []
+            embeddings = []
+            chunk_metadata = []
+
+            for chunk_data in chunks_data:
+                chunks.append(chunk_data['chunk_text'])
+                embeddings.append(chunk_data['embedding'])
+                chunk_metadata.append(chunk_data['metadata'])
+
+        elif 'embeddings_data' in ingestion_data:
+            # This is ingest_result.json format
+            embeddings_data_section = ingestion_data.get('embeddings_data', {})
+            chunks_data = embeddings_data_section.get('chunks', [])
+
+            # Extract chunks, embeddings, and metadata from ingest_result format
+            chunks = []
+            embeddings = []
+            chunk_metadata = []
+
+            for chunk_data in chunks_data:
+                chunks.append(chunk_data['chunk_text'])
+                embeddings.append(chunk_data['embedding'])
+                # Create metadata from the chunk data
+                metadata = {
+                    'chunk_id': chunk_data['chunk_id'],
+                    'document_id': ingestion_data.get('source_info', {}).get('document_id', 'unknown'),
+                    'chunk_index': chunk_data['chunk_index'],
+                    'chunk_text': chunk_data['chunk_text'],
+                    'chunk_size': chunk_data['chunk_size'],
+                    'created_at': ingestion_data.get('timestamp', ''),
+                    **chunk_data.get('metadata', {})
+                }
+                chunk_metadata.append(metadata)
+        else:
+            print("❌ Error: Unrecognized ingestion data format")
+            return False
+
+        # Get document ID and convert to expected format if needed
+        original_document_id = ingestion_data.get('document_id') or ingestion_data.get('source_info', {}).get('document_id', 'unknown')
+
+        # Convert UUID format to doc_ format if needed for Neo4j compatibility
+        if original_document_id and not original_document_id.startswith('doc_'):
+            # Convert UUID to doc_ format
+            document_id = f"doc_{original_document_id}"
+        else:
+            document_id = original_document_id
+
+        # Update chunk metadata to use the converted document ID
+        for meta in chunk_metadata:
+            if 'document_id' in meta:
+                meta['document_id'] = document_id
+            # Also update chunk_id if it contains the old document ID
+            if 'chunk_id' in meta and original_document_id in meta['chunk_id']:
+                meta['chunk_id'] = meta['chunk_id'].replace(original_document_id, document_id)
+
+        # Also update the chunks data in the embeddings_data format for consistency
+        for i, chunk_data in enumerate(chunks_data):
+            if 'chunk_id' in chunk_data and original_document_id in chunk_data['chunk_id']:
+                chunk_data['chunk_id'] = chunk_data['chunk_id'].replace(original_document_id, document_id)
+
+        # Reconstruct embeddings_data structure expected by _write_to_databases
+        embeddings_data = {
+            'chunks': chunks,
+            'embeddings': embeddings,
+            'chunk_metadata': chunk_metadata,
+            'document_id': document_id,
+            'embedding_dimension': len(embeddings[0]) if embeddings else 768
+        }
+
         # Initialize databases
         print_section("Initializing Databases")
-        await coordinator._initialize_databases(database_configs, ingestion_data.get('vector_data', {}))
-        
+        await coordinator._initialize_databases(database_configs, embeddings_data)
+
+        # Extract graph data for Neo4j and convert to proper model objects
+        from morag_graph.models.entity import Entity, EntityType
+        from morag_graph.models.relation import Relation, RelationType
+
+        if 'graph_data' in ingestion_data:
+            # Extract entities and relations data
+            if 'vector_data' in ingestion_data:
+                # This is ingest_data.json format
+                graph_data_section = ingestion_data.get('graph_data', {})
+            else:
+                # This is ingest_result.json format
+                graph_data_section = ingestion_data.get('graph_data', {})
+
+            entities_data = graph_data_section.get('entities', [])
+            relations_data = graph_data_section.get('relations', [])
+
+            # Convert dictionary data to proper Entity objects
+            entities = []
+            for entity_dict in entities_data:
+                try:
+                    # Convert string type back to EntityType enum if needed
+                    entity_type = entity_dict.get('type', 'UNKNOWN')
+                    if isinstance(entity_type, str):
+                        try:
+                            entity_type = EntityType(entity_type)
+                        except ValueError:
+                            entity_type = EntityType.UNKNOWN
+
+                    entity = Entity(
+                        id=entity_dict.get('id', ''),
+                        name=entity_dict.get('name', ''),
+                        type=entity_type,
+                        confidence=entity_dict.get('confidence', 1.0),
+                        source_doc_id=entity_dict.get('source_doc_id', document_id),
+                        attributes=entity_dict.get('attributes', {})
+                    )
+                    entities.append(entity)
+                except Exception as e:
+                    print(f"⚠️  Warning: Failed to create entity from {entity_dict.get('name', 'unknown')}: {e}")
+                    continue
+
+            # Convert dictionary data to proper Relation objects
+            relations = []
+            for relation_dict in relations_data:
+                try:
+                    # Convert string type back to RelationType enum if needed
+                    relation_type = relation_dict.get('relation_type', 'RELATED_TO')
+                    if isinstance(relation_type, str):
+                        try:
+                            relation_type = RelationType(relation_type)
+                        except ValueError:
+                            relation_type = RelationType.RELATED_TO
+
+                    relation = Relation(
+                        id=relation_dict.get('id', ''),
+                        source_entity_id=relation_dict.get('source_entity_id', ''),
+                        target_entity_id=relation_dict.get('target_entity_id', ''),
+                        type=relation_type,
+                        confidence=relation_dict.get('confidence', 1.0),
+                        source_doc_id=relation_dict.get('source_doc_id', document_id),
+                        attributes=relation_dict.get('attributes', {})
+                    )
+                    relations.append(relation)
+                except Exception as e:
+                    print(f"⚠️  Warning: Failed to create relation {relation_dict.get('id', 'unknown')}: {e}")
+                    continue
+
+            graph_data = {
+                'entities': entities,
+                'relations': relations
+            }
+        else:
+            # No graph data available
+            graph_data = {'entities': [], 'relations': []}
+
         # Write to databases using ingestion data
         print_section("Writing to Databases")
-        document_id = ingestion_data.get('document_id', 'unknown')
-        
+        # Use the converted document_id from embeddings_data
+        document_id = embeddings_data['document_id']
+
         results = await coordinator._write_to_databases(
             database_configs,
-            ingestion_data.get('vector_data', {}),
-            ingestion_data.get('graph_data', {}),
+            embeddings_data,
+            graph_data,
             document_id,
             replace_existing=True
         )

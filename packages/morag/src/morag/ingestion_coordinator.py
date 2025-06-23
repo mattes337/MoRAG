@@ -652,41 +652,50 @@ class IngestionCoordinator:
             for i, (chunk_meta, embedding) in enumerate(
                 zip(embeddings_data['chunk_metadata'], embeddings_data['embeddings'])
             ):
-                # Create a hash-based point ID for Qdrant (since it doesn't support colons in IDs)
-                import hashlib
+                # Create a simple integer point ID for Qdrant compatibility
                 chunk_id = chunk_meta['chunk_id']
-                point_id = hashlib.sha256(chunk_id.encode()).hexdigest()[:16]  # Use first 16 chars of hash
+                # Use hash to create a consistent integer ID
+                point_id = abs(hash(chunk_id)) % (2**31)  # Ensure positive 32-bit int
 
                 # Store the vector with the hash as point ID but keep original chunk_id in metadata
+                # Clean metadata to ensure JSON serialization compatibility
+                clean_metadata = {}
+                for key, value in chunk_meta.items():
+                    if key == 'chunk_text':
+                        # Don't store the full text in Qdrant payload to avoid size issues
+                        continue
+                    elif isinstance(value, (str, int, float, bool, list, dict)) or value is None:
+                        clean_metadata[key] = value
+                    else:
+                        # Convert non-serializable objects to string
+                        clean_metadata[key] = str(value)
+
                 enhanced_metadata = {
-                    **chunk_meta,
+                    **clean_metadata,
                     'original_chunk_id': chunk_id,
-                    'point_id': point_id
+                    'point_id': point_id,
+                    'text_length': len(chunk_meta.get('chunk_text', ''))
                 }
 
-                # Use the basic Qdrant client directly with proper format
+                # Use proper PointStruct format for Qdrant
+                from qdrant_client.models import PointStruct
+
+                # Create point with proper structure
+                point = PointStruct(
+                    id=point_id,
+                    vector=embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
+                    payload=enhanced_metadata
+                )
+
                 try:
                     await qdrant_storage.client.upsert(
                         collection_name=qdrant_storage.config.collection_name,
-                        points=[{
-                            "id": point_id,
-                            "vector": embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
-                            "payload": enhanced_metadata
-                        }]
+                        points=[point]
                     )
                 except Exception as e:
                     logger.warning(f"Failed to store chunk in Qdrant: {e}")
-                    # Try with integer ID instead
-                    int_point_id = hash(chunk_id) % (2**31)  # Convert to positive 32-bit int
-                    await qdrant_storage.client.upsert(
-                        collection_name=qdrant_storage.config.collection_name,
-                        points=[{
-                            "id": int_point_id,
-                            "vector": embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
-                            "payload": {**enhanced_metadata, 'point_id': int_point_id}
-                        }]
-                    )
-                    point_id = str(int_point_id)
+                    # If it still fails, skip this chunk but continue with others
+                    continue
 
                 point_ids.append(point_id)
 
