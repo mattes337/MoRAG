@@ -72,7 +72,13 @@ class UnifiedIDGenerator:
         """
         # Convert to readable format
         clean_name = name.lower().replace(' ', '_').replace('-', '_')
-        clean_type = str(entity_type).lower().replace('entitytype.', '')
+
+        # Handle both enum and string types consistently
+        if hasattr(entity_type, 'value'):
+            clean_type = entity_type.value.lower()
+        else:
+            clean_type = str(entity_type).lower().replace('entitytype.', '')
+
         doc_suffix = source_doc_id.split('_')[-1] if '_' in source_doc_id else 'abc123'
         return f"ent_{clean_name}_{clean_type}_{doc_suffix}"
     
@@ -90,7 +96,12 @@ class UnifiedIDGenerator:
             Deterministic relation ID
         """
         # Convert to readable format
-        clean_relation = str(relation_type).lower().replace('relationtype.', '')
+        # Handle both enum and string types consistently
+        if hasattr(relation_type, 'value'):
+            clean_relation = relation_type.value.lower()
+        else:
+            clean_relation = str(relation_type).lower().replace('relationtype.', '')
+
         # Generate a simple hash suffix for uniqueness
         entities = sorted([source_entity_id, target_entity_id])
         content = f"{entities[0]}:{entities[1]}:{relation_type}"

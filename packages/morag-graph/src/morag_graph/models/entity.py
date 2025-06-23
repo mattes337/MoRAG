@@ -176,14 +176,36 @@ class Entity(BaseModel):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert entity to dictionary for JSON serialization."""
-        return self.model_dump()
+        data = self.model_dump()
+
+        # Convert type to string for JSON serialization
+        if hasattr(data['type'], 'value'):
+            # Handle enum types - get just the value without the class prefix
+            data['type'] = data['type'].value
+        else:
+            # Handle string types
+            data['type'] = str(data['type'])
+
+        # Convert sets to lists for JSON serialization
+        if 'mentioned_in_chunks' in data and isinstance(data['mentioned_in_chunks'], set):
+            data['mentioned_in_chunks'] = list(data['mentioned_in_chunks'])
+
+        if 'qdrant_vector_ids' in data and isinstance(data['qdrant_vector_ids'], set):
+            data['qdrant_vector_ids'] = list(data['qdrant_vector_ids'])
+
+        return data
     
     def to_neo4j_node(self) -> Dict[str, Any]:
         """Convert entity to Neo4J node properties."""
         properties = self.model_dump()
         
         # Convert type to string for Neo4J
-        properties['type'] = str(properties['type'])
+        if hasattr(properties['type'], 'value'):
+            # Handle enum types - get just the value without the class prefix
+            properties['type'] = properties['type'].value
+        else:
+            # Handle string types
+            properties['type'] = str(properties['type'])
             
         # Serialize attributes to JSON string for Neo4J storage
         if 'attributes' in properties:

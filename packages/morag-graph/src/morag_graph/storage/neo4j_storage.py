@@ -337,7 +337,7 @@ class Neo4jStorage(BaseStorage):
         
         parameters = {
             "name": entity.name,
-            "type": str(entity.type),  # Handle both enum and string types
+            "type": entity.type.value if hasattr(entity.type, 'value') else str(entity.type),  # Handle both enum and string types
             "confidence": entity.confidence,
             "attributes": properties.get('attributes', '{}'),
             "source_doc_id": entity.source_doc_id,

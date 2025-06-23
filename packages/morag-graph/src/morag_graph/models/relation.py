@@ -104,14 +104,29 @@ class Relation(BaseModel):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert relation to dictionary for JSON serialization."""
-        return self.model_dump()
+        data = self.model_dump()
+
+        # Convert type to string for JSON serialization
+        if hasattr(data['type'], 'value'):
+            # Handle enum types - get just the value without the class prefix
+            data['type'] = data['type'].value
+        else:
+            # Handle string types
+            data['type'] = str(data['type'])
+
+        return data
     
     def to_neo4j_relationship(self) -> Dict[str, Any]:
         """Convert relation to Neo4J relationship properties."""
         properties = self.model_dump()
         
         # Convert type to string for Neo4J
-        properties['type'] = str(properties['type'])
+        if hasattr(properties['type'], 'value'):
+            # Handle enum types - get just the value without the class prefix
+            properties['type'] = properties['type'].value
+        else:
+            # Handle string types
+            properties['type'] = str(properties['type'])
             
         # Serialize attributes to JSON string for Neo4J storage
         if 'attributes' in properties:
@@ -173,6 +188,14 @@ class Relation(BaseModel):
     
     def get_neo4j_type(self) -> str:
         """Get the Neo4J relationship type."""
+        # Get the type value without enum prefix
+        if hasattr(self.type, 'value'):
+            # Handle enum types - get just the value without the class prefix
+            type_value = self.type.value
+        else:
+            # Handle string types
+            type_value = str(self.type)
+
         # Sanitize type for valid Neo4j relationship type (no dots, spaces, etc.)
-        type_str = str(self.type).replace('.', '_').replace(' ', '_').replace('-', '_')
+        type_str = type_value.replace('.', '_').replace(' ', '_').replace('-', '_')
         return type_str
