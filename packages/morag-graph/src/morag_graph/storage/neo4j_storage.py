@@ -337,7 +337,7 @@ class Neo4jStorage(BaseStorage):
         
         parameters = {
             "name": entity.name,
-            "type": str(entity.type.value if hasattr(entity.type, 'value') else entity.type),
+            "type": str(entity.type),  # Handle both enum and string types
             "confidence": entity.confidence,
             "attributes": properties.get('attributes', '{}'),
             "source_doc_id": entity.source_doc_id,
@@ -347,6 +347,45 @@ class Neo4jStorage(BaseStorage):
         
         result = await self._execute_query(query, parameters)
         return result[0]["id"] if result else entity.id
+
+    async def _create_missing_entity(self, entity_id: str, entity_name: str) -> str:
+        """Create a missing entity with minimal information.
+
+        Args:
+            entity_id: ID of the entity to create
+            entity_name: Name of the entity
+
+        Returns:
+            ID of the created entity
+        """
+        from morag_graph.models.entity import Entity, EntityType
+
+        # Extract entity name from ID if not provided
+        if not entity_name and entity_id.startswith('ent_'):
+            # Try to extract name from entity ID
+            parts = entity_id.split('_')
+            if len(parts) >= 2:
+                entity_name = ' '.join(parts[1:-1]).replace('_', ' ').title()
+
+        if not entity_name:
+            entity_name = entity_id
+
+        # Create a minimal entity
+        entity = Entity(
+            id=entity_id,
+            name=entity_name,
+            type=EntityType.CUSTOM,
+            confidence=0.5,  # Lower confidence for auto-created entities
+            attributes={
+                "auto_created": True,
+                "creation_reason": "missing_entity_for_relation"
+            }
+        )
+
+        # Store the entity
+        await self.store_entity(entity)
+        logger.info(f"Created missing entity: {entity_id} (name: {entity_name})")
+        return entity_id
     
     async def store_entities(self, entities: List[Entity]) -> List[EntityId]:
         """Store multiple entities in Neo4J.
@@ -653,6 +692,8 @@ class Neo4jStorage(BaseStorage):
     async def store_relation(self, relation: Relation) -> RelationId:
         """Store a relation in Neo4J.
 
+        If either entity doesn't exist, it will be created automatically.
+
         Args:
             relation: Relation to store
 
@@ -681,15 +722,16 @@ class Neo4jStorage(BaseStorage):
         source_exists = check_result[0]["source_exists"] is not None
         target_exists = check_result[0]["target_exists"] is not None
 
+        # Create missing entities automatically
         if not source_exists:
-            logger.warning(f"Source entity {relation.source_entity_id} does not exist for relation {relation.id}")
-            return relation.id
+            logger.info(f"Creating missing source entity {relation.source_entity_id} for relation {relation.id}")
+            await self._create_missing_entity(relation.source_entity_id, relation.attributes.get('source_entity_name', ''))
 
         if not target_exists:
-            logger.warning(f"Target entity {relation.target_entity_id} does not exist for relation {relation.id}")
-            return relation.id
+            logger.info(f"Creating missing target entity {relation.target_entity_id} for relation {relation.id}")
+            await self._create_missing_entity(relation.target_entity_id, relation.attributes.get('target_entity_name', ''))
 
-        # Both entities exist, create the relation
+        # Both entities now exist (or have been created), create the relation
         query = f"""
         MATCH (source:Entity {{id: $source_id}})
         MATCH (target:Entity {{id: $target_id}})

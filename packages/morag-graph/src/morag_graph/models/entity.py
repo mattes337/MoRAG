@@ -183,8 +183,7 @@ class Entity(BaseModel):
         properties = self.model_dump()
         
         # Convert type to string for Neo4J
-        if isinstance(properties['type'], EntityType):
-            properties['type'] = properties['type'].value
+        properties['type'] = str(properties['type'])
             
         # Serialize attributes to JSON string for Neo4J storage
         if 'attributes' in properties:
@@ -197,8 +196,9 @@ class Entity(BaseModel):
         if 'qdrant_vector_ids' in properties:
             properties['qdrant_vector_ids'] = list(properties['qdrant_vector_ids'])
             
-        # Add label for Neo4J
-        properties['_labels'] = [self._neo4j_label, properties['type']]
+        # Add label for Neo4J (sanitize type for valid Neo4j label)
+        type_label = properties['type'].replace('.', '_').replace(' ', '_').replace('-', '_')
+        properties['_labels'] = [self._neo4j_label, type_label]
         
         return properties
     

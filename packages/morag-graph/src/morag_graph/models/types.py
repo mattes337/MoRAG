@@ -51,6 +51,29 @@ class RelationType(str, Enum):
     PRACTICES = "PRACTICES"  # Person -> Activity/Belief
     ENGAGED_IN = "ENGAGED_IN"  # Person -> Activity
     STUDIED = "STUDIED"  # Person -> Subject/Field
+
+    # Technical and specification relations
+    DEFINED_BY = "DEFINED_BY"  # Entity -> Standard/Specification
+    SPECIFIED_BY = "SPECIFIED_BY"  # Entity -> Standard/Specification
+    PUBLISHED_BY = "PUBLISHED_BY"  # Entity -> Organization/Person
+    COMPONENT_OF = "COMPONENT_OF"  # Entity -> Entity (structural)
+    IMPLEMENTS = "IMPLEMENTS"  # Entity -> Standard/Protocol
+    ESTABLISHES = "ESTABLISHES"  # Entity -> Entity (creation)
+    PROVIDES = "PROVIDES"  # Entity -> Service/Function
+    MANDATES = "MANDATES"  # Standard -> Requirement
+    REQUIRES = "REQUIRES"  # Entity -> Requirement
+    SPECIFIES = "SPECIFIES"  # Standard -> Detail
+    FACILITATES = "FACILITATES"  # Entity -> Process/Function
+    ENABLES = "ENABLES"  # Entity -> Capability
+    WORKS_WITH = "WORKS_WITH"  # Entity -> Entity (collaboration)
+    INTEROPERATES_WITH = "INTEROPERATES_WITH"  # System -> System
+    COMPLIES_WITH = "COMPLIES_WITH"  # Entity -> Standard
+    FOLLOWS = "FOLLOWS"  # Entity -> Standard/Protocol
+    BASED_ON = "BASED_ON"  # Entity -> Foundation/Standard
+    COMMUNICATES_WITH = "COMMUNICATES_WITH"  # System -> System
+    PROCESSES = "PROCESSES"  # System -> Data/Entity
+    VALIDATES = "VALIDATES"  # System -> Data/Entity
+
     CUSTOM = "CUSTOM"  # For dynamic/custom relation types (deprecated, use RELATED_TO)
 
 

@@ -109,7 +109,7 @@ class GraphExtractionService:
                 Entity(
                     id=entity.id,
                     name=entity.name,
-                    type=entity.type.value if hasattr(entity.type, 'value') else str(entity.type),
+                    type=str(entity.type),  # Handle both enum and string types
                     confidence=entity.confidence,
                     attributes=getattr(entity, 'attributes', {}) or {},
                     source_span=getattr(entity, 'source_span', None)
@@ -131,7 +131,7 @@ class GraphExtractionService:
                     id=relation.id,
                     source_entity_id=relation.source_entity_id,
                     target_entity_id=relation.target_entity_id,
-                    type=relation.type.value if hasattr(relation.type, 'value') else str(relation.type),
+                    type=relation.type,  # Keep the type as-is (can be enum or string)
                     confidence=relation.confidence,
                     attributes=getattr(relation, 'attributes', {}) or {},
                     source_span=getattr(relation, 'source_span', None)

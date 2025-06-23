@@ -151,7 +151,7 @@ class ExtractionDemo:
         
         print(f"✅ Found {len(entities)} entities:")
         for entity in entities:
-            print(f"  • {entity.name} ({entity.type.value}) - confidence: {entity.confidence:.2f}")
+            print(f"  • {entity.name} ({str(entity.type)}) - confidence: {entity.confidence:.2f}")
         
         # Extract relations
         print("🔗 Extracting relations...")
@@ -168,7 +168,7 @@ class ExtractionDemo:
             target_entity = next((e for e in entities if e.id == relation.target_entity_id), None)
             
             if source_entity and target_entity:
-                print(f"  • {source_entity.name} --[{relation.type.value}]--> {target_entity.name} (confidence: {relation.confidence:.2f})")
+                print(f"  • {source_entity.name} --[{str(relation.type)}]--> {target_entity.name} (confidence: {relation.confidence:.2f})")
         
         # Add to graph
         for entity in entities:
@@ -237,13 +237,13 @@ class ExtractionDemo:
         # Count entities by type
         entity_types = {}
         for entity in self.graph.entities.values():
-            entity_type = entity.type.value
+            entity_type = str(entity.type)
             entity_types[entity_type] = entity_types.get(entity_type, 0) + 1
         
         # Count relations by type
         relation_types = {}
         for relation in self.graph.relations.values():
-            relation_type = relation.type.value
+            relation_type = str(relation.type)
             relation_types[relation_type] = relation_types.get(relation_type, 0) + 1
         
         # Find most connected entities
@@ -306,11 +306,11 @@ class ExtractionDemo:
                 if relation.source_entity_id == apple.id:
                     target = self.graph.entities.get(relation.target_entity_id)
                     if target:
-                        print(f"  • Apple --[{relation.type.value}]--> {target.name}")
+                        print(f"  • Apple --[{str(relation.type)}]--> {target.name}")
                 else:
                     source = self.graph.entities.get(relation.source_entity_id)
                     if source:
-                        print(f"  • {source.name} --[{relation.type.value}]--> Apple")
+                        print(f"  • {source.name} --[{str(relation.type)}]--> Apple")
             
             # Get Apple's neighbors
             neighbors = self.graph.get_neighbors(apple.id)
@@ -336,7 +336,7 @@ class ExtractionDemo:
                 for entity_id in list(common_entities)[:3]:  # Show first 3
                     entity = self.graph.entities.get(entity_id)
                     if entity:
-                        print(f"  • {entity.name} ({entity.type.value})")
+                        print(f"  • {entity.name} ({str(entity.type)})")
             else:
                 print("❌ No direct common connections found")
     

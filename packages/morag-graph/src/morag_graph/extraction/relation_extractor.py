@@ -33,7 +33,29 @@ class RelationExtractor(BaseExtractor):
         "RELATED_TO": "Generic relationship between entities",
         "HAPPENED_ON": "Event happened on a specific date/time",
         "HAPPENED_AT": "Event happened at a specific location",
-        "PARTICIPATED_IN": "Person or organization participated in an event"
+        "PARTICIPATED_IN": "Person or organization participated in an event",
+
+        # Technical and specification relations
+        "DEFINED_BY": "Entity is defined by a standard or specification",
+        "SPECIFIED_BY": "Entity is specified by a standard or document",
+        "PUBLISHED_BY": "Entity was published by an organization or person",
+        "COMPONENT_OF": "Entity is a component of another entity",
+        "IMPLEMENTS": "Entity implements a standard or protocol",
+        "ESTABLISHES": "Entity establishes or creates another entity",
+        "PROVIDES": "Entity provides a service or function",
+        "MANDATES": "Standard mandates a requirement",
+        "REQUIRES": "Entity requires another entity",
+        "SPECIFIES": "Standard specifies details or requirements",
+        "FACILITATES": "Entity facilitates a process or function",
+        "ENABLES": "Entity enables a capability or function",
+        "WORKS_WITH": "Entity works with another entity",
+        "INTEROPERATES_WITH": "System interoperates with another system",
+        "COMPLIES_WITH": "Entity complies with a standard",
+        "FOLLOWS": "Entity follows a standard or protocol",
+        "BASED_ON": "Entity is based on a foundation or standard",
+        "COMMUNICATES_WITH": "System communicates with another system",
+        "PROCESSES": "System processes data or entities",
+        "VALIDATES": "System validates data or entities"
     }
     
     def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, relation_types: Optional[Dict[str, str]] = None, **kwargs):
@@ -237,11 +259,11 @@ class RelationExtractor(BaseExtractor):
         for relation in relations:
             # Skip self-referencing relations (loops)
             if relation.source_entity_id == relation.target_entity_id:
-                logger.debug(f"Skipping self-referencing relation: {relation.source_entity_id} -> {relation.target_entity_id} ({relation.type.value})")
+                logger.debug(f"Skipping self-referencing relation: {relation.source_entity_id} -> {relation.target_entity_id} ({str(relation.type)})")
                 continue
             
             # Create a key for deduplication
-            key = (relation.source_entity_id, relation.target_entity_id, relation.type.value)
+            key = (relation.source_entity_id, relation.target_entity_id, str(relation.type))
             
             if key not in seen:
                 seen.add(key)
@@ -305,13 +327,27 @@ class RelationExtractor(BaseExtractor):
         return f"""
 You are an expert relation extraction system. Your task is to identify relationships between entities in the given text. Be thorough and comprehensive in finding all possible relationships, especially in medical, scientific, and technical content.
 
-Extract relations of the following types:
+IMPORTANT: Be SPECIFIC about relationship types. NEVER use generic types like "CUSTOM" or "RELATED_TO" unless absolutely necessary.
+
+Available relation types:
 {relation_types_text}
+
+RELATIONSHIP TYPE INFERENCE GUIDELINES:
+- If an entity is defined by another: use "DEFINED_BY" or "SPECIFIED_BY"
+- If an entity is created/published by another: use "CREATED_BY" or "PUBLISHED_BY"
+- If an entity is part of another: use "PART_OF" or "COMPONENT_OF"
+- If an entity uses/implements another: use "USES" or "IMPLEMENTS"
+- If an entity establishes/provides something: use "ESTABLISHES" or "PROVIDES"
+- If an entity mandates/requires something: use "MANDATES" or "REQUIRES"
+- If an entity facilitates/enables something: use "FACILITATES" or "ENABLES"
+- If entities work together: use "WORKS_WITH" or "INTEROPERATES_WITH"
+- For standards and protocols: use "COMPLIES_WITH", "FOLLOWS", "BASED_ON"
+- For technical relationships: use "COMMUNICATES_WITH", "PROCESSES", "VALIDATES"
 
 For each relation, provide:
 1. source_entity: The name of the source entity (exactly as it appears in text)
 2. target_entity: The name of the target entity (exactly as it appears in text)
-3. relation_type: One of the types listed above
+3. relation_type: A specific, descriptive relationship type (infer from context if not in list)
 4. context: The specific text that indicates this relationship
 5. confidence: A score from 0.0 to 1.0 indicating extraction confidence
 
@@ -320,7 +356,7 @@ Return the results as a JSON array of objects with the following structure:
   {{
     "source_entity": "source entity name",
     "target_entity": "target entity name",
-    "relation_type": "RELATION_TYPE",
+    "relation_type": "SPECIFIC_RELATION_TYPE",
     "context": "text that indicates the relationship",
     "confidence": 0.95
   }}
@@ -328,9 +364,8 @@ Return the results as a JSON array of objects with the following structure:
 
 Rules:
 - Extract ALL relations that are explicitly stated OR reasonably implied in the text
-- Pay special attention to causal relationships (CAUSES) and associations between medical terms
-- For medical/scientific content, be especially thorough in identifying relationships
-- Look for relationships between similar terms (e.g., a pathogen and the disease it causes)
+- Be SPECIFIC about relation types - infer the most appropriate type from context
+- For technical/scientific content, be especially thorough in identifying relationships
 - Ensure both entities are identifiable in the text
 - If a relationship could be multiple types, choose the most specific one
 - Ensure confidence scores reflect the certainty of the extraction
@@ -440,9 +475,16 @@ Return the relations as a JSON array as specified in the system prompt.
                     relation_type = RelationType(relation_type)
                 except ValueError:
                     # If not a valid enum value, try context-based detection
-                    relation_type = self._detect_relation_type_from_context(data.get("context", ""), data["source_entity"], data["target_entity"])
-                    if relation_type is None:
-                        relation_type = RelationType.CUSTOM  # Use CUSTOM as fallback
+                    detected_type = self._detect_relation_type_from_context(data.get("context", ""), data["source_entity"], data["target_entity"])
+                    if detected_type is not None:
+                        relation_type = detected_type
+                    else:
+                        # Keep the original string if it's descriptive, otherwise use CUSTOM
+                        if relation_type.upper() not in ["CUSTOM", "RELATED_TO", "UNKNOWN"] and len(relation_type) > 3:
+                            # Keep the descriptive relation type as a string
+                            pass
+                        else:
+                            relation_type = RelationType.CUSTOM
             
             # For now, use entity names as IDs (will be resolved later)
             source_entity_id = data["source_entity"].strip()
@@ -471,9 +513,37 @@ Return the relations as a JSON array as specified in the system prompt.
     def _detect_relation_type_from_context(self, context: str, source_entity: str, target_entity: str) -> Optional[RelationType]:
         """Detect relation type based on context patterns."""
         context_lower = context.lower()
-        
+
+        # Definition and specification patterns
+        if any(pattern in context_lower for pattern in ["defined by", "defined in", "as defined", "specification"]):
+            return RelationType.DEFINED_BY
+        elif any(pattern in context_lower for pattern in ["created by", "published by", "issued by", "established by"]):
+            return RelationType.CREATED_BY
+        elif any(pattern in context_lower for pattern in ["part of", "component of", "element of", "within"]):
+            return RelationType.PART_OF
+        elif any(pattern in context_lower for pattern in ["uses", "utilizes", "implements", "employs"]):
+            return RelationType.USES
+        elif any(pattern in context_lower for pattern in ["mandates", "requires", "demands"]):
+            return RelationType.MANDATES
+        elif any(pattern in context_lower for pattern in ["specifies"]):
+            return RelationType.SPECIFIES
+        elif any(pattern in context_lower for pattern in ["facilitates", "allows", "supports"]):
+            return RelationType.FACILITATES
+        elif any(pattern in context_lower for pattern in ["enables"]):
+            return RelationType.ENABLES
+        elif any(pattern in context_lower for pattern in ["based on", "according to"]):
+            return RelationType.BASED_ON
+        elif any(pattern in context_lower for pattern in ["follows"]):
+            return RelationType.FOLLOWS
+        elif any(pattern in context_lower for pattern in ["complies with"]):
+            return RelationType.COMPLIES_WITH
+        elif any(pattern in context_lower for pattern in ["communicates with", "exchanges", "sends", "receives"]):
+            return RelationType.COMMUNICATES_WITH
+        elif any(pattern in context_lower for pattern in ["processes", "handles", "manages", "controls"]):
+            return RelationType.PROCESSES
+
         # German context patterns
-        if "rolle war" in context_lower or "spielte" in context_lower:
+        elif "rolle war" in context_lower or "spielte" in context_lower:
             return RelationType.PLAYED_ROLE
         elif "darstellte" in context_lower or "verkörperte" in context_lower:
             return RelationType.PORTRAYED
@@ -483,7 +553,7 @@ Return the relations as a JSON array as specified in the system prompt.
             return RelationType.ENGAGED_IN
         elif "studierte" in context_lower or "lernte" in context_lower:
             return RelationType.STUDIED
-        
+
         # English context patterns
         elif "played role" in context_lower or "acted as" in context_lower:
             return RelationType.PLAYED_ROLE
@@ -493,7 +563,7 @@ Return the relations as a JSON array as specified in the system prompt.
             return RelationType.PRACTICES
         elif "studied" in context_lower or "learned" in context_lower:
             return RelationType.STUDIED
-        
+
         return None
     
     async def extract_for_entity_pairs(

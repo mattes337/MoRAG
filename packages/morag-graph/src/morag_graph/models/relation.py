@@ -111,8 +111,7 @@ class Relation(BaseModel):
         properties = self.model_dump()
         
         # Convert type to string for Neo4J
-        if isinstance(properties['type'], RelationType):
-            properties['type'] = properties['type'].value
+        properties['type'] = str(properties['type'])
             
         # Serialize attributes to JSON string for Neo4J storage
         if 'attributes' in properties:
@@ -174,6 +173,6 @@ class Relation(BaseModel):
     
     def get_neo4j_type(self) -> str:
         """Get the Neo4J relationship type."""
-        if isinstance(self.type, RelationType):
-            return self.type.value
-        return str(self.type)
+        # Sanitize type for valid Neo4j relationship type (no dots, spaces, etc.)
+        type_str = str(self.type).replace('.', '_').replace(' ', '_').replace('-', '_')
+        return type_str

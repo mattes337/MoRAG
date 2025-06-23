@@ -232,7 +232,7 @@ def test_entity_neo4j_conversion():
     # Check that all properties are present
     assert node_props["id"] == entity.id
     assert node_props["name"] == entity.name
-    assert node_props["type"] == entity.type.value
+    assert node_props["type"] == str(entity.type)
     assert json.loads(node_props["attributes"]) == entity.attributes
     # Document-specific attributes removed for document-agnostic extraction
     # assert node_props["source_doc_id"] == entity.source_doc_id

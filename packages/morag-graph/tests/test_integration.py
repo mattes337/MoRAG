@@ -130,7 +130,7 @@ class IntegrationTestSuite:
             
             print(f"   Found {len(entities)} entities")
             for entity in entities:
-                entity_type = entity.type.value if hasattr(entity.type, 'value') else entity.type
+                entity_type = str(entity.type)
                 print(f"   • {entity.name} ({entity_type})")
             
             all_entities.extend(entities)
@@ -166,7 +166,7 @@ class IntegrationTestSuite:
                 source_entity = next((e for e in entities if e.id == relation.source_entity_id), None)
                 target_entity = next((e for e in entities if e.id == relation.target_entity_id), None)
                 if source_entity and target_entity:
-                    relation_type = relation.type.value if hasattr(relation.type, 'value') else relation.type
+                    relation_type = str(relation.type)
                     print(f"   • {source_entity.name} --[{relation_type}]--> {target_entity.name}")
             
             all_relations.extend(relations)
@@ -242,12 +242,12 @@ class IntegrationTestSuite:
         
         # Count entity types
         for entity in graph.entities.values():
-            entity_type = entity.type.value if hasattr(entity.type, 'value') else entity.type
+            entity_type = str(entity.type)
             analysis["entity_types"][entity_type] = analysis["entity_types"].get(entity_type, 0) + 1
         
         # Count relation types
         for relation in graph.relations.values():
-            relation_type = relation.type.value if hasattr(relation.type, 'value') else relation.type
+            relation_type = str(relation.type)
             analysis["relation_types"][relation_type] = analysis["relation_types"].get(relation_type, 0) + 1
         
         # Find most connected entities
@@ -262,7 +262,7 @@ class IntegrationTestSuite:
         for entity_id, connection_count in sorted_connections[:5]:  # Top 5
             entity = graph.entities.get(entity_id)
             if entity:
-                entity_type = entity.type.value if hasattr(entity.type, 'value') else entity.type
+                entity_type = str(entity.type)
                 analysis["most_connected_entities"].append({
                     "name": entity.name,
                     "type": entity_type,
@@ -286,7 +286,7 @@ class IntegrationTestSuite:
                         "entity1": entity1.name,
                         "entity2": entity2.name,
                         "relation_count": len(relations),
-                        "relation_types": [r.type.value if hasattr(r.type, 'value') else r.type for r in relations]
+                        "relation_types": [str(r.type) for r in relations]
                     })
         
         # Print analysis results
