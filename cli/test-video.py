@@ -28,6 +28,7 @@ Options:
 """
 
 import sys
+import os
 import asyncio
 import json
 import argparse
@@ -281,10 +282,10 @@ async def test_video_ingestion(
             if use_neo4j:
                 database_configs.append(DatabaseConfig(
                     type=DatabaseType.NEO4J,
-                    hostname='bolt://localhost:7687',
-                    username='neo4j',
-                    password='password',
-                    database_name='neo4j'
+                    hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
+                    username=os.getenv('NEO4J_USERNAME', 'neo4j'),
+                    password=os.getenv('NEO4J_PASSWORD', 'password'),
+                    database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
                 ))
 
             # Initialize ingestion coordinator
@@ -358,6 +359,8 @@ async def test_video_ingestion(
         return False
 
 
+
+
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(
@@ -374,6 +377,12 @@ Examples:
     python test-video.py my-video.mp4 --ingest
     python test-video.py recording.avi --ingest --metadata '{"type": "meeting"}'
     python test-video.py presentation.mov --ingest --webhook-url https://my-app.com/webhook
+
+  Resume from Process Result:
+    python test-video.py my-video.mp4 --use-process-result my-video.process_result.json
+
+  Resume from Ingestion Data:
+    python test-video.py my-video.mp4 --use-ingestion-data my-video.ingest_data.json
 
 Note: Video processing may take several minutes for large files.
         """
@@ -394,6 +403,8 @@ Note: Video processing may take several minutes for large files.
                        help='Number of thumbnails to generate (default: 3)')
     parser.add_argument('--enable-ocr', action='store_true',
                        help='Enable OCR on video frames')
+    parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
+    parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 
     args = parser.parse_args()
 
@@ -407,6 +418,10 @@ Note: Video processing may take several minutes for large files.
         except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    # Handle resume arguments
+    from resume_utils import handle_resume_arguments
+    handle_resume_arguments(args, str(video_file), 'video', metadata)
 
     try:
         if args.ingest:

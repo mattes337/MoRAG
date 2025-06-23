@@ -532,6 +532,12 @@ Examples:
     python test-audio.py my-audio.mp3 --ingest
     python test-audio.py recording.wav --ingest --webhook-url https://my-app.com/webhook
     python test-audio.py audio.mp3 --ingest --metadata '{"category": "meeting"}'
+
+  Resume from Process Result:
+    python test-audio.py my-audio.mp3 --use-process-result my-audio.process_result.json
+
+  Resume from Ingestion Data:
+    python test-audio.py my-audio.mp3 --use-ingestion-data my-audio.ingest_data.json
         """
     )
 
@@ -550,6 +556,8 @@ Examples:
                        help='Enable speaker diarization')
     parser.add_argument('--enable-topics', action='store_true',
                        help='Enable topic segmentation')
+    parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
+    parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 
     args = parser.parse_args()
 
@@ -563,6 +571,10 @@ Examples:
         except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    # Handle resume arguments
+    from resume_utils import handle_resume_arguments
+    handle_resume_arguments(args, str(audio_file), 'audio', metadata)
 
     try:
         if args.ingest:

@@ -24,6 +24,7 @@ Options:
 """
 
 import sys
+import os
 import asyncio
 import json
 import argparse
@@ -299,6 +300,7 @@ async def test_youtube_ingestion(url: str, webhook_url: Optional[str] = None,
         return False
 
 
+
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(
@@ -315,6 +317,12 @@ Examples:
     python test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-url https://my-app.com/webhook
     python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest --metadata '{"category": "education"}'
 
+  Resume from Process Result:
+    python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --use-process-result my-youtube.process_result.json
+
+  Resume from Ingestion Data:
+    python test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --use-ingestion-data my-youtube.ingest_data.json
+
 Note: Processing may take several minutes for long videos.
 Make sure you have a stable internet connection.
         """
@@ -329,6 +337,8 @@ Make sure you have a stable internet connection.
                        help='Store in Neo4j graph database (ingestion mode only)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
+    parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
+    parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 
     args = parser.parse_args()
 
@@ -340,6 +350,10 @@ Make sure you have a stable internet connection.
         except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    # Handle resume arguments
+    from resume_utils import handle_resume_arguments
+    handle_resume_arguments(args, args.youtube_url, 'youtube', metadata)
 
     try:
         if args.ingest:

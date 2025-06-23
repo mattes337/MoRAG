@@ -330,6 +330,12 @@ Examples:
     python test-web.py https://news-site.com/article --ingest --metadata '{"category": "news"}'
     python test-web.py https://docs.site.com --ingest --webhook-url https://my-app.com/webhook
 
+  Resume from Process Result:
+    python test-web.py https://example.com --use-process-result my-web.process_result.json
+
+  Resume from Ingestion Data:
+    python test-web.py https://example.com --use-ingestion-data my-web.ingest_data.json
+
 Note: Make sure the URL is accessible and includes the protocol (http:// or https://)
         """
     )
@@ -343,6 +349,8 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
                        help='Store in Neo4j graph database (ingestion mode only)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
+    parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
+    parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 
     args = parser.parse_args()
 
@@ -354,6 +362,10 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
         except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    # Handle resume arguments
+    from resume_utils import handle_resume_arguments
+    handle_resume_arguments(args, args.url, 'web', metadata)
 
     try:
         if args.ingest:

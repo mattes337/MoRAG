@@ -351,10 +351,10 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         if use_neo4j:
             database_configs.append(DatabaseConfig(
                 type=DatabaseType.NEO4J,
-                hostname='bolt://localhost:7687',
-                username='neo4j',
-                password='password',
-                database_name='neo4j'
+                hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
+                username=os.getenv('NEO4J_USERNAME', 'neo4j'),
+                password=os.getenv('NEO4J_PASSWORD', 'password'),
+                database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
             ))
 
         # Prepare enhanced metadata
@@ -450,6 +450,12 @@ Examples:
     python test-document.py my-document.pdf --ingest
     python test-document.py document.docx --ingest --metadata '{"category": "research"}'
     python test-document.py presentation.pptx --ingest --webhook-url https://my-app.com/webhook
+
+  Resume from Process Result:
+    python test-document.py my-document.pdf --use-process-result my-document.process_result.json
+
+  Resume from Ingestion Data:
+    python test-document.py my-document.pdf --use-ingestion-data my-document.ingest_data.json
         """
     )
 
@@ -468,6 +474,8 @@ Examples:
                        help='Maximum chunk size in characters (default: 1000)')
     parser.add_argument('--chunk-overlap', type=int, default=200,
                        help='Overlap between chunks in characters (default: 200)')
+    parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
+    parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 
     args = parser.parse_args()
 
@@ -481,6 +489,10 @@ Examples:
         except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    # Handle resume arguments
+    from resume_utils import handle_resume_arguments
+    handle_resume_arguments(args, str(document_file), 'document', metadata)
 
     try:
         if args.ingest:

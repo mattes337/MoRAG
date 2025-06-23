@@ -590,6 +590,12 @@ Examples:
     python test-image.py my-image.jpg --ingest
     python test-image.py screenshot.png --ingest --metadata '{"type": "screenshot"}'
     python test-image.py diagram.png --ingest --webhook-url https://my-app.com/webhook
+
+  Resume from Process Result:
+    python test-image.py my-image.jpg --use-process-result my-image.process_result.json
+
+  Resume from Ingestion Data:
+    python test-image.py my-image.jpg --use-ingestion-data my-image.ingest_data.json
         """
     )
 
@@ -602,6 +608,8 @@ Examples:
                        help='Store in Neo4j graph database (ingestion mode only)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
+    parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
+    parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 
     args = parser.parse_args()
 
@@ -615,6 +623,10 @@ Examples:
         except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    # Handle resume arguments
+    from resume_utils import handle_resume_arguments
+    handle_resume_arguments(args, str(image_file), 'image', metadata)
 
     try:
         if args.ingest:
