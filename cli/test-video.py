@@ -210,16 +210,20 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
 async def test_video_ingestion(
     video_file: Path,
     webhook_url: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
+    use_qdrant: bool = True,
+    use_neo4j: bool = True
 ) -> bool:
     """
-    Test video ingestion via direct API calls.
-    
+    Test video ingestion using the proper ingestion coordinator.
+
     Args:
         video_file: Path to video file
         webhook_url: Optional webhook URL for completion notifications
         metadata: Optional metadata dictionary
-        
+        use_qdrant: Whether to use Qdrant vector database
+        use_neo4j: Whether to use Neo4j graph database
+
     Returns:
         True if ingestion was successful, False otherwise
     """
@@ -234,83 +238,119 @@ async def test_video_ingestion(
     print_result("File Extension", video_file.suffix.lower())
     print_result("Webhook URL", webhook_url or "None")
     print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+    print_result("Use Qdrant", "✅ Yes" if use_qdrant else "❌ No")
+    print_result("Use Neo4j", "✅ Yes" if use_neo4j else "❌ No")
 
     try:
         from morag.api import MoRAGAPI
-        from graph_extraction import extract_and_ingest
+        from morag.ingestion_coordinator import IngestionCoordinator, DatabaseConfig, DatabaseType
         import uuid
-        
+
         print_section("Processing Video File")
-        print("🔄 Starting video ingestion...")
+        print("🔄 Starting video processing...")
         print("   This may take a while for large videos...")
-        
-        # Initialize the API
+
+        # Initialize the API for video processing
         api = MoRAGAPI()
-        
-        # Prepare options
+
+        # Prepare options for processing only (no storage yet)
         options = {
-            'store_in_vector_db': True,
+            'store_in_vector_db': False,  # We'll handle storage separately
             'metadata': metadata or {},
             'webhook_url': webhook_url
         }
-        
+
         # Process the video file
         result = await api.process_file(str(video_file), 'video', options)
-        
-        if result.success:
+
+        if result.success and result.text_content:
             print("✅ Video processing completed successfully!")
-            
-            # Generate a task ID for compatibility
-            task_id = str(uuid.uuid4())
-            
-            # Perform ingestion to vector database and graph database
-            if result.text_content:
-                print_section("Ingesting to Databases")
-                print("📊 Ingesting content to databases...")
-                await extract_and_ingest(
-                    text_content=result.text_content,
-                    doc_id=task_id,
-                    metadata=metadata or {},
-                    use_qdrant=True,
-                    use_neo4j=True
-                )
-                print("✅ Content ingested to vector and graph databases!")
-            
+
+            print_section("Ingesting to Databases")
+            print("📊 Starting comprehensive ingestion...")
+
+            # Configure databases based on flags
+            database_configs = []
+            if use_qdrant:
+                database_configs.append(DatabaseConfig(
+                    type=DatabaseType.QDRANT,
+                    hostname='localhost',
+                    port=6333,
+                    database_name='morag_documents'
+                ))
+            if use_neo4j:
+                database_configs.append(DatabaseConfig(
+                    type=DatabaseType.NEO4J,
+                    hostname='bolt://localhost:7687',
+                    username='neo4j',
+                    password='password',
+                    database_name='neo4j'
+                ))
+
+            # Initialize ingestion coordinator
+            coordinator = IngestionCoordinator()
+
+            # Perform comprehensive ingestion
+            ingestion_result = await coordinator.ingest_content(
+                content=result.text_content,
+                source_path=str(video_file),
+                content_type='video',
+                metadata=metadata or {},
+                processing_result=result,
+                databases=database_configs,
+                document_id=str(uuid.uuid4()),
+                replace_existing=False
+            )
+
+            print("✅ Content ingested successfully!")
+
             print_section("Ingestion Results")
             print_result("Status", "✅ Success")
-            print_result("Task ID", task_id)
-            print_result("Content Length", f"{len(result.text_content or '')} characters")
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
-            
+            print_result("Ingestion ID", ingestion_result['ingestion_id'])
+            print_result("Document ID", ingestion_result['source_info']['document_id'])
+            print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
+            print_result("Processing Time", f"{ingestion_result['processing_time']:.2f} seconds")
+            print_result("Chunks Created", str(ingestion_result['embeddings_data']['chunk_count']))
+            print_result("Entities Extracted", str(ingestion_result['graph_data']['entities_count']))
+            print_result("Relations Extracted", str(ingestion_result['graph_data']['relations_count']))
+
+            # Show database results
+            if 'database_results' in ingestion_result:
+                for db_type, db_result in ingestion_result['database_results'].items():
+                    if db_result.get('success'):
+                        print_result(f"{db_type.title()} Storage", "✅ Success")
+                        if db_type == 'qdrant' and 'points_stored' in db_result:
+                            print_result(f"  Points Stored", str(db_result['points_stored']))
+                        elif db_type == 'neo4j':
+                            if 'chunks_stored' in db_result:
+                                print_result(f"  Chunks Stored", str(db_result['chunks_stored']))
+                            if 'entities_stored' in db_result:
+                                print_result(f"  Entities Stored", str(db_result['entities_stored']))
+                            if 'relations_stored' in db_result:
+                                print_result(f"  Relations Stored", str(db_result['relations_stored']))
+                    else:
+                        print_result(f"{db_type.title()} Storage", f"❌ Failed: {db_result.get('error', 'Unknown error')}")
+
             if webhook_url:
                 print_result("Webhook URL", f"Would notify: {webhook_url}")
-            
-            # Save ingestion result
-            ingestion_result = {
-                'mode': 'ingestion',
-                'task_id': task_id,
-                'success': True,
-                'content_length': len(result.text_content or ''),
-                'metadata': result.metadata,
-                'processing_time': result.processing_time,
-                'webhook_url': webhook_url,
-                'file_path': str(video_file)
-            }
-            
-            output_file = video_file.parent / f"{video_file.stem}_ingest_result.json"
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(ingestion_result, f, indent=2, ensure_ascii=False)
-            
-            print_section("Output")
-            print_result("Ingestion result saved to", str(output_file))
-            
+
+            print_section("Output Files")
+            # The ingestion coordinator automatically creates the files
+            result_file = video_file.parent / f"{video_file.stem}.ingest_result.json"
+            data_file = video_file.parent / f"{video_file.stem}.ingest_data.json"
+
+            if result_file.exists():
+                print_result("Ingest Result File", str(result_file))
+            if data_file.exists():
+                print_result("Ingest Data File", str(data_file))
+
             return True
         else:
-            print("❌ Video ingestion failed!")
+            print("❌ Video processing failed!")
             if result.error_message:
                 print_result("Error", result.error_message)
             return False
-            
+
     except Exception as e:
         print(f"❌ Error during video ingestion: {e}")
         import traceback
@@ -374,11 +414,13 @@ Note: Video processing may take several minutes for large files.
             success = asyncio.run(test_video_ingestion(
                 video_file,
                 webhook_url=args.webhook_url,
-                metadata=metadata
+                metadata=metadata,
+                use_qdrant=args.qdrant,
+                use_neo4j=args.neo4j
             ))
             if success:
                 print("\n🎉 Video ingestion test completed successfully!")
-                print("💡 Use the task ID to monitor progress and retrieve results.")
+                print("💡 Check the .ingest_result.json and .ingest_data.json files for details.")
                 sys.exit(0)
             else:
                 print("\n💥 Video ingestion test failed!")

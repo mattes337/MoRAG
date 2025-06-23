@@ -573,7 +573,9 @@ Examples:
                 metadata=metadata,
                 model_size=args.model_size,
                 enable_diarization=args.enable_diarization,
-                enable_topics=args.enable_topics
+                enable_topics=args.enable_topics,
+                use_qdrant=args.qdrant,
+                use_neo4j=args.neo4j
             ))
             if success:
                 print("\n🎉 Audio ingestion test completed successfully!")

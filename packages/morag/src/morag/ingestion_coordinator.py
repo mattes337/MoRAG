@@ -145,16 +145,23 @@ class IngestionCoordinator:
         # Step 7: Initialize databases (create collections/databases if needed)
         await self._initialize_databases(database_configs, embeddings_data)
         
-        # Step 8: Write data to databases using the ingest_result data
+        # Step 8: Create and write ingest_data.json file for database writes
+        ingest_data = self._create_ingest_data(
+            embeddings_data, graph_data, database_configs, document_id
+        )
+        data_file_path = self._write_ingest_data_file(source_path, ingest_data)
+
+        # Step 9: Write data to databases using the ingest_data
         database_results = await self._write_to_databases(
             database_configs, embeddings_data, graph_data, document_id, replace_existing
         )
-        
-        # Step 9: Update final result with database write results
+
+        # Step 10: Update final result with database write results
         ingest_result['database_results'] = database_results
         ingest_result['processing_time'] = (datetime.now(timezone.utc) - start_time).total_seconds()
-        
-        # Step 10: Update the ingest_result.json file with final results
+        ingest_result['ingest_data_file'] = data_file_path
+
+        # Step 11: Update the ingest_result.json file with final results
         self._write_ingest_result_file(source_path, ingest_result)
         
         logger.info("Ingestion completed successfully",
@@ -367,6 +374,16 @@ class IngestionCoordinator:
         start_time: datetime
     ) -> Dict[str, Any]:
         """Create the complete ingest_result.json data structure."""
+        # Extract content length from different ProcessingResult types
+        content_length = 0
+        if hasattr(processing_result, 'content') and processing_result.content:
+            content_length = len(processing_result.content)
+        elif hasattr(processing_result, 'document') and processing_result.document:
+            if hasattr(processing_result.document, 'raw_text'):
+                content_length = len(processing_result.document.raw_text or '')
+            elif hasattr(processing_result.document, 'content'):
+                content_length = len(processing_result.document.content or '')
+
         return {
             'ingestion_id': str(uuid.uuid4()),
             'timestamp': start_time.isoformat(),
@@ -378,7 +395,7 @@ class IngestionCoordinator:
             'processing_result': {
                 'success': processing_result.success,
                 'processing_time': processing_result.processing_time,
-                'content_length': len(processing_result.content or ''),
+                'content_length': content_length,
                 'metadata': processing_result.metadata
             },
             'databases_configured': [
@@ -450,6 +467,67 @@ class IngestionCoordinator:
             json.dump(ingest_result, f, indent=2, ensure_ascii=False)
 
         return str(result_file_path)
+
+    def _create_ingest_data(
+        self,
+        embeddings_data: Dict[str, Any],
+        graph_data: Dict[str, Any],
+        database_configs: List[DatabaseConfig],
+        document_id: str
+    ) -> Dict[str, Any]:
+        """Create the ingest_data.json data structure for database writes."""
+        return {
+            'document_id': document_id,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'databases': [db.type.value for db in database_configs],
+            'vector_data': {
+                'chunks': [
+                    {
+                        'chunk_id': meta['chunk_id'],
+                        'chunk_index': meta['chunk_index'],
+                        'chunk_text': meta['chunk_text'],
+                        'embedding': embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
+                        'metadata': meta
+                    }
+                    for meta, embedding in zip(embeddings_data['chunk_metadata'], embeddings_data['embeddings'])
+                ]
+            },
+            'graph_data': {
+                'entities': [
+                    {
+                        'id': entity.id,
+                        'name': entity.name,
+                        'type': entity.type.value if hasattr(entity.type, 'value') else str(entity.type),
+                        'attributes': entity.attributes,
+                        'confidence': entity.confidence,
+                        'source_doc_id': getattr(entity, 'source_doc_id', document_id)
+                    }
+                    for entity in graph_data['entities']
+                ],
+                'relations': [
+                    {
+                        'id': relation.id,
+                        'source_entity_id': relation.source_entity_id,
+                        'target_entity_id': relation.target_entity_id,
+                        'relation_type': relation.type.value if hasattr(relation.type, 'value') else str(relation.type),
+                        'attributes': relation.attributes,
+                        'confidence': relation.confidence,
+                        'source_doc_id': getattr(relation, 'source_doc_id', document_id)
+                    }
+                    for relation in graph_data['relations']
+                ]
+            }
+        }
+
+    def _write_ingest_data_file(self, source_path: str, ingest_data: Dict[str, Any]) -> str:
+        """Write the ingest_data.json file."""
+        source_path_obj = Path(source_path)
+        data_file_path = source_path_obj.parent / f"{source_path_obj.stem}.ingest_data.json"
+
+        with open(data_file_path, 'w', encoding='utf-8') as f:
+            json.dump(ingest_data, f, indent=2, ensure_ascii=False)
+
+        return str(data_file_path)
 
     async def _initialize_databases(
         self,

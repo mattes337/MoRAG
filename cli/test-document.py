@@ -289,9 +289,10 @@ async def store_content_in_vector_db(
 async def test_document_ingestion(document_file: Path, webhook_url: Optional[str] = None,
                                  metadata: Optional[Dict[str, Any]] = None,
                                  chunking_strategy: str = "paragraph",
-                                 chunk_size: int = 1000, chunk_overlap: int = 200) -> bool:
-    """Test document ingestion functionality using direct processing."""
-    print_header("MoRAG Document Ingestion Test (Direct Processing)")
+                                 chunk_size: int = 1000, chunk_overlap: int = 200,
+                                 use_qdrant: bool = True, use_neo4j: bool = True) -> bool:
+    """Test document ingestion using the proper ingestion coordinator."""
+    print_header("MoRAG Document Ingestion Test")
 
     if not document_file.exists():
         print(f"❌ Error: Document file not found: {document_file}")
@@ -305,10 +306,15 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
     print_result("Chunking Strategy", chunking_strategy)
     print_result("Chunk Size", f"{chunk_size} characters")
     print_result("Chunk Overlap", f"{chunk_overlap} characters")
+    print_result("Use Qdrant", "✅ Yes" if use_qdrant else "❌ No")
+    print_result("Use Neo4j", "✅ Yes" if use_neo4j else "❌ No")
 
     try:
+        from morag.ingestion_coordinator import IngestionCoordinator, DatabaseConfig, DatabaseType
+        import uuid
+
         print_section("Processing Document")
-        print("🔄 Starting document processing and ingestion...")
+        print("🔄 Starting document processing...")
 
         # Initialize document processor
         processor = DocumentProcessor()
@@ -330,8 +336,29 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         print("✅ Document processing completed successfully!")
         print_result("Processing Time", f"{result.processing_time:.2f} seconds")
 
-        # Prepare metadata for vector storage
-        vector_metadata = {
+        print_section("Ingesting to Databases")
+        print("📊 Starting comprehensive ingestion...")
+
+        # Configure databases based on flags
+        database_configs = []
+        if use_qdrant:
+            database_configs.append(DatabaseConfig(
+                type=DatabaseType.QDRANT,
+                hostname='localhost',
+                port=6333,
+                database_name='morag_documents'
+            ))
+        if use_neo4j:
+            database_configs.append(DatabaseConfig(
+                type=DatabaseType.NEO4J,
+                hostname='bolt://localhost:7687',
+                username='neo4j',
+                password='password',
+                database_name='neo4j'
+            ))
+
+        # Prepare enhanced metadata
+        enhanced_metadata = {
             "source_type": "document",
             "source_path": str(document_file),
             "processing_time": result.processing_time,
@@ -342,44 +369,61 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
             **(metadata or {})
         }
 
-        print_section("Storing in Vector Database")
-        print("🔄 Storing content in vector database...")
+        # Initialize ingestion coordinator
+        coordinator = IngestionCoordinator()
 
-        # Store content in vector database
-        point_ids = await store_content_in_vector_db(
-            result.document.raw_text if result.document else result.content,
-            vector_metadata
+        # Perform comprehensive ingestion
+        ingestion_result = await coordinator.ingest_content(
+            content=result.document.raw_text if result.document else result.content,
+            source_path=str(document_file),
+            content_type='document',
+            metadata=enhanced_metadata,
+            processing_result=result,
+            databases=database_configs,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            document_id=str(uuid.uuid4()),
+            replace_existing=False
         )
 
         print("✅ Document ingestion completed successfully!")
 
         print_section("Ingestion Results")
         print_result("Status", "✅ Success")
-        print_result("Chunks Processed", str(len(point_ids)))
-        print_result("Vector Points Created", str(len(point_ids)))
-        print_result("Total Text Length", str(len(result.document.raw_text if result.document else result.content)))
+        print_result("Ingestion ID", ingestion_result['ingestion_id'])
+        print_result("Document ID", ingestion_result['source_info']['document_id'])
+        print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
+        print_result("Processing Time", f"{ingestion_result['processing_time']:.2f} seconds")
+        print_result("Chunks Created", str(ingestion_result['embeddings_data']['chunk_count']))
+        print_result("Entities Extracted", str(ingestion_result['graph_data']['entities_count']))
+        print_result("Relations Extracted", str(ingestion_result['graph_data']['relations_count']))
 
-        # Save ingestion result
-        output_file = document_file.parent / f"{document_file.stem}_ingest_result.json"
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump({
-                'mode': 'direct_ingestion',
-                'success': True,
-                'processing_time': result.processing_time,
-                'chunks_processed': len(point_ids),
-                'vector_point_ids': point_ids,
-                'total_text_length': len(result.document.raw_text if result.document else result.content),
-                'chunking_strategy': chunking_strategy,
-                'chunk_size': chunk_size,
-                'chunk_overlap': chunk_overlap,
-                'webhook_url': webhook_url,
-                'metadata': vector_metadata,
-                'file_path': str(document_file)
-            }, f, indent=2, ensure_ascii=False)
+        # Show database results
+        if 'database_results' in ingestion_result:
+            for db_type, db_result in ingestion_result['database_results'].items():
+                if db_result.get('success'):
+                    print_result(f"{db_type.title()} Storage", "✅ Success")
+                    if db_type == 'qdrant' and 'points_stored' in db_result:
+                        print_result(f"  Points Stored", str(db_result['points_stored']))
+                    elif db_type == 'neo4j':
+                        if 'chunks_stored' in db_result:
+                            print_result(f"  Chunks Stored", str(db_result['chunks_stored']))
+                        if 'entities_stored' in db_result:
+                            print_result(f"  Entities Stored", str(db_result['entities_stored']))
+                        if 'relations_stored' in db_result:
+                            print_result(f"  Relations Stored", str(db_result['relations_stored']))
+                else:
+                    print_result(f"{db_type.title()} Storage", f"❌ Failed: {db_result.get('error', 'Unknown error')}")
 
-        print_section("Output")
-        print_result("Ingestion result saved to", str(output_file))
-        print_result("Vector Points", f"{len(point_ids)} chunks stored in Qdrant")
+        print_section("Output Files")
+        # The ingestion coordinator automatically creates the files
+        result_file = document_file.parent / f"{document_file.stem}.ingest_result.json"
+        data_file = document_file.parent / f"{document_file.stem}.ingest_data.json"
+
+        if result_file.exists():
+            print_result("Ingest Result File", str(result_file))
+        if data_file.exists():
+            print_result("Ingest Data File", str(data_file))
 
         return True
 
@@ -447,11 +491,13 @@ Examples:
                 metadata=metadata,
                 chunking_strategy=args.chunking_strategy,
                 chunk_size=args.chunk_size,
-                chunk_overlap=args.chunk_overlap
+                chunk_overlap=args.chunk_overlap,
+                use_qdrant=args.qdrant,
+                use_neo4j=args.neo4j
             ))
             if success:
                 print("\n🎉 Document ingestion test completed successfully!")
-                print("💡 Use the task ID to monitor progress and retrieve results.")
+                print("💡 Check the .ingest_result.json and .ingest_data.json files for details.")
                 sys.exit(0)
             else:
                 print("\n💥 Document ingestion test failed!")
