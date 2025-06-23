@@ -554,15 +554,25 @@ Return the relations as a JSON array as specified in the system prompt.
         
         # Resolve entity IDs and add context
         resolved_relations = []
+        missing_entities = {}  # Track entities that need to be created
+
         for relation in relations:
             # Try to resolve entity names to IDs
-            source_id = self._resolve_entity_id(
-                relation.source_entity_id, entity_name_to_id
-            )
-            target_id = self._resolve_entity_id(
-                relation.target_entity_id, entity_name_to_id
-            )
-            
+            source_name = relation.source_entity_id
+            target_name = relation.target_entity_id
+
+            source_id = self._resolve_entity_id(source_name, entity_name_to_id)
+            target_id = self._resolve_entity_id(target_name, entity_name_to_id)
+
+            # If we can't resolve an entity, create a placeholder for it
+            if not source_id and source_name:
+                source_id = self._create_missing_entity_id(source_name, missing_entities)
+                logger.info(f"🔧 Created missing entity ID for source: '{source_name}' -> {source_id}")
+
+            if not target_id and target_name:
+                target_id = self._create_missing_entity_id(target_name, missing_entities)
+                logger.info(f"🔧 Created missing entity ID for target: '{target_name}' -> {target_id}")
+
             if source_id and target_id:
                 relation.source_entity_id = source_id
                 relation.target_entity_id = target_id
@@ -571,19 +581,60 @@ Return the relations as a JSON array as specified in the system prompt.
                 resolved_relations.append(relation)
             else:
                 logger.warning(
-                    f"Could not resolve entity IDs for relation: "
+                    f"❌ Could not resolve entity IDs for relation: "
                     f"{relation.attributes.get('source_entity_name')} -> "
-                    f"{relation.attributes.get('target_entity_name')}"
+                    f"{relation.attributes.get('target_entity_name')} "
+                    f"(source_id: {source_id}, target_id: {target_id})"
                 )
-        
+                logger.warning(f"   Searched for source: '{source_name}' in {len(entity_name_to_id)} entities")
+                logger.warning(f"   Searched for target: '{target_name}' in {len(entity_name_to_id)} entities")
+
+        # Log summary of missing entities that were created
+        if missing_entities:
+            logger.info(f"📝 Created {len(missing_entities)} missing entities during relation resolution:")
+            for name, entity_id in missing_entities.items():
+                logger.info(f"   '{name}' -> {entity_id}")
+
         return resolved_relations
-    
+
+    def _create_missing_entity_id(self, entity_name: str, missing_entities: dict) -> str:
+        """Create a placeholder entity ID for entities that couldn't be resolved.
+
+        Args:
+            entity_name: Name of the missing entity
+            missing_entities: Dictionary to track created entities
+
+        Returns:
+            Generated entity ID
+        """
+        if entity_name in missing_entities:
+            return missing_entities[entity_name]
+
+        # Generate a consistent ID based on the entity name
+        import hashlib
+        import re
+
+        # Normalize the name for ID generation
+        normalized_name = re.sub(r'[^a-zA-Z0-9\s]', '', entity_name.lower())
+        normalized_name = '_'.join(normalized_name.split())
+
+        # Create a short hash for uniqueness
+        name_hash = hashlib.md5(entity_name.encode()).hexdigest()[:8]
+
+        # Generate the entity ID
+        entity_id = f"ent_{normalized_name}_{name_hash}"
+
+        # Store in missing entities tracker
+        missing_entities[entity_name] = entity_id
+
+        return entity_id
+
     def _resolve_entity_id(
         self,
         entity_name: str,
         entity_name_to_id: Dict[str, str]
     ) -> Optional[str]:
-        """Resolve entity name to ID using enhanced fuzzy matching for medical/German terms.
+        """Resolve entity name to ID using enhanced fuzzy matching.
 
         Args:
             entity_name: Name of the entity to resolve
@@ -612,43 +663,67 @@ Return the relations as a JSON array as specified in the system prompt.
             normalized_name = ' '.join(normalized_name.split())
             normalized_entity_map[normalized_name] = entity_id
 
-        # Exact match (normalized)
+        # 1. Exact match (normalized)
         if entity_name in normalized_entity_map:
             logger.info(f"✅ Exact match found for '{entity_name}' -> {normalized_entity_map[entity_name]}")
             return normalized_entity_map[entity_name]
 
-        # Case-insensitive match (normalized)
+        # 2. Case-insensitive match (normalized)
         entity_name_lower = entity_name.lower()
         for normalized_name, entity_id in normalized_entity_map.items():
             if normalized_name.lower() == entity_name_lower:
                 logger.info(f"✅ Case-insensitive match found for '{entity_name}' -> '{normalized_name}' -> {entity_id}")
                 return entity_id
-        
-        # Partial match (entity name contains or is contained in known entity)
-        # More flexible for compound German words
+
+        # 3. Partial word matching - check if entity name is contained in any known entity
+        # This handles cases like "status word" vs "Status Word" or "Class byte" vs "Class Byte"
         for name, entity_id in entity_name_to_id.items():
             name_lower = name.lower()
-            # Check if one is contained in the other (minimum 4 chars to avoid false positives)
-            if len(entity_name_lower) >= 4 and len(name_lower) >= 4:
-                if (entity_name_lower in name_lower or name_lower in entity_name_lower):
-                    logger.debug(f"Partial match: '{entity_name}' <-> '{name}'")
-                    return entity_id
-        
-        # Enhanced fuzzy matching for German medical terms
-        # Check for root word matches (e.g., "Borrelien" and "Borreliose")
+            # Check if the search term is contained in the known entity name
+            if len(entity_name_lower) >= 3 and entity_name_lower in name_lower:
+                logger.info(f"✅ Partial match (contained): '{entity_name}' found in '{name}' -> {entity_id}")
+                return entity_id
+            # Check if the known entity name is contained in the search term
+            if len(name_lower) >= 3 and name_lower in entity_name_lower:
+                logger.info(f"✅ Partial match (contains): '{name}' found in '{entity_name}' -> {entity_id}")
+                return entity_id
+
+        # 4. Word-by-word matching for compound terms
+        entity_words = set(word.lower() for word in entity_name_lower.split() if len(word) >= 3)
+        if entity_words:
+            for name, entity_id in entity_name_to_id.items():
+                name_words = set(word.lower() for word in name.lower().split() if len(word) >= 3)
+                if name_words:
+                    # Check if significant overlap in words (at least 50% of words match)
+                    overlap = entity_words.intersection(name_words)
+                    if overlap and len(overlap) >= min(len(entity_words), len(name_words)) * 0.5:
+                        logger.info(f"✅ Word overlap match: '{entity_name}' <-> '{name}' (overlap: {overlap}) -> {entity_id}")
+                        return entity_id
+
+        # 5. Acronym matching - check if entity name could be an acronym
+        if len(entity_name) <= 10 and entity_name.isupper():
+            for name, entity_id in entity_name_to_id.items():
+                name_words = [word for word in name.split() if len(word) >= 2]
+                if len(name_words) >= 2:
+                    acronym = ''.join(word[0].upper() for word in name_words)
+                    if acronym == entity_name:
+                        logger.info(f"✅ Acronym match: '{entity_name}' -> '{name}' (acronym: {acronym}) -> {entity_id}")
+                        return entity_id
+
+        # 6. Enhanced fuzzy matching for technical terms
         if len(entity_name_lower) >= 5:
             entity_root = entity_name_lower[:6]  # First 6 chars as root
             for name, entity_id in entity_name_to_id.items():
                 if len(name.lower()) >= 5:
                     name_root = name.lower()[:6]
                     if entity_root == name_root:
-                        logger.debug(f"Root match: '{entity_name}' <-> '{name}' (root: {entity_root})")
+                        logger.info(f"✅ Root match: '{entity_name}' <-> '{name}' (root: {entity_root}) -> {entity_id}")
                         return entity_id
-        
-        # Check for word similarity (enhanced for medical terms)
+
+        # 7. Check for word similarity (enhanced for technical terms)
         for name, entity_id in entity_name_to_id.items():
             if self._are_similar_words(entity_name_lower, name.lower()):
-                logger.debug(f"Similar words: '{entity_name}' <-> '{name}'")
+                logger.info(f"✅ Similar words: '{entity_name}' <-> '{name}' -> {entity_id}")
                 return entity_id
         
         # Last resort: check if entity_name is a substring of any entity (for very specific terms)
@@ -676,74 +751,95 @@ Return the relations as a JSON array as specified in the system prompt.
     
     def _are_similar_words(self, word1: str, word2: str) -> bool:
         """Check if two words are similar enough to be considered the same entity.
-        Enhanced for German medical terminology.
-        
+        Enhanced for technical terminology and common variations.
+
         Args:
             word1: First word to compare
             word2: Second word to compare
-            
+
         Returns:
             True if words are similar enough
         """
         # Skip very short words
         if len(word1) < 3 or len(word2) < 3:
             return False
-        
-        # Check for common German medical word patterns
-        # Remove common German suffixes/prefixes for comparison
-        def normalize_german_word(word):
-            # Remove common German medical suffixes
-            suffixes = ['-virus', '-bakterie', '-infektion', '-krankheit', '-syndrom', '-test']
+
+        # Check for common technical word patterns
+        def normalize_technical_word(word):
+            # Remove common technical suffixes
+            suffixes = ['-command', '-byte', '-field', '-key', '-card', '-data', '-word', '-code']
             for suffix in suffixes:
                 if word.endswith(suffix):
                     word = word[:-len(suffix)]
-            
+
             # Remove common prefixes
-            prefixes = ['dr.', 'prof.']
+            prefixes = ['ins ', 'sw', 'p1', 'p2']
             for prefix in prefixes:
                 if word.startswith(prefix):
                     word = word[len(prefix):].strip()
-            
+
+            # Remove parentheses and their contents
+            import re
+            word = re.sub(r'\([^)]*\)', '', word).strip()
+
             return word
-        
-        norm_word1 = normalize_german_word(word1)
-        norm_word2 = normalize_german_word(word2)
-        
+
+        norm_word1 = normalize_technical_word(word1)
+        norm_word2 = normalize_technical_word(word2)
+
         # Check normalized versions
         if norm_word1 == norm_word2 and len(norm_word1) >= 3:
             return True
-        
+
         # Check if one normalized word is contained in the other
         if len(norm_word1) >= 4 and len(norm_word2) >= 4:
             if norm_word1 in norm_word2 or norm_word2 in norm_word1:
                 return True
-        
+
+        # Check for common technical abbreviations and expansions
+        # Handle cases like "PIV" vs "Personal Identity Verification"
+        if len(word1) <= 5 and word1.isupper() and len(word2) > 10:
+            # Check if word1 could be an acronym of word2
+            word2_words = [w for w in word2.split() if len(w) >= 2]
+            if len(word2_words) >= 2:
+                acronym = ''.join(w[0].upper() for w in word2_words)
+                if acronym == word1:
+                    return True
+
+        # Reverse check
+        if len(word2) <= 5 and word2.isupper() and len(word1) > 10:
+            word1_words = [w for w in word1.split() if len(w) >= 2]
+            if len(word1_words) >= 2:
+                acronym = ''.join(w[0].upper() for w in word1_words)
+                if acronym == word2:
+                    return True
+
         # Check if one word is a substring of another with reasonable length
         if len(word1) >= 5 and len(word2) >= 5:
             if word1[:5] == word2[:5]:  # Same first 5 characters
                 return True
-        
-        # Enhanced edit distance check for medical terms
+
+        # Enhanced edit distance check for technical terms
         if abs(len(word1) - len(word2)) <= 3:  # Allow more length difference
             differences = sum(c1 != c2 for c1, c2 in zip(word1, word2))
             max_len = max(len(word1), len(word2))
-            if differences <= max_len * 0.25:  # Allow 25% character differences
+            if differences <= max_len * 0.3:  # Allow 30% character differences
                 return True
-        
-        # Check for common German compound word patterns
+
+        # Check for common technical compound word patterns
         # Split on common separators and check parts
-        separators = ['-', ' ', '.']
+        separators = ['-', ' ', '.', '_']
         for sep in separators:
             if sep in word1 and sep in word2:
                 parts1 = [p.strip() for p in word1.split(sep) if p.strip()]
                 parts2 = [p.strip() for p in word2.split(sep) if p.strip()]
-                
+
                 # Check if any significant parts match
                 for p1 in parts1:
                     for p2 in parts2:
-                        if len(p1) >= 4 and len(p2) >= 4 and p1 == p2:
+                        if len(p1) >= 3 and len(p2) >= 3 and p1.lower() == p2.lower():
                             return True
-        
+
         return False
     
     async def extract_from_entity_pairs(
