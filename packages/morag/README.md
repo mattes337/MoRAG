@@ -11,6 +11,17 @@ MoRAG is a comprehensive, modular system for processing and indexing various typ
 - **Vector Storage**: Qdrant integration for similarity search
 - **AI Services**: Gemini API integration for embeddings and summarization
 
+### Enhanced Query & Retrieval (NEW in v2)
+- **Graph-Augmented RAG**: Combines vector search with knowledge graph traversal
+- **Multiple Query Types**: Simple, entity-focused, relation-focused, multi-hop, and analytical queries
+- **Flexible Expansion Strategies**: Direct neighbors, breadth-first, shortest path, and adaptive expansion
+- **Result Fusion**: Multiple strategies for combining vector and graph results (weighted, RRF, adaptive)
+- **Entity & Relationship Queries**: Direct exploration of knowledge graph entities and relationships
+- **Graph Analytics**: Statistics and insights about the knowledge graph structure
+- **Streaming Support**: Real-time result streaming for large queries
+- **Multi-hop Reasoning**: Complex reasoning across multiple entities and relationships
+- **Graceful Degradation**: Fallback to vector-only search when graph components unavailable
+
 ## Supported Content Types
 
 - **Web Pages**: Scrape and process web content
@@ -60,6 +71,47 @@ async def main():
     await api.cleanup()
 
 asyncio.run(main())
+```
+
+### Enhanced Query API (v2)
+
+```python
+import requests
+
+# Basic enhanced query
+response = requests.post("http://localhost:8000/api/v2/query", json={
+    "query": "How does machine learning relate to artificial intelligence?",
+    "query_type": "entity_focused",
+    "max_results": 10,
+    "include_graph_context": True
+})
+
+result = response.json()
+print(f"Found {len(result['results'])} results")
+print(f"Graph entities: {len(result['graph_context']['entities'])}")
+
+# Multi-hop reasoning query
+response = requests.post("http://localhost:8000/api/v2/query", json={
+    "query": "What are the applications of deep learning in computer vision?",
+    "query_type": "multi_hop",
+    "expansion_strategy": "adaptive",
+    "enable_multi_hop": True,
+    "include_reasoning_path": True
+})
+
+# Entity exploration
+response = requests.post("http://localhost:8000/api/v2/entity/query", json={
+    "entity_name": "neural networks",
+    "include_relations": True,
+    "relation_depth": 2
+})
+
+# Graph traversal
+response = requests.post("http://localhost:8000/api/v2/graph/traverse", json={
+    "start_entity": "machine_learning",
+    "end_entity": "computer_vision",
+    "traversal_type": "shortest_path"
+})
 ```
 
 ### Command Line Interface
@@ -118,6 +170,20 @@ Create a configuration file (JSON format):
 ```
 
 ## API Endpoints
+
+### Enhanced Query API (v2) - Graph-Augmented RAG
+
+- `POST /api/v2/query` - Enhanced query with graph-augmented retrieval
+- `POST /api/v2/query/stream` - Streaming enhanced query for real-time results
+- `POST /api/v2/entity/query` - Query specific entities and relationships
+- `POST /api/v2/graph/traverse` - Perform graph traversal between entities
+- `GET /api/v2/graph/analytics` - Get graph analytics and statistics
+
+### Legacy Query API (v1) - Deprecated
+
+- `POST /api/v1/query` - Legacy query endpoint (deprecated, use v2)
+- `GET /api/v1/migration-guide` - Migration guidance from v1 to v2
+- `GET /api/v1/health` - Legacy health check with deprecation notice
 
 ### Processing (Immediate Results)
 
@@ -204,18 +270,39 @@ docker run morag:latest morag-worker
 - **Redis**: For task queue and caching
 - **Qdrant**: For vector storage and similarity search
 
-### Optional Services
+### Optional Services (for Enhanced Features)
 
+- **Neo4j**: For knowledge graph storage and graph-augmented retrieval
 - **PostgreSQL**: For metadata storage (if using database backend)
+
+### Service Setup
+
+```bash
+# Start required services with Docker
+docker run -d --name redis -p 6379:6379 redis:alpine
+docker run -d --name qdrant -p 6333:6333 qdrant/qdrant
+
+# Start Neo4j for graph features (optional)
+docker run -d --name neo4j -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/password \
+  neo4j:latest
+```
 
 ## Environment Variables
 
+### Core Services
 - `GEMINI_API_KEY`: Google Gemini API key
 - `QDRANT_HOST`: Qdrant server host
 - `QDRANT_PORT`: Qdrant server port
 - `QDRANT_API_KEY`: Qdrant API key (if using cloud)
 - `REDIS_URL`: Redis connection URL
 - `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR)
+
+### Graph Features (Optional)
+- `NEO4J_URI`: Neo4j database URI (default: neo4j://localhost:7687)
+- `NEO4J_USERNAME`: Neo4j username (default: neo4j)
+- `NEO4J_PASSWORD`: Neo4j password (default: password)
+- `NEO4J_DATABASE`: Neo4j database name (default: neo4j)
 
 ## Contributing
 

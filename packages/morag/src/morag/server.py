@@ -1196,8 +1196,17 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Failed to perform manual cleanup", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Include remote job router
+    # Include routers
     app.include_router(remote_jobs_router)
+
+    # Include enhanced query router (v2 API)
+    try:
+        from morag.endpoints import enhanced_query_router, legacy_router
+        app.include_router(enhanced_query_router)
+        app.include_router(legacy_router)
+        logger.info("Enhanced query and legacy API endpoints loaded")
+    except ImportError as e:
+        logger.warning("Enhanced query endpoints not available", error=str(e))
 
     return app
 
