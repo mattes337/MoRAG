@@ -21,39 +21,41 @@ class TestDynamicTypesEdgeCases:
         """Test the distinction between None and empty dict for entity types."""
         config = LLMConfig(provider="mock", model="test")
         
-        # None should use defaults
+        # None should use pure dynamic mode
         extractor_none = EntityExtractor(config, entity_types=None)
-        assert extractor_none.entity_types == EntityExtractor.DEFAULT_ENTITY_TYPES
+        assert extractor_none.entity_types == {}
         
         # Empty dict should use no types
         extractor_empty = EntityExtractor(config, entity_types={})
         assert extractor_empty.entity_types == {}
         
-        # Verify different system prompts
+        # Verify both use dynamic prompts (no predefined types)
         prompt_none = extractor_none.get_system_prompt()
         prompt_empty = extractor_empty.get_system_prompt()
-        
-        assert "PERSON: Names of people" in prompt_none
-        assert "PERSON: Names of people" not in prompt_empty
+
+        # Both should use dynamic prompts without predefined types
+        assert "semantic meaning" in prompt_none or "not limit yourself" in prompt_none
+        assert "semantic meaning" in prompt_empty or "not limit yourself" in prompt_empty
     
     def test_none_vs_empty_dict_relation_types(self):
         """Test the distinction between None and empty dict for relation types."""
         config = LLMConfig(provider="mock", model="test")
         
-        # None should use defaults
+        # None should use pure dynamic mode
         extractor_none = RelationExtractor(config, relation_types=None)
-        assert extractor_none.relation_types == RelationExtractor.DEFAULT_RELATION_TYPES
+        assert extractor_none.relation_types == {}
         
         # Empty dict should use no types
         extractor_empty = RelationExtractor(config, relation_types={})
         assert extractor_empty.relation_types == {}
         
-        # Verify different system prompts
+        # Verify both use dynamic prompts (no predefined types)
         prompt_none = extractor_none.get_system_prompt()
         prompt_empty = extractor_empty.get_system_prompt()
-        
-        assert "WORKS_FOR: Person works for" in prompt_none
-        assert "WORKS_FOR: Person works for" not in prompt_empty
+
+        # Both should use dynamic prompts without predefined types
+        assert "semantic meaning" in prompt_none or "not limit yourself" in prompt_none
+        assert "semantic meaning" in prompt_empty or "not limit yourself" in prompt_empty
     
     def test_special_characters_in_type_names(self):
         """Test handling of special characters in type names and descriptions."""
@@ -446,9 +448,10 @@ class TestDynamicTypesIntegration:
         assert old_entity_extractor.get_system_prompt() == new_entity_extractor.get_system_prompt()
         assert old_relation_extractor.get_system_prompt() == new_relation_extractor.get_system_prompt()
         
-        # Should contain default types
+        # Should use dynamic prompts (no predefined types)
         entity_prompt = old_entity_extractor.get_system_prompt()
         relation_prompt = old_relation_extractor.get_system_prompt()
-        
-        assert "PERSON: Names of people" in entity_prompt
-        assert "WORKS_FOR: Person works for" in relation_prompt
+
+        # Both should use dynamic prompts without predefined types
+        assert "semantic meaning" in entity_prompt or "not limit yourself" in entity_prompt
+        assert "semantic meaning" in relation_prompt or "not limit yourself" in relation_prompt

@@ -8,84 +8,45 @@ from .base import BaseExtractor, LLMConfig
 
 logger = logging.getLogger(__name__)
 
+# Sentinel values to detect when parameters are not explicitly set
+_DYNAMIC_TYPES_DEFAULT = object()
+_RELATION_TYPES_DEFAULT = object()
+
 
 class RelationExtractor(BaseExtractor):
     """LLM-based relation extractor.
-    
+
     This class uses Large Language Models to extract relations between entities.
     It identifies relationships like "works for", "located in", "part of", etc.
     """
-    
-    # Default relation types with descriptions
-    DEFAULT_RELATION_TYPES = {
-        "WORKS_FOR": "Person works for an organization",
-        "LOCATED_IN": "Entity is located in a place",
-        "PART_OF": "Entity is part of another entity",
-        "CREATED_BY": "Entity was created by a person or organization",
-        "FOUNDED": "Person founded an organization",
-        "OWNS": "Person or organization owns an entity",
-        "USES": "Entity uses another entity",
-        "CAUSES": "Entity causes another entity (especially important for diseases, pathogens, symptoms)",
-        "TREATS": "Treatment or medication treats a condition",
-        "DIAGNOSED_WITH": "Person is diagnosed with a condition",
-        "ASSOCIATED_WITH": "Entity is associated with another entity",
-        "AFFECTS": "Entity affects or impacts another entity",
-        "RELATED_TO": "Generic relationship between entities",
-        "HAPPENED_ON": "Event happened on a specific date/time",
-        "HAPPENED_AT": "Event happened at a specific location",
-        "PARTICIPATED_IN": "Person or organization participated in an event",
 
-        # Technical and specification relations
-        "DEFINED_BY": "Entity is defined by a standard or specification",
-        "SPECIFIED_BY": "Entity is specified by a standard or document",
-        "PUBLISHED_BY": "Entity was published by an organization or person",
-        "COMPONENT_OF": "Entity is a component of another entity",
-        "IMPLEMENTS": "Entity implements a standard or protocol",
-        "ESTABLISHES": "Entity establishes or creates another entity",
-        "PROVIDES": "Entity provides a service or function",
-        "MANDATES": "Standard mandates a requirement",
-        "REQUIRES": "Entity requires another entity",
-        "SPECIFIES": "Standard specifies details or requirements",
-        "FACILITATES": "Entity facilitates a process or function",
-        "ENABLES": "Entity enables a capability or function",
-        "WORKS_WITH": "Entity works with another entity",
-        "INTEROPERATES_WITH": "System interoperates with another system",
-        "COMPLIES_WITH": "Entity complies with a standard",
-        "FOLLOWS": "Entity follows a standard or protocol",
-        "BASED_ON": "Entity is based on a foundation or standard",
-        "COMMUNICATES_WITH": "System communicates with another system",
-        "PROCESSES": "System processes data or entities",
-        "VALIDATES": "System validates data or entities"
-    }
+    # No predefined relation types - LLM determines types dynamically
     
-    def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, relation_types: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(self, config: Union[LLMConfig, Dict[str, Any]] = None, relation_types=_RELATION_TYPES_DEFAULT, dynamic_types=_DYNAMIC_TYPES_DEFAULT, **kwargs):
         """Initialize the relation extractor.
         
         Args:
             config: LLM configuration as LLMConfig object or dictionary
             relation_types: Optional dictionary of relation types and their descriptions.
-                          If None, uses DEFAULT_RELATION_TYPES.
-                          If provided (including empty dict {}), uses EXACTLY those types.
+                          If None and dynamic_types=False, uses basic examples.
+                          If provided, uses EXACTLY those types.
                           Format: {"TYPE_NAME": "description"}
+            dynamic_types: Whether to let LLM determine relation types dynamically (default: True)
             **kwargs: Additional configuration parameters (for backward compatibility)
         
         Examples:
-            # Use default types (general purpose)
-            extractor = RelationExtractor(config)
-            
+            # Use dynamic types (recommended - LLM determines types)
+            extractor = RelationExtractor(config, dynamic_types=True)
+
             # Use custom types (domain-specific)
             medical_types = {
                 "CAUSES": "Pathogen causes disease",
                 "TREATS": "Treatment treats condition"
             }
-            extractor = RelationExtractor(config, relation_types=medical_types)
-            
-            # Use minimal types (highly focused)
-            minimal = {"CAUSES": "Causal relationship"}
-            extractor = RelationExtractor(config, relation_types=minimal)
-            
-            # Use no types (maximum control)
-            extractor = RelationExtractor(config, relation_types={})
+            extractor = RelationExtractor(config, relation_types=medical_types, dynamic_types=False)
+
+            # Use no predefined types but still constrain to specific ones
+            extractor = RelationExtractor(config, relation_types={}, dynamic_types=False)
         """
         # Handle backward compatibility with llm_config parameter
         if config is None and 'llm_config' in kwargs:
@@ -98,10 +59,17 @@ class RelationExtractor(BaseExtractor):
             config = LLMConfig()
             
         super().__init__(config)
-        
-        # Set relation types (use provided or default)
-        # Use 'is None' check to allow empty dict for complete control
-        self.relation_types = relation_types if relation_types is not None else self.DEFAULT_RELATION_TYPES
+
+        # Determine dynamic_types behavior
+        self.dynamic_types = True if dynamic_types is _DYNAMIC_TYPES_DEFAULT else dynamic_types
+
+        # Set relation types based on parameters
+        if relation_types is _RELATION_TYPES_DEFAULT or relation_types is None:
+            # No relation_types parameter or explicit None: pure dynamic mode
+            self.relation_types = {}
+        else:
+            # Explicit types provided (could be empty dict)
+            self.relation_types = relation_types
     
     async def extract(self, text: str, entities: Optional[List[Entity]] = None, doc_id: Optional[str] = None, **kwargs) -> List[Relation]:
         """Extract relations from text using chunked processing for better results.
@@ -347,37 +315,35 @@ class RelationExtractor(BaseExtractor):
      
     def get_system_prompt(self) -> str:
         """Get the system prompt for relation extraction.
-        
+
         Returns:
             System prompt string
         """
-        # Build relation types list dynamically
-        relation_types_text = "\n".join([f"- {rel_type}: {description}" for rel_type, description in self.relation_types.items()])
-        
+        if self.dynamic_types:
+            return self._get_dynamic_system_prompt()
+        else:
+            return self._get_static_system_prompt()
+
+    def _get_dynamic_system_prompt(self) -> str:
+        """Get system prompt for dynamic relation type extraction."""
+        examples_text = ""
+        if self.relation_types:
+            examples_text = f"""
+Example relation types (you can use these or create more appropriate ones):
+{chr(10).join([f"- {rel_type}: {description}" for rel_type, description in self.relation_types.items()])}
+"""
+
         return f"""
-You are an expert relation extraction system. Your task is to identify relationships between entities in the given text. Be thorough and comprehensive in finding all possible relationships, especially in medical, scientific, and technical content.
+You are an expert relation extraction system. Your task is to identify relationships between entities in the given text. Be thorough and comprehensive in finding all possible relationships.
 
-IMPORTANT: Be SPECIFIC about relationship types. NEVER use generic types like "CUSTOM" or "RELATED_TO" unless absolutely necessary.
+IMPORTANT: You should determine the most appropriate relation type for each relationship based on its semantic meaning and context. Do not limit yourself to predefined categories.
 
-Available relation types:
-{relation_types_text}
-
-RELATIONSHIP TYPE INFERENCE GUIDELINES:
-- If an entity is defined by another: use "DEFINED_BY" or "SPECIFIED_BY"
-- If an entity is created/published by another: use "CREATED_BY" or "PUBLISHED_BY"
-- If an entity is part of another: use "PART_OF" or "COMPONENT_OF"
-- If an entity uses/implements another: use "USES" or "IMPLEMENTS"
-- If an entity establishes/provides something: use "ESTABLISHES" or "PROVIDES"
-- If an entity mandates/requires something: use "MANDATES" or "REQUIRES"
-- If an entity facilitates/enables something: use "FACILITATES" or "ENABLES"
-- If entities work together: use "WORKS_WITH" or "INTEROPERATES_WITH"
-- For standards and protocols: use "COMPLIES_WITH", "FOLLOWS", "BASED_ON"
-- For technical relationships: use "COMMUNICATES_WITH", "PROCESSES", "VALIDATES"
+{examples_text}
 
 For each relation, provide:
 1. source_entity: The name of the source entity (exactly as it appears in text)
 2. target_entity: The name of the target entity (exactly as it appears in text)
-3. relation_type: A specific, descriptive relationship type (infer from context if not in list)
+3. relation_type: A descriptive type that best captures the relationship's semantic meaning (e.g., CAUSES, TREATS, AFFECTS, PRODUCES, REGULATES, etc.)
 4. context: The specific text that indicates this relationship
 5. confidence: A score from 0.0 to 1.0 indicating extraction confidence
 
@@ -386,7 +352,7 @@ Return the results as a JSON array of objects with the following structure:
   {{
     "source_entity": "source entity name",
     "target_entity": "target entity name",
-    "relation_type": "SPECIFIC_RELATION_TYPE",
+    "relation_type": "SEMANTIC_RELATION_TYPE",
     "context": "text that indicates the relationship",
     "confidence": 0.95
   }}
@@ -394,10 +360,84 @@ Return the results as a JSON array of objects with the following structure:
 
 Rules:
 - Extract ALL relations that are explicitly stated OR reasonably implied in the text
-- Be SPECIFIC about relation types - infer the most appropriate type from context
+- Create relation types that are semantically meaningful and specific
+- Use clear, descriptive relation names (e.g., CAUSES, TREATS, PRODUCES, REGULATES)
+- Be consistent with relation naming within the same extraction
 - For technical/scientific content, be especially thorough in identifying relationships
 - Ensure both entities are identifiable in the text
 - If a relationship could be multiple types, choose the most specific one
+- Ensure confidence scores reflect the certainty of the extraction
+- Return an empty array if no relations are found
+- Be careful about the direction of relationships (source -> target)
+"""
+
+    def _get_static_system_prompt(self) -> str:
+        """Get system prompt for static relation type extraction."""
+        if not self.relation_types:
+            return """
+You are an expert relation extraction system. Your task is to identify relationships between entities in the given text.
+
+Since no specific relation types are provided, extract any significant relationships and assign them appropriate semantic types.
+
+For each relation, provide:
+1. source_entity: The name of the source entity (exactly as it appears in text)
+2. target_entity: The name of the target entity (exactly as it appears in text)
+3. relation_type: A descriptive type that best captures the relationship's semantic meaning
+4. context: The specific text that indicates this relationship
+5. confidence: A score from 0.0 to 1.0 indicating extraction confidence
+
+Return the results as a JSON array of objects with the following structure:
+[
+  {{
+    "source_entity": "source entity name",
+    "target_entity": "target entity name",
+    "relation_type": "SEMANTIC_RELATION_TYPE",
+    "context": "text that indicates the relationship",
+    "confidence": 0.95
+  }}
+]
+
+Rules:
+- Extract ALL relations that are explicitly stated OR reasonably implied in the text
+- Use clear, descriptive relation names
+- Ensure both entities are identifiable in the text
+- Ensure confidence scores reflect the certainty of the extraction
+- Return an empty array if no relations are found
+- Be careful about the direction of relationships (source -> target)
+"""
+
+        # Build relation types list for static mode
+        relation_types_text = "\n".join([f"- {rel_type}: {description}" for rel_type, description in self.relation_types.items()])
+
+        return f"""
+You are an expert relation extraction system. Your task is to identify relationships between entities in the given text.
+
+Extract relations of the following types ONLY:
+{relation_types_text}
+
+For each relation, provide:
+1. source_entity: The name of the source entity (exactly as it appears in text)
+2. target_entity: The name of the target entity (exactly as it appears in text)
+3. relation_type: One of the types listed above
+4. context: The specific text that indicates this relationship
+5. confidence: A score from 0.0 to 1.0 indicating extraction confidence
+
+Return the results as a JSON array of objects with the following structure:
+[
+  {{
+    "source_entity": "source entity name",
+    "target_entity": "target entity name",
+    "relation_type": "RELATION_TYPE",
+    "context": "text that indicates the relationship",
+    "confidence": 0.95
+  }}
+]
+
+Rules:
+- Extract ALL relations that are explicitly stated OR reasonably implied in the text
+- ONLY use the relation types listed above
+- If a relationship doesn't fit any of the provided types, skip it
+- Ensure both entities are identifiable in the text
 - Ensure confidence scores reflect the certainty of the extraction
 - Return an empty array if no relations are found
 - Be careful about the direction of relationships (source -> target)

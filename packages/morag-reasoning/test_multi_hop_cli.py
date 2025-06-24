@@ -109,26 +109,26 @@ class MockGraphEngine:
     def __init__(self, query: str = ""):
         # Create relevant entities based on the query
         if "zirbeldrüse" in query.lower() or "pineal" in query.lower():
-            # German query about pineal gland - use correct entity types
+            # German query about pineal gland - use dynamic, semantically appropriate types
             self.entities = {
                 "Zirbeldrüse": {"type": "ANATOMICAL_STRUCTURE", "description": "Pineal gland, endocrine gland in the brain"},
-                "Melatonin": {"type": "CHEMICAL", "description": "Hormone produced by pineal gland"},
-                "Fluorid": {"type": "CHEMICAL", "description": "Chemical that can calcify pineal gland"},
-                "Licht": {"type": "CONCEPT", "description": "Light exposure affects pineal function"},
+                "Melatonin": {"type": "HORMONE", "description": "Hormone produced by pineal gland"},
+                "Fluorid": {"type": "CHEMICAL_COMPOUND", "description": "Chemical that can calcify pineal gland"},
+                "Licht": {"type": "ENVIRONMENTAL_FACTOR", "description": "Light exposure affects pineal function"},
                 "Schlaf": {"type": "BIOLOGICAL_PROCESS", "description": "Sleep cycle regulated by pineal gland"},
-                "Kalzifizierung": {"type": "MEDICAL_CONDITION", "description": "Calcification of pineal gland"},
-                "Alter": {"type": "CONCEPT", "description": "Aging affects pineal function"},
-                "Stress": {"type": "PSYCHOLOGICAL_CONDITION", "description": "Stress can impair pineal function"}
+                "Kalzifizierung": {"type": "PATHOLOGICAL_CONDITION", "description": "Calcification of pineal gland"},
+                "Alter": {"type": "BIOLOGICAL_FACTOR", "description": "Aging affects pineal function"},
+                "Stress": {"type": "PSYCHOLOGICAL_FACTOR", "description": "Stress can impair pineal function"}
             }
 
             self.relations = [
-                {"subject": "Zirbeldrüse", "predicate": "produziert", "object": "Melatonin"},
-                {"subject": "Fluorid", "predicate": "verursacht", "object": "Kalzifizierung"},
-                {"subject": "Kalzifizierung", "predicate": "beeinträchtigt", "object": "Zirbeldrüse"},
-                {"subject": "Licht", "predicate": "beeinflusst", "object": "Zirbeldrüse"},
-                {"subject": "Zirbeldrüse", "predicate": "reguliert", "object": "Schlaf"},
-                {"subject": "Alter", "predicate": "reduziert", "object": "Melatonin"},
-                {"subject": "Stress", "predicate": "stört", "object": "Zirbeldrüse"}
+                {"subject": "Zirbeldrüse", "predicate": "PRODUCES", "object": "Melatonin"},
+                {"subject": "Fluorid", "predicate": "CAUSES", "object": "Kalzifizierung"},
+                {"subject": "Kalzifizierung", "predicate": "IMPAIRS", "object": "Zirbeldrüse"},
+                {"subject": "Licht", "predicate": "INFLUENCES", "object": "Zirbeldrüse"},
+                {"subject": "Zirbeldrüse", "predicate": "REGULATES", "object": "Schlaf"},
+                {"subject": "Alter", "predicate": "REDUCES", "object": "Melatonin"},
+                {"subject": "Stress", "predicate": "DISRUPTS", "object": "Zirbeldrüse"}
             ]
         else:
             # Default entities for other queries

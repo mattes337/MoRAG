@@ -9,88 +9,73 @@ from .entity_normalizer import EntityTypeNormalizer
 
 logger = logging.getLogger(__name__)
 
+# Sentinel values to detect when parameters are not explicitly set
+_DYNAMIC_TYPES_DEFAULT = object()
+_ENTITY_TYPES_DEFAULT = object()
+
 
 class EntityExtractor(BaseExtractor):
     """LLM-based entity extractor.
-    
+
     This class uses Large Language Models to extract entities from text.
     It identifies named entities like persons, organizations, locations, concepts, etc.
     """
+
+    # No predefined entity types - LLM determines types dynamically
     
-    # Default entity types with descriptions
-    DEFAULT_ENTITY_TYPES = {
-        "PERSON": "Names of people",
-        "ORGANIZATION": "Companies, institutions, government bodies",
-        "LOCATION": "Cities, countries, addresses, geographical locations",
-        "DATE": "Specific dates, years, time periods",
-        "TIME": "Times of day, durations",
-        "MONEY": "Monetary amounts, currencies",
-        "PERCENT": "Percentages",
-        "FACILITY": "Buildings, airports, highways, bridges",
-        "PRODUCT": "Objects, vehicles, foods, etc.",
-        "EVENT": "Named hurricanes, battles, wars, sports events",
-        "WORK_OF_ART": "Titles of books, songs, movies",
-        "LAW": "Named documents, laws, acts",
-        "LANGUAGE": "Any named language",
-        "TECHNOLOGY": "Software, hardware, technical concepts",
-        "CONCEPT": "Abstract concepts, ideas, theories",
-        "CHEMICAL": "Chemical substances, compounds, elements",
-        "MEDICAL_CONDITION": "Diseases, disorders, medical conditions, symptoms",
-        "PSYCHOLOGICAL_CONDITION": "Mental states, emotions, psychological conditions",
-        "BIOLOGICAL_PROCESS": "Biological functions, processes, mechanisms",
-        "ANATOMICAL_STRUCTURE": "Body parts, organs, anatomical structures",
-        "SUBSTANCE": "Materials, substances, compounds not specifically chemical"
-    }
-    
-    def __init__(self, config: Union[LLMConfig, Dict[str, str]] = None, chunk_size: int = 4000, entity_types: Optional[Dict[str, str]] = None, normalize_types: bool = True, **kwargs):
+    def __init__(self, config: Union[LLMConfig, Dict[str, str]] = None, chunk_size: int = 4000, entity_types=_ENTITY_TYPES_DEFAULT, normalize_types: bool = True, dynamic_types=_DYNAMIC_TYPES_DEFAULT, **kwargs):
         """Initialize the entity extractor.
-        
+
         Args:
             config: LLM configuration as LLMConfig object or dictionary
             chunk_size: Maximum characters per chunk for large texts (default: 4000)
             entity_types: Optional dictionary of entity types and their descriptions.
-                         If None, uses DEFAULT_ENTITY_TYPES.
-                         If provided (including empty dict {}), uses EXACTLY those types.
+                         If None and dynamic_types=False, uses basic examples.
+                         If provided, uses EXACTLY those types.
                          Format: {"TYPE_NAME": "description"}
             normalize_types: Whether to normalize entity types for consistency (default: True)
+            dynamic_types: Whether to let LLM determine entity types dynamically (default: True)
             **kwargs: Additional configuration parameters (for backward compatibility)
-        
+
         Examples:
-            # Use default types (general purpose)
-            extractor = EntityExtractor(config)
-            
+            # Use dynamic types (recommended - LLM determines types)
+            extractor = EntityExtractor(config, dynamic_types=True)
+
             # Use custom types (domain-specific)
             medical_types = {
                 "DISEASE": "Medical condition or illness",
                 "TREATMENT": "Medical intervention or therapy",
                 "SYMPTOM": "Observable sign of disease"
             }
-            extractor = EntityExtractor(config, entity_types=medical_types)
-            
-            # Use minimal types (highly focused)
-            minimal = {"PERSON": "Individual person"}
-            extractor = EntityExtractor(config, entity_types=minimal)
-            
-            # Use no types (maximum control)
-            extractor = EntityExtractor(config, entity_types={})
+            extractor = EntityExtractor(config, entity_types=medical_types, dynamic_types=False)
+
+            # Use no predefined types but still constrain to specific ones
+            extractor = EntityExtractor(config, entity_types={}, dynamic_types=False)
         """
         # Handle backward compatibility with llm_config parameter
         if config is None and 'llm_config' in kwargs:
             config = kwargs['llm_config']
-        
+
         # Convert dictionary to LLMConfig if needed
         if isinstance(config, dict):
             config = LLMConfig(**config)
         elif config is None:
             config = LLMConfig()
-            
+
         super().__init__(config)
         self.chunk_size = chunk_size
-        
-        # Set entity types (use provided or default)
-        # Use 'is None' check to allow empty dict for complete control
-        self.entity_types = entity_types if entity_types is not None else self.DEFAULT_ENTITY_TYPES
-        
+
+        # Determine dynamic_types behavior
+        self.dynamic_types = True if dynamic_types is _DYNAMIC_TYPES_DEFAULT else dynamic_types
+
+        # Set entity types based on parameters
+        if entity_types is _ENTITY_TYPES_DEFAULT or entity_types is None:
+            # No entity_types parameter or explicit None: pure dynamic mode
+            self.entity_types = {}
+        else:
+            # Explicit types provided (could be empty dict)
+            self.entity_types = entity_types
+
         # Initialize entity type normalizer
         self.normalize_types = normalize_types
         self.normalizer = EntityTypeNormalizer() if normalize_types else None
@@ -133,22 +118,102 @@ class EntityExtractor(BaseExtractor):
     
     def get_system_prompt(self) -> str:
         """Get the system prompt for entity extraction.
-        
+
         Returns:
             System prompt string
         """
-        # Build entity types list dynamically
-        entity_types_text = "\n".join([f"- {entity_type}: {description}" for entity_type, description in self.entity_types.items()])
-        
+        if self.dynamic_types:
+            return self._get_dynamic_system_prompt()
+        else:
+            return self._get_static_system_prompt()
+
+    def _get_dynamic_system_prompt(self) -> str:
+        """Get system prompt for dynamic entity type extraction."""
+        examples_text = ""
+        if self.entity_types:
+            examples_text = f"""
+Example entity types (you can use these or create more appropriate ones):
+{chr(10).join([f"- {entity_type}: {description}" for entity_type, description in self.entity_types.items()])}
+"""
+
         return f"""
 You are an expert entity extraction system. Your task is to identify and extract named entities from the given text.
 
-Extract entities of the following types:
+IMPORTANT: You should determine the most appropriate entity type for each entity based on its semantic meaning and context. Do not limit yourself to predefined categories.
+
+{examples_text}
+
+For each entity, provide:
+1. name: The exact text of the entity as it appears
+2. type: A descriptive type that best captures the entity's semantic category (e.g., PERSON, ORGANIZATION, CHEMICAL_COMPOUND, MEDICAL_CONDITION, ANATOMICAL_STRUCTURE, BIOLOGICAL_PROCESS, etc.)
+3. context: A brief description of the entity's role or significance in the text
+4. confidence: A score from 0.0 to 1.0 indicating extraction confidence
+
+Return the results as a JSON array of objects with the following structure:
+[
+  {{
+    "name": "entity name",
+    "type": "SEMANTIC_TYPE",
+    "context": "brief description",
+    "confidence": 0.95
+  }}
+]
+
+Rules:
+- Only extract entities that are clearly identifiable and significant
+- Avoid extracting common words unless they are proper nouns
+- Create entity types that are semantically meaningful and specific
+- Use clear, descriptive type names (e.g., CHEMICAL_COMPOUND, MEDICAL_CONDITION, ANATOMICAL_STRUCTURE)
+- Be consistent with type naming within the same extraction
+- If an entity could be multiple types, choose the most specific one
+- Ensure confidence scores reflect the certainty of the extraction
+- Return an empty array if no entities are found
+"""
+
+    def _get_static_system_prompt(self) -> str:
+        """Get system prompt for static entity type extraction."""
+        if not self.entity_types:
+            return """
+You are an expert entity extraction system. Your task is to identify and extract named entities from the given text.
+
+Since no specific entity types are provided, extract any significant named entities and assign them appropriate semantic types.
+
+For each entity, provide:
+1. name: The exact text of the entity as it appears
+2. type: A descriptive type that best captures the entity's semantic category
+3. context: A brief description of the entity's role or significance in the text
+4. confidence: A score from 0.0 to 1.0 indicating extraction confidence
+
+Return the results as a JSON array of objects with the following structure:
+[
+  {{
+    "name": "entity name",
+    "type": "SEMANTIC_TYPE",
+    "context": "brief description",
+    "confidence": 0.95
+  }}
+]
+
+Rules:
+- Only extract entities that are clearly identifiable and significant
+- Avoid extracting common words unless they are proper nouns
+- Use clear, descriptive type names
+- Ensure confidence scores reflect the certainty of the extraction
+- Return an empty array if no entities are found
+"""
+
+        # Build entity types list for static mode
+        entity_types_text = "\n".join([f"- {entity_type}: {description}" for entity_type, description in self.entity_types.items()])
+
+        return f"""
+You are an expert entity extraction system. Your task is to identify and extract named entities from the given text.
+
+Extract entities of the following types ONLY:
 {entity_types_text}
 
 For each entity, provide:
 1. name: The exact text of the entity as it appears
-2. type: One of the types listed above - CHOOSE THE MOST SPECIFIC AND APPROPRIATE TYPE
+2. type: One of the types listed above
 3. context: A brief description of the entity's role or significance in the text
 4. confidence: A score from 0.0 to 1.0 indicating extraction confidence
 
@@ -165,14 +230,8 @@ Return the results as a JSON array of objects with the following structure:
 Rules:
 - Only extract entities that are clearly identifiable and significant
 - Avoid extracting common words unless they are proper nouns
-- CAREFULLY choose the most specific and appropriate entity type from the available options
-- For chemicals, substances, or compounds use CHEMICAL or SUBSTANCE
-- For medical conditions, diseases, symptoms use MEDICAL_CONDITION
-- For psychological states, emotions, mental conditions use PSYCHOLOGICAL_CONDITION
-- For body parts, organs, anatomical features use ANATOMICAL_STRUCTURE
-- For biological processes, functions, mechanisms use BIOLOGICAL_PROCESS
-- Do NOT default to ORGANIZATION for non-organizational entities
-- If an entity could be multiple types, choose the most specific one
+- ONLY use the entity types listed above
+- If an entity doesn't fit any of the provided types, skip it
 - Ensure confidence scores reflect the certainty of the extraction
 - Return an empty array if no entities are found
 """

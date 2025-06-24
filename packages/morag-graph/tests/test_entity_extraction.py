@@ -27,12 +27,15 @@ SAMPLE_TEXTS = [
     Guido van Rossum created Python and first released it in 1991."""
 ]
 
-# Expected entity types in the sample texts
+# Expected entity types in the sample texts (flexible for dynamic types)
 EXPECTED_ENTITY_TYPES = [
     [EntityType.ORGANIZATION, EntityType.PERSON, EntityType.LOCATION],  # Apple text
     [EntityType.LOCATION, EntityType.PERSON],  # Eiffel Tower text
-    [EntityType.TECHNOLOGY, EntityType.PERSON]  # Python text
+    [EntityType.PERSON]  # Python text - TECHNOLOGY or PROGRAMMING_LANGUAGE both acceptable
 ]
+
+# Additional acceptable types for dynamic extraction
+ACCEPTABLE_TECH_TYPES = ["TECHNOLOGY", "PROGRAMMING_LANGUAGE", "SOFTWARE"]
 
 
 @pytest.fixture
@@ -125,6 +128,11 @@ async def test_entity_extraction_multiple_texts(entity_extractor: EntityExtracto
         entity_types = {entity.type for entity in entities}
         for expected_type in EXPECTED_ENTITY_TYPES[i]:
             assert expected_type in entity_types, f"Expected entity type {expected_type} not found in text {i}"
+
+        # Special case for Python text: accept any technology-related type
+        if i == 2:  # Python text
+            has_tech_type = any(tech_type in entity_types for tech_type in ACCEPTABLE_TECH_TYPES)
+            assert has_tech_type, f"Expected a technology-related type in text {i}, found: {entity_types}"
     
     # Check that we have different entities for different texts
     assert len(set(e.id for entities in all_entities for e in entities)) >= sum(len(entities) for entities in all_entities) * 0.8, \
@@ -146,9 +154,9 @@ async def test_entity_extraction_custom_type(entity_extractor: EntityExtractor):
     # Verify that entities were extracted
     assert len(entities) > 0, "No entities were extracted"
     
-    # Check that Python is identified as a TECHNOLOGY entity
-    tech_entities = [e for e in entities if e.type == EntityType.TECHNOLOGY]
-    assert len(tech_entities) > 0, "No TECHNOLOGY entities found"
+    # Check that Python is identified as a technology-related entity
+    tech_entities = [e for e in entities if e.type in ACCEPTABLE_TECH_TYPES]
+    assert len(tech_entities) > 0, f"No technology-related entities found. Found types: {[e.type for e in entities]}"
     
     python_entities = [e for e in tech_entities if "python" in e.name.lower()]
     assert len(python_entities) > 0, "Python not identified as a TECHNOLOGY entity"
@@ -212,6 +220,11 @@ async def test_entity_extraction_batch(entity_extractor: EntityExtractor):
         entity_types = {entity.type for entity in entities}
         for expected_type in EXPECTED_ENTITY_TYPES[i]:
             assert expected_type in entity_types, f"Expected entity type {expected_type} not found in text {i}"
+
+        # Special case for Python text: accept any technology-related type
+        if i == 2:  # Python text
+            has_tech_type = any(tech_type in entity_types for tech_type in ACCEPTABLE_TECH_TYPES)
+            assert has_tech_type, f"Expected a technology-related type in text {i}, found: {entity_types}"
 
 
 def test_entity_neo4j_conversion():

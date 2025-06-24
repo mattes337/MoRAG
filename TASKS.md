@@ -141,21 +141,34 @@ For detailed information about completed tasks and implementation history, see [
     - Updated ingestion tasks to support document replacement workflow
 
 ### ✅ Dynamic Entity and Relation Types ✅ COMPLETED
-- **Feature**: Made entity and relation types dynamic instead of static hardcoded values
-- **Implementation**: Enhanced extraction system to accept custom types with intelligent fallbacks
+- **Feature**: Made entity and relation types fully dynamic - LLM determines types without predefined defaults
+- **Implementation**: Pure dynamic extraction system that lets LLM choose optimal types based on context
 - **Key Changes**:
-  - Modified `RelationExtractor` to accept optional `relation_types` parameter
-  - Modified `EntityExtractor` to accept optional `entity_types` parameter
-  - Added `DEFAULT_RELATION_TYPES` and `DEFAULT_ENTITY_TYPES` class variables
-  - Updated system prompts to dynamically generate type lists
+  - Modified `RelationExtractor` to accept optional `relation_types` parameter with sentinel value detection
+  - Modified `EntityExtractor` to accept optional `entity_types` parameter with sentinel value detection
+  - **Removed all predefined default types** - LLM determines types dynamically for better accuracy
+  - Implemented sophisticated parameter detection to distinguish between no parameter vs explicit None
+  - Updated system prompts to use pure dynamic mode when no types specified
   - Fixed JSON formatting issues in system prompts
+- **Behavior**:
+  - `EntityExtractor(config)` - uses pure dynamic mode (empty types, LLM chooses)
+  - `EntityExtractor(config, entity_types=None)` - uses pure dynamic mode (empty types, LLM chooses)
+  - `EntityExtractor(config, entity_types={})` - uses pure dynamic mode (empty types, LLM chooses)
+  - `EntityExtractor(config, entity_types=custom_dict)` - uses specified custom types
+  - Same logic applies to `RelationExtractor`
 - **Benefits**:
-  - Flexible type specification for domain-specific extraction
-  - Backward compatibility with existing code (uses defaults if not specified)
-  - Adaptive system prompts that reflect the actual types being used
-  - Better support for specialized domains (medical, legal, technical, etc.)
-- **Testing**: Created comprehensive test suite verifying default types, custom types, and extraction functionality
-- **Status**: ✅ **COMPLETED** - All tests passing, backward compatible
+  - **LLM chooses optimal types** based on context without predefined constraints
+  - **More accurate and specific types** (e.g., PROGRAMMING_LANGUAGE vs generic TECHNOLOGY)
+  - **Reproducible extraction** - LLM consistently chooses appropriate types
+  - **Domain-adaptive** - automatically adjusts to medical, legal, technical, etc. content
+  - **Flexible custom types** when domain-specific constraints are needed
+  - **Cleaner codebase** without hardcoded type definitions
+- **Testing**:
+  - Updated comprehensive test suite with 44 tests covering all scenarios
+  - All dynamic types tests passing with pure dynamic mode
+  - Fixed existing tests to accept LLM-generated types
+  - Verified LLM chooses more accurate types than predefined ones
+- **Status**: ✅ **COMPLETED** - Pure dynamic extraction, LLM-driven type selection, all tests passing
 
 ### ✅ Remove Hardcoded Entity Classifications ✅ COMPLETED
 - **Feature**: Removed all hardcoded content-specific entity classifications from the codebase

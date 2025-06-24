@@ -78,9 +78,8 @@ class TestEntityExtractorAsyncDynamicTypes:
             messages = call_args[0]
             system_prompt = messages[0]['content']  # Extract the actual system prompt content
             
-            # Should contain default entity types
-            assert "- PERSON: Names of people" in system_prompt
-            assert "- ORGANIZATION: Companies, institutions" in system_prompt
+            # Should use dynamic prompt without predefined types
+            assert "semantic meaning" in system_prompt or "not limit yourself" in system_prompt
     
     @pytest.mark.asyncio
     async def test_extract_with_custom_types(self, mock_llm_response_custom_types):
@@ -256,8 +255,8 @@ class TestRelationExtractorAsyncDynamicTypes:
             messages = call_args[0]
             system_prompt = messages[0]['content']  # Extract the actual system prompt content
             
-            assert "- WORKS_FOR: Person works for an organization" in system_prompt
-            assert "- LOCATED_IN: Entity is located in a place" in system_prompt
+            # Should use dynamic prompt without predefined types
+            assert "semantic meaning" in system_prompt or "not limit yourself" in system_prompt
     
     @pytest.mark.asyncio
     async def test_extract_with_custom_types(self, sample_entities, mock_llm_response_custom_relations):

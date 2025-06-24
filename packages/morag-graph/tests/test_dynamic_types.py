@@ -22,15 +22,15 @@ class TestEntityExtractorDynamicTypes:
     """Test dynamic entity types functionality."""
     
     def test_default_entity_types_initialization(self):
-        """Test that EntityExtractor initializes with default types when none provided."""
+        """Test that EntityExtractor initializes with dynamic types by default."""
         config = LLMConfig(provider="mock", model="test")
         extractor = EntityExtractor(config)
-        
-        # Should use default types
-        assert extractor.entity_types == EntityExtractor.DEFAULT_ENTITY_TYPES
-        assert len(extractor.entity_types) > 0
-        assert "PERSON" in extractor.entity_types
-        assert "ORGANIZATION" in extractor.entity_types
+
+        # Should use dynamic types by default
+        assert extractor.dynamic_types == True
+        # Should use empty types for pure dynamic mode
+        assert extractor.entity_types == {}
+        assert len(extractor.entity_types) == 0
     
     def test_custom_entity_types_initialization(self):
         """Test that EntityExtractor uses custom types when provided."""
@@ -57,13 +57,15 @@ class TestEntityExtractorDynamicTypes:
         assert extractor.entity_types == {}
         assert len(extractor.entity_types) == 0
     
-    def test_none_entity_types_uses_defaults(self):
-        """Test that None entity_types parameter uses defaults (backward compatibility)."""
+    def test_none_entity_types_uses_dynamic(self):
+        """Test that None entity_types parameter uses dynamic mode."""
         config = LLMConfig(provider="mock", model="test")
         extractor = EntityExtractor(config, entity_types=None)
-        
-        # Should use default types
-        assert extractor.entity_types == EntityExtractor.DEFAULT_ENTITY_TYPES
+
+        # Should use dynamic types by default
+        assert extractor.dynamic_types == True
+        # None should use empty types for pure dynamic mode
+        assert extractor.entity_types == {}
     
     def test_entity_types_system_prompt_generation(self):
         """Test that system prompt correctly includes specified entity types."""
@@ -97,16 +99,19 @@ class TestEntityExtractorDynamicTypes:
         assert "PERSON:" not in system_prompt
         assert "DISEASE:" not in system_prompt
     
-    def test_default_entity_types_content(self):
-        """Test that default entity types contain expected entries."""
-        defaults = EntityExtractor.DEFAULT_ENTITY_TYPES
-        
-        # Check that key entity types are present
-        expected_types = ["PERSON", "ORGANIZATION", "LOCATION", "CONCEPT", "TECHNOLOGY"]
-        for entity_type in expected_types:
-            assert entity_type in defaults
-            assert isinstance(defaults[entity_type], str)
-            assert len(defaults[entity_type]) > 0
+    def test_dynamic_entity_types_mode(self):
+        """Test that dynamic entity types mode works correctly."""
+        config = LLMConfig(provider="mock", model="test")
+        extractor = EntityExtractor(config, dynamic_types=True)
+
+        # Should be in dynamic mode
+        assert extractor.dynamic_types == True
+        assert extractor.entity_types == {}
+
+        # System prompt should indicate dynamic mode
+        prompt = extractor.get_system_prompt()
+        assert "semantic meaning" in prompt
+        assert "not limit yourself" in prompt
     
     def test_entity_types_parameter_validation(self):
         """Test validation of entity_types parameter."""
@@ -121,24 +126,25 @@ class TestEntityExtractorDynamicTypes:
         extractor = EntityExtractor(config, entity_types={})
         assert extractor.entity_types == {}
         
-        # None should work (uses defaults)
+        # None should work (uses pure dynamic mode)
         extractor = EntityExtractor(config, entity_types=None)
-        assert extractor.entity_types == EntityExtractor.DEFAULT_ENTITY_TYPES
+        assert extractor.dynamic_types == True
+        assert extractor.entity_types == {}
 
 
 class TestRelationExtractorDynamicTypes:
     """Test dynamic relation types functionality."""
     
     def test_default_relation_types_initialization(self):
-        """Test that RelationExtractor initializes with default types when none provided."""
+        """Test that RelationExtractor initializes with dynamic types by default."""
         config = LLMConfig(provider="mock", model="test")
         extractor = RelationExtractor(config)
-        
-        # Should use default types
-        assert extractor.relation_types == RelationExtractor.DEFAULT_RELATION_TYPES
-        assert len(extractor.relation_types) > 0
-        assert "WORKS_FOR" in extractor.relation_types
-        assert "LOCATED_IN" in extractor.relation_types
+
+        # Should use dynamic types by default
+        assert extractor.dynamic_types == True
+        # Should use empty types for pure dynamic mode
+        assert extractor.relation_types == {}
+        assert len(extractor.relation_types) == 0
     
     def test_custom_relation_types_initialization(self):
         """Test that RelationExtractor uses custom types when provided."""
@@ -165,13 +171,15 @@ class TestRelationExtractorDynamicTypes:
         assert extractor.relation_types == {}
         assert len(extractor.relation_types) == 0
     
-    def test_none_relation_types_uses_defaults(self):
-        """Test that None relation_types parameter uses defaults (backward compatibility)."""
+    def test_none_relation_types_uses_dynamic(self):
+        """Test that None relation_types parameter uses dynamic mode."""
         config = LLMConfig(provider="mock", model="test")
         extractor = RelationExtractor(config, relation_types=None)
-        
-        # Should use default types
-        assert extractor.relation_types == RelationExtractor.DEFAULT_RELATION_TYPES
+
+        # Should use dynamic types by default
+        assert extractor.dynamic_types == True
+        # None should use empty types for pure dynamic mode
+        assert extractor.relation_types == {}
     
     def test_relation_types_system_prompt_generation(self):
         """Test that system prompt correctly includes specified relation types."""
@@ -205,16 +213,19 @@ class TestRelationExtractorDynamicTypes:
         assert "WORKS_FOR:" not in system_prompt
         assert "CAUSES:" not in system_prompt
     
-    def test_default_relation_types_content(self):
-        """Test that default relation types contain expected entries."""
-        defaults = RelationExtractor.DEFAULT_RELATION_TYPES
-        
-        # Check that key relation types are present
-        expected_types = ["WORKS_FOR", "LOCATED_IN", "PART_OF", "CAUSES", "RELATED_TO"]
-        for relation_type in expected_types:
-            assert relation_type in defaults
-            assert isinstance(defaults[relation_type], str)
-            assert len(defaults[relation_type]) > 0
+    def test_dynamic_relation_types_mode(self):
+        """Test that dynamic relation types mode works correctly."""
+        config = LLMConfig(provider="mock", model="test")
+        extractor = RelationExtractor(config, dynamic_types=True)
+
+        # Should be in dynamic mode
+        assert extractor.dynamic_types == True
+        assert extractor.relation_types == {}
+
+        # System prompt should indicate dynamic mode
+        prompt = extractor.get_system_prompt()
+        assert "semantic meaning" in prompt
+        assert "not limit yourself" in prompt
     
     def test_relation_types_parameter_validation(self):
         """Test validation of relation_types parameter."""
@@ -229,9 +240,10 @@ class TestRelationExtractorDynamicTypes:
         extractor = RelationExtractor(config, relation_types={})
         assert extractor.relation_types == {}
         
-        # None should work (uses defaults)
+        # None should work (uses pure dynamic mode)
         extractor = RelationExtractor(config, relation_types=None)
-        assert extractor.relation_types == RelationExtractor.DEFAULT_RELATION_TYPES
+        assert extractor.dynamic_types == True
+        assert extractor.relation_types == {}
 
 
 class TestDynamicTypesIntegration:
@@ -307,19 +319,23 @@ class TestDynamicTypesIntegration:
         """Test backward compatibility when types are not specified."""
         config = LLMConfig(provider="mock", model="test")
         
-        # Test with None (explicit)
+        # Test with None (explicit) - should use pure dynamic mode
         entity_extractor = EntityExtractor(config, entity_types=None)
         relation_extractor = RelationExtractor(config, relation_types=None)
-        
-        assert entity_extractor.entity_types == EntityExtractor.DEFAULT_ENTITY_TYPES
-        assert relation_extractor.relation_types == RelationExtractor.DEFAULT_RELATION_TYPES
-        
-        # Test without specifying types parameter (implicit None)
+
+        assert entity_extractor.dynamic_types == True
+        assert entity_extractor.entity_types == {}
+        assert relation_extractor.dynamic_types == True
+        assert relation_extractor.relation_types == {}
+
+        # Test without specifying types parameter (implicit None) - should use pure dynamic mode
         entity_extractor2 = EntityExtractor(config)
         relation_extractor2 = RelationExtractor(config)
-        
-        assert entity_extractor2.entity_types == EntityExtractor.DEFAULT_ENTITY_TYPES
-        assert relation_extractor2.relation_types == RelationExtractor.DEFAULT_RELATION_TYPES
+
+        assert entity_extractor2.dynamic_types == True
+        assert entity_extractor2.entity_types == {}
+        assert relation_extractor2.dynamic_types == True
+        assert relation_extractor2.relation_types == {}
     
     def test_type_descriptions_in_prompts(self):
         """Test that type descriptions are properly included in system prompts."""
@@ -457,22 +473,25 @@ class TestDynamicTypesDocumentation:
         """Test that examples from documentation actually work."""
         config = LLMConfig(provider="mock", model="test")
         
-        # Example 1: Default types (general purpose)
+        # Example 1: Dynamic types (general purpose) - pure dynamic mode
         extractor1 = EntityExtractor(config)
-        assert extractor1.entity_types == EntityExtractor.DEFAULT_ENTITY_TYPES
+        assert extractor1.dynamic_types == True
+        assert extractor1.entity_types == {}  # Should be empty for pure dynamic mode
         
-        # Example 2: Custom types (domain-specific)
+        # Example 2: Custom types (domain-specific) in static mode
         medical_types = {
             "DISEASE": "Medical condition or illness",
             "TREATMENT": "Medical intervention or therapy",
             "SYMPTOM": "Observable sign of disease"
         }
-        extractor2 = EntityExtractor(config, entity_types=medical_types)
+        extractor2 = EntityExtractor(config, entity_types=medical_types, dynamic_types=False)
+        assert extractor2.dynamic_types == False
         assert extractor2.entity_types == medical_types
         
-        # Example 3: Minimal types (highly focused)
+        # Example 3: Minimal types (highly focused) in static mode
         minimal = {"PERSON": "Individual person"}
-        extractor3 = EntityExtractor(config, entity_types=minimal)
+        extractor3 = EntityExtractor(config, entity_types=minimal, dynamic_types=False)
+        assert extractor3.dynamic_types == False
         assert extractor3.entity_types == minimal
         
         # Example 4: No types (maximum control)
@@ -483,16 +502,18 @@ class TestDynamicTypesDocumentation:
         """Test that relation extractor examples from documentation work."""
         config = LLMConfig(provider="mock", model="test")
         
-        # Example 1: Default types
+        # Example 1: Dynamic types - pure dynamic mode
         extractor1 = RelationExtractor(config)
-        assert extractor1.relation_types == RelationExtractor.DEFAULT_RELATION_TYPES
+        assert extractor1.dynamic_types == True
+        assert extractor1.relation_types == {}  # Should be empty for pure dynamic mode
         
-        # Example 2: Medical domain
+        # Example 2: Medical domain in static mode
         medical_relations = {
             "CAUSES": "Pathogen causes disease",
             "TREATS": "Treatment treats condition"
         }
-        extractor2 = RelationExtractor(config, relation_types=medical_relations)
+        extractor2 = RelationExtractor(config, relation_types=medical_relations, dynamic_types=False)
+        assert extractor2.dynamic_types == False
         assert extractor2.relation_types == medical_relations
         
         # Example 3: Minimal types
