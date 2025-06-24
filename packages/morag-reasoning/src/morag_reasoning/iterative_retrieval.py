@@ -221,7 +221,38 @@ Format as JSON:
     def _parse_context_analysis(self, response: str) -> ContextAnalysis:
         """Parse LLM response into ContextAnalysis object."""
         try:
-            data = json.loads(response)
+            # Log the raw response for debugging
+            self.logger.debug(f"Raw LLM response: {response}")
+
+            # Try to extract JSON from response if it's wrapped in markdown or other text
+            response_clean = response.strip()
+
+            # Look for JSON block in markdown
+            if "```json" in response_clean:
+                start = response_clean.find("```json") + 7
+                end = response_clean.find("```", start)
+                if end != -1:
+                    response_clean = response_clean[start:end].strip()
+            elif "```" in response_clean:
+                start = response_clean.find("```") + 3
+                end = response_clean.find("```", start)
+                if end != -1:
+                    response_clean = response_clean[start:end].strip()
+
+            # Try to find JSON object boundaries
+            if not response_clean.startswith("{"):
+                start = response_clean.find("{")
+                if start != -1:
+                    response_clean = response_clean[start:]
+
+            if not response_clean.endswith("}"):
+                end = response_clean.rfind("}")
+                if end != -1:
+                    response_clean = response_clean[:end+1]
+
+            self.logger.debug(f"Cleaned response: {response_clean}")
+
+            data = json.loads(response_clean)
 
             gaps = []
             for gap_data in data.get("gaps", []):
@@ -244,6 +275,8 @@ Format as JSON:
 
         except Exception as e:
             self.logger.error(f"Error parsing context analysis: {str(e)}")
+            self.logger.error(f"Raw response was: {response}")
+            print(f"Error parsing context analysis: {str(e)}")
             return ContextAnalysis(
                 is_sufficient=False,
                 confidence=0.3,
@@ -284,7 +317,7 @@ Format as JSON:
                             relations = await self.graph_engine.get_relations_by_type(relation_name)
                             additional_context.relations.extend(relations)
 
-                elif gap.gap_type == "insufficient_detail":
+                elif gap.gap_type in ["insufficient_detail", "missing_information"]:
                     # Perform additional vector search
                     search_query = f"{query} {gap.description}"
                     if hasattr(self.vector_retriever, 'search'):

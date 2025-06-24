@@ -148,6 +148,8 @@ iterative_retriever = IterativeRetriever(
 
 ## Testing
 
+### Automated Tests
+
 Run the test suite:
 
 ```bash
@@ -166,6 +168,49 @@ pytest -m unit
 # Run only integration tests
 pytest -m integration
 ```
+
+### CLI Testing Scripts
+
+The package includes comprehensive CLI testing scripts for manual testing and validation:
+
+#### Quick Component Testing
+```bash
+# Test all components (works without API key)
+python test_reasoning_simple.py
+
+# Test specific component
+python test_reasoning_simple.py --component path_selection
+python test_reasoning_simple.py --component iterative_retrieval
+```
+
+#### Full Multi-Hop Reasoning Test
+```bash
+# Requires GEMINI_API_KEY environment variable
+export GEMINI_API_KEY="your-api-key"
+
+# Basic test
+python test_multi_hop_cli.py "How are Apple's AI research efforts related to their partnership with universities?"
+
+# With custom parameters
+python test_multi_hop_cli.py "query" --strategy bidirectional --max-paths 20 --verbose --output results.json
+```
+
+#### API Integration Testing
+```bash
+# Requires running MoRAG server
+python test_reasoning_api.py "How are Apple's AI research efforts related to their partnership with universities?" --verbose
+
+# Test unified reasoning endpoint
+python test_reasoning_api.py "query" --test-unified --api-url http://localhost:8000
+```
+
+#### Implementation Verification
+```bash
+# Verify all components are properly implemented
+python verify_task_4_1.py
+```
+
+See [CLI_TESTING.md](CLI_TESTING.md) for detailed testing documentation and examples.
 
 ## Performance
 

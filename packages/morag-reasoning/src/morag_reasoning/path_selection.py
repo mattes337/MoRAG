@@ -167,9 +167,40 @@ Format your response as JSON:
     def _parse_path_selection(self, response: str, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:
         """Parse LLM response to extract selected paths."""
         try:
-            data = json.loads(response)
+            # Log the raw response for debugging
+            self.logger.debug(f"Raw LLM response: {response}")
+
+            # Try to extract JSON from response if it's wrapped in markdown or other text
+            response_clean = response.strip()
+
+            # Look for JSON block in markdown
+            if "```json" in response_clean:
+                start = response_clean.find("```json") + 7
+                end = response_clean.find("```", start)
+                if end != -1:
+                    response_clean = response_clean[start:end].strip()
+            elif "```" in response_clean:
+                start = response_clean.find("```") + 3
+                end = response_clean.find("```", start)
+                if end != -1:
+                    response_clean = response_clean[start:end].strip()
+
+            # Try to find JSON object boundaries
+            if not response_clean.startswith("{"):
+                start = response_clean.find("{")
+                if start != -1:
+                    response_clean = response_clean[start:]
+
+            if not response_clean.endswith("}"):
+                end = response_clean.rfind("}")
+                if end != -1:
+                    response_clean = response_clean[:end+1]
+
+            self.logger.debug(f"Cleaned response: {response_clean}")
+
+            data = json.loads(response_clean)
             selected_paths = []
-            
+
             for selection in data.get("selected_paths", []):
                 path_id = selection.get("path_id", 0) - 1  # Convert to 0-based index
                 if 0 <= path_id < len(available_paths):
@@ -180,11 +211,13 @@ Format your response as JSON:
                         reasoning=selection.get("reasoning", "")
                     )
                     selected_paths.append(path_score)
-            
+
             return selected_paths
-        
+
         except Exception as e:
             self.logger.error(f"Error parsing LLM response: {str(e)}")
+            self.logger.error(f"Raw response was: {response}")
+            print(f"Error parsing LLM response: {str(e)}")
             return self._fallback_path_selection(available_paths)
     
     async def _score_paths(
