@@ -64,9 +64,12 @@ class MockStorage(BaseStorage):
     async def disconnect(self): pass
     async def get_entity(self, entity_id): pass
     async def get_entities(self, entity_ids): pass
+    async def search_entities(self, query, entity_type=None, limit=10): return []
+    async def store_entities(self, entities): return []
     async def update_entity(self, entity): pass
     async def get_relation(self, relation_id): pass
     async def get_relations(self, relation_ids): pass
+    async def store_relations(self, relations): return []
     async def update_relation(self, relation): pass
     async def get_neighbors(self, entity_id, relation_type=None, max_depth=1): pass
     async def find_path(self, source_entity_id, target_entity_id, max_depth=3): pass
@@ -93,27 +96,24 @@ def mock_llm_config():
 def sample_entities():
     return [
         Entity(
-            id="entity1",
             name="John Doe",
             type=EntityType.PERSON,
-            source_doc_id="test_doc"
+            source_doc_id="doc_test_abc123"
         ),
         Entity(
-            id="entity2",
             name="Acme Corp",
             type=EntityType.ORGANIZATION,
-            source_doc_id="test_doc"
+            source_doc_id="doc_test_abc123"
         )
     ]
 
 
 @pytest.fixture
-def sample_relations():
+def sample_relations(sample_entities):
     return [
         Relation(
-            id="rel1",
-            source_entity_id="entity1",
-            target_entity_id="entity2",
+            source_entity_id=sample_entities[0].id,
+            target_entity_id=sample_entities[1].id,
             type=RelationType.WORKS_FOR
         )
     ]
@@ -143,8 +143,8 @@ class TestGraphBuilderChecksum:
                     document_id="test_doc",
                     entities_created=2,
                     relations_created=1,
-                    entity_ids=["entity1", "entity2"],
-                    relation_ids=["rel1"]
+                    entity_ids=[sample_entities[0].id, sample_entities[1].id],
+                    relation_ids=[sample_relations[0].id]
                 )
                 
                 result = await builder.process_document(
@@ -222,21 +222,19 @@ class TestGraphBuilderChecksum:
             
             # Add some existing entities and relations to storage
             old_entity = Entity(
-                id="old_entity",
                 name="Old Entity",
                 type=EntityType.PERSON,
                 source_doc_id=document_id
             )
             old_relation = Relation(
-                id="old_rel",
-                source_entity_id="old_entity",
-                target_entity_id="entity1",
-                type=RelationType.KNOWS
+                source_entity_id=old_entity.id,
+                target_entity_id=sample_entities[0].id,
+                type=RelationType.RELATED_TO
             )
             
-            mock_storage.entities["old_entity"] = old_entity
-            mock_storage.relations["old_rel"] = old_relation
-            mock_storage.entity_relations["old_entity"] = [old_relation]
+            mock_storage.entities[old_entity.id] = old_entity
+            mock_storage.relations[old_relation.id] = old_relation
+            mock_storage.entity_relations[old_entity.id] = [old_relation]
             
             # Mock the _store_entities_and_relations method
             with patch.object(builder, '_store_entities_and_relations') as mock_store:
@@ -244,8 +242,8 @@ class TestGraphBuilderChecksum:
                     document_id=document_id,
                     entities_created=2,
                     relations_created=1,
-                    entity_ids=["entity1", "entity2"],
-                    relation_ids=["rel1"]
+                    entity_ids=[sample_entities[0].id, sample_entities[1].id],
+                    relation_ids=[sample_relations[0].id]
                 )
                 
                 result = await builder.process_document(
@@ -263,8 +261,8 @@ class TestGraphBuilderChecksum:
                 assert result.cleanup_result.relations_deleted == 1  # old_rel deleted
                 
                 # Verify old data was cleaned up
-                assert "old_entity" not in mock_storage.entities
-                assert "old_rel" not in mock_storage.relations
+                assert old_entity.id not in mock_storage.entities
+                assert old_relation.id not in mock_storage.relations
                 
                 # Verify new checksum was stored
                 new_checksum = builder.checksum_manager.calculate_document_checksum(new_content)
@@ -300,8 +298,8 @@ class TestGraphBuilderChecksum:
                     document_id=document_id,
                     entities_created=2,
                     relations_created=1,
-                    entity_ids=["entity1", "entity2"],
-                    relation_ids=["rel1"]
+                    entity_ids=[sample_entities[0].id, sample_entities[1].id],
+                    relation_ids=[sample_relations[0].id]
                 )
                 
                 result = await builder.process_document(
@@ -357,6 +355,8 @@ class TestGraphBuilderChecksum:
             document_id="test_doc",
             entities_created=3,
             relations_created=2,
+            entity_ids=["e1", "e2", "e3"],
+            relation_ids=["r1", "r2"],
             cleanup_result=cleanup_result
         )
         
@@ -370,6 +370,10 @@ class TestGraphBuilderChecksum:
         """Test GraphBuildResult for skipped document."""
         result = GraphBuildResult(
             document_id="test_doc",
+            entities_created=0,
+            relations_created=0,
+            entity_ids=[],
+            relation_ids=[],
             skipped=True
         )
         

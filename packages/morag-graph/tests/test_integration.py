@@ -396,10 +396,15 @@ class IntegrationTestSuite:
             print(f"   Retrieved graph with {len(stored_graph.entities)} entities and {len(stored_graph.relations)} relations")
             
             # Verify data consistency
-            assert len(stored_entities) == len(entities), "Entity count mismatch in storage"
-            assert len(stored_relations) == len(relations), "Relation count mismatch in storage"
+            # Note: Entity and relation counts may differ due to deduplication during graph building
+            assert len(stored_entities) == len(graph.entities), "Entity count mismatch between graph and storage"
+            assert len(stored_relations) == len(graph.relations), "Relation count mismatch between graph and storage"
             assert len(stored_graph.entities) == len(graph.entities), "Graph entity count mismatch"
             assert len(stored_graph.relations) == len(graph.relations), "Graph relation count mismatch"
+
+            # Verify that deduplication is working (stored count should be <= extracted count)
+            assert len(stored_entities) <= len(entities), "More entities in storage than extracted (unexpected)"
+            assert len(stored_relations) <= len(relations), "More relations in storage than extracted (unexpected)"
             
             print("\n✅ Integration test completed successfully!")
             print("" + "="*60)

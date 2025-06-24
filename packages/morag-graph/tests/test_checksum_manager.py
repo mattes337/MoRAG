@@ -27,11 +27,14 @@ class MockStorage(BaseStorage):
     async def connect(self): pass
     async def disconnect(self): pass
     async def store_entity(self, entity): pass
+    async def store_entities(self, entities): return []
     async def get_entity(self, entity_id): pass
     async def get_entities(self, entity_ids): pass
+    async def search_entities(self, query, entity_type=None, limit=10): return []
     async def update_entity(self, entity): pass
     async def delete_entity(self, entity_id): pass
     async def store_relation(self, relation): pass
+    async def store_relations(self, relations): return []
     async def get_relation(self, relation_id): pass
     async def get_relations(self, relation_ids): pass
     async def get_entity_relations(self, entity_id, relation_type=None, direction="both"): pass

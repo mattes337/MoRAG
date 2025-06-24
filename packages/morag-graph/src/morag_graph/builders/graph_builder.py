@@ -119,6 +119,10 @@ class GraphBuilder:
                 
                 return GraphBuildResult(
                     document_id=document_id,
+                    entities_created=0,
+                    relations_created=0,
+                    entity_ids=[],
+                    relation_ids=[],
                     processing_time=processing_time,
                     skipped=True
                 )

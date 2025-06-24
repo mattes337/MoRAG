@@ -218,9 +218,9 @@ def test_entity_neo4j_conversion():
     """Test entity conversion to/from Neo4J format."""
     # Create a test entity
     entity = Entity(
-        id="test-entity-1",
         name="Test Entity",
         type=EntityType.ORGANIZATION,
+        source_doc_id="doc_test_abc123",
         attributes={"industry": "Technology", "founded": 2020},
         # source_doc_id removed for document-agnostic extraction
         confidence=0.95
@@ -232,7 +232,7 @@ def test_entity_neo4j_conversion():
     # Check that all properties are present
     assert node_props["id"] == entity.id
     assert node_props["name"] == entity.name
-    assert node_props["type"] == str(entity.type)
+    assert node_props["type"] == entity.type.value  # Neo4j conversion extracts just the enum value
     assert json.loads(node_props["attributes"]) == entity.attributes
     # Document-specific attributes removed for document-agnostic extraction
     # assert node_props["source_doc_id"] == entity.source_doc_id

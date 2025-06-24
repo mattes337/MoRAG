@@ -53,10 +53,13 @@ class MockStorage(BaseStorage):
     async def connect(self): pass
     async def disconnect(self): pass
     async def store_entity(self, entity): pass
+    async def store_entities(self, entities): return []
     async def get_entity(self, entity_id): pass
     async def get_entities(self, entity_ids): pass
+    async def search_entities(self, query, entity_type=None, limit=10): return []
     async def update_entity(self, entity): pass
     async def store_relation(self, relation): pass
+    async def store_relations(self, relations): return []
     async def get_relation(self, relation_id): pass
     async def get_relations(self, relation_ids): pass
     async def update_relation(self, relation): pass
@@ -83,41 +86,36 @@ def sample_entities():
     """Create sample entities for testing."""
     return [
         Entity(
-            id="entity1",
             name="Entity 1",
             type=EntityType.PERSON,
-            source_doc_id="doc1"
+            source_doc_id="doc_test1_abc123"
         ),
         Entity(
-            id="entity2",
             name="Entity 2",
             type=EntityType.ORGANIZATION,
-            source_doc_id="doc1"
+            source_doc_id="doc_test1_abc123"
         ),
         Entity(
-            id="entity3",
             name="Entity 3",
             type=EntityType.PERSON,
-            source_doc_id="doc2"  # Different document
+            source_doc_id="doc_test2_abc123"  # Different document
         )
     ]
 
 
 @pytest.fixture
-def sample_relations():
+def sample_relations(sample_entities):
     """Create sample relations for testing."""
     return [
         Relation(
-            id="rel1",
-            source_entity_id="entity1",
-            target_entity_id="entity2",
+            source_entity_id=sample_entities[0].id,
+            target_entity_id=sample_entities[1].id,
             type=RelationType.WORKS_FOR
         ),
         Relation(
-            id="rel2",
-            source_entity_id="entity2",
-            target_entity_id="entity3",
-            type=RelationType.COLLABORATES_WITH
+            source_entity_id=sample_entities[1].id,
+            target_entity_id=sample_entities[2].id,
+            type=RelationType.COMMUNICATES_WITH
         )
     ]
 
@@ -143,112 +141,112 @@ class TestDocumentCleanupManager:
     @pytest.mark.asyncio
     async def test_cleanup_document_data_with_entities(self, cleanup_manager, mock_storage, sample_entities, sample_relations):
         """Test cleanup when document has entities and relations."""
-        document_id = "doc1"
-        
+        document_id = "doc_test1_abc123"
+
         # Setup mock storage with entities and relations
         for entity in sample_entities:
             mock_storage.entities[entity.id] = entity
-        
+
         for relation in sample_relations:
             mock_storage.relations[relation.id] = relation
-        
+
         # Setup entity relations mapping
-        mock_storage.entity_relations["entity1"] = [sample_relations[0]]  # rel1
-        mock_storage.entity_relations["entity2"] = [sample_relations[0], sample_relations[1]]  # rel1, rel2
-        
+        mock_storage.entity_relations[sample_entities[0].id] = [sample_relations[0]]  # rel1
+        mock_storage.entity_relations[sample_entities[1].id] = [sample_relations[0], sample_relations[1]]  # rel1, rel2
+
         # Add checksum
         mock_storage.checksums[document_id] = "test_checksum"
-        
+
         result = await cleanup_manager.cleanup_document_data(document_id)
-        
+
         assert isinstance(result, CleanupResult)
         assert result.document_id == document_id
         assert result.entities_deleted == 2  # entity1 and entity2 from doc1
         assert result.relations_deleted == 2  # rel1 and rel2
-        assert "entity1" in result.entity_ids_deleted
-        assert "entity2" in result.entity_ids_deleted
-        assert "rel1" in result.relation_ids_deleted
-        assert "rel2" in result.relation_ids_deleted
+        assert sample_entities[0].id in result.entity_ids_deleted
+        assert sample_entities[1].id in result.entity_ids_deleted
+        assert sample_relations[0].id in result.relation_ids_deleted
+        assert sample_relations[1].id in result.relation_ids_deleted
         assert len(result.errors) == 0
-        
+
         # Verify entities were deleted from storage
-        assert "entity1" not in mock_storage.entities
-        assert "entity2" not in mock_storage.entities
-        assert "entity3" in mock_storage.entities  # From different document
-        
+        assert sample_entities[0].id not in mock_storage.entities
+        assert sample_entities[1].id not in mock_storage.entities
+        assert sample_entities[2].id in mock_storage.entities  # From different document
+
         # Verify relations were deleted from storage
-        assert "rel1" not in mock_storage.relations
-        assert "rel2" not in mock_storage.relations
-        
+        assert sample_relations[0].id not in mock_storage.relations
+        assert sample_relations[1].id not in mock_storage.relations
+
         # Verify checksum was deleted
         assert document_id not in mock_storage.checksums
     
     @pytest.mark.asyncio
     async def test_cleanup_document_data_partial_failure(self, cleanup_manager, mock_storage, sample_entities):
         """Test cleanup with partial failures."""
-        document_id = "doc1"
-        
+        document_id = "doc_test1_abc123"
+
         # Setup entities
         for entity in sample_entities[:2]:  # Only first two entities
             mock_storage.entities[entity.id] = entity
-        
+
         # Mock delete_entity to fail for entity2
         original_delete_entity = mock_storage.delete_entity
-        
+
         async def failing_delete_entity(entity_id):
-            if entity_id == "entity2":
+            if entity_id == sample_entities[1].id:
                 raise Exception("Simulated delete failure")
             return await original_delete_entity(entity_id)
-        
+
         mock_storage.delete_entity = failing_delete_entity
-        
+
         result = await cleanup_manager.cleanup_document_data(document_id)
-        
+
         assert isinstance(result, CleanupResult)
         assert result.document_id == document_id
         assert result.entities_deleted == 1  # Only entity1 deleted successfully
         assert result.relations_deleted == 0
-        assert "entity1" in result.entity_ids_deleted
-        assert "entity2" not in result.entity_ids_deleted
+        assert sample_entities[0].id in result.entity_ids_deleted
+        assert sample_entities[1].id not in result.entity_ids_deleted
         assert len(result.errors) == 1
-        assert "Failed to delete entity entity2" in result.errors[0]
+        assert f"Failed to delete entity {sample_entities[1].id}" in result.errors[0]
     
     @pytest.mark.asyncio
     async def test_get_document_entities(self, cleanup_manager, mock_storage, sample_entities):
         """Test getting entities for a document."""
-        document_id = "doc1"
-        
+        document_id = "doc_test1_abc123"
+
         # Setup entities in storage
         for entity in sample_entities:
             mock_storage.entities[entity.id] = entity
-        
+
         entity_ids = await cleanup_manager._get_document_entities(document_id)
-        
-        # Should return entity1 and entity2 (both from doc1)
+
+        # Should return entity1 and entity2 (both from doc_test1_abc123)
         assert len(entity_ids) == 2
-        assert "entity1" in entity_ids
-        assert "entity2" in entity_ids
-        assert "entity3" not in entity_ids  # From different document
+        assert sample_entities[0].id in entity_ids
+        assert sample_entities[1].id in entity_ids
+        assert sample_entities[2].id not in entity_ids  # From different document
     
     @pytest.mark.asyncio
-    async def test_get_document_relations(self, cleanup_manager, mock_storage, sample_relations):
+    async def test_get_document_relations(self, cleanup_manager, mock_storage, sample_entities, sample_relations):
         """Test getting relations for entities."""
-        entity_ids = ["entity1", "entity2"]
-        
+        entity_ids = [sample_entities[0].id, sample_entities[1].id]
+
         # Setup relations in storage
         for relation in sample_relations:
             mock_storage.relations[relation.id] = relation
-        
+
         # Setup entity relations mapping
-        mock_storage.entity_relations["entity1"] = [sample_relations[0]]  # rel1
-        mock_storage.entity_relations["entity2"] = [sample_relations[0], sample_relations[1]]  # rel1, rel2
-        
+        mock_storage.entity_relations[sample_entities[0].id] = [sample_relations[0]]  # rel1
+        mock_storage.entity_relations[sample_entities[1].id] = [sample_relations[0], sample_relations[1]]  # rel1, rel2
+
         relation_ids = await cleanup_manager._get_document_relations(entity_ids)
-        
+
         # Should return unique relation IDs
         assert len(relation_ids) == 2
-        assert "rel1" in relation_ids
-        assert "rel2" in relation_ids
+        assert sample_relations[0].id in relation_ids
+        assert sample_relations[1].id in relation_ids
     
     @pytest.mark.asyncio
     async def test_remove_document_checksum(self, cleanup_manager, mock_storage):

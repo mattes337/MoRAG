@@ -190,15 +190,15 @@ class TestRelationExtractorAsyncDynamicTypes:
         """Sample entities for relation extraction tests."""
         entities = [
             Entity(
-                id="entity_1",
                 name="John Doe",
                 type=EntityType.PERSON,
+                source_doc_id="doc_test_abc123",
                 confidence=0.95
             ),
             Entity(
-                id="entity_2",
                 name="Acme Corp",
                 type=EntityType.ORGANIZATION,
+                source_doc_id="doc_test_abc123",
                 confidence=0.92
             )
         ]
@@ -275,15 +275,15 @@ class TestRelationExtractorAsyncDynamicTypes:
             # Create entities that match the mock response
             entities = [
                 Entity(
-                    id="entity_1",
                     name="Dr. Smith",
                     type=EntityType.PERSON,
+                    source_doc_id="doc_test_abc123",
                     confidence=0.95
                 ),
                 Entity(
-                    id="entity_2",
                     name="patient",
                     type=EntityType.PERSON,
+                    source_doc_id="doc_test_abc123",
                     confidence=0.92
                 )
             ]
@@ -297,7 +297,7 @@ class TestRelationExtractorAsyncDynamicTypes:
             assert len(relations) == 1
             assert relations[0].attributes["source_entity_name"] == "Dr. Smith"
             assert relations[0].attributes["target_entity_name"] == "patient"
-            assert relations[0].type == RelationType.CUSTOM
+            assert relations[0].type == "TREATS_PATIENT"  # Custom types are kept as strings
             
             # Verify LLM was called with custom types
             mock_llm.assert_called_once()
@@ -359,15 +359,15 @@ class TestRelationExtractorAsyncDynamicTypes:
             # Create entities that match the mock response
             entities = [
                 Entity(
-                    id="entity_1",
                     name="John",
                     type=EntityType.PERSON,
+                    source_doc_id="doc_test_abc123",
                     confidence=0.95
                 ),
                 Entity(
-                    id="entity_2",
                     name="Acme Corp",
                     type=EntityType.ORGANIZATION,
+                    source_doc_id="doc_test_abc123",
                     confidence=0.92
                 )
             ]
@@ -380,7 +380,7 @@ class TestRelationExtractorAsyncDynamicTypes:
             
             # Verify extraction worked
             assert len(relations) == 1
-            assert relations[0].type == RelationType.CUSTOM
+            assert relations[0].type == "COLLABORATES_WITH"  # Custom types are kept as strings
             assert relations[0].attributes["source_entity_name"] == "John"
             assert relations[0].attributes["target_entity_name"] == "Acme Corp"
             

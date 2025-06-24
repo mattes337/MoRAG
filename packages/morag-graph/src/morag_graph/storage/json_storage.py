@@ -108,7 +108,7 @@ class JsonStorage(BaseStorage):
                 await self._create_backup(self.entities_file)
             
             data = {
-                'entities': [entity.model_dump() for entity in self._entities.values()]
+                'entities': [entity.to_dict() for entity in self._entities.values()]
             }
             
             async with aiofiles.open(self.entities_file, 'w', encoding='utf-8') as f:
@@ -150,7 +150,7 @@ class JsonStorage(BaseStorage):
                 await self._create_backup(self.relations_file)
             
             data = {
-                'relations': [relation.model_dump() for relation in self._relations.values()]
+                'relations': [relation.to_dict() for relation in self._relations.values()]
             }
             
             async with aiofiles.open(self.relations_file, 'w', encoding='utf-8') as f:
