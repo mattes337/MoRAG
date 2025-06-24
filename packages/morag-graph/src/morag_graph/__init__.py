@@ -23,9 +23,19 @@ from .builders import GraphBuilder, GraphBuildResult, GraphBuildError
 # Database configuration models
 from .models.database_config import DatabaseType, DatabaseConfig, DatabaseResult
 
+# Query processing
+from .query import QueryEntityExtractor, QueryEntity, QueryAnalysis, QueryIntentAnalyzer
+
+# Retrieval system
+from .retrieval import (
+    RetrievalResult, HybridRetrievalConfig, RetrievalError,
+    HybridRetrievalCoordinator, ContextExpansionEngine, ExpandedContext,
+    ResultFusionEngine, WeightedCombinationFusion, ReciprocalRankFusion
+)
+
 __all__ = [
     "Entity",
-    "Relation", 
+    "Relation",
     "Graph",
     "EntityExtractor",
     "RelationExtractor",
@@ -43,4 +53,17 @@ __all__ = [
     "GraphBuilder",
     "GraphBuildResult",
     "GraphBuildError",
+    "QueryEntityExtractor",
+    "QueryEntity",
+    "QueryAnalysis",
+    "QueryIntentAnalyzer",
+    "RetrievalResult",
+    "HybridRetrievalConfig",
+    "RetrievalError",
+    "HybridRetrievalCoordinator",
+    "ContextExpansionEngine",
+    "ExpandedContext",
+    "ResultFusionEngine",
+    "WeightedCombinationFusion",
+    "ReciprocalRankFusion",
 ]
