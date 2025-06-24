@@ -30,6 +30,24 @@ except ImportError as e:
     GraphTraversal = None
     GraphAnalytics = None
 
+# Try to import reasoning components, but handle gracefully if not available
+try:
+    from morag_reasoning import (
+        LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder,
+        IterativeRetriever, RetrievalContext
+    )
+    REASONING_AVAILABLE = True
+except ImportError as e:
+    logger.warning("Reasoning components not available", error=str(e))
+    REASONING_AVAILABLE = False
+    # Create dummy classes for type hints
+    LLMClient = None
+    LLMConfig = None
+    PathSelectionAgent = None
+    ReasoningPathFinder = None
+    IterativeRetriever = None
+    RetrievalContext = None
+
 logger = structlog.get_logger(__name__)
 
 
@@ -304,3 +322,103 @@ class GraphEngine:
 def get_graph_engine() -> GraphEngine:
     """Get graph engine instance."""
     return GraphEngine()
+
+
+@lru_cache()
+def get_llm_client() -> Optional[LLMClient]:
+    """Get LLM client instance for reasoning."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        config = LLMConfig(
+            provider=os.getenv("MORAG_LLM_PROVIDER", "gemini"),
+            model=os.getenv("MORAG_LLM_MODEL", "gemini-1.5-flash"),
+            api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=float(os.getenv("MORAG_LLM_TEMPERATURE", "0.1")),
+            max_tokens=int(os.getenv("MORAG_LLM_MAX_TOKENS", "2000")),
+            max_retries=int(os.getenv("MORAG_LLM_MAX_RETRIES", "5")),
+        )
+        return LLMClient(config)
+    except Exception as e:
+        logger.warning("LLM client not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_path_selection_agent() -> Optional[PathSelectionAgent]:
+    """Get path selection agent instance."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        llm_client = get_llm_client()
+        if llm_client is None:
+            return None
+        max_paths = int(os.getenv("MORAG_REASONING_MAX_PATHS", "10"))
+        return PathSelectionAgent(llm_client, max_paths=max_paths)
+    except Exception as e:
+        logger.warning("Path selection agent not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_reasoning_path_finder() -> Optional[ReasoningPathFinder]:
+    """Get reasoning path finder instance."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        graph_engine = get_graph_engine()
+        path_selector = get_path_selection_agent()
+        if path_selector is None:
+            return None
+        return ReasoningPathFinder(graph_engine, path_selector)
+    except Exception as e:
+        logger.warning("Reasoning path finder not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_iterative_retriever() -> Optional[IterativeRetriever]:
+    """Get iterative retriever instance."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        llm_client = get_llm_client()
+        graph_engine = get_graph_engine()
+
+        # Create vector retriever wrapper
+        class VectorRetrieverWrapper:
+            def __init__(self, morag_api: MoRAGAPI):
+                self.morag_api = morag_api
+
+            async def search(self, query: str, limit: int = 10) -> list:
+                """Search using vector similarity."""
+                try:
+                    results = await self.morag_api.search(query, limit)
+                    return results
+                except Exception as e:
+                    logger.error("Vector search failed", error=str(e))
+                    return []
+
+            async def retrieve(self, query: str, max_results: int = 10) -> list:
+                """Retrieve using vector search."""
+                return await self.search(query, max_results)
+
+        morag_api = get_morag_api()
+        vector_retriever = VectorRetrieverWrapper(morag_api)
+
+        if llm_client is None:
+            return None
+
+        max_iterations = int(os.getenv("MORAG_REASONING_MAX_ITERATIONS", "5"))
+        sufficiency_threshold = float(os.getenv("MORAG_REASONING_SUFFICIENCY_THRESHOLD", "0.8"))
+
+        return IterativeRetriever(
+            llm_client=llm_client,
+            graph_engine=graph_engine,
+            vector_retriever=vector_retriever,
+            max_iterations=max_iterations,
+            sufficiency_threshold=sufficiency_threshold
+        )
+    except Exception as e:
+        logger.warning("Iterative retriever not available", error=str(e))
+        return None

@@ -1208,6 +1208,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     except ImportError as e:
         logger.warning("Enhanced query endpoints not available", error=str(e))
 
+    # Include reasoning router (multi-hop reasoning API)
+    try:
+        from morag.endpoints.reasoning import router as reasoning_router
+        app.include_router(reasoning_router, prefix="/api/v2")
+        logger.info("Multi-hop reasoning API endpoints loaded")
+    except ImportError as e:
+        logger.warning("Multi-hop reasoning endpoints not available", error=str(e))
+
     return app
 
 
