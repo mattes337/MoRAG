@@ -109,16 +109,16 @@ class MockGraphEngine:
     def __init__(self, query: str = ""):
         # Create relevant entities based on the query
         if "zirbeldrüse" in query.lower() or "pineal" in query.lower():
-            # German query about pineal gland
+            # German query about pineal gland - use correct entity types
             self.entities = {
-                "Zirbeldrüse": {"type": "ORGAN", "description": "Pineal gland, endocrine gland in the brain"},
-                "Melatonin": {"type": "HORMONE", "description": "Hormone produced by pineal gland"},
-                "Fluorid": {"type": "TOXIN", "description": "Chemical that can calcify pineal gland"},
-                "Licht": {"type": "FACTOR", "description": "Light exposure affects pineal function"},
-                "Schlaf": {"type": "PROCESS", "description": "Sleep cycle regulated by pineal gland"},
-                "Kalzifizierung": {"type": "CONDITION", "description": "Calcification of pineal gland"},
-                "Alter": {"type": "FACTOR", "description": "Aging affects pineal function"},
-                "Stress": {"type": "FACTOR", "description": "Stress can impair pineal function"}
+                "Zirbeldrüse": {"type": "ANATOMICAL_STRUCTURE", "description": "Pineal gland, endocrine gland in the brain"},
+                "Melatonin": {"type": "CHEMICAL", "description": "Hormone produced by pineal gland"},
+                "Fluorid": {"type": "CHEMICAL", "description": "Chemical that can calcify pineal gland"},
+                "Licht": {"type": "CONCEPT", "description": "Light exposure affects pineal function"},
+                "Schlaf": {"type": "BIOLOGICAL_PROCESS", "description": "Sleep cycle regulated by pineal gland"},
+                "Kalzifizierung": {"type": "MEDICAL_CONDITION", "description": "Calcification of pineal gland"},
+                "Alter": {"type": "CONCEPT", "description": "Aging affects pineal function"},
+                "Stress": {"type": "PSYCHOLOGICAL_CONDITION", "description": "Stress can impair pineal function"}
             }
 
             self.relations = [
@@ -150,6 +150,11 @@ class MockGraphEngine:
                 {"subject": "AI research", "predicate": "influences", "object": "product development"}
             ]
     
+    def _get_entity_type(self, entity_name: str) -> str:
+        """Get the correct entity type for an entity name."""
+        entity_data = self.entities.get(entity_name, {})
+        return entity_data.get("type", "CONCEPT")  # Default to CONCEPT if not found
+
     async def get_entity_details(self, entity_name: str) -> Optional[Dict[str, Any]]:
         """Get entity details."""
         return self.entities.get(entity_name)
@@ -183,9 +188,12 @@ class MockGraphEngine:
         from morag_graph.models import Entity, Relation, EntityType, RelationType
 
         if start in self.entities and end in self.entities:
-            # Create mock entities and relations
-            start_entity = Entity(name=start, type=EntityType.ORGANIZATION)
-            end_entity = Entity(name=end, type=EntityType.ORGANIZATION)
+            # Create mock entities and relations with correct types
+            start_type = getattr(EntityType, self._get_entity_type(start), EntityType.CONCEPT)
+            end_type = getattr(EntityType, self._get_entity_type(end), EntityType.CONCEPT)
+
+            start_entity = Entity(name=start, type=start_type)
+            end_entity = Entity(name=end, type=end_type)
             connection_rel = Relation(
                 source_entity_id=start_entity.id,
                 target_entity_id=end_entity.id,
@@ -226,13 +234,15 @@ class MockGraphEngine:
                 path_relations = []
 
                 for i, entity_name in enumerate(path):
-                    entity = Entity(name=entity_name, type=EntityType.ORGANIZATION)
+                    entity_type = getattr(EntityType, self._get_entity_type(entity_name), EntityType.CONCEPT)
+                    entity = Entity(name=entity_name, type=entity_type)
                     path_entities.append(entity)
 
                     # Create relation for each connection
                     if i < len(relations):
                         if i + 1 < len(path):
-                            next_entity = Entity(name=path[i + 1], type=EntityType.ORGANIZATION)
+                            next_entity_type = getattr(EntityType, self._get_entity_type(path[i + 1]), EntityType.CONCEPT)
+                            next_entity = Entity(name=path[i + 1], type=next_entity_type)
                             relation = Relation(
                                 source_entity_id=entity.id,
                                 target_entity_id=next_entity.id,

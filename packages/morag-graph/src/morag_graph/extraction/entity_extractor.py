@@ -33,7 +33,13 @@ class EntityExtractor(BaseExtractor):
         "LAW": "Named documents, laws, acts",
         "LANGUAGE": "Any named language",
         "TECHNOLOGY": "Software, hardware, technical concepts",
-        "CONCEPT": "Abstract concepts, ideas, theories"
+        "CONCEPT": "Abstract concepts, ideas, theories",
+        "CHEMICAL": "Chemical substances, compounds, elements",
+        "MEDICAL_CONDITION": "Diseases, disorders, medical conditions, symptoms",
+        "PSYCHOLOGICAL_CONDITION": "Mental states, emotions, psychological conditions",
+        "BIOLOGICAL_PROCESS": "Biological functions, processes, mechanisms",
+        "ANATOMICAL_STRUCTURE": "Body parts, organs, anatomical structures",
+        "SUBSTANCE": "Materials, substances, compounds not specifically chemical"
     }
     
     def __init__(self, config: Union[LLMConfig, Dict[str, str]] = None, chunk_size: int = 4000, entity_types: Optional[Dict[str, str]] = None, normalize_types: bool = True, **kwargs):
@@ -142,7 +148,7 @@ Extract entities of the following types:
 
 For each entity, provide:
 1. name: The exact text of the entity as it appears
-2. type: One of the types listed above
+2. type: One of the types listed above - CHOOSE THE MOST SPECIFIC AND APPROPRIATE TYPE
 3. context: A brief description of the entity's role or significance in the text
 4. confidence: A score from 0.0 to 1.0 indicating extraction confidence
 
@@ -159,6 +165,13 @@ Return the results as a JSON array of objects with the following structure:
 Rules:
 - Only extract entities that are clearly identifiable and significant
 - Avoid extracting common words unless they are proper nouns
+- CAREFULLY choose the most specific and appropriate entity type from the available options
+- For chemicals, substances, or compounds use CHEMICAL or SUBSTANCE
+- For medical conditions, diseases, symptoms use MEDICAL_CONDITION
+- For psychological states, emotions, mental conditions use PSYCHOLOGICAL_CONDITION
+- For body parts, organs, anatomical features use ANATOMICAL_STRUCTURE
+- For biological processes, functions, mechanisms use BIOLOGICAL_PROCESS
+- Do NOT default to ORGANIZATION for non-organizational entities
 - If an entity could be multiple types, choose the most specific one
 - Ensure confidence scores reflect the certainty of the extraction
 - Return an empty array if no entities are found
