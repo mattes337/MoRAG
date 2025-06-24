@@ -275,6 +275,7 @@ class RelationExtractor(BaseExtractor):
         """Resolve entity IDs for relations."""
         entity_name_to_id = {entity.name: entity.id for entity in entities}
         resolved_relations = []
+        missing_entities = {}  # Track entities that need to be created
 
         # Debug: Log all available entities
         logger.info(f"Available entities for resolution ({len(entities)} total):")
@@ -289,13 +290,22 @@ class RelationExtractor(BaseExtractor):
 
             logger.info(f"Attempting to resolve relation: '{source_name}' -> '{target_name}'")
 
-            # Try to resolve entity names to IDs
+            # Try to resolve entity names/IDs to valid IDs
             source_id = self._resolve_entity_id(
                 relation.source_entity_id, entity_name_to_id
             )
             target_id = self._resolve_entity_id(
                 relation.target_entity_id, entity_name_to_id
             )
+
+            # If we can't resolve an entity, create a placeholder for it
+            if not source_id and relation.source_entity_id:
+                source_id = self._create_missing_entity_id(relation.source_entity_id, missing_entities)
+                logger.info(f"🔧 Created missing entity ID for source: '{relation.source_entity_id}' -> {source_id}")
+
+            if not target_id and relation.target_entity_id:
+                target_id = self._create_missing_entity_id(relation.target_entity_id, missing_entities)
+                logger.info(f"🔧 Created missing entity ID for target: '{relation.target_entity_id}' -> {target_id}")
 
             if source_id and target_id:
                 relation.source_entity_id = source_id
@@ -312,8 +322,34 @@ class RelationExtractor(BaseExtractor):
                 logger.warning(f"   Searched for source: '{relation.source_entity_id}' in {len(entity_name_to_id)} entities")
                 logger.warning(f"   Searched for target: '{relation.target_entity_id}' in {len(entity_name_to_id)} entities")
 
+        # Log summary of missing entities that were created
+        if missing_entities:
+            logger.info(f"📝 Created {len(missing_entities)} missing entities during relation resolution:")
+            for name, entity_id in missing_entities.items():
+                logger.info(f"   '{name}' -> {entity_id}")
+
         logger.info(f"Successfully resolved {len(resolved_relations)} out of {len(relations)} relations")
         return resolved_relations
+
+    def _create_missing_entity_id(self, entity_name: str, missing_entities: Dict[str, str]) -> str:
+        """Create a placeholder entity ID for a missing entity.
+
+        Args:
+            entity_name: Name of the missing entity
+            missing_entities: Dictionary to track missing entities
+
+        Returns:
+            Generated entity ID for the missing entity
+        """
+        if entity_name in missing_entities:
+            return missing_entities[entity_name]
+
+        # Generate a simple entity ID based on the name
+        from morag_graph.models.unified_id_generator import UnifiedIDGenerator
+        entity_id = UnifiedIDGenerator.generate_entity_id(entity_name)
+        missing_entities[entity_name] = entity_id
+
+        return entity_id
      
     def get_system_prompt(self) -> str:
         """Get the system prompt for relation extraction.
@@ -701,29 +737,42 @@ Return the relations as a JSON array as specified in the system prompt.
 
     def _resolve_entity_id(
         self,
-        entity_name: str,
+        entity_name_or_id: str,
         entity_name_to_id: Dict[str, str]
     ) -> Optional[str]:
-        """Resolve entity name to ID using enhanced fuzzy matching.
+        """Resolve entity name or ID to a valid entity ID using enhanced fuzzy matching.
 
         Args:
-            entity_name: Name of the entity to resolve
+            entity_name_or_id: Name or ID of the entity to resolve
             entity_name_to_id: Mapping of entity names to IDs
 
         Returns:
             Entity ID if found, None otherwise
         """
-        if not entity_name or not entity_name.strip():
-            logger.debug(f"Empty entity name provided for resolution")
+        if not entity_name_or_id or not entity_name_or_id.strip():
+            logger.debug(f"Empty entity name/ID provided for resolution")
             return None
 
         # Normalize entity name (remove extra whitespace, quotes, etc.)
-        entity_name = entity_name.strip()
+        entity_name_or_id = entity_name_or_id.strip()
         # Remove common quote variations that LLMs might add
-        entity_name = entity_name.strip('"\'""''')
+        entity_name_or_id = entity_name_or_id.strip('"\'""''')
         # Normalize whitespace
-        entity_name = ' '.join(entity_name.split())
+        entity_name_or_id = ' '.join(entity_name_or_id.split())
 
+        # Check if this is already a valid entity ID (starts with 'ent_')
+        if entity_name_or_id.startswith('ent_'):
+            # Create a reverse mapping to check if this ID exists
+            id_to_name = {entity_id: name for name, entity_id in entity_name_to_id.items()}
+            if entity_name_or_id in id_to_name:
+                logger.info(f"✅ Direct ID match found: '{entity_name_or_id}' -> {entity_name_or_id}")
+                return entity_name_or_id
+            else:
+                logger.warning(f"❌ Entity ID '{entity_name_or_id}' not found in available entities")
+                # Continue with name-based resolution as fallback
+
+        # Treat as entity name for resolution
+        entity_name = entity_name_or_id
         logger.debug(f"Resolving entity: '{entity_name}' against {len(entity_name_to_id)} available entities")
 
         # Create normalized entity mapping for better matching

@@ -197,31 +197,40 @@ class Entity(BaseModel):
     
     def to_neo4j_node(self) -> Dict[str, Any]:
         """Convert entity to Neo4J node properties."""
-        properties = self.model_dump()
-        
-        # Convert type to string for Neo4J
-        if hasattr(properties['type'], 'value'):
+        # Get the clean type value before model_dump to avoid enum string representation
+        if hasattr(self.type, 'value') and isinstance(self.type, EntityType):
             # Handle enum types - get just the value without the class prefix
-            properties['type'] = properties['type'].value
+            type_value = self.type.value
         else:
-            # Handle string types
-            properties['type'] = str(properties['type'])
-            
+            # Handle string types or enum string representations
+            type_value = str(self.type)
+            # If it's an enum string representation, extract just the value part
+            if type_value.startswith('EntityType.'):
+                type_value = type_value.replace('EntityType.', '')
+
+        # Use model_dump but manually handle enum serialization
+        properties = self.model_dump()
+
+        # Force the type to be the clean value (override any enum serialization)
+        properties['type'] = type_value
+
         # Serialize attributes to JSON string for Neo4J storage
         if 'attributes' in properties:
             properties['attributes'] = json.dumps(properties['attributes'])
-        
+
         # Convert sets to lists for Neo4J storage
         if 'mentioned_in_chunks' in properties:
             properties['mentioned_in_chunks'] = list(properties['mentioned_in_chunks'])
-        
+
         if 'qdrant_vector_ids' in properties:
             properties['qdrant_vector_ids'] = list(properties['qdrant_vector_ids'])
-            
+
         # Add label for Neo4J (sanitize type for valid Neo4j label)
-        type_label = properties['type'].replace('.', '_').replace(' ', '_').replace('-', '_')
+        # Use only the clean type value without any prefixes
+        type_label = type_value.replace('.', '_').replace(' ', '_').replace('-', '_')
+
         properties['_labels'] = [self._neo4j_label, type_label]
-        
+
         return properties
     
     @classmethod

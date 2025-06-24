@@ -323,7 +323,6 @@ class IngestionCoordinator:
 
             all_entities = []
             all_relations = []
-            chunk_entity_mapping = {}  # Keep for compatibility but will be empty
 
             # Process entities from the full document
             if extraction_result.get('entities'):
@@ -364,6 +363,13 @@ class IngestionCoordinator:
 
             logger.info(f"Extracted {len(all_entities)} entities and {len(all_relations)} relations from full document")
 
+            # Create chunk-entity mapping by finding which entities appear in which chunks
+            chunk_entity_mapping = self._create_chunk_entity_mapping(
+                content, all_entities, chunk_size, chunk_overlap
+            )
+
+            logger.info(f"Created chunk-entity mapping: {len(chunk_entity_mapping)} chunks with entities")
+
             return {
                 'entities': all_entities,
                 'relations': all_relations,
@@ -371,7 +377,8 @@ class IngestionCoordinator:
                 'extraction_metadata': {
                     'total_entities': len(all_entities),
                     'total_relations': len(all_relations),
-                    'extraction_method': 'full_document'
+                    'extraction_method': 'full_document',
+                    'chunks_with_entities': len(chunk_entity_mapping)
                 }
             }
 
@@ -383,6 +390,51 @@ class IngestionCoordinator:
                 'chunk_entity_mapping': {},
                 'extraction_metadata': {'error': str(e)}
             }
+
+    def _create_chunk_entity_mapping(
+        self,
+        content: str,
+        entities: List[Entity],
+        chunk_size: int,
+        chunk_overlap: int
+    ) -> Dict[str, List[str]]:
+        """Create mapping of chunk indices to entity IDs by finding which entities appear in which chunks.
+
+        Args:
+            content: Full document content
+            entities: List of extracted entities
+            chunk_size: Size of each chunk
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            Dictionary mapping chunk index (as string) to list of entity IDs
+        """
+        # Create chunks using the same method as the ingestion coordinator
+        chunks = self._create_chunks(content, chunk_size, chunk_overlap)
+
+        chunk_entity_mapping = {}
+
+        logger.info(f"Analyzing {len(chunks)} chunks for entity mentions...")
+
+        for chunk_index, chunk_text in enumerate(chunks):
+            entities_in_chunk = []
+
+            # Check each entity to see if it appears in this chunk
+            for entity in entities:
+                entity_name = entity.name.lower()
+                chunk_text_lower = chunk_text.lower()
+
+                # Simple substring matching - could be improved with fuzzy matching
+                if entity_name in chunk_text_lower:
+                    entities_in_chunk.append(entity.id)
+                    logger.debug(f"Found entity '{entity.name}' in chunk {chunk_index}")
+
+            if entities_in_chunk:
+                chunk_entity_mapping[str(chunk_index)] = entities_in_chunk
+                logger.debug(f"Chunk {chunk_index} contains {len(entities_in_chunk)} entities")
+
+        logger.info(f"Found entities in {len(chunk_entity_mapping)} out of {len(chunks)} chunks")
+        return chunk_entity_mapping
 
     def _create_ingest_result(
         self,
