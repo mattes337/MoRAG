@@ -1,7 +1,7 @@
 """LLM-based relation extraction."""
 
 import logging
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Tuple
 
 from ..models import Entity, Relation, RelationType
 from .base import BaseExtractor, LLMConfig
@@ -147,7 +147,8 @@ class RelationExtractor(BaseExtractor):
             
             # Resolve entity IDs if entities are provided
             if entities:
-                relations = self._resolve_relations(relations, entities)
+                relations, missing_entities = self._resolve_relations(relations, entities, doc_id)
+                # Note: missing_entities are handled at the graph extraction level
             
             # Set document ID if provided
             # Remove document-specific attributes to make relations generic
@@ -271,11 +272,16 @@ class RelationExtractor(BaseExtractor):
         
         return unique_relations
     
-    def _resolve_relations(self, relations: List[Relation], entities: List[Entity]) -> List[Relation]:
-        """Resolve entity IDs for relations."""
+    def _resolve_relations(self, relations: List[Relation], entities: List[Entity], source_doc_id: Optional[str] = None) -> Tuple[List[Relation], List[Entity]]:
+        """Resolve entity IDs for relations and return both resolved relations and any missing entities created.
+
+        Returns:
+            Tuple of (resolved_relations, missing_entities_created)
+        """
         entity_name_to_id = {entity.name: entity.id for entity in entities}
         resolved_relations = []
         missing_entities = {}  # Track entities that need to be created
+        missing_entities_created = []  # Track actual Entity objects created
 
         # Debug: Log all available entities
         logger.info(f"Available entities for resolution ({len(entities)} total):")
@@ -300,12 +306,16 @@ class RelationExtractor(BaseExtractor):
 
             # If we can't resolve an entity, create a placeholder for it
             if not source_id and relation.source_entity_id:
-                source_id = self._create_missing_entity_id(relation.source_entity_id, missing_entities)
-                logger.info(f"🔧 Created missing entity ID for source: '{relation.source_entity_id}' -> {source_id}")
+                source_id, source_entity = self._create_missing_entity(relation.source_entity_id, missing_entities, source_doc_id)
+                if source_entity:
+                    missing_entities_created.append(source_entity)
+                logger.info(f"🔧 Created missing entity for source: '{relation.source_entity_id}' -> {source_id}")
 
             if not target_id and relation.target_entity_id:
-                target_id = self._create_missing_entity_id(relation.target_entity_id, missing_entities)
-                logger.info(f"🔧 Created missing entity ID for target: '{relation.target_entity_id}' -> {target_id}")
+                target_id, target_entity = self._create_missing_entity(relation.target_entity_id, missing_entities, source_doc_id)
+                if target_entity:
+                    missing_entities_created.append(target_entity)
+                logger.info(f"🔧 Created missing entity for target: '{relation.target_entity_id}' -> {target_id}")
 
             if source_id and target_id:
                 relation.source_entity_id = source_id
@@ -329,27 +339,10 @@ class RelationExtractor(BaseExtractor):
                 logger.info(f"   '{name}' -> {entity_id}")
 
         logger.info(f"Successfully resolved {len(resolved_relations)} out of {len(relations)} relations")
-        return resolved_relations
+        logger.info(f"Created {len(missing_entities_created)} missing entities during resolution")
+        return resolved_relations, missing_entities_created
 
-    def _create_missing_entity_id(self, entity_name: str, missing_entities: Dict[str, str]) -> str:
-        """Create a placeholder entity ID for a missing entity.
 
-        Args:
-            entity_name: Name of the missing entity
-            missing_entities: Dictionary to track missing entities
-
-        Returns:
-            Generated entity ID for the missing entity
-        """
-        if entity_name in missing_entities:
-            return missing_entities[entity_name]
-
-        # Generate a simple entity ID based on the name
-        from morag_graph.models.unified_id_generator import UnifiedIDGenerator
-        entity_id = UnifiedIDGenerator.generate_entity_id(entity_name)
-        missing_entities[entity_name] = entity_id
-
-        return entity_id
      
     def get_system_prompt(self) -> str:
         """Get the system prompt for relation extraction.
@@ -672,11 +665,11 @@ Return the relations as a JSON array as specified in the system prompt.
 
             # If we can't resolve an entity, create a placeholder for it
             if not source_id and source_name:
-                source_id = self._create_missing_entity_id(source_name, missing_entities)
+                source_id = self._create_missing_entity_id(source_name, missing_entities, source_doc_id)
                 logger.info(f"🔧 Created missing entity ID for source: '{source_name}' -> {source_id}")
 
             if not target_id and target_name:
-                target_id = self._create_missing_entity_id(target_name, missing_entities)
+                target_id = self._create_missing_entity_id(target_name, missing_entities, source_doc_id)
                 logger.info(f"🔧 Created missing entity ID for target: '{target_name}' -> {target_id}")
 
             if source_id and target_id:
@@ -703,32 +696,78 @@ Return the relations as a JSON array as specified in the system prompt.
 
         return resolved_relations
 
-    def _create_missing_entity_id(self, entity_name: str, missing_entities: dict) -> str:
+    def _create_missing_entity(self, entity_name: str, missing_entities: dict, source_doc_id: str = None) -> Tuple[str, Optional['Entity']]:
+        """Create a missing entity and return both ID and Entity object.
+
+        Args:
+            entity_name: Name of the missing entity
+            missing_entities: Dictionary to track created entities
+            source_doc_id: Source document ID to ensure consistent ID generation
+
+        Returns:
+            Tuple of (entity_id, entity_object)
+        """
+        if entity_name in missing_entities:
+            return missing_entities[entity_name], None  # Already created, don't create duplicate
+
+        # Use the unified ID generator to create consistent entity IDs
+        from morag_graph.models.unified_id_generator import UnifiedIDGenerator
+        from morag_graph.models.entity import Entity, EntityType
+
+        # Use CUSTOM as default type for missing entities
+        entity_type = EntityType.CUSTOM
+
+        # Generate unified entity ID with proper document suffix
+        entity_id = UnifiedIDGenerator.generate_entity_id(
+            name=entity_name,
+            entity_type=entity_type,
+            source_doc_id=source_doc_id or ""
+        )
+
+        # Create actual Entity object
+        entity = Entity(
+            id=entity_id,
+            name=entity_name,
+            type=entity_type,
+            confidence=0.5,  # Lower confidence for auto-created entities
+            source_doc_id=source_doc_id,
+            attributes={
+                "auto_created": True,
+                "creation_reason": "missing_entity_for_relation"
+            }
+        )
+
+        # Store in missing entities tracker
+        missing_entities[entity_name] = entity_id
+
+        return entity_id, entity
+
+    def _create_missing_entity_id(self, entity_name: str, missing_entities: dict, source_doc_id: str = None) -> str:
         """Create a placeholder entity ID for entities that couldn't be resolved.
 
         Args:
             entity_name: Name of the missing entity
             missing_entities: Dictionary to track created entities
+            source_doc_id: Source document ID to ensure consistent ID generation
 
         Returns:
-            Generated entity ID
+            Generated entity ID using unified ID generation
         """
         if entity_name in missing_entities:
             return missing_entities[entity_name]
 
-        # Generate a consistent ID based on the entity name
-        import hashlib
-        import re
+        # Use the unified ID generator to create consistent entity IDs
+        from morag_graph.models.unified_id_generator import UnifiedIDGenerator
 
-        # Normalize the name for ID generation
-        normalized_name = re.sub(r'[^a-zA-Z0-9\s]', '', entity_name.lower())
-        normalized_name = '_'.join(normalized_name.split())
+        # Use CUSTOM as default type for missing entities
+        entity_type = "CUSTOM"
 
-        # Create a short hash for uniqueness
-        name_hash = hashlib.md5(entity_name.encode()).hexdigest()[:8]
-
-        # Generate the entity ID
-        entity_id = f"ent_{normalized_name}_{name_hash}"
+        # Generate unified entity ID with proper document suffix
+        entity_id = UnifiedIDGenerator.generate_entity_id(
+            name=entity_name,
+            entity_type=entity_type,
+            source_doc_id=source_doc_id or ""
+        )
 
         # Store in missing entities tracker
         missing_entities[entity_name] = entity_id

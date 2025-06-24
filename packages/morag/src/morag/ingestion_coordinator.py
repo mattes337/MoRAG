@@ -368,6 +368,11 @@ class IngestionCoordinator:
                 content, all_entities, chunk_size, chunk_overlap
             )
 
+            # Enhance chunk-entity mapping with auto-created entities from relations
+            chunk_entity_mapping = self._enhance_chunk_entity_mapping_with_missing_entities(
+                content, all_relations, chunk_entity_mapping, chunk_size, chunk_overlap
+            )
+
             logger.info(f"Created chunk-entity mapping: {len(chunk_entity_mapping)} chunks with entities")
 
             return {
@@ -434,6 +439,88 @@ class IngestionCoordinator:
                 logger.debug(f"Chunk {chunk_index} contains {len(entities_in_chunk)} entities")
 
         logger.info(f"Found entities in {len(chunk_entity_mapping)} out of {len(chunks)} chunks")
+        return chunk_entity_mapping
+
+    def _enhance_chunk_entity_mapping_with_missing_entities(
+        self,
+        content: str,
+        relations: List,
+        chunk_entity_mapping: Dict[str, List[str]],
+        chunk_size: int,
+        chunk_overlap: int
+    ) -> Dict[str, List[str]]:
+        """Enhance chunk-entity mapping by adding auto-created entities from relations.
+
+        Args:
+            content: Full document content
+            relations: List of relations (may contain auto-created entities)
+            chunk_entity_mapping: Existing chunk-entity mapping
+            chunk_size: Size of each chunk
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            Enhanced chunk-entity mapping
+        """
+        if not relations:
+            return chunk_entity_mapping
+
+        # Find auto-created entities (those with creation_reason attribute)
+        auto_created_entities = set()
+        entity_names_to_ids = {}
+
+        for relation in relations:
+            # Check if source or target entities are auto-created
+            source_id = relation.source_entity_id
+            target_id = relation.target_entity_id
+
+            # Extract entity names from relation attributes
+            source_name = relation.attributes.get('source_entity_name', '')
+            target_name = relation.attributes.get('target_entity_name', '')
+
+            if source_id and source_name:
+                entity_names_to_ids[source_name] = source_id
+                # Check if this looks like an auto-created entity (has document hash suffix)
+                if '_' in source_id and len(source_id.split('_')[-1]) >= 8:
+                    auto_created_entities.add((source_name, source_id))
+
+            if target_id and target_name:
+                entity_names_to_ids[target_name] = target_id
+                # Check if this looks like an auto-created entity (has document hash suffix)
+                if '_' in target_id and len(target_id.split('_')[-1]) >= 8:
+                    auto_created_entities.add((target_name, target_id))
+
+        if not auto_created_entities:
+            logger.debug("No auto-created entities found in relations")
+            return chunk_entity_mapping
+
+        logger.info(f"Found {len(auto_created_entities)} auto-created entities to map to chunks")
+
+        # Create chunks for searching
+        chunks = self._create_chunks(content, chunk_size, chunk_overlap)
+
+        # Search for auto-created entities in chunks
+        entities_added_to_chunks = 0
+
+        for entity_name, entity_id in auto_created_entities:
+            entity_name_lower = entity_name.lower()
+
+            for chunk_index, chunk_text in enumerate(chunks):
+                chunk_text_lower = chunk_text.lower()
+
+                # Simple substring matching - same as regular entity mapping
+                if entity_name_lower in chunk_text_lower:
+                    chunk_index_str = str(chunk_index)
+
+                    # Add to chunk-entity mapping
+                    if chunk_index_str not in chunk_entity_mapping:
+                        chunk_entity_mapping[chunk_index_str] = []
+
+                    if entity_id not in chunk_entity_mapping[chunk_index_str]:
+                        chunk_entity_mapping[chunk_index_str].append(entity_id)
+                        entities_added_to_chunks += 1
+                        logger.debug(f"Added auto-created entity '{entity_name}' ({entity_id}) to chunk {chunk_index}")
+
+        logger.info(f"Enhanced chunk-entity mapping: added {entities_added_to_chunks} auto-created entity mappings")
         return chunk_entity_mapping
 
     def _create_ingest_result(
@@ -589,7 +676,8 @@ class IngestionCoordinator:
                         'source_doc_id': getattr(relation, 'source_doc_id', document_id)
                     }
                     for relation in graph_data['relations']
-                ]
+                ],
+                'chunk_entity_mapping': graph_data.get('chunk_entity_mapping', {})
             }
         }
 

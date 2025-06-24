@@ -82,16 +82,22 @@ class GraphExtractor:
             
             logger.info("Entities extracted", count=len(entities))
             
-            # Extract relations using extract_with_entities for better entity resolution
+            # Extract relations using extract method to get missing entities
             logger.info("Extracting relations from content")
 
-            relations = await self.relation_extractor.extract_with_entities(
+            relations = await self.relation_extractor.extract(
                 text=content,
                 entities=entities,
-                source_doc_id=source_path
+                doc_id=source_path
             )
-            
+
             logger.info("Relations extracted", count=len(relations))
+
+            # Check for auto-created entities in relations and add them to entities list
+            auto_created_entities = self._extract_auto_created_entities_from_relations(relations, source_path)
+            if auto_created_entities:
+                logger.info("Found auto-created entities in relations", count=len(auto_created_entities))
+                entities.extend(auto_created_entities)
             
             # Convert to serializable format
             entities_data = []
@@ -131,9 +137,9 @@ class GraphExtractor:
                     'content_length': len(content)
                 }
             }
-            
+
         except Exception as e:
-            logger.error("Failed to extract graph data", 
+            logger.error("Failed to extract graph data",
                         error=str(e),
                         source_path=source_path)
             return {
@@ -147,3 +153,67 @@ class GraphExtractor:
                     'content_length': len(content)
                 }
             }
+
+    def _extract_auto_created_entities_from_relations(self, relations: List, source_path: str) -> List:
+        """Extract auto-created entities from relations and create Entity objects.
+
+        Args:
+            relations: List of relation objects
+            source_path: Source document path
+
+        Returns:
+            List of Entity objects for auto-created entities
+        """
+        from morag_graph.models.entity import Entity, EntityType
+
+        auto_created_entities = []
+        seen_entity_ids = set()
+
+        for relation in relations:
+            # Check if relation has auto-created entities in its attributes
+            source_name = relation.attributes.get('source_entity_name', '')
+            target_name = relation.attributes.get('target_entity_name', '')
+
+            # Check source entity
+            if (source_name and relation.source_entity_id and
+                relation.source_entity_id not in seen_entity_ids and
+                relation.source_entity_id.startswith('ent_')):
+
+                # Check if this looks like an auto-created entity (has document hash suffix)
+                if '_' in relation.source_entity_id and len(relation.source_entity_id.split('_')[-1]) >= 8:
+                    entity = Entity(
+                        id=relation.source_entity_id,
+                        name=source_name,
+                        type=EntityType.CUSTOM,
+                        confidence=0.5,
+                        source_doc_id=source_path,
+                        attributes={
+                            "auto_created": True,
+                            "creation_reason": "missing_entity_for_relation"
+                        }
+                    )
+                    auto_created_entities.append(entity)
+                    seen_entity_ids.add(relation.source_entity_id)
+
+            # Check target entity
+            if (target_name and relation.target_entity_id and
+                relation.target_entity_id not in seen_entity_ids and
+                relation.target_entity_id.startswith('ent_')):
+
+                # Check if this looks like an auto-created entity (has document hash suffix)
+                if '_' in relation.target_entity_id and len(relation.target_entity_id.split('_')[-1]) >= 8:
+                    entity = Entity(
+                        id=relation.target_entity_id,
+                        name=target_name,
+                        type=EntityType.CUSTOM,
+                        confidence=0.5,
+                        source_doc_id=source_path,
+                        attributes={
+                            "auto_created": True,
+                            "creation_reason": "missing_entity_for_relation"
+                        }
+                    )
+                    auto_created_entities.append(entity)
+                    seen_entity_ids.add(relation.target_entity_id)
+
+        return auto_created_entities

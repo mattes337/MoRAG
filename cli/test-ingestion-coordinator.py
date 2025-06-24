@@ -124,7 +124,7 @@ async def test_ingestion_coordinator():
             databases=database_configs,
             chunk_size=500,
             chunk_overlap=50,
-            document_id='test-doc-123',
+            document_id=None,  # Let coordinator generate proper unified ID
             replace_existing=False
         )
         
