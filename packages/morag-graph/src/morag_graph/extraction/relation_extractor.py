@@ -3,7 +3,7 @@
 import logging
 from typing import Dict, List, Optional, Any, Union, Tuple
 
-from ..models import Entity, Relation, RelationType
+from ..models import Entity, Relation, RelationType, EntityType
 from .base import BaseExtractor, LLMConfig
 
 logger = logging.getLogger(__name__)
@@ -305,13 +305,14 @@ class RelationExtractor(BaseExtractor):
             )
 
             # If we can't resolve an entity, create a placeholder for it
-            if not source_id and relation.source_entity_id:
+            # Be more aggressive about creating missing entities to preserve relations
+            if not source_id and relation.source_entity_id and relation.source_entity_id.strip():
                 source_id, source_entity = self._create_missing_entity(relation.source_entity_id, missing_entities, source_doc_id)
                 if source_entity:
                     missing_entities_created.append(source_entity)
                 logger.info(f"🔧 Created missing entity for source: '{relation.source_entity_id}' -> {source_id}")
 
-            if not target_id and relation.target_entity_id:
+            if not target_id and relation.target_entity_id and relation.target_entity_id.strip():
                 target_id, target_entity = self._create_missing_entity(relation.target_entity_id, missing_entities, source_doc_id)
                 if target_entity:
                     missing_entities_created.append(target_entity)
@@ -426,7 +427,12 @@ Extract relations between entities from the following text:
 Known entities in the text:
 {', '.join(entity_names)}
 
-Focus on finding relationships between these entities, but also identify any other clear relationships.
+IMPORTANT: When extracting relations, try to use the EXACT entity names from the list above. If you find a relationship involving an entity that's similar but not exactly matching, try to map it to the closest entity from the list. For example:
+- If you see "Soul Embodiment Coach" but the list has "Constanze Witzel", consider if they refer to the same person
+- If you see "tantrischen Philosophie" but the list has "Yoga", consider if they are related concepts
+- If you see partial names or descriptions, map them to the full entity names from the list
+
+Focus on finding relationships between these entities, but also identify any other clear relationships using descriptive entity names.
 """
         
         # Add context if provided
@@ -711,10 +717,10 @@ Return the relations as a JSON array as specified in the system prompt.
             return missing_entities[entity_name], None  # Already created, don't create duplicate
 
         # Use the unified ID generator to create consistent entity IDs
-        from morag_graph.models.unified_id_generator import UnifiedIDGenerator
+        from morag_graph.utils.id_generation import UnifiedIDGenerator
         from morag_graph.models.entity import Entity, EntityType
 
-        # Use CUSTOM as default type for missing entities
+        # Use CUSTOM as default type for missing entities - let the LLM handle proper classification
         entity_type = EntityType.CUSTOM
 
         # Generate unified entity ID with proper document suffix
@@ -757,9 +763,9 @@ Return the relations as a JSON array as specified in the system prompt.
             return missing_entities[entity_name]
 
         # Use the unified ID generator to create consistent entity IDs
-        from morag_graph.models.unified_id_generator import UnifiedIDGenerator
+        from morag_graph.utils.id_generation import UnifiedIDGenerator
 
-        # Use CUSTOM as default type for missing entities
+        # Use CUSTOM as default type for missing entities - let the LLM handle proper classification
         entity_type = "CUSTOM"
 
         # Generate unified entity ID with proper document suffix
@@ -845,6 +851,25 @@ Return the relations as a JSON array as specified in the system prompt.
             if len(name_lower) >= 3 and name_lower in entity_name_lower:
                 logger.info(f"✅ Partial match (contains): '{name}' found in '{entity_name}' -> {entity_id}")
                 return entity_id
+
+        # 3.5. Enhanced partial matching for German compound words and phrases
+        # Handle cases where entity names might be parts of longer phrases
+        entity_words = [w.strip() for w in entity_name_lower.split() if len(w.strip()) >= 3]
+        for name, entity_id in entity_name_to_id.items():
+            name_lower = name.lower()
+            name_words = [w.strip() for w in name_lower.split() if len(w.strip()) >= 3]
+
+            # Check if any significant word from entity_name appears in the known entity
+            for entity_word in entity_words:
+                if entity_word in name_lower:
+                    logger.info(f"✅ Word-in-entity match: '{entity_word}' from '{entity_name}' found in '{name}' -> {entity_id}")
+                    return entity_id
+
+            # Check if any significant word from known entity appears in search term
+            for name_word in name_words:
+                if name_word in entity_name_lower:
+                    logger.info(f"✅ Entity-word-in-search match: '{name_word}' from '{name}' found in '{entity_name}' -> {entity_id}")
+                    return entity_id
 
         # 4. Word-by-word matching for compound terms
         entity_words = set(word.lower() for word in entity_name_lower.split() if len(word) >= 3)
@@ -999,7 +1024,9 @@ Return the relations as a JSON array as specified in the system prompt.
                             return True
 
         return False
-    
+
+
+
     async def extract_from_entity_pairs(
         self, 
         text: str, 

@@ -61,15 +61,17 @@ class UnifiedIDGenerator:
     @staticmethod
     def generate_entity_id(name: str, entity_type: str, source_doc_id: str) -> str:
         """Generate deterministic entity ID (maintains existing strategy).
-        
+
         Args:
             name: Entity name
             entity_type: Entity type (PERSON, ORGANIZATION, etc.)
             source_doc_id: Source document ID
-            
+
         Returns:
             Deterministic entity ID
         """
+        import hashlib
+
         # Convert to readable format
         clean_name = name.lower().replace(' ', '_').replace('-', '_')
 
@@ -79,7 +81,17 @@ class UnifiedIDGenerator:
         else:
             clean_type = str(entity_type).lower().replace('entitytype.', '')
 
-        doc_suffix = source_doc_id.split('_')[-1] if '_' in source_doc_id else 'abc123'
+        # Extract document suffix more robustly
+        if source_doc_id and '_' in source_doc_id:
+            doc_suffix = source_doc_id.split('_')[-1]
+        elif source_doc_id:
+            # If no underscores, use a hash of the full document ID
+            doc_suffix = hashlib.sha256(source_doc_id.encode()).hexdigest()[:16]
+        else:
+            # If no source_doc_id, generate a hash from name and type
+            content = f"{name}:{entity_type}"
+            doc_suffix = hashlib.sha256(content.encode()).hexdigest()[:16]
+
         return f"ent_{clean_name}_{clean_type}_{doc_suffix}"
     
     @staticmethod
