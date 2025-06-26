@@ -60,39 +60,37 @@ class UnifiedIDGenerator:
     
     @staticmethod
     def generate_entity_id(name: str, entity_type: str, source_doc_id: str) -> str:
-        """Generate deterministic entity ID (maintains existing strategy).
+        """Generate deterministic entity ID based only on entity name for deduplication.
+
+        This allows entities with the same name but different types to be merged,
+        solving the issue where 'Zirbeldrüse' was created multiple times with different types.
 
         Args:
             name: Entity name
-            entity_type: Entity type (PERSON, ORGANIZATION, etc.)
-            source_doc_id: Source document ID
+            entity_type: Entity type (ignored for ID generation, kept for compatibility)
+            source_doc_id: Source document ID (ignored for ID generation, kept for compatibility)
 
         Returns:
-            Deterministic entity ID
+            Deterministic entity ID based only on normalized entity name
         """
         import hashlib
+        import re
 
-        # Convert to readable format
-        clean_name = name.lower().replace(' ', '_').replace('-', '_')
+        # Normalize entity name for consistent ID generation
+        # Convert to lowercase, replace special characters and spaces with underscores
+        clean_name = re.sub(r'[^\w\s]', '', name.lower())  # Remove special chars except word chars and spaces
+        clean_name = re.sub(r'\s+', '_', clean_name.strip())  # Replace spaces with underscores
+        clean_name = re.sub(r'_+', '_', clean_name)  # Replace multiple underscores with single
+        clean_name = clean_name.strip('_')  # Remove leading/trailing underscores
 
-        # Handle both enum and string types consistently
-        if hasattr(entity_type, 'value'):
-            clean_type = entity_type.value.lower()
-        else:
-            clean_type = str(entity_type).lower().replace('entitytype.', '')
+        # If name becomes empty after cleaning, use a hash of the original name
+        if not clean_name:
+            clean_name = hashlib.sha256(name.encode()).hexdigest()[:16]
 
-        # Extract document suffix more robustly
-        if source_doc_id and '_' in source_doc_id:
-            doc_suffix = source_doc_id.split('_')[-1]
-        elif source_doc_id:
-            # If no underscores, use a hash of the full document ID
-            doc_suffix = hashlib.sha256(source_doc_id.encode()).hexdigest()[:16]
-        else:
-            # If no source_doc_id, generate a hash from name and type
-            content = f"{name}:{entity_type}"
-            doc_suffix = hashlib.sha256(content.encode()).hexdigest()[:16]
+        # Generate a short hash suffix for uniqueness while keeping readability
+        name_hash = hashlib.sha256(name.lower().encode()).hexdigest()[:8]
 
-        return f"ent_{clean_name}_{clean_type}_{doc_suffix}"
+        return f"ent_{clean_name}_{name_hash}"
     
     @staticmethod
     def generate_relation_id(source_entity_id: str, target_entity_id: str, 

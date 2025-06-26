@@ -15,11 +15,12 @@ try:
     from morag_graph import (
         EntityExtractor, RelationExtractor, Neo4jStorage, QdrantStorage,
         Neo4jConfig, QdrantConfig, DatabaseType, DatabaseConfig, DatabaseResult,
-        Entity, Relation, FileIngestion
+        Entity, Relation
     )
     from morag_graph.extraction.base import LLMConfig
     GRAPH_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    logger.warning("morag-graph package not available - graph processing disabled", error=str(e))
     GRAPH_AVAILABLE = False
     EntityExtractor = None
     RelationExtractor = None
@@ -32,7 +33,6 @@ except ImportError:
     DatabaseResult = None
     Entity = None
     Relation = None
-    FileIngestion = None
     LLMConfig = None
 
 logger = structlog.get_logger(__name__)
@@ -105,7 +105,6 @@ class GraphProcessor:
         self._llm_config = None
         
         if not GRAPH_AVAILABLE:
-            logger.warning("morag-graph package not available - graph processing disabled")
             self.config.enabled = False
             return
             

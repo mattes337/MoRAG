@@ -36,20 +36,27 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
             # Pure dynamic mode - let LLM determine appropriate entity types
             return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
 
-Determine the most appropriate entity type based on the semantic meaning and context of each entity. Do not limit yourself to predefined categories - use descriptive, domain-specific entity types that capture the essence of what each entity represents.
+You have COMPLETE FREEDOM to determine the most appropriate entity type based on the semantic meaning and context of each entity. Create entity types that are broad enough to be reusable but specific enough to be meaningful. There are NO predefined categories - you decide what makes sense.
 
 For each entity, provide:
 1. name: The exact text as it appears in the source
-2. type: A descriptive entity type that captures the semantic meaning (e.g., SOFTWARE_FRAMEWORK, MEDICAL_CONDITION, RESEARCH_METHODOLOGY, FINANCIAL_INSTRUMENT, etc.)
+2. type: An entity type that YOU determine based on the entity's nature and context
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. context: Brief description of the entity's role or significance
 
-Guidelines for entity types:
-- Use clear, descriptive names that capture the specific nature of the entity
-- Prefer domain-specific types over generic ones when appropriate
-- Use UPPER_CASE with underscores (e.g., PROGRAMMING_LANGUAGE, GOVERNMENT_AGENCY, SCIENTIFIC_CONCEPT)
-- Be consistent within the same document/domain
-- Consider the entity's role and function in the context
+Guidelines for creating entity types:
+- Create types that balance specificity with reusability
+- Use UPPER_CASE with underscores for consistency (e.g., MEDICAL_CONCEPT, BODY_PART, RESEARCH_METHOD)
+- Consider the entity's primary function, domain, or category
+- Aim for types that could apply to similar entities in other contexts
+- Be creative but logical in your type naming
+
+Examples of good dynamic typing:
+- "Einstein" → SCIENTIST (not just PERSON)
+- "Zirbeldrüse" → BODY_PART (not overly specific like PINEAL_GLAND)
+- "Python" → PROGRAMMING_LANGUAGE (when referring to the language)
+- "Harvard" → UNIVERSITY (not just ORGANIZATION)
+- "photosynthesis" → BIOLOGICAL_PROCESS (not just PROCESS)
 
 Focus on entities that are:
 - Clearly identifiable and significant
@@ -89,20 +96,27 @@ Avoid extracting:
             # No static types - always use dynamic mode
             return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
 
-Determine the most appropriate entity type based on the semantic meaning and context of each entity. Do not limit yourself to predefined categories - use descriptive, domain-specific entity types that capture the essence of what each entity represents.
+You have COMPLETE FREEDOM to determine the most appropriate entity type based on the semantic meaning and context of each entity. Create entity types that are broad enough to be reusable but specific enough to be meaningful. There are NO predefined categories - you decide what makes sense.
 
 For each entity, provide:
 1. name: The exact text as it appears in the source
-2. type: A descriptive entity type that captures the semantic meaning (e.g., SOFTWARE_FRAMEWORK, MEDICAL_CONDITION, RESEARCH_METHODOLOGY, FINANCIAL_INSTRUMENT, etc.)
+2. type: An entity type that YOU determine based on the entity's nature and context
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. context: Brief description of the entity's role or significance
 
-Guidelines for entity types:
-- Use clear, descriptive names that capture the specific nature of the entity
-- Prefer domain-specific types over generic ones when appropriate
-- Use UPPER_CASE with underscores (e.g., PROGRAMMING_LANGUAGE, GOVERNMENT_AGENCY, SCIENTIFIC_CONCEPT)
-- Be consistent within the same document/domain
-- Consider the entity's role and function in the context
+Guidelines for creating entity types:
+- Create types that balance specificity with reusability
+- Use UPPER_CASE with underscores for consistency (e.g., MEDICAL_CONCEPT, BODY_PART, RESEARCH_METHOD)
+- Consider the entity's primary function, domain, or category
+- Aim for types that could apply to similar entities in other contexts
+- Be creative but logical in your type naming
+
+Examples of good dynamic typing:
+- "Einstein" → SCIENTIST (not just PERSON)
+- "Zirbeldrüse" → BODY_PART (not overly specific like PINEAL_GLAND)
+- "Python" → PROGRAMMING_LANGUAGE (when referring to the language)
+- "Harvard" → UNIVERSITY (not just ORGANIZATION)
+- "photosynthesis" → BIOLOGICAL_PROCESS (not just PROCESS)
 
 Focus on entities that are:
 - Clearly identifiable and significant
@@ -292,23 +306,67 @@ Avoid extracting:
         )
     
     def _deduplicate_entities(self, entities: List[GraphEntity]) -> List[GraphEntity]:
-        """Remove duplicate entities based on name and type."""
-        seen = set()
-        deduplicated = []
-        
+        """Remove duplicate entities based on name only, merging different types."""
+        # Group entities by normalized name (case-insensitive)
+        entity_groups = {}
+
         for entity in entities:
-            # Create a key based on normalized name and type
-            key = (entity.name.lower().strip(), entity.type)
-            
-            if key not in seen:
-                seen.add(key)
-                deduplicated.append(entity)
+            # Use only the normalized name as the key, ignoring type
+            normalized_name = entity.name.lower().strip()
+
+            if normalized_name not in entity_groups:
+                entity_groups[normalized_name] = []
+            entity_groups[normalized_name].append(entity)
+
+        # Merge entities in each group
+        deduplicated = []
+        for name_group in entity_groups.values():
+            if len(name_group) == 1:
+                # Single entity, no merging needed
+                deduplicated.append(name_group[0])
             else:
-                # If we've seen this entity before, keep the one with higher confidence
-                for i, existing in enumerate(deduplicated):
-                    if (existing.name.lower().strip(), existing.type) == key:
-                        if entity.confidence > existing.confidence:
-                            deduplicated[i] = entity
-                        break
-        
+                # Multiple entities with same name, merge them
+                merged_entity = self._merge_entities_with_same_name(name_group)
+                deduplicated.append(merged_entity)
+
         return deduplicated
+
+    def _merge_entities_with_same_name(self, entities: List[GraphEntity]) -> GraphEntity:
+        """Merge multiple entities with the same name but potentially different types."""
+        if not entities:
+            raise ValueError("Cannot merge empty entity list")
+
+        if len(entities) == 1:
+            return entities[0]
+
+        # Find the entity with the highest confidence
+        best_entity = max(entities, key=lambda e: e.confidence)
+
+        # Use the type from the highest confidence entity
+        # The LLM determines all types, so we trust the highest confidence extraction
+        final_type = best_entity.type
+
+        # Merge attributes from all entities
+        merged_attributes = {}
+        for entity in entities:
+            if entity.attributes:
+                merged_attributes.update(entity.attributes)
+
+        # Create merged entity using the best entity as base
+        merged_entity = GraphEntity(
+            name=best_entity.name,  # Use the exact name from the best entity
+            type=final_type,
+            confidence=best_entity.confidence,
+            source_doc_id=best_entity.source_doc_id,
+            attributes=merged_attributes
+        )
+
+        self.logger.debug(
+            "Merged entities with same name",
+            entity_name=best_entity.name,
+            original_types=[e.type for e in entities],
+            final_type=final_type,
+            merged_confidence=best_entity.confidence
+        )
+
+        return merged_entity

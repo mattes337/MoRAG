@@ -100,14 +100,14 @@ class EntityExtractor:
                 chunk_size=self.chunk_size,
                 source_doc_id=source_doc_id
             )
-            
+
             self.logger.info(
                 "Entity extraction completed",
                 text_length=len(text),
                 entities_found=len(entities),
                 source_doc_id=source_doc_id
             )
-            
+
             return entities
             
         except Exception as e:
