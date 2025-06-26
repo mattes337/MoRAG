@@ -4,6 +4,7 @@ uvicorn==0.32.1
 python-multipart==0.0.17
 pydantic==2.10.3
 pydantic-settings==2.7.0
+pydantic-ai>=0.0.14
 celery==5.3.6
 
 redis==5.2.1
