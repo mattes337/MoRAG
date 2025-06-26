@@ -12,7 +12,9 @@ This package has been optimized to create **document-agnostic knowledge graphs**
 
 - Neo4J graph database integration
 - LLM-based entity and relation extraction with context-aware relation type detection
+- **Intention-based extraction**: Document intention analysis for guided type abstraction
 - Document-agnostic entity and relation extraction
+- **Type abstraction**: Automatic reduction of overly specific types for better graph connectivity
 - Enhanced relation types (PLAYED_ROLE, PORTRAYED, PRACTICES, ENGAGED_IN, STUDIED)
 - Dynamic schema evolution
 - JSON-first development approach
@@ -94,6 +96,43 @@ New relation types have been added to replace generic `CUSTOM` relations:
 - `STUDIED`: Person -> Subject/Field
 
 The system now uses context-aware detection to automatically suggest appropriate relation types based on textual context.
+
+### Intention-Based Extraction
+
+The new intention-based extraction system reduces type fragmentation by:
+
+1. **Document Intention Analysis**: Automatically generates a concise intention summary that captures the document's primary purpose and domain
+2. **Guided Type Abstraction**: Uses the intention to guide the LLM toward more abstract, domain-appropriate entity and relation types
+3. **Reduced Fragmentation**: Prevents overly specific types like "IS_CEO", "IS_CTO", "IS_CFO" in favor of unified types like "IS_MEMBER"
+
+**Example Usage:**
+
+```python
+from morag_graph.extraction import EntityExtractor, RelationExtractor
+from morag_graph.extraction.base import LLMConfig
+
+# Configure LLM
+config = LLMConfig(provider="gemini", api_key="your-api-key")
+
+# Create extractors
+entity_extractor = EntityExtractor(config=config)
+relation_extractor = RelationExtractor(config=config)
+
+# Extract with intention context
+text = "John Smith is the CEO of TechCorp..."
+intention = "Document explaining the structure of the organization/company"
+
+entities = await entity_extractor.extract(text, intention=intention)
+relations = await relation_extractor.extract(text, entities=entities, intention=intention)
+```
+
+**Benefits:**
+- Fewer, more meaningful entity and relation types
+- Better graph connectivity through type abstraction
+- Domain-aware extraction that respects document context
+- Maintained LLM flexibility with better guidance
+
+See `examples/intention_based_extraction.py` for a complete demonstration.
 
 ## License
 

@@ -102,6 +102,7 @@ class GraphProcessor:
         self._relation_extractor = None
         self._storage = None
         self._file_ingestion = None
+        self._llm_config = None
         
         if not GRAPH_AVAILABLE:
             logger.warning("morag-graph package not available - graph processing disabled")
@@ -115,20 +116,20 @@ class GraphProcessor:
         """Initialize graph processing components."""
         try:
             # Initialize LLM configuration
-            llm_config = LLMConfig(
+            self._llm_config = LLMConfig(
                 provider=self.config.llm_provider,
                 api_key=self.config.llm_api_key,
                 model=self.config.llm_model
             )
-            
+
             # Initialize extractors
             self._entity_extractor = EntityExtractor(
-                config=llm_config,
+                config=self._llm_config,
                 entity_types=self.config.entity_types
             )
-            
+
             self._relation_extractor = RelationExtractor(
-                config=llm_config,
+                config=self._llm_config,
                 relation_types=self.config.relation_types
             )
             
@@ -156,6 +157,63 @@ class GraphProcessor:
     def is_enabled(self) -> bool:
         """Check if graph processing is enabled and available."""
         return self.config.enabled and GRAPH_AVAILABLE and self._storage is not None
+
+    async def generate_document_intention(self, content: str, max_length: int = 200) -> Optional[str]:
+        """Generate a concise intention summary for the document.
+
+        Args:
+            content: Document content to analyze
+            max_length: Maximum length for the intention summary
+
+        Returns:
+            Document intention summary or None if generation fails
+        """
+        if not self._llm_config or not self._llm_config.api_key:
+            logger.warning("LLM configuration not available for intention generation")
+            return None
+
+        try:
+            # Import here to avoid circular dependencies
+            import google.generativeai as genai
+
+            # Configure the API
+            genai.configure(api_key=self._llm_config.api_key)
+
+            # Create the model
+            model = genai.GenerativeModel(self._llm_config.model or "gemini-1.5-flash")
+
+            # Create intention analysis prompt
+            prompt = f"""
+Analyze the following document and provide a concise intention summary that captures the document's primary purpose and domain.
+
+The intention should be a single sentence that describes what the document aims to achieve or communicate.
+
+Examples:
+- For medical content: "Heal the pineal gland for spiritual enlightenment"
+- For organizational documents: "Document explaining the structure of the organization/company"
+- For technical guides: "Guide for implementing software architecture patterns"
+- For educational content: "Teach fundamental concepts of machine learning"
+
+Document content:
+{content[:2000]}...
+
+Provide only the intention summary (maximum {max_length} characters):
+"""
+
+            # Generate intention
+            response = model.generate_content(prompt)
+            intention = response.text.strip()
+
+            # Ensure it's within max length
+            if len(intention) > max_length:
+                intention = intention[:max_length-3] + "..."
+
+            logger.debug(f"Generated document intention: {intention}")
+            return intention
+
+        except Exception as e:
+            logger.warning(f"Failed to generate document intention: {e}")
+            return None
     
     def _create_storage_from_config(self, db_config: DatabaseConfig):
         """Create a storage instance from database configuration.
@@ -230,9 +288,14 @@ class GraphProcessor:
         processed_databases = set()  # Track to prevent duplicates
         
         try:
-            # Extract entities and relations once
-            entities = await self._entity_extractor.extract_entities(content, source_doc_id)
-            relations = await self._relation_extractor.extract_relations(content, entities, source_doc_id)
+            # Generate document intention for context-aware extraction
+            intention = await self.generate_document_intention(content)
+            if intention:
+                logger.info(f"Generated document intention: {intention}")
+
+            # Extract entities and relations once with intention context
+            entities = await self._entity_extractor.extract_entities(content, source_doc_id, intention=intention)
+            relations = await self._relation_extractor.extract_relations(content, entities, source_doc_id, intention=intention)
             
             # Process each database configuration
             for db_config in database_configs:
@@ -469,32 +532,39 @@ class GraphProcessor:
         start_time = time.time()
         
         try:
+            # Generate document intention for context-aware extraction
+            intention = await self.generate_document_intention(markdown_content)
+            if intention:
+                logger.info(f"Generated document intention: {intention}")
+
             # Chunk the content
             if self.config.chunk_by_structure:
                 chunks = self._chunk_by_structure(markdown_content)
             else:
                 chunks = self._chunk_by_size(markdown_content)
-            
-            logger.info("Document chunked for graph processing", 
+
+            logger.info("Document chunked for graph processing",
                        chunks_count=len(chunks),
                        chunk_by_structure=self.config.chunk_by_structure)
-            
+
             all_entities = []
             all_relations = []
             
             # Process each chunk
             for i, (chunk_content, chunk_metadata) in enumerate(chunks):
                 try:
-                    # Extract entities
+                    # Extract entities with intention context
                     entities = await self._entity_extractor.extract(
                         chunk_content,
-                        source_doc_id=document_path
+                        source_doc_id=document_path,
+                        intention=intention
                     )
-                    
-                    # Extract relations
+
+                    # Extract relations with intention context
                     relations = await self._relation_extractor.extract(
                         chunk_content,
-                        entities=entities
+                        entities=entities,
+                        intention=intention
                     )
                     
                     # Add chunk metadata to entities and relations

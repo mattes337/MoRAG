@@ -139,13 +139,13 @@ Example entity types (you can use these or create more appropriate ones):
         return f"""
 You are an expert entity extraction system. Your task is to identify and extract named entities from the given text.
 
-IMPORTANT: You should determine the most appropriate entity type for each entity based on its semantic meaning and context. Do not limit yourself to predefined categories.
+IMPORTANT: You should determine the most appropriate entity type for each entity based on its semantic meaning and context. Use ABSTRACT, BROAD entity types rather than overly specific ones.
 
 {examples_text}
 
 For each entity, provide:
 1. name: The exact text of the entity as it appears
-2. type: A descriptive type that best captures the entity's semantic category (e.g., PERSON, ORGANIZATION, CHEMICAL_COMPOUND, MEDICAL_CONDITION, ANATOMICAL_STRUCTURE, BIOLOGICAL_PROCESS, etc.)
+2. type: A broad, abstract type that captures the entity's semantic category (e.g., PERSON, ORGANIZATION, ANATOMICAL, TECHNOLOGY, CONCEPT, etc.)
 3. context: A brief description of the entity's role or significance in the text
 4. confidence: A score from 0.0 to 1.0 indicating extraction confidence
 
@@ -162,10 +162,11 @@ Return the results as a JSON array of objects with the following structure:
 Rules:
 - Only extract entities that are clearly identifiable and significant
 - Avoid extracting common words unless they are proper nouns
-- Create entity types that are semantically meaningful and specific
-- Use clear, descriptive type names (e.g., CHEMICAL_COMPOUND, MEDICAL_CONDITION, ANATOMICAL_STRUCTURE)
+- Use BROAD, ABSTRACT entity types - avoid overly specific categories
+- Entity types should be SINGULAR (e.g., PERSON not PERSONS, TECHNOLOGY not TECHNOLOGIES)
+- Prefer general categories: ANATOMICAL over BRAIN_REGION/CELL_TYPE, TECHNOLOGY over SOFTWARE_LIBRARY/FRAMEWORK
 - Be consistent with type naming within the same extraction
-- If an entity could be multiple types, choose the most specific one
+- If an entity could be multiple types, choose the most general appropriate one
 - Ensure confidence scores reflect the certainty of the extraction
 - Return an empty array if no entities are found
 """
@@ -238,11 +239,11 @@ Rules:
     
     def get_user_prompt(self, text: str, **kwargs) -> str:
         """Get the user prompt for entity extraction.
-        
+
         Args:
             text: Text to extract entities from
-            **kwargs: Additional arguments including context
-            
+            **kwargs: Additional arguments including context and intention
+
         Returns:
             User prompt string
         """
@@ -253,12 +254,17 @@ Extract named entities from the following text:
 
 Return the entities as a JSON array as specified in the system prompt.
 """
-        
+
+        # Add document intention if provided
+        intention = kwargs.get('intention')
+        if intention:
+            base_prompt += f"\n\nDocument intention: {intention}\n\nBased on this intention, use appropriate abstract entity types that fit the document's purpose."
+
         # Add context if provided
         context = kwargs.get('context')
         if context:
             base_prompt += f"\n\nAdditional context: {context}"
-        
+
         return base_prompt
     
     def parse_response(self, response: str, text: str = "") -> List[Entity]:
@@ -337,7 +343,20 @@ Return the entities as a JSON array as specified in the system prompt.
         except Exception as e:
             logger.error(f"Error creating entity from data {data}: {e}")
             return None
-    
+
+    async def extract_entities(self, text: str, source_doc_id: Optional[str] = None, **kwargs) -> List[Entity]:
+        """Extract entities from text (alias for extract method).
+
+        Args:
+            text: Text to extract entities from
+            source_doc_id: Optional document ID to associate with entities
+            **kwargs: Additional arguments including intention
+
+        Returns:
+            List of extracted entities
+        """
+        return await self.extract(text, source_doc_id=source_doc_id, **kwargs)
+
     async def extract_with_context(
         self, 
         text: str, 

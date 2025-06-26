@@ -336,14 +336,14 @@ Example relation types (you can use these or create more appropriate ones):
         return f"""
 You are an expert relation extraction system. Your task is to identify relationships between entities in the given text. Be thorough and comprehensive in finding all possible relationships.
 
-IMPORTANT: You should determine the most appropriate relation type for each relationship based on its semantic meaning and context. Do not limit yourself to predefined categories.
+IMPORTANT: You should determine the most appropriate relation type for each relationship based on its semantic meaning and context. Use ABSTRACT, COARSE relation types rather than overly specific ones.
 
 {examples_text}
 
 For each relation, provide:
 1. source_entity: The name of the source entity (exactly as it appears in text)
 2. target_entity: The name of the target entity (exactly as it appears in text)
-3. relation_type: A descriptive type that best captures the relationship's semantic meaning (e.g., CAUSES, TREATS, AFFECTS, PRODUCES, REGULATES, etc.)
+3. relation_type: A broad, abstract type that captures the relationship's fundamental meaning (e.g., AFFECTS, USES, IS_MEMBER, LOCATED_IN, CAUSES, etc.)
 4. context: The specific text that indicates this relationship
 5. confidence: A score from 0.0 to 1.0 indicating extraction confidence
 
@@ -360,12 +360,15 @@ Return the results as a JSON array of objects with the following structure:
 
 Rules:
 - Extract ALL relations that are explicitly stated OR reasonably implied in the text
-- Create relation types that are semantically meaningful and specific
-- Use clear, descriptive relation names (e.g., CAUSES, TREATS, PRODUCES, REGULATES)
+- Use BROAD, ABSTRACT relation types - avoid overly specific categories
+- Prefer general relationships: IS_MEMBER over IS_CEO/IS_CTO, AFFECTS over CAUSES_INFLAMMATION/TRIGGERS_RESPONSE
+- Use clear, descriptive relation names that capture fundamental relationship patterns
 - Be consistent with relation naming within the same extraction
-- For technical/scientific content, be especially thorough in identifying relationships
+- For organizational content, use general hierarchy relations (IS_MEMBER, LEADS, PART_OF)
+- For technical content, use broad interaction relations (USES, IMPLEMENTS, PROCESSES)
+- For medical content, use general effect relations (AFFECTS, TREATS, ASSOCIATED_WITH)
 - Ensure both entities are identifiable in the text
-- If a relationship could be multiple types, choose the most specific one
+- If a relationship could be multiple types, choose the most general appropriate one
 - Ensure confidence scores reflect the certainty of the extraction
 - Return an empty array if no relations are found
 - Be careful about the direction of relationships (source -> target)
@@ -475,6 +478,16 @@ IMPORTANT: When extracting relations, try to use the EXACT entity names from the
 Focus on finding relationships between these entities, but also identify any other clear relationships using descriptive entity names.
 """
         
+        # Add document intention if provided
+        intention = kwargs.get('intention')
+        if intention:
+            base_prompt += f"""
+
+Document intention: {intention}
+
+Based on this intention, use appropriate abstract relation types that fit the document's purpose and domain.
+"""
+
         # Add context if provided
         context = kwargs.get('context')
         if context:
@@ -482,12 +495,12 @@ Focus on finding relationships between these entities, but also identify any oth
 
 Additional context: {context}
 """
-        
+
         base_prompt += """
 
 Return the relations as a JSON array as specified in the system prompt.
 """
-        
+
         return base_prompt
     
     def parse_response(self, response: str, text: str = "") -> List[Relation]:
@@ -1118,3 +1131,17 @@ Return relations as a JSON array as specified in the system prompt.
         finally:
             # Restore original method
             self.get_user_prompt = original_get_user_prompt
+
+    async def extract_relations(self, text: str, entities: List[Entity], source_doc_id: Optional[str] = None, **kwargs) -> List[Relation]:
+        """Extract relations from text (alias for extract method).
+
+        Args:
+            text: Text to extract relations from
+            entities: List of entities to consider for relations
+            source_doc_id: Optional document ID to associate with relations
+            **kwargs: Additional arguments including intention
+
+        Returns:
+            List of extracted relations
+        """
+        return await self.extract(text, entities=entities, doc_id=source_doc_id, **kwargs)
