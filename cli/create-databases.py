@@ -49,23 +49,59 @@ async def create_neo4j_database(database_name: str) -> bool:
     """Create a Neo4j database."""
     try:
         from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
-        
-        config = Neo4jConfig(
-            uri=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
-            username=os.getenv('NEO4J_USERNAME', 'neo4j'),
-            password=os.getenv('NEO4J_PASSWORD', 'password'),
-            database='system'  # Connect to system database to create others
-        )
-        
-        storage = Neo4jStorage(config)
-        await storage.connect()
-        
-        # Use the utility method to create the database
-        success = await storage.create_database_if_not_exists(database_name)
-        
-        await storage.disconnect()
-        return success
-        
+        from neo4j import AsyncGraphDatabase
+
+        # Connect directly to system database without using the storage class connect method
+        uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        password = os.getenv('NEO4J_PASSWORD', 'password')
+
+        driver = AsyncGraphDatabase.driver(uri, auth=(username, password))
+
+        try:
+            # Try to create database using system database
+            async with driver.session(database="system") as session:
+                # Check if database exists
+                result = await session.run(
+                    "SHOW DATABASES YIELD name WHERE name = $db_name",
+                    {"db_name": database_name}
+                )
+                databases = await result.data()
+
+                if not databases:
+                    # Database doesn't exist, create it
+                    print(f"📋 Creating Neo4j database: {database_name}")
+                    await session.run(f"CREATE DATABASE `{database_name}`")
+                    print(f"✅ Successfully created Neo4j database: {database_name}")
+                    return True
+                else:
+                    print(f"📋 Neo4j database already exists: {database_name}")
+                    return True
+
+        except Exception as e:
+            # If we can't create via system database (Community Edition), try direct connection
+            print(f"⚠️ Cannot create database via system database (likely Neo4j Community Edition): {e}")
+            print(f"📋 Attempting to verify database '{database_name}' exists...")
+
+            try:
+                async with driver.session(database=database_name) as session:
+                    await session.run("RETURN 1")
+                print(f"✅ Database '{database_name}' exists and is accessible")
+                return True
+            except Exception as direct_error:
+                if "DatabaseNotFound" in str(direct_error):
+                    print(f"❌ Database '{database_name}' does not exist and cannot be created automatically.")
+                    print(f"💡 For Neo4j Community Edition, please:")
+                    print(f"   1. Use the default 'neo4j' database, or")
+                    print(f"   2. Create the database manually, or")
+                    print(f"   3. Upgrade to Neo4j Enterprise Edition")
+                    return False
+                else:
+                    print(f"❌ Error connecting to database '{database_name}': {direct_error}")
+                    return False
+        finally:
+            await driver.close()
+
     except Exception as e:
         print(f"❌ Error creating Neo4j database: {e}")
         return False
@@ -95,29 +131,40 @@ async def create_qdrant_collection(collection_name: str, vector_size: int = 768)
 async def list_existing_databases() -> None:
     """List existing Neo4j databases and Qdrant collections."""
     print_section("Existing Neo4j Databases")
-    
+
     try:
-        from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
-        
-        config = Neo4jConfig(
-            uri=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
-            username=os.getenv('NEO4J_USERNAME', 'neo4j'),
-            password=os.getenv('NEO4J_PASSWORD', 'password'),
-            database='system'
-        )
-        
-        storage = Neo4jStorage(config)
-        await storage.connect()
-        
-        # List databases
-        result = await storage._execute_query("SHOW DATABASES YIELD name", {})
-        databases = [row['name'] for row in result]
-        
-        for db in databases:
-            print_result("Database", db)
-            
-        await storage.disconnect()
-        
+        from neo4j import AsyncGraphDatabase
+
+        uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        password = os.getenv('NEO4J_PASSWORD', 'password')
+
+        driver = AsyncGraphDatabase.driver(uri, auth=(username, password))
+
+        try:
+            # Try to list databases using system database
+            async with driver.session(database="system") as session:
+                result = await session.run("SHOW DATABASES YIELD name")
+                databases = []
+                async for record in result:
+                    databases.append(record["name"])
+
+                for db in databases:
+                    print_result("Database", db)
+
+        except Exception as e:
+            print(f"⚠️ Cannot list databases via system database (likely Neo4j Community Edition): {e}")
+            print(f"📋 Attempting to connect to default 'neo4j' database...")
+
+            try:
+                async with driver.session(database="neo4j") as session:
+                    await session.run("RETURN 1")
+                print_result("Database", "neo4j (default)")
+            except Exception as direct_error:
+                print(f"❌ Error connecting to default database: {direct_error}")
+        finally:
+            await driver.close()
+
     except Exception as e:
         print(f"❌ Error listing Neo4j databases: {e}")
     
@@ -163,6 +210,10 @@ Examples:
 Environment Variables:
   NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
   QDRANT_HOST, QDRANT_PORT, QDRANT_API_KEY
+
+Note:
+  Neo4j Community Edition only supports the default 'neo4j' database.
+  To create custom databases, you need Neo4j Enterprise Edition.
         """
     )
     
