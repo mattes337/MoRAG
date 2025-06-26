@@ -39,11 +39,13 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
-1. source_entity: Name of the source entity (exactly as mentioned)
-2. target_entity: Name of the target entity (exactly as mentioned)
+1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
+2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
 3. relation_type: A descriptive relation type that captures the semantic meaning (e.g., EMPLOYS, MANUFACTURES, COLLABORATES_WITH, INFLUENCES, DEPENDS_ON, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
+
+CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
 
 Guidelines for relation types:
 - Use clear, descriptive names that capture the specific relationship
@@ -56,12 +58,15 @@ Focus on relations that are:
 - Explicitly stated or clearly implied in the text
 - Factual and verifiable
 - Significant to understanding the content
+- Between entities that actually exist in the known entities list
 
 Avoid extracting:
+- Relations with entities not in the known entities list
 - Vague or uncertain relationships
 - Relations based on speculation
 - Relations with very low confidence (<0.5)
-- Duplicate or redundant relations"""
+- Duplicate or redundant relations
+- Relations involving technical metadata or file properties"""
 
         elif self.relation_types:
             # Custom types mode - use provided relation types
@@ -74,22 +79,27 @@ RELATION TYPES:
 {types_section}
 
 For each relation, provide:
-1. source_entity: Name of the source entity (exactly as mentioned)
-2. target_entity: Name of the target entity (exactly as mentioned)
+1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
+2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
 3. relation_type: Most appropriate relation type from the list above
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
+
+CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
 
 Focus on relations that are:
 - Explicitly stated or clearly implied in the text
 - Factual and verifiable
 - Significant to understanding the content
+- Between entities that actually exist in the known entities list
 
 Avoid extracting:
+- Relations with entities not in the known entities list
 - Vague or uncertain relationships
 - Relations based on speculation
 - Relations with very low confidence (<0.5)
-- Duplicate or redundant relations"""
+- Duplicate or redundant relations
+- Relations involving technical metadata or file properties"""
 
         else:
             # No static types - always use dynamic mode
@@ -98,11 +108,13 @@ Avoid extracting:
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
-1. source_entity: Name of the source entity (exactly as mentioned)
-2. target_entity: Name of the target entity (exactly as mentioned)
+1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
+2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
 3. relation_type: A descriptive relation type that captures the semantic meaning (e.g., EMPLOYS, MANUFACTURES, COLLABORATES_WITH, INFLUENCES, DEPENDS_ON, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
+
+CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
 
 Guidelines for relation types:
 - Use clear, descriptive names that capture the specific relationship

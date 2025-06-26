@@ -36,37 +36,61 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
             # Pure dynamic mode - let LLM determine appropriate entity types
             return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
 
-You have COMPLETE FREEDOM to determine the most appropriate entity type based on the semantic meaning and context of each entity. Create entity types that are broad enough to be reusable but specific enough to be meaningful. There are NO predefined categories - you decide what makes sense.
+CRITICAL INSTRUCTION: Create BROAD, REUSABLE entity types. Avoid overly specific types that would create duplicate entities. Think of entity types as categories that many similar entities could share.
 
 For each entity, provide:
 1. name: The exact text as it appears in the source
-2. type: An entity type that YOU determine based on the entity's nature and context
+2. type: A BROAD, REUSABLE entity type that YOU determine
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. context: Brief description of the entity's role or significance
 
-Guidelines for creating entity types:
-- Create types that balance specificity with reusability
-- Use UPPER_CASE with underscores for consistency (e.g., MEDICAL_CONCEPT, BODY_PART, RESEARCH_METHOD)
-- Consider the entity's primary function, domain, or category
-- Aim for types that could apply to similar entities in other contexts
-- Be creative but logical in your type naming
+ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
+- Use BROAD categories that can apply to many similar entities
+- Prefer GENERAL types over specific ones
+- Use UPPER_CASE with underscores for consistency
+- Think: "What GENERAL category does this entity belong to?"
 
-Examples of good dynamic typing:
-- "Einstein" → SCIENTIST (not just PERSON)
-- "Zirbeldrüse" → BODY_PART (not overly specific like PINEAL_GLAND)
-- "Python" → PROGRAMMING_LANGUAGE (when referring to the language)
-- "Harvard" → UNIVERSITY (not just ORGANIZATION)
-- "photosynthesis" → BIOLOGICAL_PROCESS (not just PROCESS)
+EXAMPLES OF GOOD BROAD TYPING:
+- "Einstein", "Newton", "Darwin" → ALL should be SCIENTIST
+- "Zirbeldrüse", "Herz", "Leber" → ALL should be BODY_PART
+- "Harvard", "MIT", "Stanford" → ALL should be UNIVERSITY
+- "Python", "Java", "C++" → ALL should be PROGRAMMING_LANGUAGE
+- "Photosynthesis", "Respiration", "Digestion" → ALL should be BIOLOGICAL_PROCESS
+- "Berlin", "Paris", "London" → ALL should be CITY
+- "Deutschland", "Frankreich", "England" → ALL should be COUNTRY
+
+EXAMPLES OF BAD (TOO SPECIFIC) TYPING:
+- "Einstein" → THEORETICAL_PHYSICIST (too specific, use SCIENTIST)
+- "Zirbeldrüse" → PINEAL_GLAND (too specific, use BODY_PART)
+- "Harvard" → IVY_LEAGUE_UNIVERSITY (too specific, use UNIVERSITY)
+
+PREFERRED BROAD CATEGORIES:
+PERSON, SCIENTIST, AUTHOR, POLITICIAN, ARTIST, ATHLETE
+ORGANIZATION, COMPANY, UNIVERSITY, HOSPITAL, GOVERNMENT
+LOCATION, CITY, COUNTRY, REGION, BUILDING
+CONCEPT, THEORY, PRINCIPLE, METHOD, TECHNIQUE
+BODY_PART, DISEASE, MEDICATION, TREATMENT
+TECHNOLOGY, SOFTWARE, DEVICE, SYSTEM
+DOCUMENT, BOOK, ARTICLE, REPORT
+EVENT, CONFERENCE, WAR, DISCOVERY
+SUBSTANCE, CHEMICAL, MATERIAL
+PROCESS, PROCEDURE, ACTIVITY
 
 Focus on entities that are:
 - Clearly identifiable and significant
-- Relevant to the document's main topics
+- Relevant to the document's main topics and content
 - Mentioned with sufficient context to determine their type
+- Represent meaningful concepts, people, places, or things discussed in the content
 
 Avoid extracting:
+- Technical metadata (file formats, timestamps, dimensions, codecs, etc.)
 - Common words or generic terms
 - Pronouns or vague references
-- Entities with very low confidence (<0.5)"""
+- Numbers without semantic meaning (unless they represent important quantities)
+- File properties, technical specifications, or system information
+- Entities with very low confidence (<0.5)
+
+REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type when they belong to the same general category."""
 
         elif self.entity_types:
             # Custom types mode - use provided entity types
@@ -96,37 +120,61 @@ Avoid extracting:
             # No static types - always use dynamic mode
             return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
 
-You have COMPLETE FREEDOM to determine the most appropriate entity type based on the semantic meaning and context of each entity. Create entity types that are broad enough to be reusable but specific enough to be meaningful. There are NO predefined categories - you decide what makes sense.
+CRITICAL INSTRUCTION: Create BROAD, REUSABLE entity types. Avoid overly specific types that would create duplicate entities. Think of entity types as categories that many similar entities could share.
 
 For each entity, provide:
 1. name: The exact text as it appears in the source
-2. type: An entity type that YOU determine based on the entity's nature and context
+2. type: A BROAD, REUSABLE entity type that YOU determine
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. context: Brief description of the entity's role or significance
 
-Guidelines for creating entity types:
-- Create types that balance specificity with reusability
-- Use UPPER_CASE with underscores for consistency (e.g., MEDICAL_CONCEPT, BODY_PART, RESEARCH_METHOD)
-- Consider the entity's primary function, domain, or category
-- Aim for types that could apply to similar entities in other contexts
-- Be creative but logical in your type naming
+ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
+- Use BROAD categories that can apply to many similar entities
+- Prefer GENERAL types over specific ones
+- Use UPPER_CASE with underscores for consistency
+- Think: "What GENERAL category does this entity belong to?"
 
-Examples of good dynamic typing:
-- "Einstein" → SCIENTIST (not just PERSON)
-- "Zirbeldrüse" → BODY_PART (not overly specific like PINEAL_GLAND)
-- "Python" → PROGRAMMING_LANGUAGE (when referring to the language)
-- "Harvard" → UNIVERSITY (not just ORGANIZATION)
-- "photosynthesis" → BIOLOGICAL_PROCESS (not just PROCESS)
+EXAMPLES OF GOOD BROAD TYPING:
+- "Einstein", "Newton", "Darwin" → ALL should be SCIENTIST
+- "Zirbeldrüse", "Herz", "Leber" → ALL should be BODY_PART
+- "Harvard", "MIT", "Stanford" → ALL should be UNIVERSITY
+- "Python", "Java", "C++" → ALL should be PROGRAMMING_LANGUAGE
+- "Photosynthesis", "Respiration", "Digestion" → ALL should be BIOLOGICAL_PROCESS
+- "Berlin", "Paris", "London" → ALL should be CITY
+- "Deutschland", "Frankreich", "England" → ALL should be COUNTRY
+
+EXAMPLES OF BAD (TOO SPECIFIC) TYPING:
+- "Einstein" → THEORETICAL_PHYSICIST (too specific, use SCIENTIST)
+- "Zirbeldrüse" → PINEAL_GLAND (too specific, use BODY_PART)
+- "Harvard" → IVY_LEAGUE_UNIVERSITY (too specific, use UNIVERSITY)
+
+PREFERRED BROAD CATEGORIES:
+PERSON, SCIENTIST, AUTHOR, POLITICIAN, ARTIST, ATHLETE
+ORGANIZATION, COMPANY, UNIVERSITY, HOSPITAL, GOVERNMENT
+LOCATION, CITY, COUNTRY, REGION, BUILDING
+CONCEPT, THEORY, PRINCIPLE, METHOD, TECHNIQUE
+BODY_PART, DISEASE, MEDICATION, TREATMENT
+TECHNOLOGY, SOFTWARE, DEVICE, SYSTEM
+DOCUMENT, BOOK, ARTICLE, REPORT
+EVENT, CONFERENCE, WAR, DISCOVERY
+SUBSTANCE, CHEMICAL, MATERIAL
+PROCESS, PROCEDURE, ACTIVITY
 
 Focus on entities that are:
 - Clearly identifiable and significant
-- Relevant to the document's main topics
+- Relevant to the document's main topics and content
 - Mentioned with sufficient context to determine their type
+- Represent meaningful concepts, people, places, or things discussed in the content
 
 Avoid extracting:
+- Technical metadata (file formats, timestamps, dimensions, codecs, etc.)
 - Common words or generic terms
 - Pronouns or vague references
-- Entities with very low confidence (<0.5)"""
+- Numbers without semantic meaning (unless they represent important quantities)
+- File properties, technical specifications, or system information
+- Entities with very low confidence (<0.5)
+
+REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type when they belong to the same general category."""
     
     async def extract_entities(
         self,
