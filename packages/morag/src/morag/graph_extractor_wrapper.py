@@ -45,8 +45,17 @@ class GraphExtractor:
             jitter=os.getenv('MORAG_GRAPH_JITTER', 'true').lower() == 'true'
         )
         
-        self.entity_extractor = EntityExtractor(llm_config)
-        self.relation_extractor = RelationExtractor(llm_config)
+        # Convert LLMConfig to dict for the extractors
+        llm_config_dict = {
+            "provider": llm_config.provider,
+            "api_key": llm_config.api_key,
+            "model": llm_config.model,
+            "temperature": llm_config.temperature,
+            "max_tokens": llm_config.max_tokens
+        }
+
+        self.entity_extractor = EntityExtractor(llm_config=llm_config_dict)
+        self.relation_extractor = RelationExtractor(llm_config=llm_config_dict)
         self._initialized = True
         
         logger.info("Graph extractor initialized")

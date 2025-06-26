@@ -94,9 +94,29 @@ Avoid extracting:
             # Convert to GraphEntity objects and filter by confidence
             graph_entities = []
             for entity in entities:
-                if entity.confidence >= self.min_confidence:
-                    graph_entity = self._convert_to_graph_entity(entity, source_doc_id)
-                    graph_entities.append(graph_entity)
+                try:
+                    # Validate confidence is a float
+                    if not isinstance(entity.confidence, (int, float)):
+                        self.logger.warning(
+                            "Invalid confidence type, skipping entity",
+                            entity_name=entity.name,
+                            confidence_type=type(entity.confidence).__name__,
+                            confidence_value=str(entity.confidence)
+                        )
+                        continue
+
+                    confidence = float(entity.confidence)
+                    if confidence >= self.min_confidence:
+                        graph_entity = self._convert_to_graph_entity(entity, source_doc_id)
+                        graph_entities.append(graph_entity)
+                except Exception as e:
+                    self.logger.warning(
+                        "Error processing entity, skipping",
+                        entity_name=getattr(entity, 'name', 'unknown'),
+                        error=str(e),
+                        error_type=type(e).__name__
+                    )
+                    continue
             
             # Deduplicate entities
             graph_entities = self._deduplicate_entities(graph_entities)
@@ -213,10 +233,13 @@ Avoid extracting:
         if entity.end_pos is not None:
             attributes['end_pos'] = entity.end_pos
         
+        # Ensure confidence is a float
+        confidence = float(entity.confidence) if isinstance(entity.confidence, (int, float)) else 0.5
+
         return GraphEntity(
             name=entity.name,
             type=graph_type,
-            confidence=entity.confidence,
+            confidence=confidence,
             source_doc_id=source_doc_id,
             attributes=attributes
         )

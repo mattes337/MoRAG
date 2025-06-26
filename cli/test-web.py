@@ -28,6 +28,7 @@ import sys
 import asyncio
 import json
 import argparse
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 import urllib.parse
@@ -218,7 +219,8 @@ async def test_web_processing(url: str) -> bool:
 
 
 async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
-                            metadata: Optional[Dict[str, Any]] = None) -> bool:
+                            metadata: Optional[Dict[str, Any]] = None,
+                            use_qdrant: bool = False, use_neo4j: bool = False) -> bool:
     """Test web ingestion functionality via direct API calls."""
     print_header("MoRAG Web Ingestion Test")
 
@@ -232,7 +234,7 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
 
     try:
         from morag.api import MoRAGAPI
-        from morag_graph.graph_extraction import extract_and_ingest
+        from morag.ingestion_coordinator import IngestionCoordinator, DatabaseConfig, DatabaseType
         import uuid
         
         print_section("Processing Web Content")
@@ -260,19 +262,75 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
             # Perform ingestion to vector database and graph database
             if result.text_content:
                 print_section("Ingesting to Databases")
-                print("📊 Ingesting content to databases...")
-                await extract_and_ingest(
-                    result.text_content,
-                    metadata or {},
-                    document_id=task_id
+                print("📊 Starting comprehensive ingestion...")
+
+                # Set up database configurations
+                database_configs = []
+                if use_qdrant:
+                    database_configs.append(DatabaseConfig(
+                        type=DatabaseType.QDRANT,
+                        hostname='localhost',
+                        port=6333,
+                        database_name='morag_web'
+                    ))
+                if use_neo4j:
+                    database_configs.append(DatabaseConfig(
+                        type=DatabaseType.NEO4J,
+                        hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
+                        username=os.getenv('NEO4J_USERNAME', 'neo4j'),
+                        password=os.getenv('NEO4J_PASSWORD', 'password'),
+                        database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
+                    ))
+
+                # Prepare enhanced metadata
+                enhanced_metadata = {
+                    "source_type": "web",
+                    "source_url": url,
+                    "processing_time": result.processing_time,
+                    **(result.metadata or {}),
+                    **(metadata or {})
+                }
+
+                # Initialize ingestion coordinator
+                coordinator = IngestionCoordinator()
+
+                # Perform comprehensive ingestion
+                ingestion_result = await coordinator.ingest_content(
+                    content=result.text_content,
+                    source_path=url,
+                    content_type='web',
+                    metadata=enhanced_metadata,
+                    processing_result=result,
+                    databases=database_configs,
+                    document_id=None,  # Let coordinator generate unified document ID
+                    replace_existing=False
                 )
-                print("✅ Content ingested to vector and graph databases!")
+
+                print("✅ Web ingestion completed successfully!")
             
             print_section("Ingestion Results")
             print_result("Status", "✅ Success")
-            print_result("Task ID", task_id)
-            print_result("Content Length", f"{len(result.text_content or '')} characters")
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+            print_result("Ingestion ID", ingestion_result['ingestion_id'])
+            print_result("Document ID", ingestion_result['source_info']['document_id'])
+            print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
+            print_result("Processing Time", f"{ingestion_result['processing_time']:.2f} seconds")
+            print_result("Chunks Created", str(ingestion_result['embeddings_data']['chunk_count']))
+            print_result("Entities Extracted", str(ingestion_result['graph_data']['entities_count']))
+            print_result("Relations Extracted", str(ingestion_result['graph_data']['relations_count']))
+
+            # Show database results
+            if 'database_results' in ingestion_result:
+                for db_type, db_result in ingestion_result['database_results'].items():
+                    if db_result.get('success'):
+                        print_result(f"{db_type.title()} Storage", "✅ Success")
+                        if 'chunks_stored' in db_result:
+                            print_result(f"  Chunks Stored", str(db_result['chunks_stored']))
+                        if 'entities_stored' in db_result:
+                            print_result(f"  Entities Stored", str(db_result['entities_stored']))
+                        if 'relations_stored' in db_result:
+                            print_result(f"  Relations Stored", str(db_result['relations_stored']))
+                    else:
+                        print_result(f"{db_type.title()} Storage", f"❌ Failed: {db_result.get('error', 'Unknown error')}")
             
             if webhook_url:
                 print_result("Webhook URL", f"Would notify: {webhook_url}")
@@ -373,7 +431,9 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
             success = asyncio.run(test_web_ingestion(
                 args.url,
                 webhook_url=args.webhook_url,
-                metadata=metadata
+                metadata=metadata,
+                use_qdrant=args.qdrant,
+                use_neo4j=args.neo4j
             ))
             if success:
                 print("\n🎉 Web ingestion test completed successfully!")

@@ -16,7 +16,43 @@ class EntityExtractor:
         """Initialize the entity extractor."""
         self.min_confidence = min_confidence
         self.chunk_size = chunk_size
-        self.agent = EntityExtractionAgent(min_confidence=min_confidence, **kwargs)
+
+        # Convert llm_config dict to proper agent configuration
+        agent_kwargs = {}
+        if 'llm_config' in kwargs:
+            llm_config = kwargs.pop('llm_config')
+            if isinstance(llm_config, dict):
+                # Import here to avoid circular imports
+                from morag_core.ai import AgentConfig
+                from morag_core.ai.providers import ProviderConfig, GeminiProvider
+
+                # Create provider config
+                provider_config = ProviderConfig(
+                    api_key=llm_config.get('api_key'),
+                    timeout=llm_config.get('timeout', 30),
+                    max_retries=llm_config.get('max_retries', 3)
+                )
+
+                # Create agent config
+                agent_config = AgentConfig(
+                    model=f"google-gla:{llm_config.get('model', 'gemini-1.5-flash')}",
+                    timeout=llm_config.get('timeout', 30),
+                    max_retries=llm_config.get('max_retries', 3),
+                    temperature=llm_config.get('temperature', 0.1),
+                    max_tokens=llm_config.get('max_tokens'),
+                    provider_config=provider_config
+                )
+
+                # Create provider
+                provider = GeminiProvider(provider_config)
+
+                agent_kwargs['config'] = agent_config
+                agent_kwargs['provider'] = provider
+
+        # Add any remaining kwargs
+        agent_kwargs.update(kwargs)
+
+        self.agent = EntityExtractionAgent(min_confidence=min_confidence, **agent_kwargs)
         self.logger = logger.bind(component="entity_extractor")
     
     async def extract(self, text: str, doc_id: Optional[str] = None, source_doc_id: Optional[str] = None, **kwargs) -> List[Entity]:

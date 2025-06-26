@@ -1201,12 +1201,19 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
     # Include enhanced query router (v2 API)
     try:
-        from morag.endpoints import enhanced_query_router, legacy_router
+        from morag.endpoints import enhanced_query_router
         app.include_router(enhanced_query_router)
-        app.include_router(legacy_router)
-        logger.info("Enhanced query and legacy API endpoints loaded")
+        logger.info("Enhanced query API endpoints loaded")
     except ImportError as e:
         logger.warning("Enhanced query endpoints not available", error=str(e))
+
+    # Legacy router temporarily disabled
+    # try:
+    #     from morag.endpoints import legacy_router
+    #     app.include_router(legacy_router)
+    #     logger.info("Legacy API endpoints loaded")
+    # except ImportError as e:
+    #     logger.warning("Legacy endpoints not available", error=str(e))
 
     # Include reasoning router (multi-hop reasoning API)
     try:

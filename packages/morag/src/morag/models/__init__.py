@@ -26,11 +26,12 @@ from .enhanced_query import (
     GraphTraversalResponse,
 )
 
-from .legacy import (
-    LegacyQueryRequest,
-    LegacyQueryResponse,
-    LegacyResult,
-)
+# Legacy models temporarily removed - will be recreated
+# from .legacy import (
+#     LegacyQueryRequest,
+#     LegacyQueryResponse,
+#     LegacyResult,
+# )
 
 __all__ = [
     "CreateRemoteJobRequest",
@@ -53,7 +54,8 @@ __all__ = [
     "GraphTraversalRequest",
     "GraphPath",
     "GraphTraversalResponse",
-    "LegacyQueryRequest",
-    "LegacyQueryResponse",
-    "LegacyResult",
+    # Legacy models temporarily removed
+    # "LegacyQueryRequest",
+    # "LegacyQueryResponse",
+    # "LegacyResult",
 ]
