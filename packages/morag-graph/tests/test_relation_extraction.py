@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 
 from morag_graph.extraction import EntityExtractor, RelationExtractor
 from morag_graph.models import Entity, Relation, Graph
-from morag_graph.models.types import EntityType, RelationType
 
 # Load environment variables from .env file
 load_dotenv()

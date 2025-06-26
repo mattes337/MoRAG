@@ -14,7 +14,6 @@ from pydantic import BaseModel
 
 from ..models import Entity, Relation, Document, DocumentChunk
 from ..storage.base import BaseStorage
-from ..models.types import RelationType
 
 logger = logging.getLogger(__name__)
 

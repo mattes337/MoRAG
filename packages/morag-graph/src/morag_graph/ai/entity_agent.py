@@ -4,8 +4,8 @@ import asyncio
 from typing import Type, List, Optional, Dict, Any
 import structlog
 
-from morag_core.ai import MoRAGBaseAgent, EntityExtractionResult, Entity, EntityType, ConfidenceLevel
-from ..models import Entity as GraphEntity, EntityType as GraphEntityType
+from morag_core.ai import MoRAGBaseAgent, EntityExtractionResult, Entity, ConfidenceLevel
+from ..models import Entity as GraphEntity
 
 logger = structlog.get_logger(__name__)
 
@@ -86,26 +86,23 @@ Avoid extracting:
 - Entities with very low confidence (<0.5)"""
 
         else:
-            # Fallback to basic static types for backward compatibility
+            # No static types - always use dynamic mode
             return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
 
-Extract entities that represent:
-- PERSON: Individual people, including names, titles, roles
-- ORGANIZATION: Companies, institutions, government bodies, groups
-- LOCATION: Places, addresses, geographical locations, buildings
-- EVENT: Meetings, conferences, incidents, historical events
-- CONCEPT: Ideas, theories, methodologies, abstract concepts
-- PRODUCT: Software, hardware, services, brands, models
-- TECHNOLOGY: Programming languages, frameworks, tools, systems
-- DATE: Specific dates, time periods, deadlines
-- MONEY: Financial amounts, budgets, costs, revenues
-- OTHER: Any other significant named entities
+Determine the most appropriate entity type based on the semantic meaning and context of each entity. Do not limit yourself to predefined categories - use descriptive, domain-specific entity types that capture the essence of what each entity represents.
 
 For each entity, provide:
 1. name: The exact text as it appears in the source
-2. type: The most appropriate entity type from the list above
+2. type: A descriptive entity type that captures the semantic meaning (e.g., SOFTWARE_FRAMEWORK, MEDICAL_CONDITION, RESEARCH_METHODOLOGY, FINANCIAL_INSTRUMENT, etc.)
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. context: Brief description of the entity's role or significance
+
+Guidelines for entity types:
+- Use clear, descriptive names that capture the specific nature of the entity
+- Prefer domain-specific types over generic ones when appropriate
+- Use UPPER_CASE with underscores (e.g., PROGRAMMING_LANGUAGE, GOVERNMENT_AGENCY, SCIENTIFIC_CONCEPT)
+- Be consistent within the same document/domain
+- Consider the entity's role and function in the context
 
 Focus on entities that are:
 - Clearly identifiable and significant
@@ -267,30 +264,12 @@ Avoid extracting:
     
     def _convert_to_graph_entity(self, entity: Entity, source_doc_id: Optional[str]) -> GraphEntity:
         """Convert AI entity to graph entity."""
-        # Handle dynamic entity types
-        if self.dynamic_types:
-            # Use the entity type directly as a string for dynamic types
-            if isinstance(entity.type, str):
-                graph_type = entity.type
-            else:
-                # Handle enum types by extracting the value
-                graph_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
+        # Always use dynamic entity types - LLM determines the type
+        if isinstance(entity.type, str):
+            graph_type = entity.type
         else:
-            # Map AI entity types to graph entity types for static mode
-            type_mapping = {
-                EntityType.PERSON: GraphEntityType.PERSON,
-                EntityType.ORGANIZATION: GraphEntityType.ORGANIZATION,
-                EntityType.LOCATION: GraphEntityType.LOCATION,
-                EntityType.EVENT: GraphEntityType.EVENT,
-                EntityType.CONCEPT: GraphEntityType.CONCEPT,
-                EntityType.PRODUCT: GraphEntityType.PRODUCT,
-                EntityType.TECHNOLOGY: GraphEntityType.TECHNOLOGY,
-                EntityType.DATE: GraphEntityType.DATE,
-                EntityType.MONEY: GraphEntityType.MONEY,
-                EntityType.OTHER: GraphEntityType.CUSTOM,
-            }
-
-            graph_type = type_mapping.get(entity.type, GraphEntityType.CUSTOM)
+            # Handle enum types by extracting the value (fallback for compatibility)
+            graph_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
         
         # Create attributes from metadata and context
         attributes = entity.metadata.copy() if entity.metadata else {}

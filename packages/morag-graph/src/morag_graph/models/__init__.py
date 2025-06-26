@@ -5,7 +5,6 @@ from .relation import Relation
 from .graph import Graph
 from .document import Document
 from .document_chunk import DocumentChunk
-from .types import EntityType, RelationType
 
 __all__ = [
     "Entity",
@@ -13,6 +12,4 @@ __all__ = [
     "Graph",
     "Document",
     "DocumentChunk",
-    "EntityType",
-    "RelationType",
 ]

@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Any, Union, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
-from .types import RelationType, RelationId, RelationAttributes, EntityId
+from .types import RelationId, RelationAttributes, EntityId
 from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
@@ -31,7 +31,7 @@ class Relation(BaseModel):
     id: RelationId = Field(default="")
     source_entity_id: EntityId
     target_entity_id: EntityId
-    type: Union[RelationType, str] = RelationType.CUSTOM
+    type: str = "CUSTOM"
     attributes: RelationAttributes = Field(default_factory=dict)
     source_doc_id: Optional[str] = None
     confidence: float = 1.0
@@ -44,8 +44,8 @@ class Relation(BaseModel):
         """Initialize relation with unified ID generation."""
         # Generate unified relation ID if not provided
         if 'id' not in data or not data['id']:
-            relation_type = data.get('type', RelationType.CUSTOM)
-            if isinstance(relation_type, RelationType):
+            relation_type = data.get('type', "CUSTOM")
+            if hasattr(relation_type, 'value'):
                 relation_type = relation_type.value
             data['id'] = UnifiedIDGenerator.generate_relation_id(
                 source_entity_id=data['source_entity_id'],
@@ -88,11 +88,11 @@ class Relation(BaseModel):
     
     @field_validator('type')
     @classmethod
-    def validate_type(cls, v: Union[RelationType, str]) -> Union[RelationType, str]:
-        """Convert string type to RelationType enum if possible."""
-        if isinstance(v, str) and v in [e.value for e in RelationType]:
-            return RelationType(v)
-        return v
+    def validate_type(cls, v: str) -> str:
+        """Validate relation type is a non-empty string."""
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Relation type must be a non-empty string")
+        return v.strip()
     
     @field_validator('source_entity_id', 'target_entity_id')
     @classmethod
@@ -118,16 +118,11 @@ class Relation(BaseModel):
     
     def to_neo4j_relationship(self) -> Dict[str, Any]:
         """Convert relation to Neo4J relationship properties."""
-        # Get the clean type value before model_dump to avoid enum string representation
-        if hasattr(self.type, 'value') and isinstance(self.type, RelationType):
-            # Handle enum types - get just the value without the class prefix
-            type_value = self.type.value
-        else:
-            # Handle string types or enum string representations
-            type_value = str(self.type)
-            # If it's an enum string representation, extract just the value part
-            if type_value.startswith('RelationType.'):
-                type_value = type_value.replace('RelationType.', '')
+        # Get the clean type value - always a string now
+        type_value = str(self.type)
+        # Clean up any enum string representations that might still exist
+        if type_value.startswith('RelationType.'):
+            type_value = type_value.replace('RelationType.', '')
 
         # Use model_dump but manually handle enum serialization
         properties = self.model_dump()
@@ -195,16 +190,11 @@ class Relation(BaseModel):
     
     def get_neo4j_type(self) -> str:
         """Get the Neo4J relationship type."""
-        # Get the type value without enum prefix
-        if hasattr(self.type, 'value') and isinstance(self.type, RelationType):
-            # Handle enum types - get just the value without the class prefix
-            type_value = self.type.value
-        else:
-            # Handle string types or enum string representations
-            type_value = str(self.type)
-            # If it's an enum string representation, extract just the value part
-            if type_value.startswith('RelationType.'):
-                type_value = type_value.replace('RelationType.', '')
+        # Get the type value - always a string now
+        type_value = str(self.type)
+        # Clean up any enum string representations that might still exist
+        if type_value.startswith('RelationType.'):
+            type_value = type_value.replace('RelationType.', '')
 
         # Sanitize type for valid Neo4j relationship type (no dots, spaces, etc.)
         type_str = type_value.replace('.', '_').replace(' ', '_').replace('-', '_')

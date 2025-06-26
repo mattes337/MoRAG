@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from morag_graph.updates.cleanup_manager import DocumentCleanupManager, CleanupResult
-from morag_graph.models.entity import Entity, EntityType
-from morag_graph.models.relation import Relation, RelationType
+from morag_graph.models.entity import Entity
+from morag_graph.models.relation import Relation
 from morag_graph.storage.base import BaseStorage
 
 
@@ -87,17 +87,17 @@ def sample_entities():
     return [
         Entity(
             name="Entity 1",
-            type=EntityType.PERSON,
+            type="PERSON",
             source_doc_id="doc_test1_abc123"
         ),
         Entity(
             name="Entity 2",
-            type=EntityType.ORGANIZATION,
+            type="ORGANIZATION",
             source_doc_id="doc_test1_abc123"
         ),
         Entity(
             name="Entity 3",
-            type=EntityType.PERSON,
+            type="PERSON",
             source_doc_id="doc_test2_abc123"  # Different document
         )
     ]

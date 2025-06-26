@@ -17,14 +17,12 @@ from morag_core.ai import (
     RelationExtractionResult,
     Entity as AIEntity,
     Relation as AIRelation,
-    EntityType,
-    RelationType,
     ConfidenceLevel,
 )
 
 from morag_graph.ai import EntityExtractionAgent, RelationExtractionAgent
 from morag_graph.extraction import EntityExtractor, RelationExtractor
-from morag_graph.models import Entity as GraphEntity, Relation as GraphRelation, EntityType as GraphEntityType
+from morag_graph.models import Entity as GraphEntity, Relation as GraphRelation
 
 
 class TestEntityExtractionAgent:
@@ -75,16 +73,16 @@ class TestEntityExtractionAgent:
         
         ai_entity = AIEntity(
             name="Apple Inc.",
-            type=EntityType.ORGANIZATION,
+            type="ORGANIZATION",
             confidence=0.95,
             context="Technology company",
             metadata={"industry": "technology"}
         )
-        
+
         graph_entity = agent._convert_to_graph_entity(ai_entity, "doc123")
-        
+
         assert graph_entity.name == "Apple Inc."
-        assert graph_entity.type == GraphEntityType.ORGANIZATION
+        assert graph_entity.type == "ORGANIZATION"
         assert graph_entity.confidence == 0.95
         assert graph_entity.source_doc_id == "doc123"
         assert graph_entity.attributes["context"] == "Technology company"
@@ -97,17 +95,17 @@ class TestEntityExtractionAgent:
         # Create duplicate entities with different confidence scores
         entity1 = GraphEntity(
             name="Apple Inc.",
-            type=GraphEntityType.ORGANIZATION,
+            type="ORGANIZATION",
             confidence=0.8
         )
         entity2 = GraphEntity(
             name="apple inc.",  # Different case
-            type=GraphEntityType.ORGANIZATION,
+            type="ORGANIZATION",
             confidence=0.9
         )
         entity3 = GraphEntity(
             name="Microsoft",
-            type=GraphEntityType.ORGANIZATION,
+            type="ORGANIZATION",
             confidence=0.85
         )
         
@@ -151,17 +149,17 @@ class TestRelationExtractionAgent:
         
         # Create test entities with proper IDs
         entities = [
-            GraphEntity(name="John Doe", type=GraphEntityType.PERSON),
-            GraphEntity(name="Apple Inc.", type=GraphEntityType.ORGANIZATION)
+            GraphEntity(name="John Doe", type="PERSON"),
+            GraphEntity(name="Apple Inc.", type="ORGANIZATION")
         ]
         # Set IDs manually after creation to avoid validation
         entities[0].id = "ent1"
         entities[1].id = "ent2"
-        
+
         ai_relation = AIRelation(
             source_entity="John Doe",
             target_entity="Apple Inc.",
-            relation_type=RelationType.WORKS_FOR,
+            relation_type="WORKS_FOR",
             confidence=0.9,
             context="John works at Apple"
         )
@@ -181,15 +179,15 @@ class TestRelationExtractionAgent:
         
         # Create test entities (missing one entity)
         entities = [
-            GraphEntity(name="John Doe", type=GraphEntityType.PERSON)
+            GraphEntity(name="John Doe", type="PERSON")
         ]
         # Set ID manually after creation to avoid validation
         entities[0].id = "ent1"
-        
+
         ai_relation = AIRelation(
             source_entity="John Doe",
             target_entity="Unknown Company",  # This entity doesn't exist
-            relation_type=RelationType.WORKS_FOR,
+            relation_type="WORKS_FOR",
             confidence=0.9
         )
         
@@ -284,9 +282,9 @@ class TestRelationExtractor:
         extractor = RelationExtractor()
         
         # Create test entities
-        entity1 = GraphEntity(name="John", type=GraphEntityType.PERSON)
-        entity2 = GraphEntity(name="Apple", type=GraphEntityType.ORGANIZATION)
-        entity3 = GraphEntity(name="Microsoft", type=GraphEntityType.ORGANIZATION)
+        entity1 = GraphEntity(name="John", type="PERSON")
+        entity2 = GraphEntity(name="Apple", type="ORGANIZATION")
+        entity3 = GraphEntity(name="Microsoft", type="ORGANIZATION")
         # Set IDs manually after creation to avoid validation
         entity1.id = "ent1"
         entity2.id = "ent2"

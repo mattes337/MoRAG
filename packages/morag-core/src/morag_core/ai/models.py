@@ -13,41 +13,11 @@ class ConfidenceLevel(str, Enum):
     HIGH = "high"
     VERY_HIGH = "very_high"
 
-
-class EntityType(str, Enum):
-    """Types of entities that can be extracted."""
-    PERSON = "person"
-    ORGANIZATION = "organization"
-    LOCATION = "location"
-    EVENT = "event"
-    CONCEPT = "concept"
-    PRODUCT = "product"
-    TECHNOLOGY = "technology"
-    DATE = "date"
-    MONEY = "money"
-    OTHER = "other"
-
-
-class RelationType(str, Enum):
-    """Types of relations between entities."""
-    RELATED_TO = "related_to"
-    PART_OF = "part_of"
-    LOCATED_IN = "located_in"
-    WORKS_FOR = "works_for"
-    FOUNDED_BY = "founded_by"
-    CREATED_BY = "created_by"
-    HAPPENED_AT = "happened_at"
-    CAUSED_BY = "caused_by"
-    SIMILAR_TO = "similar_to"
-    OPPOSITE_OF = "opposite_of"
-    OTHER = "other"
-
-
 class Entity(BaseModel):
     """Represents an extracted entity."""
-    
+
     name: str = Field(description="The name or text of the entity")
-    type: EntityType = Field(description="The type of the entity")
+    type: str = Field(description="The type of the entity (LLM-determined)")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score for the entity")
     start_pos: Optional[int] = Field(default=None, description="Start position in the text")
     end_pos: Optional[int] = Field(default=None, description="End position in the text")
@@ -57,10 +27,10 @@ class Entity(BaseModel):
 
 class Relation(BaseModel):
     """Represents a relation between entities."""
-    
+
     source_entity: str = Field(description="The source entity name")
     target_entity: str = Field(description="The target entity name")
-    relation_type: RelationType = Field(description="The type of relation")
+    relation_type: str = Field(description="The type of relation (LLM-determined)")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score for the relation")
     context: Optional[str] = Field(default=None, description="Context where the relation was found")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")

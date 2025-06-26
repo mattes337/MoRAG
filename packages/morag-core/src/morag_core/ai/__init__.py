@@ -8,8 +8,6 @@ from .summarization_agent import SummarizationAgent
 from .query_analysis_agent import QueryAnalysisAgent
 from .models import (
     ConfidenceLevel,
-    EntityType,
-    RelationType,
     Entity,
     Relation,
     EntityExtractionResult,
@@ -48,8 +46,6 @@ __all__ = [
     "SummarizationAgent",
     "QueryAnalysisAgent",
     "ConfidenceLevel",
-    "EntityType",
-    "RelationType",
     "Entity",
     "Relation",
     "EntityExtractionResult",

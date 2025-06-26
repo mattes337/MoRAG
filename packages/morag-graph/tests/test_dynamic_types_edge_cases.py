@@ -11,7 +11,7 @@ import json
 
 from morag_graph.extraction import EntityExtractor, RelationExtractor
 from morag_graph.extraction.base import LLMConfig
-from morag_graph.models import Entity, Relation, EntityType, RelationType
+from morag_graph.models import Entity, Relation
 
 
 class TestDynamicTypesEdgeCases:

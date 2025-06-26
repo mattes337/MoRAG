@@ -3,13 +3,12 @@
 import pytest
 from unittest.mock import patch
 from morag_graph.utils.id_generation import (
-    UnifiedIDGenerator, 
-    IDValidator, 
+    UnifiedIDGenerator,
+    IDValidator,
     IDCollisionDetector,
     IDValidationError,
     IDCollisionError
 )
-from morag_graph.models.types import EntityType, RelationType
 
 
 class TestUnifiedIDGenerator:
@@ -49,19 +48,19 @@ class TestUnifiedIDGenerator:
         """Test entity ID generation."""
         entity_id = UnifiedIDGenerator.generate_entity_id(
             name="John Doe",
-            entity_type=EntityType.PERSON,
+            entity_type="PERSON",
             source_doc_id="doc_test.pdf_abc123"
         )
         assert entity_id.startswith("ent_")
         assert "john_doe" in entity_id.lower()
         assert "person" in entity_id.lower()
-    
+
     def test_generate_relation_id(self):
         """Test relation ID generation."""
         relation_id = UnifiedIDGenerator.generate_relation_id(
             source_entity_id="ent_john_doe_person_abc123",
             target_entity_id="ent_company_org_abc123",
-            relation_type=RelationType.WORKS_FOR
+            relation_type="WORKS_FOR"
         )
         assert relation_id.startswith("rel_")
         assert "works_for" in relation_id.lower()
@@ -227,20 +226,20 @@ class TestIDGenerationIntegration:
         """Test that relation IDs are consistent with entity IDs."""
         source_entity_id = UnifiedIDGenerator.generate_entity_id(
             name="John Doe",
-            entity_type=EntityType.PERSON,
+            entity_type="PERSON",
             source_doc_id="doc_test.pdf_abc123"
         )
-        
+
         target_entity_id = UnifiedIDGenerator.generate_entity_id(
             name="Acme Corp",
-            entity_type=EntityType.ORGANIZATION,
+            entity_type="ORGANIZATION",
             source_doc_id="doc_test.pdf_abc123"
         )
-        
+
         relation_id = UnifiedIDGenerator.generate_relation_id(
             source_entity_id=source_entity_id,
             target_entity_id=target_entity_id,
-            relation_type=RelationType.WORKS_FOR
+            relation_type="WORKS_FOR"
         )
         
         # Validate all IDs
@@ -264,12 +263,12 @@ class TestIDGenerationIntegration:
         # Generate same entity ID multiple times
         entity_id_1 = UnifiedIDGenerator.generate_entity_id(
             name="John Doe",
-            entity_type=EntityType.PERSON,
+            entity_type="PERSON",
             source_doc_id="doc_test.pdf_abc123"
         )
         entity_id_2 = UnifiedIDGenerator.generate_entity_id(
             name="John Doe",
-            entity_type=EntityType.PERSON,
+            entity_type="PERSON",
             source_doc_id="doc_test.pdf_abc123"
         )
         assert entity_id_1 == entity_id_2
@@ -288,12 +287,12 @@ class TestIDGenerationIntegration:
         
         entity_id_1 = UnifiedIDGenerator.generate_entity_id(
             name="John Doe",
-            entity_type=EntityType.PERSON,
+            entity_type="PERSON",
             source_doc_id="doc_test.pdf_abc123"
         )
         entity_id_2 = UnifiedIDGenerator.generate_entity_id(
             name="Jane Smith",
-            entity_type=EntityType.PERSON,
+            entity_type="PERSON",
             source_doc_id="doc_test.pdf_abc123"
         )
         assert entity_id_1 != entity_id_2

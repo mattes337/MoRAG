@@ -173,7 +173,7 @@ class GraphExtractor:
         Returns:
             List of Entity objects for auto-created entities
         """
-        from morag_graph.models.entity import Entity, EntityType
+        from morag_graph.models.entity import Entity
 
         auto_created_entities = []
         seen_entity_ids = set()
@@ -193,7 +193,7 @@ class GraphExtractor:
                     entity = Entity(
                         id=relation.source_entity_id,
                         name=source_name,
-                        type=EntityType.CUSTOM,
+                        type="CUSTOM",
                         confidence=0.5,
                         source_doc_id=source_path,
                         attributes={
@@ -214,7 +214,7 @@ class GraphExtractor:
                     entity = Entity(
                         id=relation.target_entity_id,
                         name=target_name,
-                        type=EntityType.CUSTOM,
+                        type="CUSTOM",
                         confidence=0.5,
                         source_doc_id=source_path,
                         attributes={

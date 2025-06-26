@@ -25,7 +25,6 @@ from dotenv import load_dotenv
 
 from morag_graph.extraction import EntityExtractor, RelationExtractor
 from morag_graph.models import Entity, Relation, Graph
-from morag_graph.models.types import EntityType, RelationType
 from morag_graph.storage import JsonStorage, JsonConfig
 
 # Load environment variables
@@ -319,7 +318,7 @@ class ExtractionDemo:
                 print(f"  • {neighbor.name} ({neighbor.type.value})")
         
         # Find people entities
-        people = [e for e in self.graph.entities.values() if e.type == EntityType.PERSON]
+        people = [e for e in self.graph.entities.values() if e.type == "PERSON"]
         if len(people) >= 2:
             person1, person2 = people[0], people[1]
             print(f"\n🔍 Looking for paths between {person1.name} and {person2.name}...")

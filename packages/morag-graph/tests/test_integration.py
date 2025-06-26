@@ -15,7 +15,7 @@ from typing import Dict, List
 import pytest
 
 from morag_graph.extraction import EntityExtractor, RelationExtractor
-from morag_graph.models import Entity, Relation, Graph, EntityType, RelationType
+from morag_graph.models import Entity, Relation, Graph
 from morag_graph.storage import JsonStorage
 
 
@@ -313,29 +313,29 @@ class IntegrationTestSuite:
         print("\n🔍 Testing graph queries...")
         
         # Test 1: Find all companies
-        companies = [e for e in graph.entities.values() if e.type == EntityType.ORGANIZATION]
+        companies = [e for e in graph.entities.values() if e.type == "ORGANIZATION"]
         print(f"   Found {len(companies)} companies:")
         for company in companies:
             print(f"     • {company.name}")
-        
+
         # Test 2: Find all people and their roles
-        people = [e for e in graph.entities.values() if e.type == EntityType.PERSON]
+        people = [e for e in graph.entities.values() if e.type == "PERSON"]
         print(f"   Found {len(people)} people:")
         for person in people:
             # Find relations where this person is involved
             person_relations = graph.get_entity_relations(person.id)
             roles = []
             for rel in person_relations:
-                if rel.type == RelationType.WORKS_FOR or rel.type == RelationType.LEADS:
+                if rel.type == "WORKS_FOR" or rel.type == "LEADS":
                     if rel.source_entity_id == person.id:
                         target_entity = graph.entities.get(rel.target_entity_id)
                         if target_entity:
                             rel_type = rel.type.value if hasattr(rel.type, 'value') else rel.type
                             roles.append(f"{rel_type} {target_entity.name}")
             print(f"     • {person.name}: {', '.join(roles) if roles else 'No specific roles found'}")
-        
+
         # Test 3: Find competitors
-        competitor_relations = [r for r in graph.relations.values() if r.type == RelationType.COMPETES_WITH]
+        competitor_relations = [r for r in graph.relations.values() if r.type == "COMPETES_WITH"]
         print(f"   Found {len(competitor_relations)} competitor relationships:")
         for rel in competitor_relations:
             source_entity = graph.entities.get(rel.source_entity_id)
@@ -513,15 +513,15 @@ async def test_storage_integration(integration_suite):
     # Create test entities and relations
     test_entity = Entity(
         name="Test Company",
-        type=EntityType.ORGANIZATION,
+        type="ORGANIZATION",
         source_doc_id="test_doc",
         confidence=0.9
     )
-    
+
     test_relation = Relation(
         source_entity_id=test_entity.id,
         target_entity_id=test_entity.id,  # Self-reference for testing
-        type=RelationType.CUSTOM,
+        type="CUSTOM",
         source_doc_id="test_doc",
         confidence=0.8
     )

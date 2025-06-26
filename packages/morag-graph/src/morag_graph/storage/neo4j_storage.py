@@ -358,7 +358,7 @@ class Neo4jStorage(BaseStorage):
         Returns:
             ID of the created entity
         """
-        from morag_graph.models.entity import Entity, EntityType
+        from morag_graph.models.entity import Entity
 
         # Extract entity name from ID if not provided
         if not entity_name and entity_id.startswith('ent_'):
@@ -374,7 +374,7 @@ class Neo4jStorage(BaseStorage):
         entity = Entity(
             id=entity_id,
             name=entity_name,
-            type=EntityType.CUSTOM,
+            type="CUSTOM",
             confidence=0.5,  # Lower confidence for auto-created entities
             attributes={
                 "auto_created": True,

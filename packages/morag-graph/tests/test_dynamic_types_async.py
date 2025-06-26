@@ -11,7 +11,7 @@ import json
 
 from morag_graph.extraction import EntityExtractor, RelationExtractor
 from morag_graph.extraction.base import LLMConfig
-from morag_graph.models import Entity, Relation, EntityType, RelationType
+from morag_graph.models import Entity, Relation
 
 
 class TestEntityExtractorAsyncDynamicTypes:
@@ -68,7 +68,7 @@ class TestEntityExtractorAsyncDynamicTypes:
             # Verify extraction worked
             assert len(entities) == 2
             assert entities[0].name == "John Doe"
-            assert entities[0].type == EntityType.PERSON
+            assert entities[0].type == "PERSON"
             assert entities[1].name == "COVID-19"
             assert entities[1].type == "DISEASE"  # Custom type from response
             
@@ -190,13 +190,13 @@ class TestRelationExtractorAsyncDynamicTypes:
         entities = [
             Entity(
                 name="John Doe",
-                type=EntityType.PERSON,
+                type="PERSON",
                 source_doc_id="doc_test_abc123",
                 confidence=0.95
             ),
             Entity(
                 name="Acme Corp",
-                type=EntityType.ORGANIZATION,
+                type="ORGANIZATION",
                 source_doc_id="doc_test_abc123",
                 confidence=0.92
             )
@@ -247,7 +247,7 @@ class TestRelationExtractorAsyncDynamicTypes:
             assert len(relations) == 1
             assert relations[0].attributes["source_entity_name"] == "John Doe"
             assert relations[0].attributes["target_entity_name"] == "Acme Corp"
-            assert relations[0].type == RelationType.WORKS_FOR
+            assert relations[0].type == "WORKS_FOR"
             
             # Verify LLM was called with default types
             mock_llm.assert_called_once()
@@ -275,13 +275,13 @@ class TestRelationExtractorAsyncDynamicTypes:
             entities = [
                 Entity(
                     name="Dr. Smith",
-                    type=EntityType.PERSON,
+                    type="PERSON",
                     source_doc_id="doc_test_abc123",
                     confidence=0.95
                 ),
                 Entity(
                     name="patient",
-                    type=EntityType.PERSON,
+                    type="PERSON",
                     source_doc_id="doc_test_abc123",
                     confidence=0.92
                 )
@@ -359,13 +359,13 @@ class TestRelationExtractorAsyncDynamicTypes:
             entities = [
                 Entity(
                     name="John",
-                    type=EntityType.PERSON,
+                    type="PERSON",
                     source_doc_id="doc_test_abc123",
                     confidence=0.95
                 ),
                 Entity(
                     name="Acme Corp",
-                    type=EntityType.ORGANIZATION,
+                    type="ORGANIZATION",
                     source_doc_id="doc_test_abc123",
                     confidence=0.92
                 )

@@ -4,8 +4,8 @@ import asyncio
 from typing import Type, List, Optional, Dict, Any, Tuple
 import structlog
 
-from morag_core.ai import MoRAGBaseAgent, RelationExtractionResult, Relation, RelationType, ConfidenceLevel
-from ..models import Entity as GraphEntity, Relation as GraphRelation, RelationType as GraphRelationType
+from morag_core.ai import MoRAGBaseAgent, RelationExtractionResult, Relation, ConfidenceLevel
+from ..models import Entity as GraphEntity, Relation as GraphRelation
 
 logger = structlog.get_logger(__name__)
 
@@ -92,32 +92,24 @@ Avoid extracting:
 - Duplicate or redundant relations"""
 
         else:
-            # Fallback to basic static types for backward compatibility
+            # No static types - always use dynamic mode
             return """You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.
 
-Extract relations that represent clear, factual connections between entities:
-
-RELATION TYPES:
-- WORKS_FOR: Person works for organization
-- LOCATED_IN: Entity is located in a place
-- PART_OF: Entity is part of another entity
-- CREATED_BY: Entity was created by person/organization
-- FOUNDED: Person founded organization
-- OWNS: Person/organization owns entity
-- USES: Entity uses another entity
-- LEADS: Person leads organization
-- COMPETES_WITH: Organizations compete
-- CAUSES: Entity causes another entity/event
-- TREATS: Treatment treats condition
-- RELATED_TO: General meaningful relationship
-- OTHER: Any other significant relationship
+Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
 1. source_entity: Name of the source entity (exactly as mentioned)
 2. target_entity: Name of the target entity (exactly as mentioned)
-3. relation_type: Most appropriate relation type from the list above
+3. relation_type: A descriptive relation type that captures the semantic meaning (e.g., EMPLOYS, MANUFACTURES, COLLABORATES_WITH, INFLUENCES, DEPENDS_ON, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
+
+Guidelines for relation types:
+- Use clear, descriptive names that capture the specific relationship
+- Prefer domain-specific types over generic ones when appropriate
+- Use UPPER_CASE with underscores (e.g., DEVELOPS_SOFTWARE, TREATS_DISEASE, REGULATES_INDUSTRY)
+- Be consistent within the same document/domain
+- Consider the direction of the relationship (source -> target)
 
 Focus on relations that are:
 - Explicitly stated or clearly implied in the text
@@ -302,31 +294,12 @@ Avoid extracting:
             )
             return None
         
-        # Handle dynamic relation types
-        if self.dynamic_types:
-            # Use the relation type directly as a string for dynamic types
-            if isinstance(relation.relation_type, str):
-                graph_type = relation.relation_type
-            else:
-                # Handle enum types by extracting the value
-                graph_type = relation.relation_type.value if hasattr(relation.relation_type, 'value') else str(relation.relation_type)
+        # Always use dynamic relation types - LLM determines the type
+        if isinstance(relation.relation_type, str):
+            graph_type = relation.relation_type
         else:
-            # Map AI relation types to graph relation types for static mode
-            type_mapping = {
-                RelationType.RELATED_TO: GraphRelationType.RELATED_TO,
-                RelationType.PART_OF: GraphRelationType.PART_OF,
-                RelationType.LOCATED_IN: GraphRelationType.LOCATED_IN,
-                RelationType.WORKS_FOR: GraphRelationType.WORKS_FOR,
-                RelationType.FOUNDED_BY: GraphRelationType.FOUNDED,
-                RelationType.CREATED_BY: GraphRelationType.CREATED_BY,
-                RelationType.HAPPENED_AT: GraphRelationType.HAPPENED_AT,
-                RelationType.CAUSED_BY: GraphRelationType.CAUSES,
-                RelationType.SIMILAR_TO: GraphRelationType.RELATED_TO,  # Map to RELATED_TO as fallback
-                RelationType.OPPOSITE_OF: GraphRelationType.RELATED_TO,  # Map to RELATED_TO as fallback
-                RelationType.OTHER: GraphRelationType.CUSTOM,
-            }
-
-            graph_type = type_mapping.get(relation.relation_type, GraphRelationType.RELATED_TO)
+            # Handle enum types by extracting the value (fallback for compatibility)
+            graph_type = relation.relation_type.value if hasattr(relation.relation_type, 'value') else str(relation.relation_type)
         
         # Create attributes from metadata and context
         attributes = relation.metadata.copy() if relation.metadata else {}

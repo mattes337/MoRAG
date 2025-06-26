@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any, Union, ClassVar, Set
 
 from pydantic import BaseModel, Field, field_validator
 
-from .types import EntityType, EntityId, EntityAttributes
+from .types import EntityId, EntityAttributes
 from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 
@@ -29,7 +29,7 @@ class Entity(BaseModel):
     
     id: EntityId = Field(default="")
     name: str
-    type: Union[EntityType, str] = EntityType.CUSTOM
+    type: str = "CUSTOM"
     attributes: EntityAttributes = Field(default_factory=dict)
     source_doc_id: Optional[str] = None
     confidence: float = 1.0
@@ -46,9 +46,9 @@ class Entity(BaseModel):
         if 'id' not in data or not data['id']:
             # Generate unified deterministic ID based on name, type, and source document
             name = data.get('name', '')
-            entity_type = data.get('type', EntityType.CUSTOM)
+            entity_type = data.get('type', "CUSTOM")
             source_doc_id = data.get('source_doc_id', '')
-            if isinstance(entity_type, EntityType):
+            if hasattr(entity_type, 'value'):
                 entity_type = entity_type.value
             data['id'] = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
         super().__init__(**data)
@@ -68,7 +68,7 @@ class Entity(BaseModel):
             super().__setattr__(name, value)
             # Regenerate ID with new source_doc_id using unified generator
             entity_type = self.type
-            if isinstance(entity_type, EntityType):
+            if hasattr(entity_type, 'value'):
                 entity_type = entity_type.value
             super().__setattr__('id', UnifiedIDGenerator.generate_entity_id(self.name, entity_type, value or ''))
         else:
@@ -158,11 +158,11 @@ class Entity(BaseModel):
     
     @field_validator('type')
     @classmethod
-    def validate_type(cls, v: Union[EntityType, str]) -> Union[EntityType, str]:
-        """Convert string type to EntityType enum if possible."""
-        if isinstance(v, str) and v in [e.value for e in EntityType]:
-            return EntityType(v)
-        return v
+    def validate_type(cls, v: str) -> str:
+        """Validate entity type is a non-empty string."""
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Entity type must be a non-empty string")
+        return v.strip()
     
     def __hash__(self) -> int:
         """Make Entity hashable based on its ID."""
@@ -197,16 +197,11 @@ class Entity(BaseModel):
     
     def to_neo4j_node(self) -> Dict[str, Any]:
         """Convert entity to Neo4J node properties."""
-        # Get the clean type value before model_dump to avoid enum string representation
-        if hasattr(self.type, 'value') and isinstance(self.type, EntityType):
-            # Handle enum types - get just the value without the class prefix
-            type_value = self.type.value
-        else:
-            # Handle string types or enum string representations
-            type_value = str(self.type)
-            # If it's an enum string representation, extract just the value part
-            if type_value.startswith('EntityType.'):
-                type_value = type_value.replace('EntityType.', '')
+        # Get the clean type value - always a string now
+        type_value = str(self.type)
+        # Clean up any enum string representations that might still exist
+        if type_value.startswith('EntityType.'):
+            type_value = type_value.replace('EntityType.', '')
 
         # Use model_dump but manually handle enum serialization
         properties = self.model_dump()
