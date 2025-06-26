@@ -54,8 +54,8 @@ class GraphExtractor:
             "max_tokens": llm_config.max_tokens
         }
 
-        self.entity_extractor = EntityExtractor(llm_config=llm_config_dict)
-        self.relation_extractor = RelationExtractor(llm_config=llm_config_dict)
+        self.entity_extractor = EntityExtractor(llm_config=llm_config_dict, dynamic_types=True)
+        self.relation_extractor = RelationExtractor(llm_config=llm_config_dict, dynamic_types=True)
         self._initialized = True
         
         logger.info("Graph extractor initialized")

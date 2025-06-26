@@ -11,11 +11,36 @@ logger = structlog.get_logger(__name__)
 
 class EntityExtractor:
     """PydanticAI-based entity extractor - completely new implementation."""
-    
-    def __init__(self, min_confidence: float = 0.6, chunk_size: int = 4000, **kwargs):
-        """Initialize the entity extractor."""
+
+    def __init__(self, config=None, min_confidence: float = 0.6, chunk_size: int = 4000, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, **kwargs):
+        """Initialize the entity extractor.
+
+        Args:
+            config: LLMConfig object or dict with LLM configuration (for compatibility with tests)
+            min_confidence: Minimum confidence threshold for entities
+            chunk_size: Maximum characters per chunk for large texts
+            dynamic_types: Whether to use dynamic entity types (LLM-determined)
+            entity_types: Custom entity types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
+            **kwargs: Additional arguments passed to the agent
+        """
         self.min_confidence = min_confidence
         self.chunk_size = chunk_size
+        self.dynamic_types = dynamic_types
+        self.entity_types = entity_types or {}
+
+        # Handle config parameter for test compatibility
+        if config is not None:
+            # If config is provided, it might be an LLMConfig object or dict
+            if hasattr(config, 'provider'):
+                # It's an LLMConfig object, convert to dict
+                llm_config = {
+                    'provider': config.provider,
+                    'model': config.model,
+                    'api_key': getattr(config, 'api_key', None),
+                    'temperature': getattr(config, 'temperature', 0.1),
+                    'max_tokens': getattr(config, 'max_tokens', None)
+                }
+                kwargs['llm_config'] = llm_config
 
         # Convert llm_config dict to proper agent configuration
         agent_kwargs = {}
@@ -52,8 +77,17 @@ class EntityExtractor:
         # Add any remaining kwargs
         agent_kwargs.update(kwargs)
 
-        self.agent = EntityExtractionAgent(min_confidence=min_confidence, **agent_kwargs)
+        self.agent = EntityExtractionAgent(
+            min_confidence=min_confidence,
+            dynamic_types=self.dynamic_types,
+            entity_types=self.entity_types,
+            **agent_kwargs
+        )
         self.logger = logger.bind(component="entity_extractor")
+
+    def get_system_prompt(self) -> str:
+        """Get the system prompt used by the agent."""
+        return self.agent.get_system_prompt()
     
     async def extract(self, text: str, doc_id: Optional[str] = None, source_doc_id: Optional[str] = None, **kwargs) -> List[Entity]:
         """Extract entities from text using PydanticAI agent."""

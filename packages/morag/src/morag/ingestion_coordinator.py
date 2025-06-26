@@ -929,11 +929,14 @@ class IngestionCoordinator:
                     document_id_stored, chunk_id_stored
                 )
 
-            # Store entities
+            # Store entities and update their mentioned_in_chunks field
             entity_ids = []
+            entity_id_to_entity = {}  # Map entity_id to entity object for later updates
+
             for entity in graph_data['entities']:
                 entity_id_stored = await neo4j_storage.store_entity(entity)
                 entity_ids.append(entity_id_stored)
+                entity_id_to_entity[entity_id_stored] = entity
 
             # Store relations
             relation_ids = []
@@ -964,7 +967,7 @@ class IngestionCoordinator:
 
                     logger.debug(f"Creating relationships for chunk {chunk_index} (id: {chunk_id}) with {len(entity_ids_in_chunk)} entities")
 
-                    # Create chunk -> MENTIONS -> entity relationships
+                    # Create chunk -> MENTIONS -> entity relationships and update entity mentioned_in_chunks
                     for entity_id in entity_ids_in_chunk:
                         try:
                             await neo4j_storage.create_chunk_mentions_entity_relation(
@@ -972,6 +975,28 @@ class IngestionCoordinator:
                             )
                             chunk_entity_relationships_created += 1
                             logger.debug(f"Created relationship: chunk {chunk_id} -> entity {entity_id}")
+
+                            # Update entity's mentioned_in_chunks field
+                            entity = None
+                            if entity_id in entity_id_to_entity:
+                                entity = entity_id_to_entity[entity_id]
+                            else:
+                                # This might be an auto-created entity, fetch it from Neo4j
+                                try:
+                                    entity = await neo4j_storage.get_entity(entity_id)
+                                    if entity:
+                                        logger.debug(f"Fetched auto-created entity {entity_id} from Neo4j")
+                                except Exception as fetch_error:
+                                    logger.warning(f"Failed to fetch entity {entity_id} from Neo4j: {fetch_error}")
+
+                            if entity:
+                                entity.add_chunk_reference(chunk_id)
+                                # Update the entity in Neo4j with the new mentioned_in_chunks
+                                await neo4j_storage.store_entity(entity)
+                                logger.debug(f"Updated entity {entity_id} mentioned_in_chunks: {entity.mentioned_in_chunks}")
+                            else:
+                                logger.warning(f"Could not find entity {entity_id} to update mentioned_in_chunks")
+
                         except Exception as e:
                             logger.warning(f"Failed to create chunk-entity relationship: chunk {chunk_id} -> entity {entity_id}: {e}")
                 else:

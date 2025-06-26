@@ -12,23 +12,88 @@ logger = structlog.get_logger(__name__)
 
 class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
     """PydanticAI agent for extracting relations between entities."""
-    
-    def __init__(self, min_confidence: float = 0.6, **kwargs):
+
+    def __init__(self, min_confidence: float = 0.6, dynamic_types: bool = True, relation_types: Optional[Dict[str, str]] = None, **kwargs):
         """Initialize the relation extraction agent.
-        
+
         Args:
             min_confidence: Minimum confidence threshold for relations
+            dynamic_types: Whether to use dynamic relation types (LLM-determined)
+            relation_types: Custom relation types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
             **kwargs: Additional arguments passed to base agent
         """
         super().__init__(**kwargs)
         self.min_confidence = min_confidence
+        self.dynamic_types = dynamic_types
+        self.relation_types = relation_types or {}
         self.logger = logger.bind(agent="relation_extraction")
-    
+
     def get_result_type(self) -> Type[RelationExtractionResult]:
         return RelationExtractionResult
-    
+
     def get_system_prompt(self) -> str:
-        return """You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.
+        if self.dynamic_types and not self.relation_types:
+            # Pure dynamic mode - let LLM determine appropriate relation types
+            return """You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.
+
+Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
+
+For each relation, provide:
+1. source_entity: Name of the source entity (exactly as mentioned)
+2. target_entity: Name of the target entity (exactly as mentioned)
+3. relation_type: A descriptive relation type that captures the semantic meaning (e.g., EMPLOYS, MANUFACTURES, COLLABORATES_WITH, INFLUENCES, DEPENDS_ON, etc.)
+4. confidence: Your confidence in the relation (0.0 to 1.0)
+5. context: Brief explanation of the relationship
+
+Guidelines for relation types:
+- Use clear, descriptive names that capture the specific relationship
+- Prefer domain-specific types over generic ones when appropriate
+- Use UPPER_CASE with underscores (e.g., DEVELOPS_SOFTWARE, TREATS_DISEASE, REGULATES_INDUSTRY)
+- Be consistent within the same document/domain
+- Consider the direction of the relationship (source -> target)
+
+Focus on relations that are:
+- Explicitly stated or clearly implied in the text
+- Factual and verifiable
+- Significant to understanding the content
+
+Avoid extracting:
+- Vague or uncertain relationships
+- Relations based on speculation
+- Relations with very low confidence (<0.5)
+- Duplicate or redundant relations"""
+
+        elif self.relation_types:
+            # Custom types mode - use provided relation types
+            types_section = "\n".join([f"- {type_name}: {description}" for type_name, description in self.relation_types.items()])
+            return f"""You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.
+
+Extract relations that represent clear, factual connections between entities:
+
+RELATION TYPES:
+{types_section}
+
+For each relation, provide:
+1. source_entity: Name of the source entity (exactly as mentioned)
+2. target_entity: Name of the target entity (exactly as mentioned)
+3. relation_type: Most appropriate relation type from the list above
+4. confidence: Your confidence in the relation (0.0 to 1.0)
+5. context: Brief explanation of the relationship
+
+Focus on relations that are:
+- Explicitly stated or clearly implied in the text
+- Factual and verifiable
+- Significant to understanding the content
+
+Avoid extracting:
+- Vague or uncertain relationships
+- Relations based on speculation
+- Relations with very low confidence (<0.5)
+- Duplicate or redundant relations"""
+
+        else:
+            # Fallback to basic static types for backward compatibility
+            return """You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.
 
 Extract relations that represent clear, factual connections between entities:
 
@@ -237,22 +302,31 @@ Avoid extracting:
             )
             return None
         
-        # Map AI relation types to graph relation types
-        type_mapping = {
-            RelationType.RELATED_TO: GraphRelationType.RELATED_TO,
-            RelationType.PART_OF: GraphRelationType.PART_OF,
-            RelationType.LOCATED_IN: GraphRelationType.LOCATED_IN,
-            RelationType.WORKS_FOR: GraphRelationType.WORKS_FOR,
-            RelationType.FOUNDED_BY: GraphRelationType.FOUNDED,
-            RelationType.CREATED_BY: GraphRelationType.CREATED_BY,
-            RelationType.HAPPENED_AT: GraphRelationType.HAPPENED_AT,
-            RelationType.CAUSED_BY: GraphRelationType.CAUSES,
-            RelationType.SIMILAR_TO: GraphRelationType.RELATED_TO,  # Map to RELATED_TO as fallback
-            RelationType.OPPOSITE_OF: GraphRelationType.RELATED_TO,  # Map to RELATED_TO as fallback
-            RelationType.OTHER: GraphRelationType.CUSTOM,
-        }
-        
-        graph_type = type_mapping.get(relation.relation_type, GraphRelationType.RELATED_TO)
+        # Handle dynamic relation types
+        if self.dynamic_types:
+            # Use the relation type directly as a string for dynamic types
+            if isinstance(relation.relation_type, str):
+                graph_type = relation.relation_type
+            else:
+                # Handle enum types by extracting the value
+                graph_type = relation.relation_type.value if hasattr(relation.relation_type, 'value') else str(relation.relation_type)
+        else:
+            # Map AI relation types to graph relation types for static mode
+            type_mapping = {
+                RelationType.RELATED_TO: GraphRelationType.RELATED_TO,
+                RelationType.PART_OF: GraphRelationType.PART_OF,
+                RelationType.LOCATED_IN: GraphRelationType.LOCATED_IN,
+                RelationType.WORKS_FOR: GraphRelationType.WORKS_FOR,
+                RelationType.FOUNDED_BY: GraphRelationType.FOUNDED,
+                RelationType.CREATED_BY: GraphRelationType.CREATED_BY,
+                RelationType.HAPPENED_AT: GraphRelationType.HAPPENED_AT,
+                RelationType.CAUSED_BY: GraphRelationType.CAUSES,
+                RelationType.SIMILAR_TO: GraphRelationType.RELATED_TO,  # Map to RELATED_TO as fallback
+                RelationType.OPPOSITE_OF: GraphRelationType.RELATED_TO,  # Map to RELATED_TO as fallback
+                RelationType.OTHER: GraphRelationType.CUSTOM,
+            }
+
+            graph_type = type_mapping.get(relation.relation_type, GraphRelationType.RELATED_TO)
         
         # Create attributes from metadata and context
         attributes = relation.metadata.copy() if relation.metadata else {}

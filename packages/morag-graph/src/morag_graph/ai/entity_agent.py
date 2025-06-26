@@ -12,23 +12,82 @@ logger = structlog.get_logger(__name__)
 
 class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
     """PydanticAI agent for extracting entities from text."""
-    
-    def __init__(self, min_confidence: float = 0.6, **kwargs):
+
+    def __init__(self, min_confidence: float = 0.6, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, **kwargs):
         """Initialize the entity extraction agent.
-        
+
         Args:
             min_confidence: Minimum confidence threshold for entities
+            dynamic_types: Whether to use dynamic entity types (LLM-determined)
+            entity_types: Custom entity types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
             **kwargs: Additional arguments passed to base agent
         """
         super().__init__(**kwargs)
         self.min_confidence = min_confidence
+        self.dynamic_types = dynamic_types
+        self.entity_types = entity_types or {}
         self.logger = logger.bind(agent="entity_extraction")
-    
+
     def get_result_type(self) -> Type[EntityExtractionResult]:
         return EntityExtractionResult
-    
+
     def get_system_prompt(self) -> str:
-        return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
+        if self.dynamic_types and not self.entity_types:
+            # Pure dynamic mode - let LLM determine appropriate entity types
+            return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
+
+Determine the most appropriate entity type based on the semantic meaning and context of each entity. Do not limit yourself to predefined categories - use descriptive, domain-specific entity types that capture the essence of what each entity represents.
+
+For each entity, provide:
+1. name: The exact text as it appears in the source
+2. type: A descriptive entity type that captures the semantic meaning (e.g., SOFTWARE_FRAMEWORK, MEDICAL_CONDITION, RESEARCH_METHODOLOGY, FINANCIAL_INSTRUMENT, etc.)
+3. confidence: Your confidence in the extraction (0.0 to 1.0)
+4. context: Brief description of the entity's role or significance
+
+Guidelines for entity types:
+- Use clear, descriptive names that capture the specific nature of the entity
+- Prefer domain-specific types over generic ones when appropriate
+- Use UPPER_CASE with underscores (e.g., PROGRAMMING_LANGUAGE, GOVERNMENT_AGENCY, SCIENTIFIC_CONCEPT)
+- Be consistent within the same document/domain
+- Consider the entity's role and function in the context
+
+Focus on entities that are:
+- Clearly identifiable and significant
+- Relevant to the document's main topics
+- Mentioned with sufficient context to determine their type
+
+Avoid extracting:
+- Common words or generic terms
+- Pronouns or vague references
+- Entities with very low confidence (<0.5)"""
+
+        elif self.entity_types:
+            # Custom types mode - use provided entity types
+            types_section = "\n".join([f"- {type_name}: {description}" for type_name, description in self.entity_types.items()])
+            return f"""You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
+
+Extract entities that represent:
+{types_section}
+
+For each entity, provide:
+1. name: The exact text as it appears in the source
+2. type: The most appropriate entity type from the list above
+3. confidence: Your confidence in the extraction (0.0 to 1.0)
+4. context: Brief description of the entity's role or significance
+
+Focus on entities that are:
+- Clearly identifiable and significant
+- Relevant to the document's main topics
+- Mentioned with sufficient context to determine their type
+
+Avoid extracting:
+- Common words or generic terms
+- Pronouns or vague references
+- Entities with very low confidence (<0.5)"""
+
+        else:
+            # Fallback to basic static types for backward compatibility
+            return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
 
 Extract entities that represent:
 - PERSON: Individual people, including names, titles, roles
@@ -208,21 +267,30 @@ Avoid extracting:
     
     def _convert_to_graph_entity(self, entity: Entity, source_doc_id: Optional[str]) -> GraphEntity:
         """Convert AI entity to graph entity."""
-        # Map AI entity types to graph entity types
-        type_mapping = {
-            EntityType.PERSON: GraphEntityType.PERSON,
-            EntityType.ORGANIZATION: GraphEntityType.ORGANIZATION,
-            EntityType.LOCATION: GraphEntityType.LOCATION,
-            EntityType.EVENT: GraphEntityType.EVENT,
-            EntityType.CONCEPT: GraphEntityType.CONCEPT,
-            EntityType.PRODUCT: GraphEntityType.PRODUCT,
-            EntityType.TECHNOLOGY: GraphEntityType.TECHNOLOGY,
-            EntityType.DATE: GraphEntityType.DATE,
-            EntityType.MONEY: GraphEntityType.MONEY,
-            EntityType.OTHER: GraphEntityType.CUSTOM,
-        }
-        
-        graph_type = type_mapping.get(entity.type, GraphEntityType.CUSTOM)
+        # Handle dynamic entity types
+        if self.dynamic_types:
+            # Use the entity type directly as a string for dynamic types
+            if isinstance(entity.type, str):
+                graph_type = entity.type
+            else:
+                # Handle enum types by extracting the value
+                graph_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
+        else:
+            # Map AI entity types to graph entity types for static mode
+            type_mapping = {
+                EntityType.PERSON: GraphEntityType.PERSON,
+                EntityType.ORGANIZATION: GraphEntityType.ORGANIZATION,
+                EntityType.LOCATION: GraphEntityType.LOCATION,
+                EntityType.EVENT: GraphEntityType.EVENT,
+                EntityType.CONCEPT: GraphEntityType.CONCEPT,
+                EntityType.PRODUCT: GraphEntityType.PRODUCT,
+                EntityType.TECHNOLOGY: GraphEntityType.TECHNOLOGY,
+                EntityType.DATE: GraphEntityType.DATE,
+                EntityType.MONEY: GraphEntityType.MONEY,
+                EntityType.OTHER: GraphEntityType.CUSTOM,
+            }
+
+            graph_type = type_mapping.get(entity.type, GraphEntityType.CUSTOM)
         
         # Create attributes from metadata and context
         attributes = entity.metadata.copy() if entity.metadata else {}
