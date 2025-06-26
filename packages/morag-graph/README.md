@@ -41,22 +41,65 @@ pip install morag-graph
 
 ```python
 from morag_graph.models import Entity, Relation, Graph
-from morag_graph.extraction import EntityExtractor, RelationExtractor
+from morag_graph.extraction import EntityExtractor, RelationExtractor, HybridEntityExtractor
 from morag_graph.storage import Neo4jStorage
 
-# Extract entities and relations from text
+# Standard AI-based extraction
 entity_extractor = EntityExtractor()
 relation_extractor = RelationExtractor()
 
 entities = await entity_extractor.extract("Your text content here")
 relations = await relation_extractor.extract("Your text content here", entities)
 
+# Enhanced hybrid extraction (AI + Pattern Matching)
+hybrid_extractor = HybridEntityExtractor(
+    min_confidence=0.7,
+    enable_pattern_matching=True,
+    pattern_confidence_boost=0.1
+)
+enhanced_entities = await hybrid_extractor.extract("Your text content here")
+
 # Store in Neo4J
 storage = Neo4jStorage(uri="neo4j://localhost:7687", auth=("neo4j", "password"))
-for entity in entities:
+for entity in enhanced_entities:
     await storage.store_entity(entity)
 for relation in relations:
     await storage.store_relation(relation)
+```
+
+### Hybrid Entity Extraction
+
+The package now includes enhanced entity extraction that combines AI-based extraction with pattern matching for improved accuracy:
+
+```python
+from morag_graph.extraction import HybridEntityExtractor, EntityPatternMatcher, EntityPattern, PatternType
+
+# Create hybrid extractor
+extractor = HybridEntityExtractor(
+    min_confidence=0.6,
+    enable_pattern_matching=True,
+    pattern_confidence_boost=0.1,  # Boost confidence for pattern matches
+    ai_confidence_boost=0.0        # Boost confidence for AI matches
+)
+
+# Extract entities with enhanced accuracy
+text = "I'm using Python and React to build applications for Microsoft."
+entities = await extractor.extract(text)
+
+# Add custom patterns
+pattern_matcher = EntityPatternMatcher()
+custom_pattern = EntityPattern(
+    pattern=r"\bCustomTech\b",
+    entity_type="TECHNOLOGY",
+    pattern_type=PatternType.REGEX,
+    confidence=0.9,
+    description="Custom technology pattern"
+)
+pattern_matcher.add_pattern(custom_pattern)
+
+# Get extraction statistics
+stats = extractor.get_extraction_stats()
+print(f"Using {stats['pattern_count']} patterns")
 ```
 
 ### Command Line Scripts
