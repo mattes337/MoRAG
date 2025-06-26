@@ -220,7 +220,9 @@ async def test_web_processing(url: str) -> bool:
 
 async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
                             metadata: Optional[Dict[str, Any]] = None,
-                            use_qdrant: bool = False, use_neo4j: bool = False) -> bool:
+                            use_qdrant: bool = False, use_neo4j: bool = False,
+                            qdrant_collection_name: Optional[str] = None,
+                            neo4j_database_name: Optional[str] = None) -> bool:
     """Test web ingestion functionality via direct API calls."""
     print_header("MoRAG Web Ingestion Test")
 
@@ -267,19 +269,27 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
                 # Set up database configurations
                 database_configs = []
                 if use_qdrant:
+                    qdrant_collection = (
+                        qdrant_collection_name or
+                        os.getenv('QDRANT_COLLECTION', 'morag_web')
+                    )
                     database_configs.append(DatabaseConfig(
                         type=DatabaseType.QDRANT,
                         hostname='localhost',
                         port=6333,
-                        database_name='morag_web'
+                        database_name=qdrant_collection
                     ))
                 if use_neo4j:
+                    neo4j_database = (
+                        neo4j_database_name or
+                        os.getenv('NEO4J_DATABASE', 'neo4j')
+                    )
                     database_configs.append(DatabaseConfig(
                         type=DatabaseType.NEO4J,
                         hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
                         username=os.getenv('NEO4J_USERNAME', 'neo4j'),
                         password=os.getenv('NEO4J_PASSWORD', 'password'),
-                        database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
+                        database_name=neo4j_database
                     ))
 
                 # Prepare enhanced metadata
@@ -403,14 +413,20 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
                        help='Enable ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
+    parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_web)')
     parser.add_argument('--neo4j', action='store_true',
                        help='Store in Neo4j graph database (ingestion mode only)')
+    parser.add_argument('--neo4j-database', help='Neo4j database name (default: from environment or neo4j)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
     parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
     parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 
     args = parser.parse_args()
+
+    # Extract database configuration arguments
+    qdrant_collection_name = args.qdrant_collection
+    neo4j_database_name = args.neo4j_database
 
     # Parse metadata if provided
     metadata = None
@@ -433,7 +449,9 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
                 webhook_url=args.webhook_url,
                 metadata=metadata,
                 use_qdrant=args.qdrant,
-                use_neo4j=args.neo4j
+                use_neo4j=args.neo4j,
+                qdrant_collection_name=qdrant_collection_name,
+                neo4j_database_name=neo4j_database_name
             ))
             if success:
                 print("\n🎉 Web ingestion test completed successfully!")

@@ -19,35 +19,18 @@ logger = structlog.get_logger(__name__)
 try:
     import spacy
     SPACY_AVAILABLE = True
-
-    # Get spacy model from environment variable or use default
-    import os
-    spacy_model = os.environ.get("MORAG_SPACY_MODEL", "en_core_web_sm")
-
-    try:
-        nlp = spacy.load(spacy_model)
-        logger.info(f"Loaded spaCy model: {spacy_model}")
-    except OSError:
-        # Fallback to other common models
-        fallback_models = ["en_core_web_sm", "en_core_web_md", "de_core_news_sm", "de_core_news_md"]
-        nlp = None
-
-        for model in fallback_models:
-            if model != spacy_model:  # Don't try the same model twice
-                try:
-                    nlp = spacy.load(model)
-                    logger.info(f"Loaded fallback spaCy model: {model}")
-                    break
-                except OSError:
-                    continue
-
-        if nlp is None:
-            logger.warning("No spaCy models available, using basic NLP processing")
-            SPACY_AVAILABLE = False
+    logger.info("SpaCy is available for NLP processing")
 except ImportError:
     SPACY_AVAILABLE = False
-    nlp = None
     logger.warning("spaCy not available, using basic NLP processing")
+
+# Import language detection service
+try:
+    from morag_core.services.language_detection import get_language_service
+    LANGUAGE_DETECTION_AVAILABLE = True
+except ImportError:
+    LANGUAGE_DETECTION_AVAILABLE = False
+    logger.warning("Language detection service not available")
 
 try:
     import nltk
@@ -283,22 +266,32 @@ class TopicSegmentationService:
         """Extract sentences from text using available NLP libraries."""
         if not text or text.strip() == "":
             return []
-        
-        # Try spaCy first
-        if SPACY_AVAILABLE and nlp:
+
+        # Try spaCy with dynamic language detection
+        if SPACY_AVAILABLE and LANGUAGE_DETECTION_AVAILABLE:
             try:
-                # Process in chunks to avoid memory issues with long texts
-                max_length = 100000  # spaCy default
-                if len(text) > max_length:
-                    chunks = [text[i:i+max_length] for i in range(0, len(text), max_length)]
-                    all_sentences = []
-                    for chunk in chunks:
-                        doc = nlp(chunk)
-                        all_sentences.extend([sent.text.strip() for sent in doc.sents if sent.text.strip()])
-                    return all_sentences
+                language_service = get_language_service()
+                detected_language, nlp_model = language_service.detect_and_get_model(text)
+
+                if nlp_model:
+                    logger.debug("Using language-specific SpaCy model for sentence extraction",
+                               language=detected_language)
+
+                    # Process in chunks to avoid memory issues with long texts
+                    max_length = 100000  # spaCy default
+                    if len(text) > max_length:
+                        chunks = [text[i:i+max_length] for i in range(0, len(text), max_length)]
+                        all_sentences = []
+                        for chunk in chunks:
+                            doc = nlp_model(chunk)
+                            all_sentences.extend([sent.text.strip() for sent in doc.sents if sent.text.strip()])
+                        return all_sentences
+                    else:
+                        doc = nlp_model(text)
+                        return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
                 else:
-                    doc = nlp(text)
-                    return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+                    logger.debug("No suitable SpaCy model found for detected language",
+                               language=detected_language)
             except Exception as e:
                 logger.warning("spaCy sentence extraction failed", error=str(e))
         
@@ -547,23 +540,33 @@ class TopicSegmentationService:
         """Extract keywords from sentences."""
         if not sentences:
             return []
-        
+
         # Join sentences
         text = " ".join(sentences)
-        
-        # Try spaCy for keyword extraction
-        if SPACY_AVAILABLE and nlp:
+
+        # Try spaCy for keyword extraction with dynamic language detection
+        if SPACY_AVAILABLE and LANGUAGE_DETECTION_AVAILABLE:
             try:
-                doc = nlp(text)
-                # Extract nouns and proper nouns as keywords
-                keywords = []
-                for token in doc:
-                    if token.pos_ in ["NOUN", "PROPN"] and len(token.text) > 2:
-                        keywords.append(token.text.lower())
-                
-                # Count frequencies and get top keywords
-                keyword_counts = Counter(keywords)
-                return [kw for kw, _ in keyword_counts.most_common(max_keywords)]
+                language_service = get_language_service()
+                detected_language, nlp_model = language_service.detect_and_get_model(text)
+
+                if nlp_model:
+                    logger.debug("Using language-specific SpaCy model for keyword extraction",
+                               language=detected_language)
+
+                    doc = nlp_model(text)
+                    # Extract nouns and proper nouns as keywords
+                    keywords = []
+                    for token in doc:
+                        if token.pos_ in ["NOUN", "PROPN"] and len(token.text) > 2:
+                            keywords.append(token.text.lower())
+
+                    # Count frequencies and get top keywords
+                    keyword_counts = Counter(keywords)
+                    return [kw for kw, _ in keyword_counts.most_common(max_keywords)]
+                else:
+                    logger.debug("No suitable SpaCy model found for keyword extraction",
+                               language=detected_language)
             except Exception as e:
                 logger.warning("spaCy keyword extraction failed", error=str(e))
         

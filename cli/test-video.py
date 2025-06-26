@@ -393,8 +393,10 @@ Note: Video processing may take several minutes for large files.
                        help='Enable ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
+    parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_videos)')
     parser.add_argument('--neo4j', action='store_true',
                        help='Store in Neo4j graph database (ingestion mode only)')
+    parser.add_argument('--neo4j-database', help='Neo4j database name (default: from environment or neo4j)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
     parser.add_argument('--thumbnails', action='store_true',

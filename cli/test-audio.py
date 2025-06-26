@@ -278,14 +278,16 @@ async def store_content_in_vector_db(
 
 
 async def test_audio_ingestion(
-    audio_file: Path, 
+    audio_file: Path,
     webhook_url: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None, 
+    metadata: Optional[Dict[str, Any]] = None,
     model_size: str = "base",
-    enable_diarization: bool = False, 
+    enable_diarization: bool = False,
     enable_topics: bool = False,
     use_qdrant: bool = True,
-    use_neo4j: bool = False
+    use_neo4j: bool = False,
+    qdrant_collection_name: Optional[str] = None,
+    neo4j_database_name: Optional[str] = None
 ) -> bool:
     """Test audio ingestion functionality with graph extraction and dual database storage."""
     print_header("MoRAG Audio Ingestion Test")
@@ -546,8 +548,10 @@ Examples:
                        help='Enable ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
+    parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_audio)')
     parser.add_argument('--neo4j', action='store_true',
                        help='Store in Neo4j graph database (ingestion mode only)')
+    parser.add_argument('--neo4j-database', help='Neo4j database name (default: from environment or neo4j)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
     parser.add_argument('--model-size', choices=['tiny', 'base', 'small', 'medium', 'large'],
@@ -562,6 +566,10 @@ Examples:
     args = parser.parse_args()
 
     audio_file = Path(args.audio_file)
+
+    # Extract database configuration arguments
+    qdrant_collection_name = args.qdrant_collection
+    neo4j_database_name = args.neo4j_database
 
     # Parse metadata if provided
     metadata = None
@@ -587,7 +595,9 @@ Examples:
                 enable_diarization=args.enable_diarization,
                 enable_topics=args.enable_topics,
                 use_qdrant=args.qdrant,
-                use_neo4j=args.neo4j
+                use_neo4j=args.neo4j,
+                qdrant_collection_name=qdrant_collection_name,
+                neo4j_database_name=neo4j_database_name
             ))
             if success:
                 print("\n🎉 Audio ingestion test completed successfully!")

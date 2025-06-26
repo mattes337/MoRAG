@@ -48,12 +48,16 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         """
         # Create a basic config for the parent class
         from morag_core.interfaces.embedding import EmbeddingConfig, EmbeddingProvider
+        # Get batch size from environment or use default
+        import os
+        batch_size = int(os.getenv('MORAG_EMBEDDING_BATCH_SIZE', '50'))
+
         config = EmbeddingConfig(
             provider=EmbeddingProvider.GEMINI,
             model_name=embedding_model,
             api_key=api_key,
             max_tokens=8192,
-            batch_size=10
+            batch_size=batch_size
         )
         super().__init__(config)
 
@@ -414,13 +418,17 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         self,
         texts: List[str],
         task_type: str = "retrieval_document",
-        batch_size: int = 10,
+        batch_size: Optional[int] = None,
         delay_between_batches: float = 0.1,
         use_native_batch: bool = True
     ) -> List[EmbeddingResult]:
         """Generate embeddings for multiple texts with optimized batch processing."""
         if not texts:
             return []
+
+        # Use config batch size if none provided
+        if batch_size is None:
+            batch_size = self.config.batch_size
 
         results = []
 

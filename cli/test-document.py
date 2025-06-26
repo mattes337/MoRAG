@@ -306,7 +306,9 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
                                  metadata: Optional[Dict[str, Any]] = None,
                                  chunking_strategy: str = "paragraph",
                                  chunk_size: int = 1000, chunk_overlap: int = 200,
-                                 use_qdrant: bool = True, use_neo4j: bool = True) -> bool:
+                                 use_qdrant: bool = True, use_neo4j: bool = True,
+                                 qdrant_collection_name: Optional[str] = None,
+                                 neo4j_database_name: Optional[str] = None) -> bool:
     """Test document ingestion using the proper ingestion coordinator."""
     print_header("MoRAG Document Ingestion Test")
 
@@ -358,19 +360,27 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         # Configure databases based on flags
         database_configs = []
         if use_qdrant:
+            qdrant_collection = (
+                qdrant_collection_name or
+                os.getenv('QDRANT_COLLECTION', 'morag_documents')
+            )
             database_configs.append(DatabaseConfig(
                 type=DatabaseType.QDRANT,
                 hostname='localhost',
                 port=6333,
-                database_name='morag_documents'
+                database_name=qdrant_collection
             ))
         if use_neo4j:
+            neo4j_database = (
+                neo4j_database_name or
+                os.getenv('NEO4J_DATABASE', 'neo4j')
+            )
             database_configs.append(DatabaseConfig(
                 type=DatabaseType.NEO4J,
                 hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
                 username=os.getenv('NEO4J_USERNAME', 'neo4j'),
                 password=os.getenv('NEO4J_PASSWORD', 'password'),
-                database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
+                database_name=neo4j_database
             ))
 
         # Prepare enhanced metadata
@@ -480,8 +490,10 @@ Examples:
                        help='Enable ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
+    parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_documents)')
     parser.add_argument('--neo4j', action='store_true',
                        help='Store in Neo4j graph database (ingestion mode only)')
+    parser.add_argument('--neo4j-database', help='Neo4j database name (default: from environment or neo4j)')
     parser.add_argument('--webhook-url', help='Webhook URL for completion notifications (ingestion mode only)')
     parser.add_argument('--metadata', help='Additional metadata as JSON string (ingestion mode only)')
     parser.add_argument('--chunking-strategy', choices=['paragraph', 'sentence', 'page', 'chapter'],
@@ -496,6 +508,10 @@ Examples:
     args = parser.parse_args()
 
     document_file = Path(args.document_file)
+
+    # Extract database configuration arguments
+    qdrant_collection_name = args.qdrant_collection
+    neo4j_database_name = args.neo4j_database
 
     # Parse metadata if provided
     metadata = None
@@ -521,7 +537,9 @@ Examples:
                 chunk_size=args.chunk_size,
                 chunk_overlap=args.chunk_overlap,
                 use_qdrant=args.qdrant,
-                use_neo4j=args.neo4j
+                use_neo4j=args.neo4j,
+                qdrant_collection_name=qdrant_collection_name,
+                neo4j_database_name=neo4j_database_name
             ))
             if success:
                 print("\n🎉 Document ingestion test completed successfully!")
