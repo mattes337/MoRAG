@@ -53,13 +53,16 @@ class Neo4jStorage(BaseStorage):
                 max_connection_pool_size=self.config.max_connection_pool_size,
                 connection_acquisition_timeout=self.config.connection_acquisition_timeout,
             )
-            
-            # Test connection
+
+            # Ensure database exists before testing connection
+            await self._ensure_database_exists()
+
+            # Test connection to the specific database
             async with self.driver.session(database=self.config.database) as session:
                 await session.run("RETURN 1")
-            
+
             logger.info("Connected to Neo4J database")
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to Neo4J: {e}")
             raise
@@ -70,10 +73,83 @@ class Neo4jStorage(BaseStorage):
             await self.driver.close()
             self.driver = None
             logger.info("Disconnected from Neo4J database")
-    
+
+    async def _ensure_database_exists(self) -> None:
+        """Ensure the specified database exists, create it if it doesn't."""
+        try:
+            # First try to connect to the system database to check/create the target database
+            # This works in Neo4j Enterprise Edition
+            async with self.driver.session(database="system") as session:
+                # Check if database exists
+                result = await session.run(
+                    "SHOW DATABASES YIELD name WHERE name = $db_name",
+                    {"db_name": self.config.database}
+                )
+                databases = await result.data()
+
+                if not databases:
+                    # Database doesn't exist, create it
+                    logger.info(f"Creating Neo4j database: {self.config.database}")
+                    await session.run(f"CREATE DATABASE `{self.config.database}`")
+                    logger.info(f"Successfully created Neo4j database: {self.config.database}")
+                else:
+                    logger.info(f"Neo4j database already exists: {self.config.database}")
+
+        except Exception as e:
+            # If we can't create the database (e.g., Neo4j Community Edition or auth issues),
+            # try to connect directly to the target database
+            logger.warning(f"Could not ensure database exists via system database (this is normal for Neo4j Community Edition): {e}")
+
+            # For Community Edition or when we can't access system database,
+            # try to connect directly to the target database
+            try:
+                async with self.driver.session(database=self.config.database) as session:
+                    await session.run("RETURN 1")
+                logger.info(f"Successfully connected to existing Neo4j database: {self.config.database}")
+            except Exception as direct_error:
+                # If the database doesn't exist and we can't create it, suggest using 'neo4j' database
+                if "DatabaseNotFound" in str(direct_error):
+                    logger.error(f"Database '{self.config.database}' does not exist and cannot be created automatically. "
+                               f"Please either: 1) Create the database manually, 2) Use the default 'neo4j' database, "
+                               f"or 3) Use Neo4j Enterprise Edition for automatic database creation.")
+                raise direct_error
+
+    async def create_database_if_not_exists(self, database_name: str) -> bool:
+        """
+        Manually create a database if it doesn't exist.
+
+        Args:
+            database_name: Name of the database to create
+
+        Returns:
+            True if database was created or already exists, False if creation failed
+        """
+        try:
+            async with self.driver.session(database="system") as session:
+                # Check if database exists
+                result = await session.run(
+                    "SHOW DATABASES YIELD name WHERE name = $db_name",
+                    {"db_name": database_name}
+                )
+                databases = await result.data()
+
+                if not databases:
+                    # Database doesn't exist, create it
+                    logger.info(f"Creating Neo4j database: {database_name}")
+                    await session.run(f"CREATE DATABASE `{database_name}`")
+                    logger.info(f"Successfully created Neo4j database: {database_name}")
+                    return True
+                else:
+                    logger.info(f"Neo4j database already exists: {database_name}")
+                    return True
+
+        except Exception as e:
+            logger.error(f"Failed to create database {database_name}: {e}")
+            return False
+
     async def _execute_query(
-        self, 
-        query: str, 
+        self,
+        query: str,
         parameters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Execute a Cypher query.

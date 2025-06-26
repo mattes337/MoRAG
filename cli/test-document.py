@@ -538,8 +538,8 @@ Examples:
                 chunk_overlap=args.chunk_overlap,
                 use_qdrant=args.qdrant,
                 use_neo4j=args.neo4j,
-                qdrant_collection_name=qdrant_collection_name,
-                neo4j_database_name=neo4j_database_name
+                qdrant_collection_name=args.qdrant_collection,
+                neo4j_database_name=args.neo4j_database
             ))
             if success:
                 print("\n🎉 Document ingestion test completed successfully!")

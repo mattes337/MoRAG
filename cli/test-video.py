@@ -213,7 +213,9 @@ async def test_video_ingestion(
     webhook_url: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     use_qdrant: bool = True,
-    use_neo4j: bool = True
+    use_neo4j: bool = True,
+    qdrant_collection_name: Optional[str] = None,
+    neo4j_database_name: Optional[str] = None
 ) -> bool:
     """
     Test video ingestion using the proper ingestion coordinator.
@@ -273,19 +275,21 @@ async def test_video_ingestion(
             # Configure databases based on flags
             database_configs = []
             if use_qdrant:
+                collection_name = qdrant_collection_name or os.getenv('MORAG_QDRANT_COLLECTION', 'morag_videos')
                 database_configs.append(DatabaseConfig(
                     type=DatabaseType.QDRANT,
                     hostname='localhost',
                     port=6333,
-                    database_name='morag_documents'
+                    database_name=collection_name
                 ))
             if use_neo4j:
+                db_name = neo4j_database_name or os.getenv('NEO4J_DATABASE', 'neo4j')
                 database_configs.append(DatabaseConfig(
                     type=DatabaseType.NEO4J,
                     hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
                     username=os.getenv('NEO4J_USERNAME', 'neo4j'),
                     password=os.getenv('NEO4J_PASSWORD', 'password'),
-                    database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
+                    database_name=db_name
                 ))
 
             # Initialize ingestion coordinator
@@ -433,7 +437,9 @@ Note: Video processing may take several minutes for large files.
                 webhook_url=args.webhook_url,
                 metadata=metadata,
                 use_qdrant=args.qdrant,
-                use_neo4j=args.neo4j
+                use_neo4j=args.neo4j,
+                qdrant_collection_name=args.qdrant_collection,
+                neo4j_database_name=args.neo4j_database
             ))
             if success:
                 print("\n🎉 Video ingestion test completed successfully!")

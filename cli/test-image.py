@@ -28,6 +28,7 @@ Options:
 """
 
 import sys
+import os
 import asyncio
 import json
 import argparse
@@ -317,11 +318,13 @@ async def test_image_processing(
 
 
 async def test_image_ingestion(
-    image_file: Path, 
+    image_file: Path,
     webhook_url: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     use_qdrant: bool = True,
-    use_neo4j: bool = False
+    use_neo4j: bool = False,
+    qdrant_collection_name: Optional[str] = None,
+    neo4j_database_name: Optional[str] = None
 ) -> bool:
     """Test image ingestion functionality with graph extraction and dual database storage."""
     print_header("MoRAG Image Ingestion Test")
@@ -493,12 +496,35 @@ async def test_image_ingestion(
             }
             
             try:
+                # Prepare database configurations
+                qdrant_config = None
+                neo4j_config = None
+
+                if use_qdrant:
+                    collection_name = qdrant_collection_name or os.getenv('MORAG_QDRANT_COLLECTION', 'morag_images')
+                    qdrant_config = {
+                        'host': 'localhost',
+                        'port': 6333,
+                        'collection_name': collection_name
+                    }
+
+                if use_neo4j:
+                    db_name = neo4j_database_name or os.getenv('NEO4J_DATABASE', 'neo4j')
+                    neo4j_config = {
+                        'uri': os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
+                        'username': os.getenv('NEO4J_USERNAME', 'neo4j'),
+                        'password': os.getenv('NEO4J_PASSWORD', 'password'),
+                        'database': db_name
+                    }
+
                 graph_results = await extract_and_ingest(
                     text_content=text_content,
                     doc_id=f"image_{image_file.stem}",
                     context=f"Image analysis from {image_file.name}",
                     use_qdrant=use_qdrant,
                     use_neo4j=use_neo4j,
+                    qdrant_config=qdrant_config,
+                    neo4j_config=neo4j_config,
                     metadata=ingestion_metadata
                 )
                 
@@ -642,7 +668,9 @@ Examples:
                 webhook_url=args.webhook_url,
                 metadata=metadata,
                 use_qdrant=use_qdrant,
-                use_neo4j=use_neo4j
+                use_neo4j=use_neo4j,
+                qdrant_collection_name=args.qdrant_collection,
+                neo4j_database_name=args.neo4j_database
             ))
             if success:
                 print("\n🎉 Image ingestion test completed successfully!")

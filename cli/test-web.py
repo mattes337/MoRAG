@@ -450,8 +450,8 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
                 metadata=metadata,
                 use_qdrant=args.qdrant,
                 use_neo4j=args.neo4j,
-                qdrant_collection_name=qdrant_collection_name,
-                neo4j_database_name=neo4j_database_name
+                qdrant_collection_name=args.qdrant_collection,
+                neo4j_database_name=args.neo4j_database
             ))
             if success:
                 print("\n🎉 Web ingestion test completed successfully!")

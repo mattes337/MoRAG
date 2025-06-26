@@ -31,6 +31,29 @@ MoRAG supports two distinct operation modes:
 
 All CLI scripts are located in `cli/` and support both operation modes with enhanced graph extraction capabilities.
 
+### Database Setup Scripts
+
+#### `create-databases.py`
+**Purpose**: Create Neo4j databases and Qdrant collections before ingestion
+```bash
+# Create both database and collection
+python cli/create-databases.py --neo4j-database smartcard --qdrant-collection smartcard_docs
+
+# Create only Neo4j database
+python cli/create-databases.py --neo4j-database my_database
+
+# Create only Qdrant collection
+python cli/create-databases.py --qdrant-collection my_collection
+
+# List existing databases and collections
+python cli/create-databases.py --list-existing
+```
+
+**Use Cases**:
+- Neo4j Community Edition (doesn't support automatic database creation)
+- Pre-creating databases/collections for better organization
+- Troubleshooting database connection issues
+
 ### System Validation Scripts
 
 #### `test-simple.py`
@@ -254,7 +277,9 @@ python cli/test-remote-conversion.py --test api
 |--------|-------------|---------|
 | `--ingest` | Enable ingestion mode (background processing + storage) | `--ingest` |
 | `--qdrant` | Store vectors in Qdrant database (requires `--ingest`) | `--qdrant` |
+| `--qdrant-collection NAME` | Qdrant collection name (auto-created if not exists) | `--qdrant-collection my_docs` |
 | `--neo4j` | Store graph entities/relations in Neo4j (requires `--ingest`) | `--neo4j` |
+| `--neo4j-database NAME` | Neo4j database name (auto-created if not exists) | `--neo4j-database my_graph` |
 | `--remote` | Enable remote processing (requires `--ingest`) | `--remote` |
 | `--webhook-url URL` | Webhook URL for completion notifications | `--webhook-url https://my-app.com/webhook` |
 | `--metadata JSON` | Additional metadata as JSON string | `--metadata '{"category": "research"}'` |

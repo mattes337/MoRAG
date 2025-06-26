@@ -216,7 +216,9 @@ async def test_youtube_processing(url: str) -> bool:
 
 
 async def test_youtube_ingestion(url: str, webhook_url: Optional[str] = None,
-                                metadata: Optional[Dict[str, Any]] = None) -> bool:
+                                metadata: Optional[Dict[str, Any]] = None,
+                                qdrant_collection_name: Optional[str] = None,
+                                neo4j_database_name: Optional[str] = None) -> bool:
     """Test YouTube ingestion functionality."""
     print_header("MoRAG YouTube Ingestion Test")
 
@@ -246,6 +248,10 @@ async def test_youtube_ingestion(url: str, webhook_url: Optional[str] = None,
             data['webhook_url'] = webhook_url
         if metadata:
             data['metadata'] = metadata
+        if qdrant_collection_name:
+            data['qdrant_collection'] = qdrant_collection_name
+        if neo4j_database_name:
+            data['neo4j_database'] = neo4j_database_name
 
         # Submit to ingestion API
         response = requests.post(
@@ -363,7 +369,9 @@ Make sure you have a stable internet connection.
             success = asyncio.run(test_youtube_ingestion(
                 args.youtube_url,
                 webhook_url=args.webhook_url,
-                metadata=metadata
+                metadata=metadata,
+                qdrant_collection_name=args.qdrant_collection,
+                neo4j_database_name=args.neo4j_database
             ))
             if success:
                 print("\n🎉 YouTube ingestion test completed successfully!")

@@ -253,6 +253,30 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here  # Optional
 
 **Note**: Use `GEMINI_API_KEY` for consistency. The deprecated `GOOGLE_API_KEY` is still supported for backward compatibility.
 
+### Database Setup
+
+MoRAG automatically creates Qdrant collections and Neo4j databases when needed. However, for Neo4j Community Edition or when you want to pre-create databases, use the database creation utility:
+
+```bash
+# Create both Neo4j database and Qdrant collection
+python cli/create-databases.py --neo4j-database smartcard --qdrant-collection smartcard_docs
+
+# Create only Neo4j database
+python cli/create-databases.py --neo4j-database my_database
+
+# Create only Qdrant collection
+python cli/create-databases.py --qdrant-collection my_collection
+
+# List existing databases and collections
+python cli/create-databases.py --list-existing
+```
+
+**Important Notes:**
+- **Neo4j Enterprise**: Supports automatic database creation
+- **Neo4j Community**: Requires manual database creation or using the utility script
+- **Qdrant**: Always supports automatic collection creation
+- **Collection/Database Names**: Use `--qdrant-collection` and `--neo4j-database` arguments in test scripts
+
 ### Testing Docker Setup
 
 Test infrastructure services:
