@@ -3,6 +3,9 @@
 from .base_agent import MoRAGBaseAgent, AgentConfig
 from .providers import GeminiProvider, ProviderConfig, ProviderFactory
 from .factory import AgentFactory, create_agent, create_agent_with_config
+from .semantic_chunking_agent import SemanticChunkingAgent
+from .summarization_agent import SummarizationAgent
+from .query_analysis_agent import QueryAnalysisAgent
 from .models import (
     ConfidenceLevel,
     EntityType,
@@ -41,6 +44,9 @@ __all__ = [
     "AgentFactory",
     "create_agent",
     "create_agent_with_config",
+    "SemanticChunkingAgent",
+    "SummarizationAgent",
+    "QueryAnalysisAgent",
     "ConfidenceLevel",
     "EntityType",
     "RelationType",

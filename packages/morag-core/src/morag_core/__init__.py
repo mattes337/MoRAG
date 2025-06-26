@@ -8,6 +8,9 @@ from .ai import (
     AgentFactory,
     create_agent,
     create_agent_with_config,
+    SemanticChunkingAgent,
+    SummarizationAgent,
+    QueryAnalysisAgent,
     EntityExtractionResult,
     RelationExtractionResult,
     SummaryResult,
@@ -15,6 +18,14 @@ from .ai import (
     QueryAnalysisResult,
     ContentAnalysisResult,
     TranscriptAnalysisResult,
+)
+
+from .chunking import (
+    ChunkingConfig,
+    ChunkingStrategy,
+    SemanticChunker,
+    ChunkerFactory,
+    create_chunker,
 )
 
 __version__ = "0.1.0"
@@ -27,6 +38,14 @@ __all__ = [
     "AgentFactory",
     "create_agent",
     "create_agent_with_config",
+    "SemanticChunkingAgent",
+    "SummarizationAgent",
+    "QueryAnalysisAgent",
+    "ChunkingConfig",
+    "ChunkingStrategy",
+    "SemanticChunker",
+    "ChunkerFactory",
+    "create_chunker",
     "EntityExtractionResult",
     "RelationExtractionResult",
     "SummaryResult",
