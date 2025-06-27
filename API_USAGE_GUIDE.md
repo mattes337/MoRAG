@@ -371,13 +371,30 @@ Supported auto-detection:
 # Ingest a document file (auto-detect content type)
 curl -X POST "http://localhost:8000/api/v1/ingest/file" \
   -F "file=@document.pdf" \
-  -F "metadata={\"tags\": [\"important\"], \"category\": \"research\"}"
+  -F "request_data={\"metadata\": {\"tags\": [\"important\"], \"category\": \"research\"}}"
 
-# Ingest with explicit source type
+# Ingest with explicit source type and database configuration
 curl -X POST "http://localhost:8000/api/v1/ingest/file" \
-  -F "source_type=document" \
   -F "file=@document.pdf" \
-  -F "metadata={\"tags\": [\"important\"], \"category\": \"research\"}"
+  -F "request_data={
+    \"source_type\": \"document\",
+    \"metadata\": {\"tags\": [\"important\"], \"category\": \"research\"},
+    \"databases\": [
+      {
+        \"type\": \"qdrant\",
+        \"hostname\": \"localhost\",
+        \"port\": 6333,
+        \"database_name\": \"my_collection\"
+      },
+      {
+        \"type\": \"neo4j\",
+        \"hostname\": \"bolt://localhost:7687\",
+        \"username\": \"neo4j\",
+        \"password\": \"password\",
+        \"database_name\": \"my_database\"
+      }
+    ]
+  }"
 
 # Response
 {
