@@ -202,10 +202,10 @@ class VideoService:
             if result.audio_processing_result:
                 response["audio"] = {
                     "transcript_length": len(result.audio_processing_result.transcript) if result.audio_processing_result.transcript else 0,
-                    "language": result.audio_processing_result.language,
+                    "language": result.audio_processing_result.metadata.get("language", "unknown"),
                     "segments_count": len(result.audio_processing_result.segments) if result.audio_processing_result.segments else 0,
-                    "has_speaker_diarization": result.audio_processing_result.speaker_segments is not None,
-                    "has_topic_segmentation": result.audio_processing_result.topic_segments is not None,
+                    "has_speaker_diarization": result.audio_processing_result.metadata.get("has_speaker_info", False),
+                    "has_topic_segmentation": result.audio_processing_result.metadata.get("has_topic_info", False),
                     "has_embeddings": hasattr(result.audio_processing_result, "embeddings")
                 }
             
@@ -358,19 +358,26 @@ class VideoService:
             # Build topics from audio processing result
             topics = []
             if result.audio_processing_result and result.audio_processing_result.segments:
-                # Group segments by topic if topic segmentation is available
-                if (hasattr(result.audio_processing_result, 'topic_segments') and
-                    result.audio_processing_result.topic_segments):
+                # Check if topic segmentation was performed and topics are available in metadata
+                topics_metadata = result.audio_processing_result.metadata.get("topics", [])
 
-                    for topic_segment in result.audio_processing_result.topic_segments:
+                if topics_metadata:
+                    # Group segments by topic using the topic information from metadata
+                    for topic_info in topics_metadata:
                         topic_data = {
-                            "timestamp": int(topic_segment.start_time) if hasattr(topic_segment, 'start_time') else 0,
+                            "timestamp": int(topic_info.get("start_time", 0)),
+                            "title": topic_info.get("title", f"Topic {topic_info.get('id', '')}"),
+                            "summary": topic_info.get("summary", ""),
                             "sentences": []
                         }
 
-                        # Add sentences from this topic
-                        if hasattr(topic_segment, 'segments'):
-                            for segment in topic_segment.segments:
+                        # Find segments that belong to this topic
+                        topic_id = topic_info.get("id", "").replace("TOPIC_", "") if isinstance(topic_info.get("id"), str) else topic_info.get("id")
+                        if isinstance(topic_id, str) and topic_id.isdigit():
+                            topic_id = int(topic_id)
+
+                        for segment in result.audio_processing_result.segments:
+                            if hasattr(segment, 'topic_id') and segment.topic_id == topic_id:
                                 sentence = {
                                     "timestamp": int(segment.start),
                                     "speaker": getattr(segment, 'speaker', 1) if hasattr(segment, 'speaker') else 1,
@@ -380,9 +387,10 @@ class VideoService:
 
                         topics.append(topic_data)
                 else:
-                    # Single topic with all segments
+                    # Single topic with all segments (no topic segmentation)
                     topic_data = {
                         "timestamp": int(result.audio_processing_result.segments[0].start) if result.audio_processing_result.segments else 0,
+                        "title": "Full Transcript",
                         "sentences": []
                     }
 
@@ -412,8 +420,8 @@ class VideoService:
                 metadata.update({
                     "transcript_length": len(result.audio_processing_result.transcript) if result.audio_processing_result.transcript else 0,
                     "segments_count": len(result.audio_processing_result.segments) if result.audio_processing_result.segments else 0,
-                    "has_speaker_diarization": hasattr(result.audio_processing_result, 'speaker_segments') and result.audio_processing_result.speaker_segments is not None,
-                    "has_topic_segmentation": hasattr(result.audio_processing_result, 'topic_segments') and result.audio_processing_result.topic_segments is not None
+                    "has_speaker_diarization": result.audio_processing_result.metadata.get("has_speaker_info", False),
+                    "has_topic_segmentation": result.audio_processing_result.metadata.get("has_topic_info", False)
                 })
 
             return {

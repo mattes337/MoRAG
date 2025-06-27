@@ -18,6 +18,7 @@ import structlog
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
+from morag_graph.models.database_config import DatabaseType, DatabaseConfig
 from morag.utils.file_upload import get_upload_handler, FileUploadError, validate_temp_directory_access
 from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
 from morag.worker import (
@@ -28,6 +29,50 @@ from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_t
 from morag.endpoints import remote_jobs_router
 
 logger = structlog.get_logger(__name__)
+
+
+def build_database_configs(
+    databases: Optional[List[DatabaseConfig]] = None,
+    qdrant_collection: Optional[str] = None,
+    neo4j_database: Optional[str] = None
+) -> Optional[List[DatabaseConfig]]:
+    """Build database configurations from individual parameters or existing list.
+
+    Args:
+        databases: Existing database configurations
+        qdrant_collection: Qdrant collection name
+        neo4j_database: Neo4j database name
+
+    Returns:
+        List of database configurations or None
+    """
+    # If explicit database configs are provided, use them
+    if databases:
+        return databases
+
+    # Build configs from individual parameters
+    configs = []
+
+    if qdrant_collection:
+        import os
+        configs.append(DatabaseConfig(
+            type=DatabaseType.QDRANT,
+            hostname=os.getenv('QDRANT_HOST', 'localhost'),
+            port=int(os.getenv('QDRANT_PORT', '6333')),
+            database_name=qdrant_collection
+        ))
+
+    if neo4j_database:
+        import os
+        configs.append(DatabaseConfig(
+            type=DatabaseType.NEO4J,
+            hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
+            username=os.getenv('NEO4J_USERNAME', 'neo4j'),
+            password=os.getenv('NEO4J_PASSWORD', 'password'),
+            database_name=neo4j_database
+        ))
+
+    return configs if configs else None
 
 
 async def download_remote_file(file_path: str, temp_dir: Path) -> Path:
@@ -296,6 +341,7 @@ class ProcessURLRequest(BaseModel):
     url: str
     content_type: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class ProcessBatchRequest(BaseModel):
@@ -325,6 +371,10 @@ class IngestFileRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     use_docling: Optional[bool] = False
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    # Individual database/collection parameters for convenience
+    qdrant_collection: Optional[str] = None  # Qdrant collection name
+    neo4j_database: Optional[str] = None  # Neo4j database name
 
 
 class IngestURLRequest(BaseModel):
@@ -333,12 +383,20 @@ class IngestURLRequest(BaseModel):
     webhook_url: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    # Individual database/collection parameters for convenience
+    qdrant_collection: Optional[str] = None  # Qdrant collection name
+    neo4j_database: Optional[str] = None  # Neo4j database name
 
 
 class IngestBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     webhook_url: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    # Individual database/collection parameters for convenience
+    qdrant_collection: Optional[str] = None  # Qdrant collection name
+    neo4j_database: Optional[str] = None  # Neo4j database name
 
 
 class IngestRemoteFileRequest(BaseModel):
@@ -353,12 +411,17 @@ class IngestRemoteFileRequest(BaseModel):
     chunk_overlap: Optional[int] = None
     chunking_strategy: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    # Individual database/collection parameters for convenience
+    qdrant_collection: Optional[str] = None  # Qdrant collection name
+    neo4j_database: Optional[str] = None  # Neo4j database name
 
 
 class ProcessRemoteFileRequest(BaseModel):
     file_path: str  # UNC path or HTTP/HTTPS URL
     content_type: Optional[str] = None  # Auto-detect if not provided
     options: Optional[Dict[str, Any]] = None
+    databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
 
 
 class IngestResponse(BaseModel):
@@ -483,10 +546,15 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_url(request: ProcessURLRequest):
         """Process content from a URL."""
         try:
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
             result = await get_morag_api().process_url(
                 request.url,
                 request.content_type,
-                request.options
+                options
             )
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
@@ -612,7 +680,12 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_web_page(request: ProcessURLRequest):
         """Process a web page."""
         try:
-            result = await get_morag_api().process_web_page(request.url, request.options)
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
+            result = await get_morag_api().process_web_page(request.url, options)
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
@@ -629,7 +702,12 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def process_youtube_video(request: ProcessURLRequest):
         """Process a YouTube video."""
         try:
-            result = await get_morag_api().process_youtube_video(request.url, request.options)
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
+            result = await get_morag_api().process_youtube_video(request.url, options)
             result = normalize_processing_result(result)
             return ProcessingResultResponse(
                 success=result.success,
@@ -687,7 +765,10 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         chunk_size: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunk_overlap: Optional[int] = Form(default=None),  # Use default from settings if not provided
         chunking_strategy: Optional[str] = Form(default=None),  # paragraph, sentence, word, character, etc.
-        remote: Optional[bool] = Form(default=False)  # Use remote processing for audio/video
+        remote: Optional[bool] = Form(default=False),  # Use remote processing for audio/video
+        databases: Optional[str] = Form(default=None),  # JSON string of database configurations
+        qdrant_collection: Optional[str] = Form(default=None),  # Qdrant collection name
+        neo4j_database: Optional[str] = Form(default=None)  # Neo4j database name
     ):
         """Ingest and process a file, storing results in vector database."""
         temp_path = None
@@ -700,6 +781,27 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 except json.JSONDecodeError as e:
                     logger.error("Invalid JSON in metadata", metadata=metadata, error=str(e))
                     raise HTTPException(status_code=400, detail=f"Invalid JSON in metadata: {str(e)}")
+
+            # Parse databases if provided
+            parsed_databases = None
+            if databases:
+                try:
+                    databases_data = json.loads(databases)
+                    parsed_databases = [DatabaseConfig(**db) for db in databases_data]
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON in databases", databases=databases, error=str(e))
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON in databases: {str(e)}")
+                except Exception as e:
+                    logger.error("Invalid database configuration", databases=databases, error=str(e))
+                    raise HTTPException(status_code=400, detail=f"Invalid database configuration: {str(e)}")
+
+            # Build database configurations from individual parameters if not provided
+            if not parsed_databases:
+                parsed_databases = build_database_configs(
+                    databases=None,
+                    qdrant_collection=qdrant_collection,
+                    neo4j_database=neo4j_database
+                )
 
             # Save uploaded file using secure file upload handler
             upload_handler = get_upload_handler()
@@ -756,6 +858,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "chunk_overlap": chunk_overlap,
                 "chunking_strategy": chunking_strategy,
                 "remote": remote,  # Remote processing flag
+                "databases": parsed_databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -802,11 +905,19 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                            url=request.url,
                            detected_type=source_type)
 
+            # Build database configurations from individual parameters if not provided
+            databases = build_database_configs(
+                databases=request.databases,
+                qdrant_collection=request.qdrant_collection,
+                neo4j_database=request.neo4j_database
+            )
+
             # Create task options with sanitized inputs
             options = {
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "metadata": request.metadata or {},  # Ensure dict, not None
                 "remote": request.remote,  # Remote processing flag
+                "databases": databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -833,10 +944,18 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def ingest_batch(request: IngestBatchRequest):
         """Ingest and process multiple items in batch, storing results in vector database."""
         try:
+            # Build database configurations from individual parameters if not provided
+            databases = build_database_configs(
+                databases=request.databases,
+                qdrant_collection=request.qdrant_collection,
+                neo4j_database=request.neo4j_database
+            )
+
             # Create batch options with sanitized inputs
             options = {
                 "webhook_url": request.webhook_url or "",  # Ensure string, not None
                 "remote": request.remote,  # Remote processing flag
+                "databases": databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -896,6 +1015,7 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                 "chunk_overlap": request.chunk_overlap,
                 "chunking_strategy": request.chunking_strategy,
                 "remote": request.remote,  # Remote processing flag
+                "databases": request.databases,  # Database configurations for graph processing
                 "store_in_vector_db": True  # Key difference from process endpoints
             }
 
@@ -967,11 +1087,16 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
                        temp_path=str(temp_path),
                        content_type=content_type)
 
+            # Merge databases into options if provided
+            options = request.options or {}
+            if request.databases:
+                options["databases"] = request.databases
+            
             # Submit to background task queue for processing (no storage)
             task = process_file_task.delay(
                 str(temp_path),
                 content_type,
-                request.options or {}
+                options
             )
 
             logger.info("Remote file processing task created",
@@ -1151,8 +1276,32 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             logger.error("Failed to perform manual cleanup", error=str(e))
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Include remote job router
+    # Include routers
     app.include_router(remote_jobs_router)
+
+    # Include enhanced query router (v2 API)
+    try:
+        from morag.endpoints import enhanced_query_router
+        app.include_router(enhanced_query_router)
+        logger.info("Enhanced query API endpoints loaded")
+    except ImportError as e:
+        logger.warning("Enhanced query endpoints not available", error=str(e))
+
+    # Legacy router temporarily disabled
+    # try:
+    #     from morag.endpoints import legacy_router
+    #     app.include_router(legacy_router)
+    #     logger.info("Legacy API endpoints loaded")
+    # except ImportError as e:
+    #     logger.warning("Legacy endpoints not available", error=str(e))
+
+    # Include reasoning router (multi-hop reasoning API)
+    try:
+        from morag.endpoints.reasoning import router as reasoning_router
+        app.include_router(reasoning_router, prefix="/api/v2")
+        logger.info("Multi-hop reasoning API endpoints loaded")
+    except ImportError as e:
+        logger.warning("Multi-hop reasoning endpoints not available", error=str(e))
 
     return app
 

@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     gemini_vision_model: str = Field(default="gemini-1.5-flash", alias="MORAG_GEMINI_VISION_MODEL")
 
     # Embedding Configuration
-    embedding_batch_size: int = Field(default=100, alias="MORAG_EMBEDDING_BATCH_SIZE")
+    embedding_batch_size: int = Field(default=50, alias="MORAG_EMBEDDING_BATCH_SIZE")
     enable_batch_embedding: bool = Field(default=True, alias="MORAG_ENABLE_BATCH_EMBEDDING")
 
     # Redis Configuration

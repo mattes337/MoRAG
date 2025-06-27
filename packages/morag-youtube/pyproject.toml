@@ -26,7 +26,7 @@ dependencies = [
     "morag-audio>=0.1.0,<0.2.0",
     "yt-dlp>=2023.3.4",
     "structlog>=24.4.0,<25.0.0",
-    "aiofiles>=23.2.1,<24.0.0",
+    "aiofiles>=24.1.0,<25.0.0",
 ]
 
 [project.optional-dependencies]

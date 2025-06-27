@@ -1,0 +1,2730 @@
+{
+  "source_file": "..\\..\\examples\\transcript3.txt",
+  "model": "gemini-1.5-flash",
+  "entities": [
+    {
+      "id": "9ba365c9-1048-4ef2-a0aa-f8c29e6ee8e2",
+      "name": "Carolin Tietz",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Interviewer of Alicia Kusumitra",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2c1fd672-81f4-4abc-a3b9-5ac6b2117452",
+      "name": "Alicia Kusumitra",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Interviewee, Maya priestess, author, and seminar leader",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "83c279f9-1afe-4d0a-9513-58ebcd414aa5",
+      "name": "Guatemala",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Country where Alicia Kusumitra lives and where the K'iche people live; Country where Maya traditions are still practiced.; Location of a trip where a friend experienced a ligament tear.; The country where Ina May Gesskin learned from Mayan midwives.; A country mentioned in the speaker's travel history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4b81e046-dbef-4f72-8721-43198be6b484",
+      "name": "Maya",
+      "type": "CONCEPT",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Refers to the Maya civilization and culture; Refers to the Maya civilization and its people.; Refers to the Mayan belief that wisdom comes from collective unity and collaboration.; Refers to the Maya civilization and their worldview, emphasizing harmony with nature.; Refers to Maya midwives, indicating a cultural context.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6b3031b5-9811-41ad-9f2c-261f2cb70675",
+      "name": "K'iche",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Specific Mayan ethnic group",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "89d6b07b-6b1b-41e4-b166-d5b55d74cf50",
+      "name": "Yucatan",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Region in Mexico where the Maya civilization existed",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "97f0887d-ef4e-4169-88bc-5a371e4035e1",
+      "name": "Nicaragua",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Country where the Maya civilization existed",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4bfcda9e-43ca-404d-b9f5-b4e11a4fe9fa",
+      "name": "Honduras",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Country where the Maya civilization existed",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0cb20943-8c60-444f-b7ab-ab39b9eeda15",
+      "name": "El Salvador",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Country where the Maya civilization existed",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "63e677a5-a8d7-4ad8-ae3c-512c0dcb55e4",
+      "name": "Belize",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Country where the Maya civilization existed",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9ab282c5-6b9b-47e8-a40f-a106c3d86ad8",
+      "name": "Mexico",
+      "type": "LOCATION",
+      "confidence": 0.99,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Country where part of the Maya civilization existed",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "16d534fd-6440-4b9b-b5c9-061f33708504",
+      "name": "2012",
+      "type": "DATE",
+      "confidence": 0.99,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Year Alicia received her assignment from the Maya elders",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a6d469e1-a7f1-44ae-9b33-839fc41c7af0",
+      "name": "seven",
+      "type": "NUMBER",
+      "confidence": 0.99,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Number of children Alicia has",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4ac2d069-40a9-4420-a74e-b0b4995cba91",
+      "name": "fourteen",
+      "type": "NUMBER",
+      "confidence": 0.99,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Number of congresses Alicia has organized",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4fb36c96-223c-4247-8099-2b152dbdbcb1",
+      "name": "Mexiko",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Location where some Maya orphans reside.; A country mentioned in the speaker's travel history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "be10622b-54c3-4c6f-8941-deed6407e8fb",
+      "name": "Europa",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Continent mentioned in comparison to Maya practices.; Mentioned in the context of historical practices and current societal issues.; A continent mentioned in the speaker's travel history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a158297f-9074-47f3-81a8-931be2629bff",
+      "name": "Kirche",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Refers to the church, often built on ancient sacred sites.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "94f62448-2718-4cfe-9a22-aadbc2d2f963",
+      "name": "Maya-Priester",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Refers to Maya priests who conduct fire ceremonies.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6dc3b41b-79f4-4de8-8e05-56956aef2b94",
+      "name": "Inka",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Another ancient civilization mentioned in comparison to the Maya.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "71c56dcc-447b-4a0e-9c3e-70fa12875e71",
+      "name": "Spanisch",
+      "type": "LANGUAGE",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Language spoken in some parts of South America.; Language mentioned in the context of Mayan terms.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d5b044c2-5976-4309-87ac-81614982fc34",
+      "name": "Südamerika",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Continent where the speaker has traveled and studied shamanic medicine.; The speaker mentions that the practice of pharmaceutical companies taking plants from the rainforest is known in South America.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0b583dc8-5c0e-4980-bfaa-f87000c68fff",
+      "name": "Fastfood",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a factor contributing to imbalance in modern life.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a5ad030a-c43d-4a53-b1d7-65743842771c",
+      "name": "Viren",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Discussed in the context of their presence in the body and their role in health and disease.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b9d2592f-c532-4c2e-8b9f-326cab4271ee",
+      "name": "Bakterien",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Discussed in the context of their presence in the body and their role in health and disease.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6591b036-9ed2-4bd3-8f16-a57f57d83833",
+      "name": "Pilze",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Discussed in the context of their presence in the body and their role in health and disease.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6388e350-df04-41fd-b4d0-7969483be0c2",
+      "name": "Parasiten",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a significant health concern, especially in the context of the jungle.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7d345973-6e74-4a2e-a010-4b526b2fabad",
+      "name": "Arzt",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "056f98de-e48c-45c2-a9a8-1bda92f133d8",
+      "name": "Anwalt",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "56c9ccc1-e434-40db-9882-8875d336af40",
+      "name": "Gärtner",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "5493c310-dcc9-4906-bda3-0ca1c1f05d9f",
+      "name": "Landwirt",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a90c975f-4cf0-4989-a994-486483c61226",
+      "name": "Architekt",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "93bf1d36-13a7-44e4-969a-53d03dfda52a",
+      "name": "Hausbauer",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1f1908b8-f957-4477-b4cd-9bbc7fb59101",
+      "name": "Priesterin",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1d498d0d-3a77-42fd-98b4-c765f660c593",
+      "name": "Hebamme",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as an example of a profession in a discussion of societal equality.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ea63b732-21f4-470a-9b5c-785f528d9693",
+      "name": "Candida",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A type of fungus that can cause illness if it grows excessively in the body.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6342853b-c531-45f4-9f02-30f4f528c3a1",
+      "name": "Spanien",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a source of produce that may be harvested prematurely and treated with pesticides.; A country mentioned in the speaker's travel history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "aca380fa-e7ad-485d-8a51-e56c0eedd80f",
+      "name": "Leaky Gut",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A condition where the gut lining is compromised, leading to nutrient malabsorption.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "name": "Mama Erde",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A metaphorical reference to Mother Earth, emphasizing the interconnectedness between human health and the environment.; A metaphorical representation of Mother Earth and her wisdom.; Personification of Earth as a healing entity.; A reference to Mother Earth, symbolizing a source of support and healing.; A metaphorical representation of Mother Earth, used to describe connection with nature.; A metaphorical representation of Mother Earth, symbolizing connection to nature and feminine energy.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "44d4c88b-eb34-43e1-ba58-eed8314367a3",
+      "name": "Karma",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a principle of cause and effect, relating actions towards the earth to consequences for oneself.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6f230dc0-4d40-4aaa-8259-edd97a985bbf",
+      "name": "Maya",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Reference to the Maya civilization and their practices.; The speaker mentions living with the Maya since 2009 and learning about their lifestyle and healthcare practices.; The Mayan prophecy about the return of feminine power is mentioned.; Reference to the Mayan civilization and their cosmology.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "891dfb2f-6bb0-4acf-8951-88d8d9eb3809",
+      "name": "Antibiotika",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a treatment in acute medical situations.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "cc2423c9-9600-4a9c-b2d2-8e3fd38a081f",
+      "name": "Cortison",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A medication mentioned in the speaker's personal medical history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "8fba7ff6-21e7-48b3-9fb5-70577fb5f0a5",
+      "name": "Pille",
+      "type": "PRODUCT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Reference to birth control pills.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ab65942c-605d-4caf-82df-b8287bb28d7d",
+      "name": "Neurodermitis",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A chronic skin condition mentioned in the speaker's medical history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "83c3f321-2a3a-45b4-a274-3f61f199d8fb",
+      "name": "Skoliose",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A spinal curvature mentioned in the speaker's medical history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "78d60084-79d4-4581-a8f6-f077b337f28a",
+      "name": "Tumor",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A medical condition mentioned in the speaker's medical history.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "35600b4d-6689-4f88-a521-13aa72372708",
+      "name": "Blutvergiftung",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A serious medical condition mentioned in the context of antibiotic use.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "5e88e855-36ff-497b-99f0-e17d59aa4f6c",
+      "name": "2009",
+      "type": "DATE",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker started living with the Maya in the beginning of 2009.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "be6b4f3b-3579-40a4-ae53-13c5f1cec9b8",
+      "name": "Anthropologen",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker refers to observations made by anthropologists regarding birth practices among indigenous populations.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2af39191-7e5e-4020-906b-a44a76b4d25a",
+      "name": "Urvölker",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker discusses observations of birth practices among indigenous peoples.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2ad809a8-eb21-4b4d-b12e-83d15ddaa0ae",
+      "name": "Permakultur",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker mentions the Maya's agricultural practices as an example of permaculture.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "90709f88-6d17-426d-b0b1-859e8cf84b9d",
+      "name": "Naturheilkunde",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker mentions studying natural medicine after questioning conventional medicine.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "name": "Schulmedizin",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker questions the practices of conventional medicine.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "639c904b-531b-4f22-8fb8-ae34626f4584",
+      "name": "allopathische Medizin",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker questions the necessity of allopathic medicine.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9ea205ee-124e-4369-9444-2912a0ee6bb6",
+      "name": "Pharmaindustrie",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker discusses pharmaceutical companies exploiting indigenous knowledge of medicinal plants.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c9b748bf-ff32-45f5-83d2-3582b464fff7",
+      "name": "30 Prozent Kaiserschnittrate",
+      "type": "PERCENT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker mentions a 30% cesarean section rate.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c9545125-fd9d-482a-97ff-d8da82496682",
+      "name": "Deutschland",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Country of origin of a friend who experienced a ligament tear.; The speaker mentions Germany in the context of family structures.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c7ccd910-7577-4bbc-a128-8a8c3f9a4606",
+      "name": "Hawaii",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Destination of a trip after a ligament tear was healed.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4df1ed69-b8eb-48b6-8c20-a15909b74603",
+      "name": "Philippinen",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Location where spontaneous healing was investigated.; Shamans and healers on the Philippines are mentioned in the context of black magic and tourist exploitation.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b5fa6c22-f461-469a-8a5c-c46edd33ba11",
+      "name": "30 Prozent",
+      "type": "PERCENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Percentage representing the Caesarean section rate.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4f26f51c-2c41-4424-b8b7-af186f0c5a87",
+      "name": "Mama Natur",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Personification of nature's healing powers.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7dfb7f0a-4060-47d6-b805-c8899387ddf3",
+      "name": "Kurkuma",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as a blood purifier in the text.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "name": "Maya",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Refers to the Mayan people and their traditional practices.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "47a774e3-50ff-43d3-a2c1-517d474b5c6e",
+      "name": "Ina May Gesskin",
+      "type": "PERSON",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A well-known midwife mentioned in the text.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "aa81a6e3-e69a-462c-93ec-9deec7c80d75",
+      "name": "70er Jahren",
+      "type": "DATE",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The decade when Ina May Gesskin visited Guatemala.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4871fa8f-8692-45d6-883e-69228cd7be47",
+      "name": "Themaskal",
+      "type": "FACILITY",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A type of earth womb used in Mayan traditions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1873d8e7-6723-4132-8d48-30a945662113",
+      "name": "Iglu",
+      "type": "FACILITY",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Used as a comparison to describe the shape of a Themaskal.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "f06247cc-035d-4c1d-aa92-00611b46a1be",
+      "name": "Meierhebermen",
+      "type": "PERSON",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Refers to the women who perform traditional Mayan practices.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1a376da4-af05-4241-ae4f-6abeadca8b08",
+      "name": "Meiermassagetechnik",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "An ancient Mayan massage technique.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "07c67477-25ef-4e64-b4de-0d8ff1d63a08",
+      "name": "Meierfrauen",
+      "type": "PERSON",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Refers to women who practice Mayan traditions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "name": "Ayahuasca",
+      "type": "PRODUCT",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ayahuasca is referred to as a sacred medicine used in a cult and by shamans.; Ayahuasca is repeatedly mentioned as a plant used in shamanic practices and tourism.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "name": "Mutter Erde",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Refers to Mother Earth, a concept representing the feminine power of nature.; Mother Earth, used metaphorically to represent connection to nature.; Mother Earth, a concept central to the speaker's worldview.; Referred to in the title of a meditation.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "511ea72d-7fec-4736-9787-eeba17e61bb1",
+      "name": "Plejada",
+      "type": "ORGANIZATION",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned in the context of a theory about extraterrestrial beings.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "f30e707c-d062-47f6-8dfd-1e802a855c03",
+      "name": "Peru",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The government of Peru is mentioned in relation to regulating Ayahuasca tourism.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "297e8df9-5b0c-45f2-86c5-b9a6f156cb45",
+      "name": "Amerika",
+      "type": "LOCATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The natives of America are mentioned in relation to seeking help from the Peruvian government.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b5c4bb38-fd4f-4935-b89b-289fe9ae56e6",
+      "name": "Cambo",
+      "type": "PRODUCT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Cambo is mentioned alongside Ayahuasca as an example of shamanic medicine.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7f356b29-6889-484d-aa71-41168f597cf4",
+      "name": "15-, 16-, 17-jährigen Einweihung",
+      "type": "DATE",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "This refers to a period of initiation before using Ayahuasca.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "name": "Urvölker",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Indigenous peoples whose prophecies are mentioned.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "250858df-01b9-4d2d-b37e-f3d62f78d959",
+      "name": "Sonntagabend",
+      "type": "TIME",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sunday evening, mentioned in the context of feeling bad before work.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "58e785fb-192e-4249-b55e-4bbfa5a2df1d",
+      "name": "Montag",
+      "type": "DATE",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Monday, mentioned in the context of returning to work.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "78ad5241-b36d-42f5-b032-5778056f6f12",
+      "name": "Antidepressiva",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Antidepressant medication mentioned as a coping mechanism.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ac53aaf7-6e13-47b5-be7f-b849cf22c7ac",
+      "name": "inneren Kind",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A concept discussed in the text, referring to a part of oneself that needs healing.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "3974a1c1-8124-4d3b-958d-7eab575baec0",
+      "name": "innerer Teenager",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Another concept mentioned, similar to the 'inner child', representing unhealed parts of oneself.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d62a9d3c-063a-4e26-870c-e0c788a0cde5",
+      "name": "MSM",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A natural pain reliever mentioned as an alternative to pharmaceutical drugs.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0eb36793-33aa-4723-bf61-08e76c51d44e",
+      "name": "Temaskal",
+      "type": "FACILITY",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Referred to as the 'womb of the earth,' suggesting a sacred space for healing and connection.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "71612adc-2cc2-452e-909b-a7036e7f0e79",
+      "name": "Lilith",
+      "type": "PERSON",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a goddess from earlier times, contrasting with the limited image of women presented by the patriarchy.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "69d078b8-f06e-4f5a-a0c1-d5e9f0a07824",
+      "name": "Maria",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Referenced as a representation of a limited and idealized image of women from the Bible.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e61393fd-fc37-4024-b84b-47037dfda35a",
+      "name": "Bibel",
+      "type": "WORK_OF_ART",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The Bible is mentioned as a source of a limited and idealized image of women.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "02b76148-10c3-4b44-a752-8820768b87a8",
+      "name": "Patriarchat",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The patriarchy is blamed for creating a limited image of women.; The patriarchal system, contrasted with the speaker's worldview.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "cb5488c8-428b-4a77-8078-a5e6a525b8b1",
+      "name": "Kamee",
+      "type": "PERSON",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker's grandmother, who carries a skull in her sacred space, symbolizing the acceptance of death for rebirth.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6863a812-d753-40bb-89ef-efdfb170f398",
+      "name": "Ischelle",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A person mentioned in the text who is associated with rain and cleansing.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ead960d3-a839-4287-a2ca-8feb823bb574",
+      "name": "Alicia",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker's name, whose empowerment is discussed in relation to her husband's strength.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a595d4bc-909f-46ff-817f-3768076ea404",
+      "name": "19",
+      "type": "DATE",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Age of the speaker's oldest child.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "28b4de5b-7961-48d9-90b3-1bf8cb2db333",
+      "name": "zwei Jahre",
+      "type": "DATE",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Age of the speaker's youngest child.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ad2bc621-7a76-402f-949b-46ec73d455b1",
+      "name": "Cosmic Tribe",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker uses this term to describe the collective interconnectedness of humanity.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9066152b-17ba-48d7-8935-fd4ee2191687",
+      "name": "35.000",
+      "type": "NUMBER",
+      "confidence": 0.99,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The approximate size of the speaker's online community.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "3e829e91-196a-412e-acb6-3ee27a2bf8f1",
+      "name": "5 bis 10 Prozent",
+      "type": "PERCENT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Estimated percentage of men in the online community.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "212c6a49-1f3a-4f03-85ae-2a735836090c",
+      "name": "Maya Ältesten",
+      "type": "PERSON",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Elder members of the Maya culture.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d5f7d9a5-b4be-4a57-815b-3b3a1d90e63a",
+      "name": "Hüterinnenkreis",
+      "type": "ORGANIZATION",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "An online women's circle focused on reclaiming feminine power.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c2888203-515b-41a0-b837-5e7922579258",
+      "name": "Online-Frauenkreis",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "An online community for women.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0398cfb4-2389-4500-9409-6781ee1451e4",
+      "name": "Medizinkreise",
+      "type": "EVENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Regular meetings involving representatives of indigenous peoples.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "04415a8e-2918-4903-98b6-e6a3c2cafc7f",
+      "name": "Summits",
+      "type": "EVENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Twice-yearly events, possibly in-person.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0189c806-263e-43df-a63d-8e2e31c0cde1",
+      "name": "Einweihung zur Priesterin",
+      "type": "EVENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A ceremony or initiation into a role of priestess.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "880f86ed-4601-4c6c-beba-fdb4231dca5f",
+      "name": "November",
+      "type": "DATE",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The month of the next trip.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e2d20759-59a8-4ccc-9e8c-1308cd67c34b",
+      "name": "2022",
+      "type": "DATE",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The year of the next trip.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1d3c9c0a-60f2-43e0-a9e0-a5ab6a50a78f",
+      "name": "13",
+      "type": "NUMBER",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Approximate number of women on the trip.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "83693387-3250-478c-b480-86633cb2cf61",
+      "name": "Okusch Ulev",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mayan term, likely related to the heart of the earth.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "717a135c-16b8-4586-9a6a-fd17250be2e2",
+      "name": "Okusch Alav",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mayan term, likely related to the heart of the heavens.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "296e01ad-2b7e-410f-a22b-4c0f5028ab69",
+      "name": "Universum",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The universe, described as the father principle.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "012f73d6-f2c2-4206-8c2c-e308763da607",
+      "name": "Kosmos",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The cosmos, synonymous with the universe in this context.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "3e5eadeb-b4d8-4334-9f5b-8db8a4523e9e",
+      "name": "Herz des Himmels",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mayan term for the heart of the heavens.; Metaphorical representation of the heart of the heavens.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "08db413f-e2b2-4144-ba90-c945d030afd7",
+      "name": "Herz von Mama Erde",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mayan term for the heart of Mother Earth.; Metaphorical representation of the heart of Mother Earth.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "38c2a5e8-2523-4ddd-9735-f2c541f39da9",
+      "name": "Monotheismus",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Monotheism, linked to the patriarchal system.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "abef2329-9ba0-45e2-bc9a-1be325557d9f",
+      "name": "Jonis-Teams",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A ritual or practice mentioned in the text, possibly related to feminine energy.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "92c02adb-ac73-4fc9-a20b-7908cf44c736",
+      "name": "Vater Kosmos",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A metaphorical representation of Father Cosmos, symbolizing connection to the universe and masculine energy.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "83a01412-50e7-444e-9f96-efe0cd02f210",
+      "name": "Carolin",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Person addressed in the conversation.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ca4821a9-e0d9-41a2-848f-c46ee5bc0e7f",
+      "name": "Jaguarfrau",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned in the context of a meditation.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e40e1594-381d-4c45-941e-7020452e5a48",
+      "name": "Reise zum Herzen von Mutter Erde",
+      "type": "WORK_OF_ART",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Title of a meditation.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a5002cdb-1b2f-4fbe-a1b4-c5052a4e3e62",
+      "name": "Kongresspaket",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A package offered in the conversation, likely containing meditations.",
+        "extraction_method": "llm"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "1e07e1c3-2d3c-475a-9a38-be81d812c1bf",
+      "type": "RELATED_TO",
+      "source_entity_id": "9ba365c9-1048-4ef2-a0aa-f8c29e6ee8e2",
+      "target_entity_id": "2c1fd672-81f4-4abc-a3b9-5ac6b2117452",
+      "confidence": 0.99,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Hallo, mein Name ist Carolin Tietz. Ich heiße dich herzlich willkommen zum folgenden Interview mit der wunderbaren Alicia Kusumitra.",
+        "extraction_method": "llm",
+        "source_entity_name": "Carolin Tietz",
+        "target_entity_name": "Alicia Kusumitra"
+      }
+    },
+    {
+      "id": "e4d12cb6-d350-4d84-b9e0-e2bcb2bb181a",
+      "type": "RELATED_TO",
+      "source_entity_id": "2c1fd672-81f4-4abc-a3b9-5ac6b2117452",
+      "target_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sie ist Autorin, Seminar- und Zeremonialleiterin, Maya-Priesterin und jetzt kommt sie, sie ist siebenfache Mutter.",
+        "extraction_method": "llm",
+        "source_entity_name": "Alicia Kusumitra",
+        "target_entity_name": "Maya-Priesterin"
+      }
+    },
+    {
+      "id": "71b159d8-d963-4022-bb59-5987d1e5b067",
+      "type": "LOCATED_IN",
+      "source_entity_id": "2c1fd672-81f4-4abc-a3b9-5ac6b2117452",
+      "target_entity_id": "83c279f9-1afe-4d0a-9513-58ebcd414aa5",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "denn sie lebt seit vielen Jahren in Guatemala bei den Original-Maya-Stämmen",
+        "extraction_method": "llm",
+        "source_entity_name": "Alicia Kusumitra",
+        "target_entity_name": "Guatemala"
+      }
+    },
+    {
+      "id": "3c84cc3a-26b0-488c-9727-1525ae58998f",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "2c1fd672-81f4-4abc-a3b9-5ac6b2117452",
+      "target_entity_id": "6b3031b5-9811-41ad-9f2c-261f2cb70675",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Du kommst ja von dem Volke, beziehungsweise warst du da lange K'iche, ist das richtig ausgesprochen? K'iche. K'iche, genau.",
+        "extraction_method": "llm",
+        "source_entity_name": "Alicia Kusumitra",
+        "target_entity_name": "K'iche"
+      }
+    },
+    {
+      "id": "bd9beaa5-6cb6-491f-81c2-4d40c3d8b3a6",
+      "type": "LOCATED_IN",
+      "source_entity_id": "6b3031b5-9811-41ad-9f2c-261f2cb70675",
+      "target_entity_id": "83c279f9-1afe-4d0a-9513-58ebcd414aa5",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Wo leben die? Ja, die leben im Hochland von Guatemala. Ich lebe auch immer noch hier.",
+        "extraction_method": "llm",
+        "source_entity_name": "K'iche",
+        "target_entity_name": "Guatemala"
+      }
+    },
+    {
+      "id": "a8d29077-185d-4a06-b0b1-f34d0b9abb91",
+      "type": "PARTICIPATED_IN",
+      "source_entity_id": "2c1fd672-81f4-4abc-a3b9-5ac6b2117452",
+      "target_entity_id": "0189c806-263e-43df-a63d-8e2e31c0cde1",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Genau, ich bin hier eingeweiht worden. Also man kann es nicht Ausbildung nennen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Alicia Kusumitra",
+        "target_entity_name": "Einweihung zur Priesterin"
+      }
+    },
+    {
+      "id": "8e083169-55c0-4658-a226-1b7102b1f820",
+      "type": "STUDIED",
+      "source_entity_id": "be6b4f3b-3579-40a4-ae53-13c5f1cec9b8",
+      "target_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und da habe ich sehr schnell herausgefunden beim Thema Geburt, dass die Anthropologen damals, egal bei welchem Volk die waren, die haben das beobachtet, dass bei der Geburt bei den Urvölkern eine Mutter- und Kindsterblichkeitsrate von Null war.",
+        "extraction_method": "llm",
+        "source_entity_name": "Anthropologen",
+        "target_entity_name": "Urvölker"
+      }
+    },
+    {
+      "id": "5c15afbd-056f-4be3-bc19-a864801beff5",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "target_entity_id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und da habe ich sehr schnell herausgefunden beim Thema Geburt, dass die Anthropologen damals, egal bei welchem Volk die waren, die haben das beobachtet, dass bei der Geburt bei den Urvölkern eine Mutter- und Kindsterblichkeitsrate von Null war.",
+        "extraction_method": "llm",
+        "source_entity_name": "Urvölker",
+        "target_entity_name": "Mutter- und Kindsterblichkeitsrate von Null"
+      }
+    },
+    {
+      "id": "c0bcc45f-9eb6-45a5-b6d3-090f52fafee3",
+      "type": "RELATED_TO",
+      "source_entity_id": "9ba365c9-1048-4ef2-a0aa-f8c29e6ee8e2",
+      "target_entity_id": "90709f88-6d17-426d-b0b1-859e8cf84b9d",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und dann habe ich angefangen, Naturheilkunde zu studieren und habe viel gerade über Geburt, über die Urvölker gelesen, was Anthropologen damals beobachtet haben.",
+        "extraction_method": "llm",
+        "source_entity_name": "Carolin Tietz",
+        "target_entity_name": "Naturheilkunde"
+      }
+    },
+    {
+      "id": "819c99c7-c12f-48fe-acee-340ac6a69a97",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "4fb36c96-223c-4247-8099-2b152dbdbcb1",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Maya haben ja gelebt in Mexiko, also in Yucatan und in Guatemala, in Nicaragua, in Honduras, in El Salvador und in Belize.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Mexiko"
+      }
+    },
+    {
+      "id": "170924af-b65c-40ef-bf03-c4513be90bab",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "89d6b07b-6b1b-41e4-b166-d5b55d74cf50",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Maya haben ja gelebt in Mexiko, also in Yucatan und in Guatemala, in Nicaragua, in Honduras, in El Salvador und in Belize.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Yucatan"
+      }
+    },
+    {
+      "id": "21c2f971-43a6-4ef3-9bc9-f2e6c5b11d5e",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "83c279f9-1afe-4d0a-9513-58ebcd414aa5",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Maya haben ja gelebt in Mexiko, also in Yucatan und in Guatemala, in Nicaragua, in Honduras, in El Salvador und in Belize.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Guatemala"
+      }
+    },
+    {
+      "id": "0c06f0ac-8d88-4968-838b-37831447f2d8",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "97f0887d-ef4e-4169-88bc-5a371e4035e1",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Maya haben ja gelebt in Mexiko, also in Yucatan und in Guatemala, in Nicaragua, in Honduras, in El Salvador und in Belize.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Nicaragua"
+      }
+    },
+    {
+      "id": "d6a76419-c35f-47e2-aa80-c29fd92c5906",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "4bfcda9e-43ca-404d-b9f5-b4e11a4fe9fa",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Maya haben ja gelebt in Mexiko, also in Yucatan und in Guatemala, in Nicaragua, in Honduras, in El Salvador und in Belize.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Honduras"
+      }
+    },
+    {
+      "id": "0406d4bb-4494-4aa9-9629-efb731e03f41",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "0cb20943-8c60-444f-b7ab-ab39b9eeda15",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Maya haben ja gelebt in Mexiko, also in Yucatan und in Guatemala, in Nicaragua, in Honduras, in El Salvador und in Belize.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "El Salvador"
+      }
+    },
+    {
+      "id": "fcc0c710-dc70-4984-923d-91cff2af9e40",
+      "type": "LOCATED_IN",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "63e677a5-a8d7-4ad8-ae3c-512c0dcb55e4",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Maya haben ja gelebt in Mexiko, also in Yucatan und in Guatemala, in Nicaragua, in Honduras, in El Salvador und in Belize.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Belize"
+      }
+    },
+    {
+      "id": "e34d9093-9a83-440a-ae50-e605a130e6d4",
+      "type": "HAPPENED_AT",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "4fb36c96-223c-4247-8099-2b152dbdbcb1",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Vor 150 Jahren war der letzte Aufstand der Maya dort und der wurde niedergeschlagen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Aufstand der Maya",
+        "target_entity_name": "Mexiko"
+      }
+    },
+    {
+      "id": "f781900b-c469-469b-82a2-2c5582e38038",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "a158297f-9074-47f3-81a8-931be2629bff",
+      "target_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Aber die Kirche, so weiß ich das aus Mexiko, ich war ja auch schon da, die Kirche, also die Mayas, die haben ja noch lange gekämpft, ja, und dann hat die Kirche ja den sozusagen deren Kultur und deren Bräuche versucht aufzuzwingen, ja.",
+        "extraction_method": "llm",
+        "source_entity_name": "Kirche",
+        "target_entity_name": "Maya"
+      }
+    },
+    {
+      "id": "afa47cf0-e3cc-4a3f-9b63-ffce40fc8103",
+      "type": "AFFECTS",
+      "source_entity_id": "a158297f-9074-47f3-81a8-931be2629bff",
+      "target_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "die Kirche, also die Mayas, die haben ja noch lange gekämpft, ja, und dann hat die Kirche ja den sozusagen deren Kultur und deren Bräuche versucht aufzuzwingen",
+        "extraction_method": "llm",
+        "source_entity_name": "Kirche",
+        "target_entity_name": "Mayas"
+      }
+    },
+    {
+      "id": "e9e105d6-62cc-4aad-a90f-f48754d8fef9",
+      "type": "USES",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "71c56dcc-447b-4a0e-9c3e-70fa12875e71",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "es gibt ja immer noch sehr, sehr viele Maya, die kaum Spanisch sprechen",
+        "extraction_method": "llm",
+        "source_entity_name": "Mayas",
+        "target_entity_name": "Spanisch"
+      }
+    },
+    {
+      "id": "e0f51965-c380-4aa9-ba15-8d4cde27ec4c",
+      "type": "RELATED_TO",
+      "source_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "target_entity_id": "296e01ad-2b7e-410f-a22b-4c0f5028ab69",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "sie kannten die Gesetze des Universums und kennen sie bis heute",
+        "extraction_method": "llm",
+        "source_entity_name": "Urvölker",
+        "target_entity_name": "Gesetze des Universums"
+      }
+    },
+    {
+      "id": "12a7b8db-bdb9-42dc-b4de-8141303668fa",
+      "type": "CAUSES",
+      "source_entity_id": "aca380fa-e7ad-485d-8a51-e56c0eedd80f",
+      "target_entity_id": "6591b036-9ed2-4bd3-8f16-a57f57d83833",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und dann reichen sich überhaupt erst Pilze und Parasiten da an.",
+        "extraction_method": "llm",
+        "source_entity_name": "Leaky Gut",
+        "target_entity_name": "Pilze"
+      }
+    },
+    {
+      "id": "93951a77-59d6-42ae-9af6-c0e5f567f631",
+      "type": "CAUSES",
+      "source_entity_id": "aca380fa-e7ad-485d-8a51-e56c0eedd80f",
+      "target_entity_id": "6388e350-df04-41fd-b4d0-7969483be0c2",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und dann reichen sich überhaupt erst Pilze und Parasiten da an.",
+        "extraction_method": "llm",
+        "source_entity_name": "Leaky Gut",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "7752b182-f713-46ca-b7d0-ce860b932a70",
+      "type": "PART_OF",
+      "source_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "target_entity_id": "44d4c88b-eb34-43e1-ba58-eed8314367a3",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "viele weise Menschen sagen, der Boden von Mama Erde ist, wie ich sage, wie im Kleinen, wie im Großen, ist quasi der Darm von Mama Erde.",
+        "extraction_method": "llm",
+        "source_entity_name": "Mama Erde",
+        "target_entity_name": "Darm"
+      }
+    },
+    {
+      "id": "05902cef-6e4a-4d11-b930-e3902d8b8013",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "7d345973-6e74-4a2e-a010-4b526b2fabad",
+      "target_entity_id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich kannte auch nichts anderes als die Schulmedizin. Das heißt, meine Eltern sind sehr früh mit mir zum Arzt gegangen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Arzt",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "a5790a59-e8c8-439f-b7a4-fbb4ef97dcde",
+      "type": "TREATS",
+      "source_entity_id": "891dfb2f-6bb0-4acf-8951-88d8d9eb3809",
+      "target_entity_id": "35600b4d-6689-4f88-a521-13aa72372708",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "also es rettet ja tatsächlich auch, wenn man jetzt zum Beispiel ein Antibiotika gibt, weil man eine akute Blutvergiftung hat oder sowas, dann rettet es ja wirklich auch Leben.",
+        "extraction_method": "llm",
+        "source_entity_name": "Antibiotika",
+        "target_entity_name": "Blutvergiftung"
+      }
+    },
+    {
+      "id": "54777c17-91b3-424e-b4f3-e19c7dcc2ef9",
+      "type": "TREATS",
+      "source_entity_id": "cc2423c9-9600-4a9c-b2d2-8e3fd38a081f",
+      "target_entity_id": "ab65942c-605d-4caf-82df-b8287bb28d7d",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich habe viele Jahre lang Cortison bekommen. Ich hatte schon in meinem ersten Lebensjahr zum Beispiel chronische Neurodermitis.",
+        "extraction_method": "llm",
+        "source_entity_name": "Cortison",
+        "target_entity_name": "Neurodermitis"
+      }
+    },
+    {
+      "id": "9d634127-13bc-4f79-ab13-f666f8ea2d32",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "8fba7ff6-21e7-48b3-9fb5-70577fb5f0a5",
+      "target_entity_id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich habe mit 15 die Pille bekommen.  Und so weiter und so weiter.  Also dieses ganze Gedöns. So, es hat mir aber nicht geholfen. Es hat mich immer nur noch kranker gemacht.",
+        "extraction_method": "llm",
+        "source_entity_name": "Pille",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "0172ec91-4cdb-4f76-bf60-ba7b32b2847d",
+      "type": "RELATED_TO",
+      "source_entity_id": "ab65942c-605d-4caf-82df-b8287bb28d7d",
+      "target_entity_id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich war von klein auf krank. Schon in meinem ersten Lebensjahr hatte ich zum Beispiel chronische Neurodermitis. ... Ich kannte auch nichts anderes als die Schulmedizin.",
+        "extraction_method": "llm",
+        "source_entity_name": "Neurodermitis",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "eed7d0fb-432b-4365-a460-d5aca0169237",
+      "type": "RELATED_TO",
+      "source_entity_id": "83c3f321-2a3a-45b4-a274-3f61f199d8fb",
+      "target_entity_id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich hatte eine unheilbare Skoliose. ... Ich kannte auch nichts anderes als die Schulmedizin.",
+        "extraction_method": "llm",
+        "source_entity_name": "Skoliose",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "1d27fa1d-fd95-481f-b6c7-d6dbffb58f8e",
+      "type": "RELATED_TO",
+      "source_entity_id": "78d60084-79d4-4581-a8f6-f077b337f28a",
+      "target_entity_id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich hatte selbst einen Tumor. ... Ich kannte auch nichts anderes als die Schulmedizin.",
+        "extraction_method": "llm",
+        "source_entity_name": "Tumor",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "8c1d4df5-07b5-477e-a9b0-9123e8304b64",
+      "type": "RELATED_TO",
+      "source_entity_id": "35600b4d-6689-4f88-a521-13aa72372708",
+      "target_entity_id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn man jetzt zum Beispiel ein Antibiotika gibt, weil man eine akute Blutvergiftung hat ...  wir können ja der Schulmedizin diesen Ansichten auch einiges verdanken im Akutfall.",
+        "extraction_method": "llm",
+        "source_entity_name": "Blutvergiftung",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "41559413-ab3c-40e9-b8ab-f9917767ad09",
+      "type": "WORKS_FOR",
+      "source_entity_id": "7d345973-6e74-4a2e-a010-4b526b2fabad",
+      "target_entity_id": "b997de67-fc2b-4906-9d9c-51dde37afa17",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Denn meine Geburt war wunderbar, bis der Arzt kam, der laut Krankenhausrichtlinien gerufen werden musste, wenn die Presslinien losgehen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Arzt",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "8e01244e-c76f-4830-bed0-f7073fe90326",
+      "type": "RELATED_TO",
+      "source_entity_id": "be6b4f3b-3579-40a4-ae53-13c5f1cec9b8",
+      "target_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und da habe ich sehr schnell rausgefunden beim Thema Geburt,  dass die Anthropologen damals, egal bei welchem Volk die waren,  die haben das beobachtet, dass bei der Geburt,  bei den Urvölkern eine Mutter- und Kindsterblichkeitsrate von null war.",
+        "extraction_method": "llm",
+        "source_entity_name": "Anthropologen",
+        "target_entity_name": "Urvölker"
+      }
+    },
+    {
+      "id": "b9287c4e-5f28-4b9c-a5bf-577e109a6be7",
+      "type": "HAPPENED_ON",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "5e88e855-36ff-497b-99f0-e17d59aa4f6c",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich belebe ja seit Anfang 2009 mit den Maya",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "2009"
+      }
+    },
+    {
+      "id": "a7852e77-1509-48b2-8fb2-a07a88565b19",
+      "type": "USES",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "2ad809a8-eb21-4b4d-b12e-83d15ddaa0ae",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also Permakultur.  Und hauptsächlich wirklich das gegeben.  Also ganz viel Kräuter gegessen.  Das machen sie bis heute.  Und ganz, ganz natürlich gelebt.  Und wenn sie krank waren,  also die haben ja ein unglaubliches Kräuterwissen bis heute.  Und wenn du sie fragst, woher sie das haben,  dann sagen sie von den Pflanzen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Permakultur"
+      }
+    },
+    {
+      "id": "223308e9-6c33-4ea9-ad9e-3b8749ab2c91",
+      "type": "LOCATED_IN",
+      "source_entity_id": "9ea205ee-124e-4369-9444-2912a0ee6bb6",
+      "target_entity_id": "d5b044c2-5976-4309-87ac-81614982fc34",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also das ist hier sehr bekannt, aber auch in Südamerika.",
+        "extraction_method": "llm",
+        "source_entity_name": "Pharmaindustrie",
+        "target_entity_name": "Südamerika"
+      }
+    },
+    {
+      "id": "a2c4276f-4325-46c5-9d73-8d73daa7ceda",
+      "type": "TREATS",
+      "source_entity_id": "7dfb7f0a-4060-47d6-b805-c8899387ddf3",
+      "target_entity_id": "35600b4d-6689-4f88-a521-13aa72372708",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und wir machen dann Kurkuma-Umschläge. Das ist das Blutreinigungsmittel Nummer eins. Also da kommt gar keine Blutvergiftung.",
+        "extraction_method": "llm",
+        "source_entity_name": "Kurkuma",
+        "target_entity_name": "Blutvergiftung"
+      }
+    },
+    {
+      "id": "37cc8016-c7be-41ae-9bee-e25ffdf7a671",
+      "type": "HAPPENED_AT",
+      "source_entity_id": "47a774e3-50ff-43d3-a2c1-517d474b5c6e",
+      "target_entity_id": "83c279f9-1afe-4d0a-9513-58ebcd414aa5",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die war in den 70er Jahren hier in Guatemala",
+        "extraction_method": "llm",
+        "source_entity_name": "Ina May Gesskin",
+        "target_entity_name": "Guatemala"
+      }
+    },
+    {
+      "id": "85a8daf1-1d48-4712-b6a7-0d136d56c6dd",
+      "type": "RELATED_TO",
+      "source_entity_id": "47a774e3-50ff-43d3-a2c1-517d474b5c6e",
+      "target_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und hat auch hier von den Maya Hebammen gelernt",
+        "extraction_method": "llm",
+        "source_entity_name": "Ina May Gesskin",
+        "target_entity_name": "Maya Hebammen"
+      }
+    },
+    {
+      "id": "caad5ab6-5315-4aed-af83-6420e54d9a71",
+      "type": "RELATED_TO",
+      "source_entity_id": "4871fa8f-8692-45d6-883e-69228cd7be47",
+      "target_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und der Tuch, das ist der Schoßraum der Erde. Das stellt den Schoßraum der Erde dar.",
+        "extraction_method": "llm",
+        "source_entity_name": "Themaskal",
+        "target_entity_name": "Schoßraum der Erde"
+      }
+    },
+    {
+      "id": "c9eae926-6f75-4210-b4d3-4d687a61f9c6",
+      "type": "RELATED_TO",
+      "source_entity_id": "4871fa8f-8692-45d6-883e-69228cd7be47",
+      "target_entity_id": "1873d8e7-6723-4132-8d48-30a945662113",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und sieht ähnlich aus wie ein Iglu",
+        "extraction_method": "llm",
+        "source_entity_name": "Themaskal",
+        "target_entity_name": "Iglu"
+      }
+    },
+    {
+      "id": "43ee9375-59cb-420b-b5cb-0ff22290d9b0",
+      "type": "RELATED_TO",
+      "source_entity_id": "47a774e3-50ff-43d3-a2c1-517d474b5c6e",
+      "target_entity_id": "1d498d0d-3a77-42fd-98b4-c765f660c593",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "das ist ja die bekannteste Hebamme der Welt, sagt man",
+        "extraction_method": "llm",
+        "source_entity_name": "Ina May Gesskin",
+        "target_entity_name": "Hebamme"
+      }
+    },
+    {
+      "id": "51414205-d009-47db-a0a0-2469bc403672",
+      "type": "PARTICIPATED_IN",
+      "source_entity_id": "f06247cc-035d-4c1d-aa92-00611b46a1be",
+      "target_entity_id": "4871fa8f-8692-45d6-883e-69228cd7be47",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "in den Frau alleine mit der Meierhebermen nackt, hineinkrabbelt und sich hinlegt",
+        "extraction_method": "llm",
+        "source_entity_name": "Meierhebermen",
+        "target_entity_name": "Themaskal"
+      }
+    },
+    {
+      "id": "d2014e15-4352-415e-9730-6213033206ad",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "f06247cc-035d-4c1d-aa92-00611b46a1be",
+      "target_entity_id": "07c67477-25ef-4e64-b4de-0d8ff1d63a08",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und die Meierheber, also die Frau liegt nackt im Themaskal.  Und die Meierheber ist auch nackt damit drin.  Und wäscht die Frau, reinigt die Frau mit Kräutern und massiert die Frau nach der alten Meiermassagetechnik.",
+        "extraction_method": "llm",
+        "source_entity_name": "Meierhebermen",
+        "target_entity_name": "Frau"
+      }
+    },
+    {
+      "id": "1dd13d6c-f80f-4962-b683-3942e91d7c2b",
+      "type": "USES",
+      "source_entity_id": "1a376da4-af05-4241-ae4f-6abeadca8b08",
+      "target_entity_id": "f06247cc-035d-4c1d-aa92-00611b46a1be",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und die Meierheber, die gehören auch zu den Priesterinnen. Und die haben natürlich auch große Fähigkeiten. Die spüren ganz genau mit ihren Händen, wo Blockaden oder wo Trauma festsitzen. Und sie massieren die Frau, sie massieren wirklich dieses Trauma, den Schmerz und so weiter raus. Und die Meierheber, die gehören auch zu den Priesterinnen.  Und die haben natürlich auch große Fähigkeiten.  Die spüren ganz genau mit ihren Händen, wo Blockaden oder wo Trauma festsitzen.  Und sie massieren die Frau, sie massieren wirklich dieses Trauma, den Schmerz und so weiter raus.  nach der alten Meiermassagetechnik",
+        "extraction_method": "llm",
+        "source_entity_name": "Meiermassagetechnik",
+        "target_entity_name": "Meierhebermen"
+      }
+    },
+    {
+      "id": "aaeac4d7-8838-484c-9f08-a4155a698182",
+      "type": "PART_OF",
+      "source_entity_id": "f06247cc-035d-4c1d-aa92-00611b46a1be",
+      "target_entity_id": "1f1908b8-f957-4477-b4cd-9bbc7fb59101",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und die Meierheber, die gehören auch zu den Priesterinnen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Meierhebermen",
+        "target_entity_name": "Priesterinnen"
+      }
+    },
+    {
+      "id": "7d2631ff-9e6e-497e-bafd-84ad6f5ebc35",
+      "type": "PARTICIPATED_IN",
+      "source_entity_id": "07c67477-25ef-4e64-b4de-0d8ff1d63a08",
+      "target_entity_id": "4871fa8f-8692-45d6-883e-69228cd7be47",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also die Meierfrauen, weil sie regelmäßig von klein auf, also sie gebären tatsächlich auch im Tuch im Themaskal.",
+        "extraction_method": "llm",
+        "source_entity_name": "Meierfrauen",
+        "target_entity_name": "Themaskal"
+      }
+    },
+    {
+      "id": "24b2fdfd-6b18-4c08-98af-781a9d67b8a9",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "target_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und immer mehr Schamanen und Urvölker gehen auch raus mit dieser heiligen Medizin, weil sie sagen, das ist wirklich auch ein Teil, der zur Heilung der Welt beiträgt.",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Urvölker"
+      }
+    },
+    {
+      "id": "1a1c7028-4c34-468f-8bca-bae58fb450c0",
+      "type": "RELATED_TO",
+      "source_entity_id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "target_entity_id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ja, mit der weiblichen Kraft. Mit der weiblichen Kraft von Mutter Erde.",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Mutter Erde"
+      }
+    },
+    {
+      "id": "bb4ac673-1cb4-4479-bb96-2d4b4f54e3a5",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "target_entity_id": "f30e707c-d062-47f6-8dfd-1e802a855c03",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich weiß zum Beispiel, dass selbst die Regierung von Peru, die die Natives aus Amerika gebeten haben, um Hilfe, um diesen Ayahuasca-Tourismus, auch etwas zu beruhigen, weil da eben auch Menschen sterben.",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Peru"
+      }
+    },
+    {
+      "id": "376476db-d44a-4815-8a54-835793abca12",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "target_entity_id": "297e8df9-5b0c-45f2-86c5-b9a6f156cb45",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich weiß zum Beispiel, dass selbst die Regierung von Peru, die die Natives aus Amerika gebeten haben, um Hilfe, um diesen Ayahuasca-Tourismus, auch etwas zu beruhigen, weil da eben auch Menschen sterben.",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Amerika"
+      }
+    },
+    {
+      "id": "9393e4bf-18ed-43c3-a809-59299796672e",
+      "type": "AFFECTS",
+      "source_entity_id": "f30e707c-d062-47f6-8dfd-1e802a855c03",
+      "target_entity_id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich weiß zum Beispiel, dass selbst die Regierung von Peru, die die Natives aus Amerika gebeten haben, um Hilfe, um diesen Ayahuasca-Tourismus, auch etwas zu beruhigen, weil da eben auch Menschen sterben.",
+        "extraction_method": "llm",
+        "source_entity_name": "Regierung von Peru",
+        "target_entity_name": "Ayahuasca-Tourismus"
+      }
+    },
+    {
+      "id": "39cf5fc1-30d5-4fc7-83ee-58c4b2648539",
+      "type": "USES",
+      "source_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "target_entity_id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und immer mehr Schamanen und Urvölker gehen auch raus mit dieser heiligen Medizin,",
+        "extraction_method": "llm",
+        "source_entity_name": "Urvölker",
+        "target_entity_name": "Ayahuasca"
+      }
+    },
+    {
+      "id": "9336ffa0-c721-439a-ae9e-a54bf12155ef",
+      "type": "LOCATED_IN",
+      "source_entity_id": "298e4c72-53c5-410e-b816-49c695255b38",
+      "target_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Denn wenn du bei den Urvölkern schaust, genau dort, wo Ayahuasca wächst,",
+        "extraction_method": "llm",
+        "source_entity_name": "Ayahuasca",
+        "target_entity_name": "Urvölker"
+      }
+    },
+    {
+      "id": "742425a3-19a2-4537-8c9e-d128268584ad",
+      "type": "RELATED_TO",
+      "source_entity_id": "250858df-01b9-4d2d-b37e-f3d62f78d959",
+      "target_entity_id": "58e785fb-192e-4249-b55e-4bbfa5a2df1d",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sie merken zwar, haben zwar ein ungutes Gefühl am Sonntagabend, wenn sie am Montag wieder arbeiten müssen,",
+        "extraction_method": "llm",
+        "source_entity_name": "Sonntagabend",
+        "target_entity_name": "Montag"
+      }
+    },
+    {
+      "id": "ad83ec13-c90e-4e62-aad3-5083c6b9a488",
+      "type": "RELATED_TO",
+      "source_entity_id": "0eb36793-33aa-4723-bf61-08e76c51d44e",
+      "target_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Oder dem Temaskal, also dem Schoß der Erde.",
+        "extraction_method": "llm",
+        "source_entity_name": "Temaskal",
+        "target_entity_name": "Schoß der Erde"
+      }
+    },
+    {
+      "id": "ec5f53f7-c9e1-4ffa-ad76-aac2e618b621",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "69d078b8-f06e-4f5a-a0c1-d5e9f0a07824",
+      "target_entity_id": "e61393fd-fc37-4024-b84b-47037dfda35a",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bei deiner Kirche in der Bibel gucken Maria, die reine, die unbefleckte, blabliblublu.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maria",
+        "target_entity_name": "Bibel"
+      }
+    },
+    {
+      "id": "5257458c-d01a-4505-a65f-6e77fa58ae64",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "69d078b8-f06e-4f5a-a0c1-d5e9f0a07824",
+      "target_entity_id": "a158297f-9074-47f3-81a8-931be2629bff",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bei deiner Kirche in der Bibel gucken Maria, die reine, die unbefleckte, blabliblublu.",
+        "extraction_method": "llm",
+        "source_entity_name": "Maria",
+        "target_entity_name": "Kirche"
+      }
+    },
+    {
+      "id": "2e00709a-bf8c-4bc4-b921-6aba54c18ef8",
+      "type": "RELATED_TO",
+      "source_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "target_entity_id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "zum anderen  zu Mama Erde, also immer wieder in  die Natur gehen, ... sie ist deine Mutter, sie möchte  dir helfen",
+        "extraction_method": "llm",
+        "source_entity_name": "Mama Erde",
+        "target_entity_name": "Mutter Erde"
+      }
+    },
+    {
+      "id": "fa030ecd-1ea8-4d38-9d47-a13304df95ec",
+      "type": "RELATED_TO",
+      "source_entity_id": "c2888203-515b-41a0-b837-5e7922579258",
+      "target_entity_id": "d5f7d9a5-b4be-4a57-815b-3b3a1d90e63a",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann habe ich den Hüterinnenkreis,  also das ist wirklich dieser Online-Frauenkreis,",
+        "extraction_method": "llm",
+        "source_entity_name": "Online-Frauenkreis",
+        "target_entity_name": "Hüterinnenkreis"
+      }
+    },
+    {
+      "id": "722a4b52-2399-4022-8d0a-b8dfae7c1962",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "c2888203-515b-41a0-b837-5e7922579258",
+      "target_entity_id": "9066152b-17ba-48d7-8935-fd4ee2191687",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wir haben eine Community von  35.000 Menschen, da sind auch ein paar Männer  dabei,",
+        "extraction_method": "llm",
+        "source_entity_name": "Online-Frauenkreis",
+        "target_entity_name": "35.000 Menschen"
+      }
+    },
+    {
+      "id": "e681483a-421d-4800-b5c7-fa1d3cdbd4ad",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "0398cfb4-2389-4500-9409-6781ee1451e4",
+      "target_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wir machen regelmäßig  Medizinkreise, also auch  mit anderen Vertretern  von Urvölkern zusammen,",
+        "extraction_method": "llm",
+        "source_entity_name": "Medizinkreise",
+        "target_entity_name": "Urvölker"
+      }
+    },
+    {
+      "id": "f016d683-03aa-4a25-b668-d9b6d241286f",
+      "type": "PART_OF",
+      "source_entity_id": "3e829e91-196a-412e-acb6-3ee27a2bf8f1",
+      "target_entity_id": "9066152b-17ba-48d7-8935-fd4ee2191687",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wir haben eine Community von  35.000 Menschen, da sind auch ein paar Männer  dabei, ich weiß  nicht genau wie viele, vielleicht 5  bis 10 Prozent,",
+        "extraction_method": "llm",
+        "source_entity_name": "5 bis 10 Prozent",
+        "target_entity_name": "35.000 Menschen"
+      }
+    },
+    {
+      "id": "f0a150db-8697-4e24-a886-dffaf3c205d0",
+      "type": "RELATED_TO",
+      "source_entity_id": "d5f7d9a5-b4be-4a57-815b-3b3a1d90e63a",
+      "target_entity_id": "c2888203-515b-41a0-b837-5e7922579258",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "habe ich den Hüterinnenkreis, also das ist wirklich dieser Online-Frauenkreis,",
+        "extraction_method": "llm",
+        "source_entity_name": "Hüterinnenkreis",
+        "target_entity_name": "Online-Frauenkreis"
+      }
+    },
+    {
+      "id": "9925a95c-be21-466f-8487-5eb3576a9b85",
+      "type": "RELATED_TO",
+      "source_entity_id": "0189c806-263e-43df-a63d-8e2e31c0cde1",
+      "target_entity_id": "1f1908b8-f957-4477-b4cd-9bbc7fb59101",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und dann habe ich ja noch die Einweihung zur Priesterin, und ja,",
+        "extraction_method": "llm",
+        "source_entity_name": "Einweihung zur Priesterin",
+        "target_entity_name": "Priesterin"
+      }
+    },
+    {
+      "id": "fb91c1f3-7b87-4b3e-be4a-4f40ae60584c",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "04415a8e-2918-4903-98b6-e6a3c2cafc7f",
+      "target_entity_id": "212c6a49-1f3a-4f03-85ae-2a735836090c",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und wir haben natürlich regelmäßig Summits, also zweimal im Jahr, und wer wirklich mal vor Ort sein möchte und den Tuch, den Schoß der Erde erleben möchte, die Maya Ältesten kennenlernen möchte.",
+        "extraction_method": "llm",
+        "source_entity_name": "Summits",
+        "target_entity_name": "Maya Ältesten"
+      }
+    },
+    {
+      "id": "ac3c927f-e4aa-4529-8691-4b5937921fab",
+      "type": "HAPPENED_ON",
+      "source_entity_id": "0398cfb4-2389-4500-9409-6781ee1451e4",
+      "target_entity_id": "880f86ed-4601-4c6c-beba-fdb4231dca5f",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ja, die nächste Reise ist im November,",
+        "extraction_method": "llm",
+        "source_entity_name": "Reise",
+        "target_entity_name": "November"
+      }
+    },
+    {
+      "id": "34c7577c-6f5e-498c-82bf-e7248ba8ef96",
+      "type": "HAPPENED_ON",
+      "source_entity_id": "0398cfb4-2389-4500-9409-6781ee1451e4",
+      "target_entity_id": "e2d20759-59a8-4ccc-9e8c-1308cd67c34b",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und die nächste Reise ist dann erst wieder Ende 2022.",
+        "extraction_method": "llm",
+        "source_entity_name": "Reise",
+        "target_entity_name": "2022"
+      }
+    },
+    {
+      "id": "31ed1761-4496-4915-8251-bb5f1fcda758",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "b60fa61c-01db-4eae-9899-c0f1ae667014",
+      "target_entity_id": "296e01ad-2b7e-410f-a22b-4c0f5028ab69",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "also das Universum ist der Vater, das männliche Prinzip, also so habe ich das von den Urvölkern gelernt,",
+        "extraction_method": "llm",
+        "source_entity_name": "Urvölker",
+        "target_entity_name": "Universum"
+      }
+    },
+    {
+      "id": "0783ee7e-da06-4206-9a72-3ca509ab6762",
+      "type": "RELATED_TO",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "012f73d6-f2c2-4206-8c2c-e308763da607",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Der Kosmos, ja, das nennen die Maya auch so, Herz des Himmels",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Kosmos"
+      }
+    },
+    {
+      "id": "592b2c28-8ca3-460c-a4c0-72e43ce517cc",
+      "type": "RELATED_TO",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "3e5eadeb-b4d8-4334-9f5b-8db8a4523e9e",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Der Kosmos, ja, das nennen die Maya auch so, Herz des Himmels",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Herz des Himmels"
+      }
+    },
+    {
+      "id": "c73f8985-d035-4838-bb69-10710c330b21",
+      "type": "RELATED_TO",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "83693387-3250-478c-b480-86633cb2cf61",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Okusch Ulev und Okusch Alav in Mayasprache",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Okusch Ulev"
+      }
+    },
+    {
+      "id": "677773a5-a32e-42ce-bd72-5e225fda430b",
+      "type": "RELATED_TO",
+      "source_entity_id": "fee20512-79d6-4659-aba0-6a6b6306c4ed",
+      "target_entity_id": "717a135c-16b8-4586-9a6a-fd17250be2e2",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Okusch Ulev und Okusch Alav in Mayasprache",
+        "extraction_method": "llm",
+        "source_entity_name": "Maya",
+        "target_entity_name": "Okusch Alav"
+      }
+    },
+    {
+      "id": "ae6e4e52-25f9-4d1d-9ce0-6aad47d01a9e",
+      "type": "PART_OF",
+      "source_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "target_entity_id": "08db413f-e2b2-4144-ba90-c945d030afd7",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Herz des Himmels, also Herz von Mama Erde",
+        "extraction_method": "llm",
+        "source_entity_name": "Mama Erde",
+        "target_entity_name": "Herz von Mama Erde"
+      }
+    },
+    {
+      "id": "d9176ac9-2221-47f7-8f27-ce1df03f54a1",
+      "type": "RELATED_TO",
+      "source_entity_id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "target_entity_id": "296e01ad-2b7e-410f-a22b-4c0f5028ab69",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wo der Erde ist, genau, die Mutter und die Kraft, also das Universum ist der Vater",
+        "extraction_method": "llm",
+        "source_entity_name": "Mutter Erde",
+        "target_entity_name": "Universum"
+      }
+    },
+    {
+      "id": "0e7d102a-68d8-4eac-b7ca-d0857adc669f",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "target_entity_id": "296e01ad-2b7e-410f-a22b-4c0f5028ab69",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "die Urquelle ist Mutter Erde, weil alles aus ihrem Schoß entspringt,  das ist einfach nun mal so. Und das Universum",
+        "extraction_method": "llm",
+        "source_entity_name": "Mutter Erde",
+        "target_entity_name": "Universum"
+      }
+    },
+    {
+      "id": "1b2a8a9a-e971-4311-a579-436efde3f353",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "02b76148-10c3-4b44-a752-8820768b87a8",
+      "target_entity_id": "a158297f-9074-47f3-81a8-931be2629bff",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "das wurde ja so durch die Kirche oder durch das Patriarchat, was ja zusammengehört",
+        "extraction_method": "llm",
+        "source_entity_name": "Patriarchat",
+        "target_entity_name": "Kirche"
+      }
+    },
+    {
+      "id": "e024040b-b219-4c79-ab7d-4325973dcc6b",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "02b76148-10c3-4b44-a752-8820768b87a8",
+      "target_entity_id": "38c2a5e8-2523-4ddd-9735-f2c541f39da9",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "meine Freundin sagt immer, Monotheismus ist nur möglich durch das Patriarchat",
+        "extraction_method": "llm",
+        "source_entity_name": "Patriarchat",
+        "target_entity_name": "Monotheismus"
+      }
+    },
+    {
+      "id": "9728426f-36be-40f1-893b-e2a8d86d2106",
+      "type": "RELATED_TO",
+      "source_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "target_entity_id": "92c02adb-ac73-4fc9-a20b-7908cf44c736",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ins Gleichgewicht zu kommen von Mama Erde und Vater Kosmos",
+        "extraction_method": "llm",
+        "source_entity_name": "Mama Erde",
+        "target_entity_name": "Vater Kosmos"
+      }
+    },
+    {
+      "id": "2ae5a004-1394-4062-9708-61f964b94f7e",
+      "type": "RELATED_TO",
+      "source_entity_id": "08db413f-e2b2-4144-ba90-c945d030afd7",
+      "target_entity_id": "3e5eadeb-b4d8-4334-9f5b-8db8a4523e9e",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Herz des Himmels und Herz von Mama Erde",
+        "extraction_method": "llm",
+        "source_entity_name": "Herz von Mama Erde",
+        "target_entity_name": "Herz des Himmels"
+      }
+    },
+    {
+      "id": "2636acc7-00a3-405b-9d9f-d55dc650b5e6",
+      "type": "RELATED_TO",
+      "source_entity_id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "target_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Man wird ja dann auch gelenkt und geführt von Mutter Erde, wenn man sich verbindet. Genau. Wir sind immer gehalten. Und klar, das erfordert auf jeden Fall Mut, sowieso dem eigenen Seelenruf zu folgen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Mutter Erde",
+        "target_entity_name": "Mama Erde"
+      }
+    },
+    {
+      "id": "124b6812-3a02-4dc8-941c-df651f516445",
+      "type": "PART_OF",
+      "source_entity_id": "e40e1594-381d-4c45-941e-7020452e5a48",
+      "target_entity_id": "f98373fc-cdde-4e32-9c9a-ffbe63691cab",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also ich hätte da jetzt mal so ganz spontan, habe ich die Reise zum Herzen von Mutter Erde. Also da geht es sehr viel ums Fühlen und auch um Reinigung, um dieses Wiederankommen in dieser Kraftquelle von Mama Erde und ihrem Schoß.",
+        "extraction_method": "llm",
+        "source_entity_name": "Reise zum Herzen von Mutter Erde",
+        "target_entity_name": "Mutter Erde"
+      }
+    },
+    {
+      "id": "4fded286-38ae-4730-b238-7f75286493c2",
+      "type": "PART_OF",
+      "source_entity_id": "e40e1594-381d-4c45-941e-7020452e5a48",
+      "target_entity_id": "a46decfc-8c1f-4f61-81b2-41ad0548ccf0",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also ich hätte da jetzt mal so ganz spontan, habe ich die Reise zum Herzen von Mutter Erde. Also da geht es sehr viel ums Fühlen und auch um Reinigung, um dieses Wiederankommen in dieser Kraftquelle von Mama Erde und ihrem Schoß.",
+        "extraction_method": "llm",
+        "source_entity_name": "Reise zum Herzen von Mutter Erde",
+        "target_entity_name": "Mama Erde"
+      }
+    }
+  ],
+  "statistics": {
+    "entity_count": 119,
+    "relation_count": 84,
+    "entity_types": {
+      "PERSON": 13,
+      "LOCATION": 16,
+      "CONCEPT": 48,
+      "DATE": 9,
+      "NUMBER": 4,
+      "LANGUAGE": 1,
+      "PRODUCT": 10,
+      "ORGANIZATION": 6,
+      "PERCENT": 3,
+      "FACILITY": 3,
+      "TIME": 1,
+      "WORK_OF_ART": 2,
+      "EVENT": 3
+    },
+    "relation_types": {
+      "RELATED_TO": 28,
+      "LOCATED_IN": 11,
+      "ASSOCIATED_WITH": 18,
+      "PARTICIPATED_IN": 3,
+      "STUDIED": 1,
+      "HAPPENED_AT": 2,
+      "AFFECTS": 2,
+      "USES": 4,
+      "CAUSES": 2,
+      "PART_OF": 6,
+      "TREATS": 3,
+      "WORKS_FOR": 1,
+      "HAPPENED_ON": 3
+    }
+  }
+}

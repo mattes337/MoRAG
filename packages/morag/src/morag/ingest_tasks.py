@@ -14,6 +14,8 @@ from morag_core.models import Document, DocumentChunk
 from morag_core.config import get_settings, validate_chunk_size
 from morag.services.remote_job_service import RemoteJobService
 from morag.models.remote_job_api import CreateRemoteJobRequest
+from .ingestion_coordinator import IngestionCoordinator
+from morag_graph.models.database_config import DatabaseConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -36,12 +38,14 @@ async def continue_ingestion_after_remote_processing(
 
         options = remote_job.task_options
 
-        # Store in vector database if requested
+        # Use comprehensive ingestion system if requested
         if options.get('store_in_vector_db', True):
-            # Prepare metadata for vector storage
-            options_metadata = options.get('metadata') or {}
+            # Initialize ingestion coordinator
+            coordinator = IngestionCoordinator()
 
-            vector_metadata = {
+            # Prepare metadata for ingestion
+            options_metadata = options.get('metadata') or {}
+            ingestion_metadata = {
                 "source_type": remote_job.content_type,
                 "source_path": remote_job.source_file_path,
                 "processing_time": processing_time,
@@ -56,20 +60,36 @@ async def continue_ingestion_after_remote_processing(
             if not document_id:
                 document_id = generate_document_id(remote_job.source_file_path, content)
 
-            # Store content in vector database
-            point_ids = await store_content_in_vector_db(
-                content,
-                vector_metadata,
+            # Create a mock processing result for the coordinator
+            from morag_core.models.config import ProcessingResult
+            mock_result = ProcessingResult(
+                success=True,
+                task_id=remote_job.ingestion_task_id,
+                source_type=remote_job.content_type,
+                content=content,
+                metadata=metadata,
+                processing_time=processing_time
+            )
+
+            # Use comprehensive ingestion system
+            ingestion_result = await coordinator.ingest_content(
+                content=content,
+                source_path=remote_job.source_file_path,
+                content_type=remote_job.content_type,
+                metadata=ingestion_metadata,
+                processing_result=mock_result,
+                databases=options.get('databases'),
                 chunk_size=options.get('chunk_size'),
                 chunk_overlap=options.get('chunk_overlap'),
                 document_id=document_id,
-                replace_existing=options.get('replace_existing', False),
-                use_content_checksum=options.get('use_content_checksum', True)
+                replace_existing=options.get('replace_existing', False)
             )
 
-            logger.info("Remote processing result stored in vector database",
+            logger.info("Remote processing result stored via comprehensive ingestion",
                        remote_job_id=remote_job_id,
-                       point_ids_count=len(point_ids))
+                       databases_used=len(ingestion_result.get('database_results', {})),
+                       qdrant_points=len(ingestion_result.get('database_results', {}).get('qdrant', {}).get('point_ids', [])),
+                       neo4j_entities=ingestion_result.get('database_results', {}).get('neo4j', {}).get('entities_stored', 0))
 
         # Send webhook notification if requested
         webhook_url = options.get('webhook_url')
@@ -80,8 +100,9 @@ async def continue_ingestion_after_remote_processing(
                 'SUCCESS',
                 {
                     'remote_job_id': remote_job_id,
-                    'chunks_processed': len(point_ids) if 'point_ids' in locals() else 0,
+                    'chunks_processed': len(ingestion_result.get('database_results', {}).get('qdrant', {}).get('point_ids', [])),
                     'total_text_length': len(content),
+                    'databases_used': list(ingestion_result.get('database_results', {}).keys()),
                     'metadata': {**metadata, 'remote_processing': True}
                 }
             )
@@ -420,13 +441,14 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
 
             self.update_state(state='PROGRESS', meta={'stage': 'storing', 'progress': 0.7})
 
-            # Store in vector database if requested
+            # Use comprehensive ingestion system if requested
             if options.get('store_in_vector_db', True):
-                # Prepare metadata for vector storage
-                # Ensure options metadata is also a dictionary
-                options_metadata = options.get('metadata') or {}
+                # Initialize ingestion coordinator
+                coordinator = IngestionCoordinator()
 
-                vector_metadata = {
+                # Prepare metadata for ingestion
+                options_metadata = options.get('metadata') or {}
+                ingestion_metadata = {
                     "source_type": content_type or "unknown",
                     "source_path": file_path,
                     "processing_time": result.processing_time,
@@ -439,20 +461,28 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                 if not document_id:
                     document_id = generate_document_id(file_path, result.text_content or result.content)
 
-                # Store content in vector database with chunk configuration and document replacement
-                point_ids = await store_content_in_vector_db(
-                    result.text_content or result.content,
-                    vector_metadata,
+                # Use comprehensive ingestion system
+                ingestion_result = await coordinator.ingest_content(
+                    content=result.text_content or result.content,
+                    source_path=file_path,
+                    content_type=content_type or "unknown",
+                    metadata=ingestion_metadata,
+                    processing_result=result,
+                    databases=options.get('databases'),
                     chunk_size=options.get('chunk_size'),
                     chunk_overlap=options.get('chunk_overlap'),
                     document_id=document_id,
-                    replace_existing=options.get('replace_existing', False),
-                    use_content_checksum=options.get('use_content_checksum', True)
+                    replace_existing=options.get('replace_existing', False)
                 )
 
-                # Add vector storage info to result
-                result.metadata['vector_point_ids'] = point_ids
+                # Add ingestion info to result
+                result.metadata['ingestion_result'] = ingestion_result
                 result.metadata['stored_in_vector_db'] = True
+                result.metadata['stored_in_graph_db'] = bool(ingestion_result.get('database_results', {}).get('neo4j'))
+
+                # Maintain backward compatibility
+                if ingestion_result.get('database_results', {}).get('qdrant'):
+                    result.metadata['vector_point_ids'] = ingestion_result['database_results']['qdrant'].get('point_ids', [])
             
             self.update_state(state='PROGRESS', meta={'stage': 'completing', 'progress': 0.9})
             
@@ -561,13 +591,14 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
 
             self.update_state(state='PROGRESS', meta={'stage': 'storing', 'progress': 0.7})
 
-            # Store in vector database if requested
+            # Use comprehensive ingestion system if requested
             if options.get('store_in_vector_db', True):
-                # Prepare metadata for vector storage
-                # Ensure options metadata is also a dictionary
-                options_metadata = options.get('metadata') or {}
+                # Initialize ingestion coordinator
+                coordinator = IngestionCoordinator()
 
-                vector_metadata = {
+                # Prepare metadata for ingestion
+                options_metadata = options.get('metadata') or {}
+                ingestion_metadata = {
                     "source_type": content_type or "url",
                     "source_url": url,
                     "processing_time": result.processing_time,
@@ -580,20 +611,28 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                 if not document_id:
                     document_id = generate_document_id(url, result.text_content or result.content)
 
-                # Store content in vector database with chunk configuration and document replacement
-                point_ids = await store_content_in_vector_db(
-                    result.text_content or result.content,
-                    vector_metadata,
+                # Use comprehensive ingestion system
+                ingestion_result = await coordinator.ingest_content(
+                    content=result.text_content or result.content,
+                    source_path=url,
+                    content_type=content_type or "url",
+                    metadata=ingestion_metadata,
+                    processing_result=result,
+                    databases=options.get('databases'),
                     chunk_size=options.get('chunk_size'),
                     chunk_overlap=options.get('chunk_overlap'),
                     document_id=document_id,
-                    replace_existing=options.get('replace_existing', False),
-                    use_content_checksum=options.get('use_content_checksum', True)
+                    replace_existing=options.get('replace_existing', False)
                 )
 
-                # Add vector storage info to result
-                result.metadata['vector_point_ids'] = point_ids
+                # Add ingestion info to result
+                result.metadata['ingestion_result'] = ingestion_result
                 result.metadata['stored_in_vector_db'] = True
+                result.metadata['stored_in_graph_db'] = bool(ingestion_result.get('database_results', {}).get('neo4j'))
+
+                # Maintain backward compatibility
+                if ingestion_result.get('database_results', {}).get('qdrant'):
+                    result.metadata['vector_point_ids'] = ingestion_result['database_results']['qdrant'].get('point_ids', [])
             
             self.update_state(state='PROGRESS', meta={'stage': 'completing', 'progress': 0.9})
             
@@ -719,11 +758,12 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
                         result.metadata = {}
 
                     if result.success and options.get('store_in_vector_db', True):
-                        # Store in vector database
-                        # Ensure options metadata is also a dictionary
-                        options_metadata = options.get('metadata') or {}
+                        # Use comprehensive ingestion system
+                        coordinator = IngestionCoordinator()
 
-                        vector_metadata = {
+                        # Prepare metadata for ingestion
+                        options_metadata = options.get('metadata') or {}
+                        ingestion_metadata = {
                             "source_type": detected_source_type or item.get('source_type', 'unknown'),
                             "batch_index": i,
                             "batch_size": len(items),
@@ -733,19 +773,34 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
                         }
 
                         if 'url' in item:
-                            vector_metadata['source_url'] = item['url']
+                            ingestion_metadata['source_url'] = item['url']
+                            source_path = item['url']
                         elif 'file_path' in item:
-                            vector_metadata['source_path'] = item['file_path']
+                            ingestion_metadata['source_path'] = item['file_path']
+                            source_path = item['file_path']
+                        else:
+                            source_path = f"batch_item_{i}"
 
-                        point_ids = await store_content_in_vector_db(
-                            result.text_content or result.content,
-                            vector_metadata,
+                        # Use comprehensive ingestion system
+                        ingestion_result = await coordinator.ingest_content(
+                            content=result.text_content or result.content,
+                            source_path=source_path,
+                            content_type=detected_source_type or item.get('source_type', 'unknown'),
+                            metadata=ingestion_metadata,
+                            processing_result=result,
+                            databases=options.get('databases'),
                             chunk_size=options.get('chunk_size'),
                             chunk_overlap=options.get('chunk_overlap')
                         )
 
-                        result.metadata['vector_point_ids'] = point_ids
+                        # Add ingestion info to result
+                        result.metadata['ingestion_result'] = ingestion_result
                         result.metadata['stored_in_vector_db'] = True
+                        result.metadata['stored_in_graph_db'] = bool(ingestion_result.get('database_results', {}).get('neo4j'))
+
+                        # Maintain backward compatibility
+                        if ingestion_result.get('database_results', {}).get('qdrant'):
+                            result.metadata['vector_point_ids'] = ingestion_result['database_results']['qdrant'].get('point_ids', [])
 
                     results.append({
                         'success': result.success,

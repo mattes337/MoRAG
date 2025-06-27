@@ -1,7 +1,7 @@
 """Embedding services for MoRAG using various AI providers."""
 
-import google.genai as genai
-from google.genai import types
+import google.generativeai as genai
+from google.generativeai import types
 from typing import List, Dict, Any, Optional
 import structlog
 import asyncio
@@ -48,12 +48,16 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         """
         # Create a basic config for the parent class
         from morag_core.interfaces.embedding import EmbeddingConfig, EmbeddingProvider
+        # Get batch size from environment or use default
+        import os
+        batch_size = int(os.getenv('MORAG_EMBEDDING_BATCH_SIZE', '50'))
+
         config = EmbeddingConfig(
             provider=EmbeddingProvider.GEMINI,
             model_name=embedding_model,
             api_key=api_key,
             max_tokens=8192,
-            batch_size=10
+            batch_size=batch_size
         )
         super().__init__(config)
 
@@ -63,9 +67,10 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         self.max_retries = 3
         self.base_delay = 1.0
 
-        # Configure Gemini client
+        # Configure Gemini API
         if self.api_key:
-            self.client = genai.Client(api_key=self.api_key)
+            genai.configure(api_key=self.api_key)
+            self.client = True  # Use boolean to indicate client is configured
             logger.info("Gemini service initialized",
                        embedding_model=self.embedding_model,
                        generation_model=self.generation_model)
@@ -260,13 +265,13 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                 model_name = self.embedding_model
                 if not model_name.startswith(('models/', 'tunedModels/')):
                     model_name = f"models/{model_name}"
-                response = self.client.models.embed_content(
+                response = genai.embed_content(
                     model=model_name,
-                    contents=text
+                    content=text
                 )
 
                 return EmbeddingResult(
-                    embedding=response.embeddings[0].values,
+                    embedding=response['embedding'],
                     token_count=len(text.split()),  # Approximate token count
                     model=self.embedding_model
                 )
@@ -389,32 +394,21 @@ class GeminiEmbeddingService(BaseEmbeddingService):
     def _generate_batch_embeddings_sync(self, texts: List[str], task_type: str) -> List[List[float]]:
         """Synchronous batch embedding generation."""
         try:
-            # Use the new Google GenAI SDK for batch embedding
+            # Use the Google GenAI SDK for batch embedding
             # Ensure model name has proper prefix for new SDK
             model_name = self.embedding_model
             if not model_name.startswith(('models/', 'tunedModels/')):
                 model_name = f"models/{model_name}"
-            response = self.client.models.embed_content(
-                model=model_name,
-                contents=texts
-            )
 
-            # Extract embeddings from response
-            if hasattr(response, 'embeddings'):
-                return [emb.values for emb in response.embeddings]
-            elif hasattr(response, 'embedding'):
-                # Single embedding returned, replicate for all texts
-                return [response.embedding.values] * len(texts)
-            else:
-                # Fallback: try to extract from response structure
-                embeddings = []
-                for text in texts:
-                    single_response = self.client.models.embed_content(
-                        model=model_name,  # Use the same model_name with prefix
-                        contents=text
-                    )
-                    embeddings.append(single_response.embedding.values)
-                return embeddings
+            # Process texts individually since batch API might not be available
+            embeddings = []
+            for text in texts:
+                response = genai.embed_content(
+                    model=model_name,
+                    content=text
+                )
+                embeddings.append(response['embedding'])
+            return embeddings
 
         except Exception as e:
             logger.error("Synchronous batch embedding failed", error=str(e))
@@ -424,13 +418,17 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         self,
         texts: List[str],
         task_type: str = "retrieval_document",
-        batch_size: int = 10,
+        batch_size: Optional[int] = None,
         delay_between_batches: float = 0.1,
         use_native_batch: bool = True
     ) -> List[EmbeddingResult]:
         """Generate embeddings for multiple texts with optimized batch processing."""
         if not texts:
             return []
+
+        # Use config batch size if none provided
+        if batch_size is None:
+            batch_size = self.config.batch_size
 
         results = []
 
@@ -585,10 +583,8 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         while True:
             try:
-                response = self.client.models.generate_content(
-                    model=self.generation_model,
-                    contents=prompt
-                )
+                model = genai.GenerativeModel(self.generation_model)
+                response = model.generate_content(prompt)
                 return response.text
 
             except Exception as e:

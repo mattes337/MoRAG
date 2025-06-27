@@ -351,9 +351,21 @@ class SpeakerDiarizationService:
         
         try:
             # Simple fallback: assume single speaker or split by duration
-            from pydub import AudioSegment
-            audio = AudioSegment.from_file(str(audio_path))
-            duration = len(audio) / 1000.0  # Convert to seconds
+            duration = 60.0  # Default duration fallback
+            try:
+                from pydub import AudioSegment
+                audio = AudioSegment.from_file(str(audio_path))
+                duration = len(audio) / 1000.0  # Convert to seconds
+            except (ImportError, ModuleNotFoundError) as e:
+                logger.warning("pydub not available for audio duration, using default duration", error=str(e))
+                # Try to get duration from file stats as fallback
+                try:
+                    import os
+                    file_size = os.path.getsize(audio_path)
+                    # Rough estimate: assume 128kbps MP3 (16KB/s)
+                    duration = max(60.0, file_size / 16000)
+                except Exception:
+                    duration = 60.0  # Final fallback
             
             if duration > 60:  # If longer than 1 minute, assume 2 speakers
                 mid_point = duration / 2

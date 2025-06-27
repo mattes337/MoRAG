@@ -1,0 +1,424 @@
+"""FastAPI dependencies for MoRAG API."""
+
+import os
+from typing import Optional
+from functools import lru_cache
+import structlog
+from fastapi import HTTPException
+
+from morag.api import MoRAGAPI
+from morag_services import ServiceConfig
+
+# Try to import graph components, but handle gracefully if not available
+try:
+    from morag_graph import HybridRetrievalCoordinator, ContextExpansionEngine, QueryEntityExtractor
+    from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
+    from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
+    GRAPH_AVAILABLE = True
+except ImportError as e:
+    logger.warning("Graph components not available", error=str(e))
+    GRAPH_AVAILABLE = False
+    # Create dummy classes for type hints
+    HybridRetrievalCoordinator = None
+    ContextExpansionEngine = None
+    QueryEntityExtractor = None
+    Neo4jStorage = None
+    QdrantStorage = None
+    Neo4jConfig = None
+    QdrantConfig = None
+    GraphCRUD = None
+    GraphTraversal = None
+    GraphAnalytics = None
+
+# Try to import reasoning components, but handle gracefully if not available
+try:
+    from morag_reasoning import (
+        LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder,
+        IterativeRetriever, RetrievalContext
+    )
+    REASONING_AVAILABLE = True
+except ImportError as e:
+    logger.warning("Reasoning components not available", error=str(e))
+    REASONING_AVAILABLE = False
+    # Create dummy classes for type hints
+    LLMClient = None
+    LLMConfig = None
+    PathSelectionAgent = None
+    ReasoningPathFinder = None
+    IterativeRetriever = None
+    RetrievalContext = None
+
+logger = structlog.get_logger(__name__)
+
+
+class FallbackHybridRetrievalCoordinator:
+    """Fallback coordinator that only does vector search when graph components are unavailable."""
+
+    def __init__(self, vector_retriever):
+        self.vector_retriever = vector_retriever
+        self.logger = structlog.get_logger(__name__)
+
+    async def retrieve(self, query: str, max_results: int = 10) -> list:
+        """Retrieve using only vector search."""
+        try:
+            self.logger.info("Using fallback vector-only retrieval", query=query[:100])
+            results = await self.vector_retriever.retrieve(query, max_results)
+            return results
+        except Exception as e:
+            self.logger.error("Fallback retrieval failed", error=str(e))
+            return []
+
+
+@lru_cache()
+def get_service_config() -> ServiceConfig:
+    """Get service configuration."""
+    return ServiceConfig()
+
+
+@lru_cache()
+def get_morag_api() -> MoRAGAPI:
+    """Get MoRAG API instance."""
+    config = get_service_config()
+    return MoRAGAPI(config)
+
+
+@lru_cache()
+def get_neo4j_storage() -> Optional[Neo4jStorage]:
+    """Get Neo4j storage instance."""
+    if not GRAPH_AVAILABLE:
+        return None
+    try:
+        config = Neo4jConfig(
+            uri=os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
+            username=os.getenv("NEO4J_USERNAME", "neo4j"),
+            password=os.getenv("NEO4J_PASSWORD", "password"),
+            database=os.getenv("NEO4J_DATABASE", "neo4j")
+        )
+        return Neo4jStorage(config)
+    except Exception as e:
+        logger.warning("Neo4j storage not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_qdrant_storage() -> Optional[QdrantStorage]:
+    """Get Qdrant storage instance."""
+    if not GRAPH_AVAILABLE:
+        return None
+    try:
+        config = QdrantConfig(
+            host=os.getenv("QDRANT_HOST", "localhost"),
+            port=int(os.getenv("QDRANT_PORT", "6333")),
+            collection_name=os.getenv("QDRANT_COLLECTION", "morag_vectors")
+        )
+        return QdrantStorage(config)
+    except Exception as e:
+        logger.warning("Qdrant storage not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_graph_crud() -> Optional[GraphCRUD]:
+    """Get graph CRUD operations instance."""
+    if not GRAPH_AVAILABLE:
+        return None
+    try:
+        storage = get_neo4j_storage()
+        if storage is None:
+            return None
+        return GraphCRUD(storage)
+    except Exception as e:
+        logger.warning("Graph CRUD not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_graph_traversal() -> Optional[GraphTraversal]:
+    """Get graph traversal instance."""
+    if not GRAPH_AVAILABLE:
+        return None
+    try:
+        storage = get_neo4j_storage()
+        if storage is None:
+            return None
+        return GraphTraversal(storage)
+    except Exception as e:
+        logger.warning("Graph traversal not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_graph_analytics() -> Optional[GraphAnalytics]:
+    """Get graph analytics instance."""
+    if not GRAPH_AVAILABLE:
+        return None
+    try:
+        storage = get_neo4j_storage()
+        if storage is None:
+            return None
+        return GraphAnalytics(storage)
+    except Exception as e:
+        logger.warning("Graph analytics not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_query_entity_extractor() -> Optional[QueryEntityExtractor]:
+    """Get query entity extractor instance."""
+    try:
+        storage = get_neo4j_storage()
+        return QueryEntityExtractor(graph_storage=storage)
+    except Exception as e:
+        logger.warning("Query entity extractor not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_context_expansion_engine() -> Optional[ContextExpansionEngine]:
+    """Get context expansion engine instance."""
+    try:
+        storage = get_neo4j_storage()
+        return ContextExpansionEngine(storage)
+    except Exception as e:
+        logger.warning("Context expansion engine not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_hybrid_retrieval_coordinator() -> Optional[HybridRetrievalCoordinator]:
+    """Get hybrid retrieval coordinator instance."""
+    try:
+        # Create a simple vector retriever wrapper for the existing search functionality
+        class VectorRetrieverWrapper:
+            def __init__(self, morag_api: MoRAGAPI):
+                self.morag_api = morag_api
+
+            async def retrieve(self, query: str, max_results: int = 10) -> list:
+                """Retrieve using vector search."""
+                try:
+                    results = await self.morag_api.search(query, max_results)
+                    return results
+                except Exception as e:
+                    logger.error("Vector retrieval failed", error=str(e))
+                    return []
+
+        morag_api = get_morag_api()
+        vector_retriever = VectorRetrieverWrapper(morag_api)
+        context_expansion_engine = get_context_expansion_engine()
+        query_entity_extractor = get_query_entity_extractor()
+
+        # If graph components are not available, create a fallback coordinator
+        if context_expansion_engine is None or query_entity_extractor is None:
+            logger.warning("Graph components not available, creating fallback coordinator")
+            return FallbackHybridRetrievalCoordinator(vector_retriever)
+
+        return HybridRetrievalCoordinator(
+            vector_retriever=vector_retriever,
+            context_expansion_engine=context_expansion_engine,
+            query_entity_extractor=query_entity_extractor
+        )
+    except Exception as e:
+        logger.error("Failed to create hybrid retrieval coordinator", error=str(e))
+        # Return fallback that only does vector search
+        morag_api = get_morag_api()
+
+        class VectorRetrieverWrapper:
+            def __init__(self, morag_api: MoRAGAPI):
+                self.morag_api = morag_api
+
+            async def retrieve(self, query: str, max_results: int = 10) -> list:
+                """Retrieve using vector search."""
+                try:
+                    results = await self.morag_api.search(query, max_results)
+                    return results
+                except Exception as e:
+                    logger.error("Vector retrieval failed", error=str(e))
+                    return []
+
+        vector_retriever = VectorRetrieverWrapper(morag_api)
+        return FallbackHybridRetrievalCoordinator(vector_retriever)
+
+
+class GraphEngine:
+    """Wrapper for graph operations to provide a unified interface."""
+
+    def __init__(self):
+        self.crud = get_graph_crud()
+        self.traversal = get_graph_traversal()
+        self.analytics = get_graph_analytics()
+        self.available = self.crud is not None and self.traversal is not None
+    
+    async def get_entity(self, entity_id: str):
+        """Get entity by ID."""
+        if not self.available:
+            raise HTTPException(status_code=503, detail="Graph engine not available")
+        return await self.crud.get_entity(entity_id)
+    
+    async def find_entities_by_name(self, name: str, entity_type: Optional[str] = None):
+        """Find entities by name."""
+        if not self.available:
+            raise HTTPException(status_code=503, detail="Graph engine not available")
+
+        # Check if the method exists, if not, provide a fallback
+        if hasattr(self.crud, 'find_entities_by_name'):
+            return await self.crud.find_entities_by_name(name, entity_type)
+        else:
+            # Fallback: search for entities with similar names
+            logger.warning("find_entities_by_name method not available, using fallback")
+            # Return empty list as fallback
+            return []
+
+    async def get_entity_relations(self, entity_id: str, depth: int = 1, max_relations: int = 50):
+        """Get entity relations."""
+        if not self.available:
+            raise HTTPException(status_code=503, detail="Graph engine not available")
+        return await self.traversal.find_neighbors(entity_id, max_distance=depth)
+
+    async def find_shortest_paths(self, start_id: str, end_id: str, max_paths: int = 10, relation_filters: Optional[list] = None):
+        """Find shortest paths between entities."""
+        if not self.available:
+            raise HTTPException(status_code=503, detail="Graph engine not available")
+        path = await self.traversal.find_shortest_path(start_id, end_id, relation_filters)
+        return [path] if path else []
+
+    async def explore_from_entity(self, entity_id: str, max_depth: int = 3, max_paths: int = 10,
+                                entity_filters: Optional[list] = None, relation_filters: Optional[list] = None):
+        """Explore from entity."""
+        if not self.available:
+            raise HTTPException(status_code=503, detail="Graph engine not available")
+        neighbors = await self.traversal.find_neighbors(entity_id, max_distance=max_depth, relation_types=relation_filters)
+        # Convert to paths format (simplified)
+        paths = []
+        for neighbor in neighbors[:max_paths]:
+            path = type('Path', (), {
+                'entities': [entity_id, neighbor.id],
+                'relations': [],
+                'total_weight': 1.0,
+                'confidence': 0.8
+            })()
+            paths.append(path)
+        return paths
+
+    async def get_graph_statistics(self):
+        """Get graph statistics."""
+        if not self.available or self.analytics is None:
+            raise HTTPException(status_code=503, detail="Graph analytics not available")
+        return await self.analytics.get_graph_statistics()
+
+    async def calculate_centrality_measures(self):
+        """Calculate centrality measures."""
+        if not self.available or self.analytics is None:
+            raise HTTPException(status_code=503, detail="Graph analytics not available")
+        return await self.analytics.calculate_centrality_measures()
+
+    async def detect_communities(self):
+        """Detect communities."""
+        if not self.available or self.analytics is None:
+            raise HTTPException(status_code=503, detail="Graph analytics not available")
+        return await self.analytics.detect_communities()
+
+
+@lru_cache()
+def get_graph_engine() -> GraphEngine:
+    """Get graph engine instance."""
+    return GraphEngine()
+
+
+@lru_cache()
+def get_llm_client() -> Optional[LLMClient]:
+    """Get LLM client instance for reasoning."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        config = LLMConfig(
+            provider=os.getenv("MORAG_LLM_PROVIDER", "gemini"),
+            model=os.getenv("MORAG_LLM_MODEL", "gemini-1.5-flash"),
+            api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=float(os.getenv("MORAG_LLM_TEMPERATURE", "0.1")),
+            max_tokens=int(os.getenv("MORAG_LLM_MAX_TOKENS", "2000")),
+            max_retries=int(os.getenv("MORAG_LLM_MAX_RETRIES", "5")),
+        )
+        return LLMClient(config)
+    except Exception as e:
+        logger.warning("LLM client not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_path_selection_agent() -> Optional[PathSelectionAgent]:
+    """Get path selection agent instance."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        llm_client = get_llm_client()
+        if llm_client is None:
+            return None
+        max_paths = int(os.getenv("MORAG_REASONING_MAX_PATHS", "10"))
+        return PathSelectionAgent(llm_client, max_paths=max_paths)
+    except Exception as e:
+        logger.warning("Path selection agent not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_reasoning_path_finder() -> Optional[ReasoningPathFinder]:
+    """Get reasoning path finder instance."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        graph_engine = get_graph_engine()
+        path_selector = get_path_selection_agent()
+        if path_selector is None:
+            return None
+        return ReasoningPathFinder(graph_engine, path_selector)
+    except Exception as e:
+        logger.warning("Reasoning path finder not available", error=str(e))
+        return None
+
+
+@lru_cache()
+def get_iterative_retriever() -> Optional[IterativeRetriever]:
+    """Get iterative retriever instance."""
+    if not REASONING_AVAILABLE:
+        return None
+    try:
+        llm_client = get_llm_client()
+        graph_engine = get_graph_engine()
+
+        # Create vector retriever wrapper
+        class VectorRetrieverWrapper:
+            def __init__(self, morag_api: MoRAGAPI):
+                self.morag_api = morag_api
+
+            async def search(self, query: str, limit: int = 10) -> list:
+                """Search using vector similarity."""
+                try:
+                    results = await self.morag_api.search(query, limit)
+                    return results
+                except Exception as e:
+                    logger.error("Vector search failed", error=str(e))
+                    return []
+
+            async def retrieve(self, query: str, max_results: int = 10) -> list:
+                """Retrieve using vector search."""
+                return await self.search(query, max_results)
+
+        morag_api = get_morag_api()
+        vector_retriever = VectorRetrieverWrapper(morag_api)
+
+        if llm_client is None:
+            return None
+
+        max_iterations = int(os.getenv("MORAG_REASONING_MAX_ITERATIONS", "5"))
+        sufficiency_threshold = float(os.getenv("MORAG_REASONING_SUFFICIENCY_THRESHOLD", "0.8"))
+
+        return IterativeRetriever(
+            llm_client=llm_client,
+            graph_engine=graph_engine,
+            vector_retriever=vector_retriever,
+            max_iterations=max_iterations,
+            sufficiency_threshold=sufficiency_threshold
+        )
+    except Exception as e:
+        logger.warning("Iterative retriever not available", error=str(e))
+        return None

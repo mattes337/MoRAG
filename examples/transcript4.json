@@ -1,0 +1,4562 @@
+{
+  "source_file": "..\\..\\examples\\transcript4.txt",
+  "model": "gemini-1.5-flash",
+  "entities": [
+    {
+      "id": "883ea7ca-4727-4159-95b3-f4a9d88ee9c9",
+      "name": "Dorothee Rund",
+      "type": "PERSON",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The interviewer's name.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e880a949-1925-4078-aaae-be7b4ee00cba",
+      "name": "Doro",
+      "type": "PERSON",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Nickname of Dorothee Rund.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "name": "Sören Schumann",
+      "type": "PERSON",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The interviewee's name, an expert on chronic infections.; The speaker's name, mentioned multiple times.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "72849ff6-36c7-4aeb-a254-2dbf2a2a0a2e",
+      "name": "Bachelor in Sportwissenschaften",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sören Schumann's academic degree.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "cb598297-9e91-4a32-a630-747d2cf2288f",
+      "name": "Online-Kongresses",
+      "type": "EVENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Type of event organized by Sören Schumann.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0aca2fc8-fe62-4879-9196-179ae911bf43",
+      "name": "YouTuber",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sören Schumann's online activity.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b82f73be-4042-4b7d-8cb6-caf76b6dda04",
+      "name": "Speaker",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sören Schumann's professional role.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "70110200-bf34-4aa8-8bc7-6d063da13e0a",
+      "name": "ganzheitlicher Ernährungs- und Gesundheitsberater",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sören Schumann's professional role.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "633ffb32-5db4-44a6-9a14-cc7cb2ae7852",
+      "name": "Schulmedizin",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Type of medicine mentioned in the context of Sören Schumann's health journey.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b5d28d30-4759-4f03-a278-55f4eac8289f",
+      "name": "naturheilkundlichen Ärzten oder Heilpraktikern",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Type of practitioners Sören Schumann sought help from.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c19ffbef-6f87-457e-b46c-8696f3e14ebe",
+      "name": "Candida",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as an example of a chronic infection.; A fungus that can overgrow in the body.; A type of yeast infection mentioned in relation to carbohydrate and fat consumption.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e0f44540-2c5a-4208-954f-dc72e7d23672",
+      "name": "Borreliose",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A disease the speaker contracted three years prior.; A disease mentioned in the context of hypohyperthermia therapy.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "61ef1872-1d4a-4631-a49a-830e5b08a6be",
+      "name": "drei Jahren",
+      "type": "DATE",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Approximately three years ago, in the summer.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b9a77019-88c3-46ef-a772-d520417fc153",
+      "name": "Sommer",
+      "type": "DATE",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The season in which the speaker contracted Borreliose.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "name": "Immunsystem",
+      "type": "CONCEPT",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker discusses strengthening the immune system.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "name": "Magensäure",
+      "type": "CONCEPT",
+      "confidence": 0.99,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Stomach acid; its role in gut and overall health is discussed.; Referred to as being stimulated by bitters and important for digestion.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1af59554-8b76-4406-aa9f-26930699249b",
+      "name": "Sodbrennen",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Heartburn, used as an example related to stomach acid.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c6263f65-0694-4bde-85ae-be9881fee2f5",
+      "name": "80, 90 Prozent",
+      "type": "PERCENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Estimated percentage of people with health problems and weak stomach acid.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "152ef455-e76d-40ff-bb8a-32eb6118ee15",
+      "name": "Nährstoffmengen",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Nutrient deficiencies, a consequence of weak stomach acid.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "name": "Darm",
+      "type": "CONCEPT",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Intestine; its health and relation to stomach acid are discussed.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "189f5349-01f3-4f67-92ae-3927735562b7",
+      "name": "Krankheitserreger",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Pathogens; stomach acid helps kill them.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d645df6e-34a5-4309-8e31-a9ce59c34bb1",
+      "name": "Protonpumpenheimer",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A type of medication mentioned in the context of its negative effects on people with weak stomach acid.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7259a919-e9d9-4733-9343-1c0a7299d4e2",
+      "name": "Weizen",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a substance to avoid for better stomach acid health.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "dfea3069-f4b1-4b12-88e8-bc1d0dc39edb",
+      "name": "Zucker",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a substance to avoid for better stomach acid health.; Food that can exacerbate Candida overgrowth.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1d531736-036b-410a-b742-0447bd31d248",
+      "name": "Wildkräutern",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Recommended as a source of bitter substances beneficial for stomach acid.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d23ee952-a228-42d9-a2d9-b46c77627dab",
+      "name": "grünen Smoothies",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Recommended as a beneficial food for stomach acid health, especially when containing wild herbs.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "54d4a3be-fbb3-43b6-8827-858c3966d00b",
+      "name": "Sellerie-Saft",
+      "type": "PRODUCT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a trendy and beneficial juice for stomach health.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "5dc5e1ee-286c-436e-b4dd-a0b2e9bdb0ff",
+      "name": "Weißkohl",
+      "type": "PRODUCT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a source of beneficial juice for stomach health.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "17ab7dd0-bdfa-4e65-8b6d-19a86766b5c8",
+      "name": "Käse",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Discussed in the context of its long stomach residence time and recommendation to consume it at the end of a meal.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0b3524da-a1fa-44d3-a6d1-1f092aea082c",
+      "name": "Obst",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as having a short stomach residence time.; Fruit mentioned as an example of a food source.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9f3edd4f-46ec-463b-844c-e5569d99e2ee",
+      "name": "Helicobacter pylori",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A bacterium mentioned as a potential factor in stomach problems, but not the sole cause.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "50704c3e-ea2b-40b2-8d84-0aa12433aadd",
+      "name": "Gastritis",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A medical condition mentioned as a possible consequence of poor dietary habits.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2c21acf2-519f-4fb1-93d0-c9653e477401",
+      "name": "Protonpumpenhemmer",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Medication mentioned as potentially worsening the problem of low stomach acid.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2a7c4646-84be-4c66-b04d-0ea4898e30da",
+      "name": "Selleriesaft",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A juice recommended to strengthen stomach acid production.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "30d45415-54fb-484b-98f2-feb7e6f50c1c",
+      "name": "Kohlgewächsensäfte",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Juices from cruciferous vegetables suggested for improving stomach health, but with a recommendation to start slowly.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2ac1811f-8555-4886-abf5-c3f311cf50c9",
+      "name": "Sämpföle",
+      "type": "PRODUCT",
+      "confidence": 0.75,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Essential oils mentioned for their potential antiparasitic effects, but with a recommendation to start slowly.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e142017b-d43d-416b-9c62-0ed1c2e636aa",
+      "name": "Weißkohlsaft",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A suggested remedy for bacterial issues.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "89de2123-2ad9-46f9-bfe1-e9a52bd3e205",
+      "name": "Manuka- oder Grapefruitkernextrakt",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Another suggested remedy for bacterial issues.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9411f185-d948-4ad8-a46b-30762a16d24e",
+      "name": "grünes Smoothies",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Recommended for people starting to address health issues.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "name": "Candida-Pilz",
+      "type": "CONCEPT",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A type of yeast often found in the gut, discussed as a potential problem.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "cdb26156-2dc9-47dc-9850-e5a90835df37",
+      "name": "westlichen Regionen",
+      "type": "LOCATION",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Geographic area where Candida is prevalent.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d6cca0da-c89a-4aaa-8f4b-c9034f332fcc",
+      "name": "Naturvölker",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Indigenous populations mentioned in contrast to those in Western regions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "3e47f0b1-d239-4cd6-965e-65addfa69ec4",
+      "name": "verarbeiteten Lebensmitteln",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Foods that can exacerbate Candida overgrowth.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6360769c-36fc-47b7-85b3-3ff26f483ae9",
+      "name": "verarbeiteten Kohlenhydraten",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Foods that can exacerbate Candida overgrowth.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0054bcfb-c6e9-4e91-a463-e685e9fdaa5d",
+      "name": "Nagelpilz",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A condition potentially linked to Candida.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "name": "Parasiten",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Organisms discussed as potential gut problems.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a2cea73d-f254-4a39-ad42-a80702fdaf0b",
+      "name": "Vorbandwürmer",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Example of a type of parasite.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "289adaf3-9795-4043-a653-ca031ae2a930",
+      "name": "Toxoplasma gondii",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A type of parasite that can affect cells and the brain.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "5b376698-98ac-4f89-8ede-6d8bfed92bed",
+      "name": "Leberegel",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Parasites that can infect the liver.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "25030f46-1597-4c3f-929c-9d91e7eab909",
+      "name": "Toxoplasmose",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Infection caused by Toxoplasma gondii.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "841a4a95-db2a-4015-a2d3-95f29f0117a3",
+      "name": "Borrelien",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bacteria causing Lyme disease, mentioned as a significant issue.; Mentioned as a type of infection.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fea68b9f-8e54-4794-b87e-db46c03810b5",
+      "name": "Klamydien",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bacteria mentioned as a co-infection.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "3960a93b-60f1-4cc4-8135-e68015494a84",
+      "name": "Mikroplasmen",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bacteria mentioned as a co-infection.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b53905d7-c280-43eb-b216-1d2788ee8534",
+      "name": "Toxoplasmoseparasiten",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A parasite mentioned in relation to chronic fatigue, chronic tiredness, pain, and mental health problems.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2c612845-c78c-42a3-9745-ae2e6b3e2da6",
+      "name": "Borrellen",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bacteria mentioned in the context of molecular mimicry and its effect on the immune system.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "31376cb5-514d-4d79-a78b-cab6766d94d2",
+      "name": "molekularen Mimikri",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A mechanism used by Borrelia bacteria to evade the immune system.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c8bbc7b1-bcd6-40a3-b1f8-a360e4320467",
+      "name": "Immunsensorgereien",
+      "type": "CONCEPT",
+      "confidence": 0.75,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sensory organs of the immune system, mentioned in relation to Toxoplasmosis.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9d26577a-c7a6-4d80-949b-4617a447c89b",
+      "name": "Blut-Hirn-Schranke",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A barrier between the bloodstream and the brain, mentioned in relation to Toxoplasmosis.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "f4bd0810-b0e9-416a-a9cd-06d8c70f07bf",
+      "name": "Krebstumoren",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Tumors mentioned in relation to the potential role of viruses or parasites in their development.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "51215cbb-4625-4514-8213-a89f37da3d46",
+      "name": "Dr. Dominik Nischwitz",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The speaker recommends watching an interview with this person.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "61992621-e942-43f7-b502-480c3ca91c6c",
+      "name": "Rosacea",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a skin condition involving mites.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c4547256-36e3-4a00-9409-19a20ff19ab7",
+      "name": "Pasteur",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A well-known scientist who initially focused on the dangers of microorganisms.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ece3ef33-bdf1-4a5a-9bb1-522c80b9fbcc",
+      "name": "Béchon",
+      "type": "PERSON",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A scientist who emphasized the importance of the milieu (environment) in health.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d08dfc79-60db-4ff5-a500-22efc8c2bfe0",
+      "name": "Glyphosat",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A herbicide mentioned as a factor contributing to health problems by damaging gut flora and soil microorganisms.; A herbicide, discussed in relation to intestinal diseases.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "819a5ac4-0dc7-4a3a-8e15-d65af7d84619",
+      "name": "Katze",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Cats are mentioned as pets that can transmit parasites.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "69144eff-d3c9-43f1-99e9-3bf83223f417",
+      "name": "Hunden",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Dogs are mentioned as pets that can transmit parasites.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "88cfeb6f-a1f8-4614-91d7-6273d0aa8f4d",
+      "name": "Wurmkuchen",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Referred to in the context of veterinary medicine, suggesting a treatment or diagnostic tool related to worms.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b859c08b-789c-4e79-b2d3-eb380de6cea8",
+      "name": "Jürgen Amthor",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Person mentioned in an interview about biodynamic farming and soil microorganisms.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d0c2004f-427f-4fb5-bb4f-9091e162e431",
+      "name": "Blyphosat",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A chemical mentioned in relation to chronic inflammatory bowel cramps.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7d8554da-c20d-47a8-b05d-7e30d1893706",
+      "name": "Quecksilber",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mercury, mentioned as a harmful substance that can damage the intestines.; Mercury, mentioned as a factor affecting health.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fa27cd2e-517e-4551-8e47-a11d537bcd0b",
+      "name": "Blei",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Lead, mentioned as a harmful substance.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "42482007-919f-424d-a761-9564f4a37318",
+      "name": "Katmium",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Cadmium, mentioned as a harmful substance.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "46adca2a-0a4f-4cd4-b58f-8fdcd32f3f41",
+      "name": "Chrom",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Chromium, mentioned as a trace element important for bodily functions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e830ed90-5fd0-4566-97e9-adce780d079b",
+      "name": "Molybden",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Molybdenum, mentioned as a trace element important for bodily functions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ef4bfb44-d17a-40da-95e5-8ed5451910e7",
+      "name": "Vanadium",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Vanadium, mentioned as a trace element important for bodily functions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2442c336-6811-48b4-83b1-2dab785eb617",
+      "name": "Lithium",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Lithium, mentioned as a trace element important for bodily functions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "64839e7a-f98a-4d09-9298-d55ab89a5a12",
+      "name": "Kalzium",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Calcium, mentioned as a mineral that has decreased in food over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d1863eab-9aca-4e62-bd72-8cf5926f6fce",
+      "name": "Magnesium",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Magnesium, mentioned as a mineral that has decreased in food over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fa668b53-dafe-40ed-88b5-4b513118462e",
+      "name": "Eisen",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Iron, mentioned as a mineral that has decreased in food over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "85aa2fb4-0ed2-4c3c-9419-e89b8fa04c17",
+      "name": "Salat",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Lettuce, mentioned as a food with decreased mineral content over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7165cfdc-410c-4dc6-9d06-a0ae100fd33e",
+      "name": "Tomaten",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Tomatoes, mentioned as a food with decreased mineral content over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "85c442e6-2f8c-4f8a-a7fa-de19542b33a0",
+      "name": "Spinat",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Spinach, mentioned as a food with decreased mineral content over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "8b83b468-7c31-4a0a-a1d0-5a5e1296162c",
+      "name": "Kohl",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Cabbage, mentioned as a food with decreased mineral content over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c109ddcf-a530-4b17-8b78-b39e356f8435",
+      "name": "Lettuce",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Lettuce, mentioned as a food with decreased mineral content over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "482135ac-ff85-4af4-a02a-1046827f2fef",
+      "name": "80 Prozent",
+      "type": "PERCENT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Percentage decrease in mineral content of certain foods over 80 years.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "55818552-0ef9-4918-a3b0-9dc324cb48f3",
+      "name": "80 Jahren",
+      "type": "DATE",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Time period over which mineral content in foods decreased.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6e915a82-076e-408c-816e-36362c12f2b3",
+      "name": "drei, vier Monate",
+      "type": "DATE",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Duration of the speaker's digestive problems after mercury exposure.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "5b6be835-00b4-42e8-ac74-d69c52a3c94e",
+      "name": "Zeolid",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A binding agent used to remove toxins from the body.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "46a93e94-9283-4052-be46-d4c55a388da2",
+      "name": "Aktivkohle",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Activated charcoal, used as a binding agent to remove toxins.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c78336ab-b6d7-40bd-bb47-0994b90addc6",
+      "name": "Purellien",
+      "type": "CONCEPT",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Likely refers to a type of parasite or toxin.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "bb81b303-c108-4c9a-b10d-e067a34fbfb4",
+      "name": "Wechselbe",
+      "type": "CONCEPT",
+      "confidence": 0.6,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Likely a misspelling or a less common term for a toxin or heavy metal.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a864b00a-c20c-4193-b85a-c88346093b77",
+      "name": "Bleikadmium",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Combination of lead and cadmium, both heavy metals.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "744815a2-2300-47eb-a387-0425ab8afe3f",
+      "name": "Morbus Crohn",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "An inflammatory bowel disease.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "98fc1d9c-ab20-4894-8ae1-9e17cd228008",
+      "name": "Colitis ulcerosa",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ulcerative colitis, an inflammatory bowel disease.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "name": "Likigat",
+      "type": "CONCEPT",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A concept mentioned multiple times, possibly a medical term or condition.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "f6f07860-dffd-4165-be96-076d6f2cd692",
+      "name": "Gluten",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A protein found in wheat, barley, and rye, discussed as a factor in chronic inflammation.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fcb02eeb-a582-46ee-9dd0-cd6cb50984eb",
+      "name": "Darmkongress",
+      "type": "EVENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A congress or conference related to the intestines.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6ac6cdd6-84a4-4d8f-87ef-b92ef24ac7e4",
+      "name": "Uwe Karstädt",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A Heilpraktiker who researched body temperature in chronically ill patients.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "92052d7c-2361-42f7-b5e3-cc5ee2b7b2d2",
+      "name": "Krebs",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Cancer, mentioned in the context of hypohyperthermia therapy.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "21993700-f192-4b8b-b7ec-1f39c012df0c",
+      "name": "Hypohyperthermie",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A therapy involving artificially induced fever.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "3cdb9435-c9b9-48c4-85a2-87325465c8ca",
+      "name": "Vitamin D",
+      "type": "PRODUCT",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A vitamin mentioned as playing a significant role in health.; A vitamin discussed in the context of health and supplementation.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d3d6ea10-ffcb-43d3-9f50-b2531213cb54",
+      "name": "Elektrosmog",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Electromagnetic smog, mentioned as a factor affecting health.; Electromagnetic smog, a recurring theme throughout the text.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fd0e1c6b-2191-4c09-8235-3fd938668ab3",
+      "name": "Antibiotika",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Antibiotics, mentioned as a factor in health issues.; Antibiotics mentioned in relation to their ineffectiveness against biofilms.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1f4590bf-e8d0-4284-887b-85a51081b78e",
+      "name": "Schmerzmittel",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Painkillers, mentioned as a factor in health issues.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ce099147-46a9-4b09-89d3-c1cf8d37e1e2",
+      "name": "Fiebersenker",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Fever reducers, mentioned as a factor in health issues.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9ba1cba1-03f3-42ac-b9c2-eb9cc49717ad",
+      "name": "WLAN",
+      "type": "TECHNOLOGY",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A wireless local area network used in the study comparing the growth of mold in shielded and unshielded environments.; Wireless Local Area Network, the speaker recommends turning it off at night.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "de20fece-66cf-4154-9d00-8aa0893460b7",
+      "name": "12",
+      "type": "PERCENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The factor by which mold growth increased in the WLAN-exposed group compared to the control group.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2c1c641e-0c0d-437f-8082-7984dd52115c",
+      "name": "600",
+      "type": "PERCENT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The factor by which toxin production increased in the WLAN-exposed mold compared to the control group.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b8dab747-1136-42e4-97b1-b0b54e965849",
+      "name": "Melatonin",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A hormone affected by electrosmog, impacting sleep and regeneration.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "8b250730-683e-4c09-9fde-1cc2bc7b3b7b",
+      "name": "Schlafhormonen",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "German for sleep hormones, mentioned in relation to melatonin production.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6e7f466d-da66-4976-8de3-89abd5e7825d",
+      "name": "Handy",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A mobile phone, mentioned in the context of reducing electrosmog exposure.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d37ad506-5f30-4991-bca1-b86d73982b6f",
+      "name": "Flugzeugmodus",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Airplane mode on a mobile phone, used to reduce electromagnetic emissions.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "13ab55e8-b8be-458d-adf3-b5fb47233586",
+      "name": "Laptop",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A laptop computer, mentioned in the context of using a LAN cable for internet connection.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2241b5ae-9609-4e1d-ac0d-a56396f7109e",
+      "name": "Computer",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A desktop computer, mentioned in the context of using a LAN cable for internet connection.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "918f29f0-93b2-42f7-835b-6b1d765f3975",
+      "name": "LAN-Kabel",
+      "type": "TECHNOLOGY",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A local area network cable, recommended for internet connection to reduce electrosmog.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6043cde1-131a-45eb-88ab-538448ec502c",
+      "name": "Telefone",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Cordless phones, mentioned as a source of electrosmog.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "8a200614-cf0c-43cd-88a2-a79aa655ad26",
+      "name": "Internet",
+      "type": "TECHNOLOGY",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The internet, mentioned as an alternative way to make phone calls.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "ab74fbde-dc58-4aa3-b36a-a2e6bc1f2cdd",
+      "name": "Glühbirnen",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Light bulbs, used as an example of products that are difficult to find in their older form.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "name": "Schimmel",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mold, discussed as a health hazard and its interaction with electrosmog.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0cd68aca-4a5c-4ff0-8646-00960e2f05ad",
+      "name": "Darmflora",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Gut flora, mentioned in relation to the impact of mold.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "b0526d0e-fa1f-4cb1-9ae3-e2c849fb6795",
+      "name": "Neurodermitis",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A symptom mentioned in relation to mold exposure.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1669052e-2b4e-4889-a50d-ba4cab9c1eb3",
+      "name": "Dr. Klingert",
+      "type": "PERSON",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Author of a book on Bureiose mentioned in relation to Biofilms and antibiotic treatment.; A physician who collaborates with Armin Schwarzwagzee.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "8bb1fe01-7325-4123-ac38-024539b32471",
+      "name": "Bureiosebuch",
+      "type": "WORK_OF_ART",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A book by Dr. Klingert mentioned in relation to Biofilms and antibiotic treatment.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d5d1eb8c-7425-4828-a293-852a88216381",
+      "name": "Zistrose",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A plant mentioned as a potential treatment for biofilms.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0ccc7657-6d5f-4304-a0a7-fb2201b15f35",
+      "name": "Artemisia annua",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A plant (one-year wormwood) mentioned in combination with Zistrose for biofilm treatment.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "name": "Biofilme",
+      "type": "CONCEPT",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A central topic of discussion, referring to microbial communities.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "name": "Kohlenhydrate",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Carbohydrates mentioned in relation to their potential impact on gut microbiota and toxin production.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4ca52ed8-6f75-4b52-9c9e-0b9de8ea3dad",
+      "name": "Düstbiose",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Dysbiosis, an imbalance in gut microbiota, mentioned in relation to carbohydrate intolerance.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "2d0f9121-8f6c-4c2a-8eaf-1fa584b52bbd",
+      "name": "Süßkartoffel",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sweet potato mentioned as an example of a carbohydrate source.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "18e71d76-450e-4996-ab1c-4bbee0761c04",
+      "name": "Sprossen",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sprouts mentioned as an example of a food source that might not be tolerated by everyone.; Sprouts, suggested as a healthy food.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c4999f0e-1c13-4876-8919-f79747b42d07",
+      "name": "ketogene Ernährung",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ketogenic diet mentioned as a treatment for parasites.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "8cba5831-e1a0-4ae2-8beb-129f44a77255",
+      "name": "Fasten",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Fasting mentioned as a personal method for improving health.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "8991e2c7-8751-478f-abf1-daa0fbc3b1a9",
+      "name": "Wildkräuter",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Wild herbs mentioned as a source of minerals.; Wild herbs mentioned as a healthy food option.; Example of a source of bitter substances.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0e031d14-aad2-4064-8e23-fc0cc241c23a",
+      "name": "Bio-Lebensmitteln",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Organic food mentioned in relation to mineral content.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "14e7b80e-4907-40bb-9c0b-83a56367f66a",
+      "name": "Brennnessel",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Nettle, a type of wild herb.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7426edae-2d3b-49be-bfa1-fc8b454fd99a",
+      "name": "Löwenzahn",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Dandelion, another type of wild herb.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0bd25297-9f4e-433e-ace5-96c34f94c0ed",
+      "name": "Chlorophyll",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A pigment mentioned for its role in gut regeneration.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "62ed42bb-93ef-4cad-80c3-67ef8edc5a73",
+      "name": "Smoothie",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A green smoothie is mentioned as part of a healthy diet.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0b19b6e0-d8c6-408c-9625-33d30c02c2f5",
+      "name": "Saft",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Green juice is mentioned as part of a healthy diet.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e39252c9-b94e-4bfd-bb54-1dcf05f13580",
+      "name": "Zellulose",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Cellulose, mentioned for its role in gut health.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "4946938c-4058-4460-a0e3-f2b89ea8a332",
+      "name": "Apfel",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Apple, mentioned as a natural food.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "421f22c0-9202-4537-916b-733b0c669548",
+      "name": "Beeren",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Berries, mentioned as a natural food.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "f14e15d8-4950-4858-9d14-25910d9121ec",
+      "name": "Fructose",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Fructose, discussed in the context of food tolerance.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "db8c5315-b783-4b09-bb35-d99d6615634e",
+      "name": "Deutschland",
+      "type": "LOCATION",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Germany, mentioned in comparison to another location.; Armin Schwarzwagzee's country of origin and where he is less known.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "dc494c8f-6927-46e6-aea3-9b9927e77e78",
+      "name": "Azonen",
+      "type": "LOCATION",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Location mentioned in comparison to Germany, likely a place name but requires more context for higher confidence.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a401b32a-cc39-4023-87aa-1800f7154e94",
+      "name": "Helen Scheu",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Person mentioned in the context of an interview.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "64ca72f6-fd83-40fa-bf83-bd3e81fc5dc2",
+      "name": "Leber",
+      "type": "CONCEPT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as an example of a detoxification organ that benefits from bitters.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "f1e0cffa-9b8d-4419-a9df-db4aa1d3f318",
+      "name": "Grapefruit",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Example of a source of bitter substances.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "44cbd917-4779-403c-b777-4025565e6593",
+      "name": "Kurkuma",
+      "type": "PRODUCT",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Example of a source of bitter substances.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d0a5331d-edb8-424c-a438-587ebc9ef31b",
+      "name": "Vermut",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned in relation to its antiparasitic properties and English translation 'Wurmwut'.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a0124180-35e0-4b4f-89c6-22d18ae1cde2",
+      "name": "Wurmwut",
+      "type": "PRODUCT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "English translation of 'Vermut', mentioned for its antiparasitic properties.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "6c4e5c8d-27b0-495c-a6a6-af673c2a4567",
+      "name": "Eva Molle",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Author of an e-book on health and immunity, mentioned as the speaker's friend and a Heilpraktikerin.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "15746e0d-a4c6-414a-9b8b-b4674515e360",
+      "name": "befreie dich von Krankheitsregeln und chronischen Infektionen in den Schritten zu einem starken Immunsystem",
+      "type": "WORK_OF_ART",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Title of an e-book written by Eva Molle and the speaker.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "5b75d163-e6b0-4f3d-be9b-7c06e2e45768",
+      "name": "Dysbiose",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A concept discussed in the e-book, related to health and immunity.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "a63ce311-cb4c-49bc-be90-a14f6c5510d3",
+      "name": "Symbiose",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A concept discussed in the e-book, related to health and immunity.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "fdf5d97e-23c4-4f15-9408-70b8db4ed2ce",
+      "name": "EBV-Virus",
+      "type": "CONCEPT",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mentioned as a type of infection.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "389bf806-c10f-49fa-b167-5f471d798243",
+      "name": "Dr.",
+      "type": "PERSON",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "An abbreviated title suggesting a medical doctor, mentioned at the end of the text.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "79f34f70-4eee-4d65-b8e5-764c62bcf944",
+      "name": "Armin Schwarzwagzee",
+      "type": "PERSON",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A laboratory physician from Germany specializing in developing tests for various pathogens.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7d425e8e-e83b-41c6-9cd4-91bcf93aa8cc",
+      "name": "Pollack",
+      "type": "PERSON",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "An American scientist who discovered the fourth phase of water.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "c05ce84b-0981-4e3c-bcf2-c25c9e373c35",
+      "name": "Exclusion Zones Wasser",
+      "type": "CONCEPT",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The fourth phase of water,  structurally organized water.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "472a209f-d4a4-4206-8e39-1f473b29b803",
+      "name": "ATP",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Adenosine triphosphate, a molecule that carries energy within cells.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "e14f5963-6565-416b-b972-ba5b6b68e2ac",
+      "name": "Infrarotlicht",
+      "type": "CONCEPT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Infrared light, which increases the proportion of EZ water in the body.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "1bae6726-5a57-4710-9d43-8c88420d7a14",
+      "name": "Sauna",
+      "type": "FACILITY",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A type of facility where infrared light exposure can occur.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "d5ae1f79-297f-4b3f-9d82-6e5df6aadb2d",
+      "name": "Infrarotsauna",
+      "type": "FACILITY",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "A specific type of sauna that emits infrared light.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "0306071e-ffb4-4445-a3dc-047a3de21a60",
+      "name": "www.sören-schumann.com",
+      "type": "WEBSITE",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sören Schumann's website address.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "7f401e83-a6dd-4cf0-a2c7-432fd8231100",
+      "name": "YouTube",
+      "type": "TECHNOLOGY",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "The platform where Sören Schumann has a channel.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "80072732-9028-4c87-aeb2-887561a99254",
+      "name": "Sören Schumann, Gesundheit ganzheitlich",
+      "type": "ORGANIZATION",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Name of Sören Schumann's YouTube channel.",
+        "extraction_method": "llm"
+      }
+    },
+    {
+      "id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "name": "E-Book",
+      "type": "PRODUCT",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "An ebook mentioned by Sören Schumann.",
+        "extraction_method": "llm"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "f1e539b9-3cdd-4d2a-ab52-4a128f8c9eb7",
+      "type": "RELATED_TO",
+      "source_entity_id": "883ea7ca-4727-4159-95b3-f4a9d88ee9c9",
+      "target_entity_id": "e880a949-1925-4078-aaae-be7b4ee00cba",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Mein Name ist Dorothee Rund oder einfach Doro",
+        "extraction_method": "llm",
+        "source_entity_name": "Dorothee Rund",
+        "target_entity_name": "Doro"
+      }
+    },
+    {
+      "id": "a19dfdfe-b7f0-4474-b870-4d9f1b5220bd",
+      "type": "RELATED_TO",
+      "source_entity_id": "e880a949-1925-4078-aaae-be7b4ee00cba",
+      "target_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ich darf ja als heutigen  Experten den Sören Schumann begrüßen",
+        "extraction_method": "llm",
+        "source_entity_name": "Doro",
+        "target_entity_name": "Sören Schumann"
+      }
+    },
+    {
+      "id": "7866a6e3-f23d-43ff-bc13-177ceb3e9833",
+      "type": "PARTICIPATED_IN",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "cb598297-9e91-4a32-a630-747d2cf2288f",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sören, du veranstaltest chronische Infektionen Online-Kongresses",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "Online-Kongresses"
+      }
+    },
+    {
+      "id": "c571452d-be35-45e7-864e-abe35d5b317f",
+      "type": "RELATED_TO",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "0aca2fc8-fe62-4879-9196-179ae911bf43",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "du bist Blogger, du bist YouTuber, Speaker",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "YouTuber"
+      }
+    },
+    {
+      "id": "e5832254-08fd-4cc2-a4ae-636cd61af5f6",
+      "type": "RELATED_TO",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "b82f73be-4042-4b7d-8cb6-caf76b6dda04",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "du bist Blogger, du bist YouTuber, Speaker",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "Speaker"
+      }
+    },
+    {
+      "id": "762fca3d-cdf0-4cdd-a0fd-590b5b1f1e12",
+      "type": "RELATED_TO",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "70110200-bf34-4aa8-8bc7-6d063da13e0a",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "du bist Blogger, du bist YouTuber, Speaker, ganzheitlicher Ernährungs- und Gesundheitsberater",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "ganzheitlicher Ernährungs- und Gesundheitsberater"
+      }
+    },
+    {
+      "id": "777076a3-db12-4c07-8bbc-f50ef1b4732d",
+      "type": "RELATED_TO",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "72849ff6-36c7-4aeb-a254-2dbf2a2a0a2e",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und hast einen Bachelor in Sportwissenschaften",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "Bachelor in Sportwissenschaften"
+      }
+    },
+    {
+      "id": "8eae18dc-09a0-4b53-9cdb-62b6919850f5",
+      "type": "RELATED_TO",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "633ffb32-5db4-44a6-9a14-cc7cb2ae7852",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "damals kannte ich halt nur die Schulmedizin und bin dann halt von Arzt zu Arzt gerannt",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "Schulmedizin"
+      }
+    },
+    {
+      "id": "0004d993-16c1-4424-a4da-39ac834c3351",
+      "type": "HAPPENED_ON",
+      "source_entity_id": "e0f44540-2c5a-4208-954f-dc72e7d23672",
+      "target_entity_id": "b9a77019-88c3-46ef-a772-d520417fc153",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "man war das ich glaube so vor drei Jahren im Sommer ungefähr,  habe ich mir auch eine Borreliose eingefangen",
+        "extraction_method": "llm",
+        "source_entity_name": "Borreliose",
+        "target_entity_name": "Sommer"
+      }
+    },
+    {
+      "id": "d5966da5-8179-426b-b54b-8368afbf2114",
+      "type": "HAPPENED_ON",
+      "source_entity_id": "e0f44540-2c5a-4208-954f-dc72e7d23672",
+      "target_entity_id": "61ef1872-1d4a-4631-a49a-830e5b08a6be",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "man war das ich glaube so vor drei Jahren im Sommer ungefähr,  habe ich mir auch eine Borreliose eingefangen",
+        "extraction_method": "llm",
+        "source_entity_name": "Borreliose",
+        "target_entity_name": "drei Jahren"
+      }
+    },
+    {
+      "id": "4e952bfd-8f9a-4faf-b3d5-4956bf9139ab",
+      "type": "AFFECTS",
+      "source_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "target_entity_id": "a63ce311-cb4c-49bc-be90-a14f6c5510d3",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wie viele Leute das betrifft und ja wie vielen Leuten das auch helfen kann, wenn  man halt das Bewusstsein oder das Wissen dafür hat und dann halt auch da ansetzen  kann und ja das Immunsystem zu stärken beziehungsweise halt das Milieu zu  stärken und halt wieder für eine Symbiose im Körper zu schaffen",
+        "extraction_method": "llm",
+        "source_entity_name": "Immunsystem",
+        "target_entity_name": "Symbiose"
+      }
+    },
+    {
+      "id": "f1d463af-ef77-4de4-b4d1-082546b86ab9",
+      "type": "AFFECTS",
+      "source_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "du sagst ja, dass das Magensäure eine ganz große Rolle spielt für unsere Darmgesundheit und auch die Gesundheit unseres ganzen Körpers.",
+        "extraction_method": "llm",
+        "source_entity_name": "Magensäure",
+        "target_entity_name": "Darmgesundheit"
+      }
+    },
+    {
+      "id": "8cdb33a1-8347-4978-9b1f-e484639be7b6",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "1af59554-8b76-4406-aa9f-26930699249b",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "weil die meisten denken, sie haben zu viel Magensäure, wenn sie zum Beispiel Sodbrennen haben oder so.",
+        "extraction_method": "llm",
+        "source_entity_name": "Sodbrennen",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "e7e5c7a4-c8db-4374-a17a-02f04043dc6f",
+      "type": "CAUSES",
+      "source_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "target_entity_id": "152ef455-e76d-40ff-bb8a-32eb6118ee15",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn halt die Magensäure zu schwach ist, dann können halt erstens die Nahrungsbestandteile im Magen nicht so gut aufgebrochen werden. Dadurch kann es zu Nährstoffmengen kommen,",
+        "extraction_method": "llm",
+        "source_entity_name": "zu schwache Magensäure",
+        "target_entity_name": "Nährstoffmangel"
+      }
+    },
+    {
+      "id": "799e5fdc-00ec-4202-9ee0-316ccbc451d3",
+      "type": "AFFECTS",
+      "source_entity_id": "152ef455-e76d-40ff-bb8a-32eb6118ee15",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "was wie das Immunsystem ja sehr stark runterfahren kann,",
+        "extraction_method": "llm",
+        "source_entity_name": "Nährstoffmangel",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "a1f8e574-b946-4141-a2da-59edbdaf4ce4",
+      "type": "AFFECTS",
+      "source_entity_id": "152ef455-e76d-40ff-bb8a-32eb6118ee15",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "was den Darm sehr stark belastet oder, sagen wir mal, überfordert, weil der dann mehr arbeiten muss",
+        "extraction_method": "llm",
+        "source_entity_name": "Nährstoffmangel",
+        "target_entity_name": "Darm"
+      }
+    },
+    {
+      "id": "10b649e3-3489-4ca6-b4df-4112f20496dc",
+      "type": "TREATS",
+      "source_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "target_entity_id": "189f5349-01f3-4f67-92ae-3927735562b7",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Und die Magensäure ist natürlich auch dazu da, um diverse Krankheitserreger, die jetzt auf der Nahrung drauf sind oder in der Nahrung drin sind, abzutöten.",
+        "extraction_method": "llm",
+        "source_entity_name": "Magensäure",
+        "target_entity_name": "Krankheitserreger"
+      }
+    },
+    {
+      "id": "809c3653-91fb-4b92-9e1a-6bc7495600d3",
+      "type": "AFFECTS",
+      "source_entity_id": "d645df6e-34a5-4309-8e31-a9ce59c34bb1",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn Leute, die schon eine zu schwache Magensäure haben, dann irgendwelche Medikamente bekommen, wie zum Beispiel Protonpumpenheimer, was so ein dann wird die Ursache eigentlich nur noch schlimmer,",
+        "extraction_method": "llm",
+        "source_entity_name": "Protonpumpenhemmer",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "7e023919-dc87-479e-8150-360f27790531",
+      "type": "AFFECTS",
+      "source_entity_id": "7259a919-e9d9-4733-9343-1c0a7299d4e2",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "einmal die ganzen Gifte meiden, Weizen, Zucker und so weiter",
+        "extraction_method": "llm",
+        "source_entity_name": "Weizen",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "649846e8-a756-4426-adac-01b2ad2cae46",
+      "type": "AFFECTS",
+      "source_entity_id": "dfea3069-f4b1-4b12-88e8-bc1d0dc39edb",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "einmal die ganzen Gifte meiden, Weizen, Zucker und so weiter",
+        "extraction_method": "llm",
+        "source_entity_name": "Zucker",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "b94a94c7-d800-48af-a25f-335ccc6e60b7",
+      "type": "TREATS",
+      "source_entity_id": "1d531736-036b-410a-b742-0447bd31d248",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bitterstoffe aus, ja zum Beispiel aus Wildkräutern ... dass, wenn die Leute das regelmäßig zu sich nehmen, dass dann die Magensäure,  von denen sich normalisiert",
+        "extraction_method": "llm",
+        "source_entity_name": "Wildkräutern",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "da296be0-9be8-4978-aaba-41de435f93be",
+      "type": "TREATS",
+      "source_entity_id": "d23ee952-a228-42d9-a2d9-b46c77627dab",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "bin ich auch ein sehr großer Fan von grünen Smoothies, am besten mit Wildkräutern. Da gibt es auch eine Studie, wo nachgewiesen wurde, dass, wenn die Leute das regelmäßig zu sich nehmen, dass dann die Magensäure, von denen sich normalisiert",
+        "extraction_method": "llm",
+        "source_entity_name": "grünen Smoothies",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "5c91dba2-13ab-46d1-a16a-fb076c7ef677",
+      "type": "TREATS",
+      "source_entity_id": "54d4a3be-fbb3-43b6-8827-858c3966d00b",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sellerie-Saft ist zum Beispiel auch noch eine gute Geschichte",
+        "extraction_method": "llm",
+        "source_entity_name": "Sellerie-Saft",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "9c6487c5-c236-45a7-b268-b99c53eca6ab",
+      "type": "TREATS",
+      "source_entity_id": "5dc5e1ee-286c-436e-b4dd-a0b2e9bdb0ff",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Säfte aus Kohlsorten wie zum Beispiel Weißkohl",
+        "extraction_method": "llm",
+        "source_entity_name": "Weißkohl",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "69f2fa90-3dbe-48f7-b5a3-8bd585eed6fe",
+      "type": "TREATS",
+      "source_entity_id": "85aa2fb4-0ed2-4c3c-9419-e89b8fa04c17",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.75,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Bitterstoffe aus, ja zum Beispiel aus Wildkräutern oder aus  bitteren Salatsorten",
+        "extraction_method": "llm",
+        "source_entity_name": "Salat",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "088c71d0-6142-4e92-a2b9-0dbc01279bc1",
+      "type": "TREATS",
+      "source_entity_id": "8b83b468-7c31-4a0a-a1d0-5a5e1296162c",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Säfte aus Kohlsorten wie zum Beispiel Weißkohl",
+        "extraction_method": "llm",
+        "source_entity_name": "Kohl",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "7bf2da70-5a21-4f66-91d4-bc6d70b41e4e",
+      "type": "PART_OF",
+      "source_entity_id": "8991e2c7-8751-478f-abf1-daa0fbc3b1a9",
+      "target_entity_id": "62ed42bb-93ef-4cad-80c3-67ef8edc5a73",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "grünen Smoothies, am besten mit Wildkräutern",
+        "extraction_method": "llm",
+        "source_entity_name": "Wildkräuter",
+        "target_entity_name": "Smoothie"
+      }
+    },
+    {
+      "id": "7a038ec6-44e1-4beb-b592-945194fd9ee1",
+      "type": "RELATED_TO",
+      "source_entity_id": "85aa2fb4-0ed2-4c3c-9419-e89b8fa04c17",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "weil Magensäure ist ja quasi Salzsäure und ja, das ist natürlich auch ein  Standteil davon",
+        "extraction_method": "llm",
+        "source_entity_name": "Salz",
+        "target_entity_name": "Magensäure"
+      }
+    },
+    {
+      "id": "3cd641c5-b9b7-49a5-8330-8dee427cd395",
+      "type": "PART_OF",
+      "source_entity_id": "54d4a3be-fbb3-43b6-8827-858c3966d00b",
+      "target_entity_id": "0b19b6e0-d8c6-408c-9625-33d30c02c2f5",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "t war, Sellerie-Saft ist zum Beispiel auch noch eine gute Geschichte  oder auch Säfte aus Kohlsorten wie zum Beispiel Weißkohl",
+        "extraction_method": "llm",
+        "source_entity_name": "Sellerie-Saft",
+        "target_entity_name": "Saft"
+      }
+    },
+    {
+      "id": "1f47fb8f-b0ee-423e-bf96-3bf191ad92d0",
+      "type": "PART_OF",
+      "source_entity_id": "5dc5e1ee-286c-436e-b4dd-a0b2e9bdb0ff",
+      "target_entity_id": "8b83b468-7c31-4a0a-a1d0-5a5e1296162c",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "oder auch Säfte aus Kohlsorten wie zum Beispiel Weißkohl",
+        "extraction_method": "llm",
+        "source_entity_name": "Weißkohl",
+        "target_entity_name": "Kohlsorten"
+      }
+    },
+    {
+      "id": "9062ac6e-fe13-47a0-b6c4-e054ed83d389",
+      "type": "AFFECTS",
+      "source_entity_id": "17ab7dd0-bdfa-4e65-8b6d-19a86766b5c8",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Käse braucht schon einige Stunden, bis er den Magen wieder verlässt",
+        "extraction_method": "llm",
+        "source_entity_name": "Käse",
+        "target_entity_name": "Magen"
+      }
+    },
+    {
+      "id": "5a661ad2-6277-4cec-98a7-a62bd5d570e2",
+      "type": "AFFECTS",
+      "source_entity_id": "62ed42bb-93ef-4cad-80c3-67ef8edc5a73",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und jetzt ein grünes Smoothie oder reifes Obst oder frisch gepresster Saft braucht halt nur viertel Stunde, halbe Stunde und deutlich, also weniger Zeit",
+        "extraction_method": "llm",
+        "source_entity_name": "grünes Smoothie",
+        "target_entity_name": "Magen"
+      }
+    },
+    {
+      "id": "f21d0ace-d1d6-496b-8098-ad040656c597",
+      "type": "AFFECTS",
+      "source_entity_id": "0b3524da-a1fa-44d3-a6d1-1f092aea082c",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und jetzt ein grünes Smoothie oder reifes Obst oder frisch gepresster Saft braucht halt nur viertel Stunde, halbe Stunde und deutlich, also weniger Zeit",
+        "extraction_method": "llm",
+        "source_entity_name": "reifes Obst",
+        "target_entity_name": "Magen"
+      }
+    },
+    {
+      "id": "7f7fd094-44bc-431c-a515-20b2224cbe67",
+      "type": "AFFECTS",
+      "source_entity_id": "0b19b6e0-d8c6-408c-9625-33d30c02c2f5",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und jetzt ein grünes Smoothie oder reifes Obst oder frisch gepresster Saft braucht halt nur viertel Stunde, halbe Stunde und deutlich, also weniger Zeit",
+        "extraction_method": "llm",
+        "source_entity_name": "frisch gepresster Saft",
+        "target_entity_name": "Magen"
+      }
+    },
+    {
+      "id": "2a2341be-5c3f-4949-a060-9e5f8d220aa5",
+      "type": "CAUSES",
+      "source_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "target_entity_id": "fa27cd2e-517e-4551-8e47-a11d537bcd0b",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "es kann auch sein, dass aufgrund der zu geringen  Magensäure, die unter halt zum Beispiel schlechte Kombination noch, die Nahrung einfach länger im  Magen bleibt",
+        "extraction_method": "llm",
+        "source_entity_name": "zu geringe Magensäure",
+        "target_entity_name": "Nahrung bleibt länger im Magen"
+      }
+    },
+    {
+      "id": "6c07e6de-21a9-47e2-8334-03b9368ad979",
+      "type": "CAUSES",
+      "source_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass das Immunsystem dann auch nicht darauf reagiert, auch um Mikroorganismen  abzutöten",
+        "extraction_method": "llm",
+        "source_entity_name": "Magensäure",
+        "target_entity_name": "Immunsystem reagiert nicht"
+      }
+    },
+    {
+      "id": "24fe28cd-4a72-4af9-a415-681e2507518b",
+      "type": "TREATS",
+      "source_entity_id": "62ed42bb-93ef-4cad-80c3-67ef8edc5a73",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "du umfielst eben so grüne Smoothies, Säfte und Bitterstoffe. Genau, um das zu stärken",
+        "extraction_method": "llm",
+        "source_entity_name": "grüne Smoothies, Säfte und Bitterstoffe",
+        "target_entity_name": "stärkt Magensäure"
+      }
+    },
+    {
+      "id": "a23be7b6-f4fb-4b1d-90e6-2ef191d0c0bf",
+      "type": "TREATS",
+      "source_entity_id": "2a7c4646-84be-4c66-b04d-0ea4898e30da",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Selleriesaft ist noch super zum Beispiel auch",
+        "extraction_method": "llm",
+        "source_entity_name": "Selleriesaft",
+        "target_entity_name": "stärkt Magensäure"
+      }
+    },
+    {
+      "id": "80f5a5e4-39a0-4c21-a39a-5a6275efac9e",
+      "type": "TREATS",
+      "source_entity_id": "30d45415-54fb-484b-98f2-feb7e6f50c1c",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "oder halt so aus Kohlgewächsensäfte",
+        "extraction_method": "llm",
+        "source_entity_name": "Kohlgewächsensäfte",
+        "target_entity_name": "stärkt Magensäure"
+      }
+    },
+    {
+      "id": "cc06e262-e9d9-44fa-b3c3-fe2db6825a42",
+      "type": "CAUSES",
+      "source_entity_id": "9f3edd4f-46ec-463b-844c-e5569d99e2ee",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.6,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da wird ja häufig Helicobacter pylori genannt",
+        "extraction_method": "llm",
+        "source_entity_name": "Helicobacter pylori",
+        "target_entity_name": "zu wenig Magensäure"
+      }
+    },
+    {
+      "id": "b4c2f5f6-40d2-4028-9140-4833e7c71e3f",
+      "type": "TREATS",
+      "source_entity_id": "9f3edd4f-46ec-463b-844c-e5569d99e2ee",
+      "target_entity_id": "fd0e1c6b-2191-4c09-8235-3fd938668ab3",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "normalerweise wird er halt mit zwei  verschiedenen Antibiotika, bloß noch mit einem anderen Medikament behandelt",
+        "extraction_method": "llm",
+        "source_entity_name": "Helicobacter pylori",
+        "target_entity_name": "Antibiotika"
+      }
+    },
+    {
+      "id": "a1bbbb4a-7735-44fd-b6c1-02ec48ae85ec",
+      "type": "TREATS",
+      "source_entity_id": "e142017b-d43d-416b-9c62-0ed1c2e636aa",
+      "target_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "auf dieser Basis könnte man jetzt noch speziell  wie zum Beispiel Weißkohlsaft, Weißkohlsaft, solche Sachen nehmen",
+        "extraction_method": "llm",
+        "source_entity_name": "Weißkohlsaft",
+        "target_entity_name": "stärkt Magensäure"
+      }
+    },
+    {
+      "id": "f0e325c3-b471-4648-aefe-60e8727bdec9",
+      "type": "PART_OF",
+      "source_entity_id": "1d531736-036b-410a-b742-0447bd31d248",
+      "target_entity_id": "9411f185-d948-4ad8-a46b-30762a16d24e",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "würde ich halt auf jeden Fall grünes Smoothies empfehlen,  sich da mal einfach zu mit beschäftigen, weil da halt, also wenn man sie richtig macht,  mit am besten auch mit Wildkräutern und so weiter",
+        "extraction_method": "llm",
+        "source_entity_name": "Wildkräutern",
+        "target_entity_name": "grünes Smoothies"
+      }
+    },
+    {
+      "id": "cb9e5649-c2f6-40ee-a34a-6f1ac2db10a8",
+      "type": "CAUSES",
+      "source_entity_id": "dfea3069-f4b1-4b12-88e8-bc1d0dc39edb",
+      "target_entity_id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "okay, wie ist das Gesamtmilieu und in welchem, sozusagen in welchem Ausmaß ist  der vorhanden, so wenn ich ihn halt fütter mit Zucker, mit verarbeiteten Lebensmitteln,  verarbeiteten Kohlenhydraten und so weiter, dann kann er halt schon diverse Probleme verursachen",
+        "extraction_method": "llm",
+        "source_entity_name": "Zucker",
+        "target_entity_name": "Candida-Pilz"
+      }
+    },
+    {
+      "id": "a58a8aaf-1232-431a-a04f-9147941dfb82",
+      "type": "CAUSES",
+      "source_entity_id": "3e47f0b1-d239-4cd6-965e-65addfa69ec4",
+      "target_entity_id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "okay, wie ist das Gesamtmilieu und in welchem, sozusagen in welchem Ausmaß ist  der vorhanden, so wenn ich ihn halt fütter mit Zucker, mit verarbeiteten Lebensmitteln,  verarbeiteten Kohlenhydraten und so weiter, dann kann er halt schon diverse Probleme verursachen",
+        "extraction_method": "llm",
+        "source_entity_name": "verarbeiteten Lebensmitteln",
+        "target_entity_name": "Candida-Pilz"
+      }
+    },
+    {
+      "id": "56097b87-560b-4943-905d-0fadbb70c727",
+      "type": "CAUSES",
+      "source_entity_id": "6360769c-36fc-47b7-85b3-3ff26f483ae9",
+      "target_entity_id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "okay, wie ist das Gesamtmilieu und in welchem, sozusagen in welchem Ausmaß ist  der vorhanden, so wenn ich ihn halt fütter mit Zucker, mit verarbeiteten Lebensmitteln,  verarbeiteten Kohlenhydraten und so weiter, dann kann er halt schon diverse Probleme verursachen",
+        "extraction_method": "llm",
+        "source_entity_name": "verarbeiteten Kohlenhydraten",
+        "target_entity_name": "Candida-Pilz"
+      }
+    },
+    {
+      "id": "70aa90ed-0250-490a-ac32-6b92ebb097b2",
+      "type": "RELATED_TO",
+      "source_entity_id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "target_entity_id": "0054bcfb-c6e9-4e91-a463-e685e9fdaa5d",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und halt auch nicht nur im Darm sein, sondern auch generell, also häufig halt Nagelpilz und solche  Sachen hängen halt auch damit zusammen",
+        "extraction_method": "llm",
+        "source_entity_name": "Candida-Pilz",
+        "target_entity_name": "Nagelpilz"
+      }
+    },
+    {
+      "id": "51e8fb57-32c5-4b2e-a898-ab4cc1a0c4ec",
+      "type": "LOCATED_IN",
+      "source_entity_id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und halt auch nicht nur im Darm sein, sondern auch generell",
+        "extraction_method": "llm",
+        "source_entity_name": "Candida-Pilz",
+        "target_entity_name": "Darm"
+      }
+    },
+    {
+      "id": "876383cc-8a49-4444-a1bf-4eb7aea9d858",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "target_entity_id": "cdb26156-2dc9-47dc-9850-e5a90835df37",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "sehr bekannt ist zum  Beispiel der Candida-Pilz, das ist ein Hefepilz, den also sehr viele haben in den westlichen  Regionen",
+        "extraction_method": "llm",
+        "source_entity_name": "Candida-Pilz",
+        "target_entity_name": "westlichen Regionen"
+      }
+    },
+    {
+      "id": "a0737ce9-644d-4dd9-a56f-756089f45042",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "7ecaec4e-4c55-4d1e-bee2-7fd8af9bd7e1",
+      "target_entity_id": "d6cca0da-c89a-4aaa-8f4b-c9034f332fcc",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "anscheinend gibt es auch Naturvölker, wo der halt gar nicht da ist",
+        "extraction_method": "llm",
+        "source_entity_name": "Candida-Pilz",
+        "target_entity_name": "Naturvölker"
+      }
+    },
+    {
+      "id": "3d2db72d-cf6f-4e75-8cec-7f2dddd3eb02",
+      "type": "CAUSES",
+      "source_entity_id": "dfea3069-f4b1-4b12-88e8-bc1d0dc39edb",
+      "target_entity_id": "0054bcfb-c6e9-4e91-a463-e685e9fdaa5d",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann kann er halt schon diverse Probleme verursachen und  halt auch nicht nur im Darm sein, sondern auch generell, also häufig halt Nagelpilz und solche  Sachen hängen halt auch damit zusammen",
+        "extraction_method": "llm",
+        "source_entity_name": "Zucker",
+        "target_entity_name": "Nagelpilz"
+      }
+    },
+    {
+      "id": "45258ebb-db4c-47df-af15-ba35fb14bd63",
+      "type": "CAUSES",
+      "source_entity_id": "3e47f0b1-d239-4cd6-965e-65addfa69ec4",
+      "target_entity_id": "0054bcfb-c6e9-4e91-a463-e685e9fdaa5d",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann kann er halt schon diverse Probleme verursachen und  halt auch nicht nur im Darm sein, sondern auch generell, also häufig halt Nagelpilz und solche  Sachen hängen halt auch damit zusammen",
+        "extraction_method": "llm",
+        "source_entity_name": "verarbeiteten Lebensmitteln",
+        "target_entity_name": "Nagelpilz"
+      }
+    },
+    {
+      "id": "c5fa9d5a-ad76-4f82-ac66-58471c5eda21",
+      "type": "CAUSES",
+      "source_entity_id": "6360769c-36fc-47b7-85b3-3ff26f483ae9",
+      "target_entity_id": "0054bcfb-c6e9-4e91-a463-e685e9fdaa5d",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann kann er halt schon diverse Probleme verursachen und  halt auch nicht nur im Darm sein, sondern auch generell, also häufig halt Nagelpilz und solche  Sachen hängen halt auch damit zusammen",
+        "extraction_method": "llm",
+        "source_entity_name": "verarbeiteten Kohlenhydraten",
+        "target_entity_name": "Nagelpilz"
+      }
+    },
+    {
+      "id": "7bb653f3-0b89-4643-aaf8-b0b761babe53",
+      "type": "CAUSES",
+      "source_entity_id": "dfea3069-f4b1-4b12-88e8-bc1d0dc39edb",
+      "target_entity_id": "c19ffbef-6f87-457e-b46c-8696f3e14ebe",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann kann er halt schon diverse Probleme verursachen und  halt auch nicht nur im Darm sein, sondern auch generell, also häufig halt Nagelpilz und solche  Sachen hängen halt auch damit zusammen oder auch im Mund, wenn man da so Ablagerungen hat. Genau,  also Candidas auf jeden Fall,",
+        "extraction_method": "llm",
+        "source_entity_name": "Zucker",
+        "target_entity_name": "Candida"
+      }
+    },
+    {
+      "id": "34ed0fca-f6f1-4f26-bf8d-302fd54da1a3",
+      "type": "CAUSES",
+      "source_entity_id": "3e47f0b1-d239-4cd6-965e-65addfa69ec4",
+      "target_entity_id": "c19ffbef-6f87-457e-b46c-8696f3e14ebe",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann kann er halt schon diverse Probleme verursachen und  halt auch nicht nur im Darm sein, sondern auch generell, also häufig halt Nagelpilz und solche  Sachen hängen halt auch damit zusammen oder auch im Mund, wenn man da so Ablagerungen hat. Genau,  also Candidas auf jeden Fall,",
+        "extraction_method": "llm",
+        "source_entity_name": "verarbeiteten Lebensmitteln",
+        "target_entity_name": "Candida"
+      }
+    },
+    {
+      "id": "8fd6e6d0-53b8-41c3-a370-07ff0e553e2c",
+      "type": "CAUSES",
+      "source_entity_id": "6360769c-36fc-47b7-85b3-3ff26f483ae9",
+      "target_entity_id": "c19ffbef-6f87-457e-b46c-8696f3e14ebe",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann kann er halt schon diverse Probleme verursachen und  halt auch nicht nur im Darm sein, sondern auch generell, also häufig halt Nagelpilz und solche  Sachen hängen halt auch damit zusammen oder auch im Mund, wenn man da so Ablagerungen hat. Genau,  also Candidas auf jeden Fall,",
+        "extraction_method": "llm",
+        "source_entity_name": "verarbeiteten Kohlenhydraten",
+        "target_entity_name": "Candida"
+      }
+    },
+    {
+      "id": "32b4cb47-63d3-48b2-aef7-b8bc6ca5ec65",
+      "type": "PART_OF",
+      "source_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "target_entity_id": "a2cea73d-f254-4a39-ad42-a80702fdaf0b",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ja, wir haben auch diverse, also Parasiten, ich sag mal,  wenn man jetzt Parasiten sagt, dann stellen sich die meisten darunter jetzt irgendwelche Würmer,  Vorbandwürmer zum Beispiel,",
+        "extraction_method": "llm",
+        "source_entity_name": "Parasiten",
+        "target_entity_name": "Vorbandwürmer"
+      }
+    },
+    {
+      "id": "b48a517f-6c4d-40fb-a42c-016af0591636",
+      "type": "LOCATED_IN",
+      "source_entity_id": "5b376698-98ac-4f89-8ede-6d8bfed92bed",
+      "target_entity_id": "64ca72f6-fd83-40fa-bf83-bd3e81fc5dc2",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "egal, ob jetzt Leberegel in der Leber sind",
+        "extraction_method": "llm",
+        "source_entity_name": "Leberegel",
+        "target_entity_name": "Leber"
+      }
+    },
+    {
+      "id": "284aa2ba-f4a7-47d8-a5dd-666ae79547ae",
+      "type": "USES",
+      "source_entity_id": "2c612845-c78c-42a3-9745-ae2e6b3e2da6",
+      "target_entity_id": "31376cb5-514d-4d79-a78b-cab6766d94d2",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "also zum Beispiel von Borrellen ist bekannt, dass sie mit dem sogenannten  molekularen Mimikri arbeiten",
+        "extraction_method": "llm",
+        "source_entity_name": "Borrellen",
+        "target_entity_name": "molekularen Mimikri"
+      }
+    },
+    {
+      "id": "e5e5456c-e3d1-41ca-92e4-91f7b84966e7",
+      "type": "AFFECTS",
+      "source_entity_id": "31376cb5-514d-4d79-a78b-cab6766d94d2",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass sie quasi in die Zellen des  Menschen reingehen können und dort, also deren oder deren Gestalt annehmen können eher und dann  das Immunsystem entweder nicht in der Lage ist, die zu unterscheiden",
+        "extraction_method": "llm",
+        "source_entity_name": "molekularen Mimikri",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "086859e1-f886-4996-8611-4852add135a4",
+      "type": "AFFECTS",
+      "source_entity_id": "189f5349-01f3-4f67-92ae-3927735562b7",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass es dann in der Lage, dass es dann nicht mehr unterscheiden kann zwischen gut und böse sozusagen,  weil halt die sehr ähnlich aussehen und dann auch körpereigenen Zellen angegriffen werden.  Das Immunsystem wird blind gemacht",
+        "extraction_method": "llm",
+        "source_entity_name": "Krankheitserreger",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "ad5a81e1-3a4d-4c40-b2e0-19f5ec304014",
+      "type": "USES",
+      "source_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "target_entity_id": "c8bbc7b1-bcd6-40a3-b1f8-a360e4320467",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Toxoplasmos ist zum Beispiel auch bekannt, dass er anscheinend sich in  Immunsensorgereien schleusen kann",
+        "extraction_method": "llm",
+        "source_entity_name": "Parasiten",
+        "target_entity_name": "Immunsensorgereien"
+      }
+    },
+    {
+      "id": "1985f11f-f60b-4c84-b647-b99664ae0b82",
+      "type": "USES",
+      "source_entity_id": "c8bbc7b1-bcd6-40a3-b1f8-a360e4320467",
+      "target_entity_id": "9d26577a-c7a6-4d80-949b-4617a447c89b",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und mit denen dann die Blut-Hirn-Schranke überwinden kann",
+        "extraction_method": "llm",
+        "source_entity_name": "Immunsensorgereien",
+        "target_entity_name": "Blut-Hirn-Schranke"
+      }
+    },
+    {
+      "id": "b8d8dce1-24bc-4745-b0b0-8964b59dc07b",
+      "type": "AFFECTS",
+      "source_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass auch zum Beispiel Parasiten halt einfach unsere Nährstoffvorräte,  die eh schon schlecht gefüllt sind, halt plündern und von uns sozusagen Sachen nehmen, die einfach  sorgen, dass diverse Körperfunktionen nicht mehr optimal funktionieren bzw. halt nur noch so auf  Sparflamme, unter anderem auch unser Immunsystem",
+        "extraction_method": "llm",
+        "source_entity_name": "Parasiten",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "2d8ab03c-54ee-4952-91dd-c49a23eb0688",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "target_entity_id": "f4bd0810-b0e9-416a-a9cd-06d8c70f07bf",
+      "confidence": 0.75,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "es kann sogar in Krebstumoren werden sogar so Viren  oder Parasiten gefunden, die da wohl auch mit eine Rolle spielen bei Krebsentstehungen",
+        "extraction_method": "llm",
+        "source_entity_name": "Parasiten",
+        "target_entity_name": "Krebstumoren"
+      }
+    },
+    {
+      "id": "78096e02-4214-4949-82c9-c26633516738",
+      "type": "CAUSES",
+      "source_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "target_entity_id": "92052d7c-2361-42f7-b5e3-cc5ee2b7b2d2",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "es kann sogar in Krebstumoren werden sogar so Viren  oder Parasiten gefunden, die da wohl auch mit eine Rolle spielen bei Krebsentstehungen",
+        "extraction_method": "llm",
+        "source_entity_name": "Parasiten",
+        "target_entity_name": "Krebsentstehungen"
+      }
+    },
+    {
+      "id": "1a17243c-32a9-4149-8c16-8af8e3e415ee",
+      "type": "TREATS",
+      "source_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "target_entity_id": "189f5349-01f3-4f67-92ae-3927735562b7",
+      "confidence": 0.75,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass es wichtig ist, das Milieu, dass das Milieu quasi in der richtigen Lage ist und dass es  halt wichtig ist, das zu stärken und das dann halt, ja, mit einem funktionierenden Immunsystem  man jetzt nicht unbedingt Angst haben muss vor den übermächtigen Krankheitserregern",
+        "extraction_method": "llm",
+        "source_entity_name": "funktionierendes Immunsystem",
+        "target_entity_name": "Krankheitserreger"
+      }
+    },
+    {
+      "id": "687979e4-ed64-45b3-a68b-c98fde602a88",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "819a5ac4-0dc7-4a3a-8e15-d65af7d84619",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "weil die auch häufig in der Lage sind, Parasiten zu übertragen, zum Beispiel Katze  oder Hunden",
+        "extraction_method": "llm",
+        "source_entity_name": "Katze",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "0a3e8971-700f-4386-a123-ba922105c541",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "69144eff-d3c9-43f1-99e9-3bf83223f417",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "weil die auch häufig in der Lage sind, Parasiten zu übertragen, zum Beispiel Katze  oder Hunden",
+        "extraction_method": "llm",
+        "source_entity_name": "Hunden",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "eb4d0182-8d2a-49ac-b1df-97b7961ef0ad",
+      "type": "AFFECTS",
+      "source_entity_id": "d08dfc79-60db-4ff5-a500-22efc8c2bfe0",
+      "target_entity_id": "0cd68aca-4a5c-4ff0-8646-00960e2f05ad",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Gifte spielen natürlich eine riesige Rolle, da also zum Beispiel Glyphosat, habt ihr wahrscheinlich  auch schon in einigen Interviews darüber gesprochen, das quasi ja die komplette Darmflora eigentlich  abmäht,",
+        "extraction_method": "llm",
+        "source_entity_name": "Glyphosat",
+        "target_entity_name": "Darmflora"
+      }
+    },
+    {
+      "id": "c3c72f21-dcaa-4734-82fd-6661d50e62b2",
+      "type": "RELATED_TO",
+      "source_entity_id": "55818552-0ef9-4918-a3b0-9dc324cb48f3",
+      "target_entity_id": "482135ac-ff85-4af4-a02a-1046827f2fef",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ich habe jetzt nur hier stellvertretend mal so eine ganz coole Grafik gefunden, die halt zeigt,  einfach in 80 Jahren der Minereiengehalt von Salat, Tomaten, Spinat, Lettuce, weiß ich  gerade gar nicht, was das auf Deutsch heißt. Salat, ja, Salat. Achso, und was ist das? Kohl, Kohl, genau. Genau, Kohl, okay. Genau, das  einfach zeigt, dass das um 80 Prozent runtergegangen ist.",
+        "extraction_method": "llm",
+        "source_entity_name": "80 Jahren",
+        "target_entity_name": "80 Prozent"
+      }
+    },
+    {
+      "id": "89a8d1ea-5932-451f-96c4-40fe8abbbc05",
+      "type": "CAUSES",
+      "source_entity_id": "d0c2004f-427f-4fb5-bb4f-9091e162e431",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ich habe auch gleich noch eine coole Statistik, die den Zusammenhang zwischen Blyphosat und chronischen zündlichen Darmerkrampungen zeigt",
+        "extraction_method": "llm",
+        "source_entity_name": "Blyphosat",
+        "target_entity_name": "chronischen zündlichen Darmerkrampungen"
+      }
+    },
+    {
+      "id": "895e3579-78cd-406c-a456-454f1f25516f",
+      "type": "AFFECTS",
+      "source_entity_id": "7d8554da-c20d-47a8-b05d-7e30d1893706",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "von Quecksilber ist bekannt, das ist halt einfach, neben vielen anderen Sachen, wo es schädlich ist, das hat zum Beispiel auch regelrecht Löcher in den Darm rein brennt",
+        "extraction_method": "llm",
+        "source_entity_name": "Quecksilber",
+        "target_entity_name": "Darm"
+      }
+    },
+    {
+      "id": "2c18ab4e-0d29-4bec-a268-4aa12b695b7f",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "target_entity_id": "fa27cd2e-517e-4551-8e47-a11d537bcd0b",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Untersuchungen an Parasiten, ich glaube,  in Fischen war das, dass die, wenn die jetzt stark belastet waren, also die Fische mit Blei  oder Cadmium",
+        "extraction_method": "llm",
+        "source_entity_name": "Parasiten",
+        "target_entity_name": "Blei"
+      }
+    },
+    {
+      "id": "d931073c-6d6a-46c1-842c-05f526691c01",
+      "type": "AFFECTS",
+      "source_entity_id": "fa27cd2e-517e-4551-8e47-a11d537bcd0b",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass die Parasiten halt, also um den Faktor, weiß nicht, 20, 30 oder sogar 100 mehr  noch damit belastet waren",
+        "extraction_method": "llm",
+        "source_entity_name": "Blei",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "9dbe595d-74b3-4579-86ea-a0d9d35c086e",
+      "type": "RELATED_TO",
+      "source_entity_id": "d08dfc79-60db-4ff5-a500-22efc8c2bfe0",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Korrelation zwischen den Tonnen  Glyphosat, die gespritzt wurden, also die Rotlinie und halt dem chronischen zündlichen  Darmerkrankungen, also Morus Crohn und Colitis ulcerosa.",
+        "extraction_method": "llm",
+        "source_entity_name": "Glyphosat",
+        "target_entity_name": "chronischen zündlichen Darmerkrankungen"
+      }
+    },
+    {
+      "id": "c296fa0c-2293-4fa1-9698-88e11897f0ff",
+      "type": "RELATED_TO",
+      "source_entity_id": "d08dfc79-60db-4ff5-a500-22efc8c2bfe0",
+      "target_entity_id": "98fc1d9c-ab20-4894-8ae1-9e17cd228008",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Korrelation zwischen den Tonnen  Glyphosat, die gespritzt wurden, also die Rotlinie und halt dem chronischen zündlichen  Darmerkrankungen, also Morus Crohn und Colitis ulcerosa.",
+        "extraction_method": "llm",
+        "source_entity_name": "Glyphosat",
+        "target_entity_name": "Colitis ulcerosa"
+      }
+    },
+    {
+      "id": "587a02c5-f63f-4f89-995d-7364ac9f706f",
+      "type": "RELATED_TO",
+      "source_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "target_entity_id": "d08dfc79-60db-4ff5-a500-22efc8c2bfe0",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass da die beiden, beiden eigentlich sich, also sehr stark, also der Anstieg von dem  chronischen zündlichen Darmerkrankungen sehr stark korreliert mit dem Glyphosat.",
+        "extraction_method": "llm",
+        "source_entity_name": "chronischen zündlichen Darmerkrankungen",
+        "target_entity_name": "Glyphosat"
+      }
+    },
+    {
+      "id": "e02d06b1-b2a8-4cf6-b1b1-f69fef650225",
+      "type": "CAUSES",
+      "source_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "target_entity_id": "f6f07860-dffd-4165-be96-076d6f2cd692",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn halt der Darm also löchrig wird, dann können natürlich sämtliche Bestandteile dann einfach  leichter ins Blut vordringen",
+        "extraction_method": "llm",
+        "source_entity_name": "Darm",
+        "target_entity_name": "Blut"
+      }
+    },
+    {
+      "id": "10c1eab1-455f-40a3-a061-45a115633c7f",
+      "type": "CAUSES",
+      "source_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Aber auch ist ein Eintrittsvorte für Parasiten oder halt schädliche Mikroorganismen zum Beispiel auch,  um ins Blut reinzukommen.",
+        "extraction_method": "llm",
+        "source_entity_name": "löchriger Darm",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "f814f521-eb55-4b4e-a759-1aae2742ab8c",
+      "type": "RELATED_TO",
+      "source_entity_id": "141f5cba-2176-425a-8c1a-79fe5bbcdf78",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Genau, also zu schwache Magensäure ist auf jeden Fall auch ein Risikofaktor für Likigat,  würde ich so sagen.",
+        "extraction_method": "llm",
+        "source_entity_name": "zu wenig Magensäure",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "c49b5b15-3c47-4f73-b5b8-2e5751d86846",
+      "type": "RELATED_TO",
+      "source_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wir haben jetzt dann zum Beispiel diese Kombination zu wenig,  Magensäure plus dann noch durchlässiger Darm und das ist dann noch nicht die gefährliche Kombination.",
+        "extraction_method": "llm",
+        "source_entity_name": "durchlässiger Darm",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "7bfb6c0a-1cd7-4032-b4e5-b9f9f4a7c49d",
+      "type": "AFFECTS",
+      "source_entity_id": "f6f07860-dffd-4165-be96-076d6f2cd692",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass es halt einfach zu diesen  chronischen Entzündungen führt und auch einfach die Darmschleimhaut sehr stark entzündet",
+        "extraction_method": "llm",
+        "source_entity_name": "Gluten",
+        "target_entity_name": "Darmschleimhaut"
+      }
+    },
+    {
+      "id": "fb493a65-b831-4c84-b495-f8318d1ecab0",
+      "type": "RELATED_TO",
+      "source_entity_id": "f6f07860-dffd-4165-be96-076d6f2cd692",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und das  halt auch Likigat sehr stark fördern kann",
+        "extraction_method": "llm",
+        "source_entity_name": "Gluten",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "8def1969-d0c0-4dbb-93df-09bf42b219d4",
+      "type": "RELATED_TO",
+      "source_entity_id": "3cdb9435-c9b9-48c4-85a2-87325465c8ca",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.6,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Vitamin D spielt zum Beispiel auch noch eine große Rolle.",
+        "extraction_method": "llm",
+        "source_entity_name": "Vitamin D",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "31019bf3-6a89-4c4d-8672-6c6c11959ea8",
+      "type": "RELATED_TO",
+      "source_entity_id": "d3d6ea10-ffcb-43d3-9f50-b2531213cb54",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.6,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Elektrosmog spielt  auch noch eine große Rolle.",
+        "extraction_method": "llm",
+        "source_entity_name": "Elektrosmog",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "925a6872-81ef-4f79-95b5-f52cb5c97359",
+      "type": "RELATED_TO",
+      "source_entity_id": "fd0e1c6b-2191-4c09-8235-3fd938668ab3",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.6,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "jetzt einfach der tonnenweise Antibiotika Konsum",
+        "extraction_method": "llm",
+        "source_entity_name": "Antibiotika",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "3749e1a8-3513-4d44-b81f-b74896422c60",
+      "type": "RELATED_TO",
+      "source_entity_id": "1f4590bf-e8d0-4284-887b-85a51081b78e",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.6,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "oder auch solche Sachen wie  Schmerzmittel oder auch Fiebersenker.",
+        "extraction_method": "llm",
+        "source_entity_name": "Schmerzmittel",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "bb65436b-b927-454f-834e-45e02ab4d504",
+      "type": "RELATED_TO",
+      "source_entity_id": "ce099147-46a9-4b09-89d3-c1cf8d37e1e2",
+      "target_entity_id": "591edc1c-6e14-4251-8485-80a3d44f4600",
+      "confidence": 0.6,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "oder auch solche Sachen wie  Schmerzmittel oder auch Fiebersenker.",
+        "extraction_method": "llm",
+        "source_entity_name": "Fiebersenker",
+        "target_entity_name": "Likigat"
+      }
+    },
+    {
+      "id": "414f3ecf-6aba-43c2-9276-7e11c66577ed",
+      "type": "RELATED_TO",
+      "source_entity_id": "21993700-f192-4b8b-b7ec-1f39c012df0c",
+      "target_entity_id": "92052d7c-2361-42f7-b5e3-cc5ee2b7b2d2",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Genau, also es gibt ja auch jetzt in der Krebstherapie  oder auch bei Borrelioso oder so, da gibt es halt extra Hypohyperthermie Geschichten",
+        "extraction_method": "llm",
+        "source_entity_name": "Hypohyperthermie",
+        "target_entity_name": "Krebstherapie"
+      }
+    },
+    {
+      "id": "25fac938-bea9-4070-8559-120cd8e7ab95",
+      "type": "RELATED_TO",
+      "source_entity_id": "21993700-f192-4b8b-b7ec-1f39c012df0c",
+      "target_entity_id": "841a4a95-db2a-4015-a2d3-95f29f0117a3",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Genau, also es gibt ja auch jetzt in der Krebstherapie  oder auch bei Borreliose oder so, da gibt es halt extra Hypohyperthermie Geschichten, wo halt so  quasi künstlich Fieber erzeugt wird,",
+        "extraction_method": "llm",
+        "source_entity_name": "Hypohyperthermie",
+        "target_entity_name": "Borreliose"
+      }
+    },
+    {
+      "id": "08bb5d8c-6963-4317-b009-234f0e6451fc",
+      "type": "AFFECTS",
+      "source_entity_id": "d3d6ea10-ffcb-43d3-9f50-b2531213cb54",
+      "target_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass der Schimmel mehr Toxine produziert, wenn er sehr starken elektromagnetischen  Feldern ausgesetzt ist,",
+        "extraction_method": "llm",
+        "source_entity_name": "Elektromagnetische Felder",
+        "target_entity_name": "Schimmel"
+      }
+    },
+    {
+      "id": "770bfab1-6fda-40f6-808b-14d098ea7d68",
+      "type": "CAUSES",
+      "source_entity_id": "d3d6ea10-ffcb-43d3-9f50-b2531213cb54",
+      "target_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass die Pilze, also die Schimmelpilze, die jetzt dem Elektrosmog  ausgesetzt waren, dass die halt sich um den Faktor 12 vermehrt habe",
+        "extraction_method": "llm",
+        "source_entity_name": "Elektrosmog",
+        "target_entity_name": "Vermehrung Schimmelpilze"
+      }
+    },
+    {
+      "id": "f3f8e9bd-46ea-4264-8a6b-535f606ea574",
+      "type": "RELATED_TO",
+      "source_entity_id": "9ba1cba1-03f3-42ac-b9c2-eb9cc49717ad",
+      "target_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "eine, die waren quasi in einem stradungssicheren Raum und das andere war direkt in so einer WLAN-Box",
+        "extraction_method": "llm",
+        "source_entity_name": "WLAN",
+        "target_entity_name": "Schimmelpilze"
+      }
+    },
+    {
+      "id": "d867fb60-6304-4067-a48d-5637fddd06c6",
+      "type": "AFFECTS",
+      "source_entity_id": "d3d6ea10-ffcb-43d3-9f50-b2531213cb54",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "das Immunsystem ist ständig sozusagen dem ausgesetzt",
+        "extraction_method": "llm",
+        "source_entity_name": "Elektrosmog",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "f15c874e-8f68-45d0-8348-9da76c49213d",
+      "type": "AFFECTS",
+      "source_entity_id": "d3d6ea10-ffcb-43d3-9f50-b2531213cb54",
+      "target_entity_id": "b8dab747-1136-42e4-97b1-b0b54e965849",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass z.B. auch die Melatoninproduktion stark runtergefahren wird",
+        "extraction_method": "llm",
+        "source_entity_name": "Elektrosmog",
+        "target_entity_name": "Melatoninproduktion"
+      }
+    },
+    {
+      "id": "fbe94a9a-7cc1-4f37-8048-62f4458dc6a2",
+      "type": "AFFECTS",
+      "source_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "target_entity_id": "64ca72f6-fd83-40fa-bf83-bd3e81fc5dc2",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "auch die Leber, die ganzen, also die Toxine können die Leber extrem belasten,",
+        "extraction_method": "llm",
+        "source_entity_name": "Schimmel",
+        "target_entity_name": "Leber"
+      }
+    },
+    {
+      "id": "eae8e753-a0a9-4701-8f94-3763118a0600",
+      "type": "AFFECTS",
+      "source_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "das Immunsystem ist ständig sozusagen dem ausgesetzt",
+        "extraction_method": "llm",
+        "source_entity_name": "Schimmel",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "456efd8e-f2e2-4c56-9fb6-dc09d911951c",
+      "type": "RELATED_TO",
+      "source_entity_id": "9ba1cba1-03f3-42ac-b9c2-eb9cc49717ad",
+      "target_entity_id": "d3d6ea10-ffcb-43d3-9f50-b2531213cb54",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da gab es zwei Pilzkulturen, eine, die waren quasi in einem stradungssicheren Raum und das andere war direkt in so einer WLAN-Box",
+        "extraction_method": "llm",
+        "source_entity_name": "WLAN",
+        "target_entity_name": "Elektrosmog"
+      }
+    },
+    {
+      "id": "7aa47bd3-9a21-486f-8a43-dab8c5b1627a",
+      "type": "USES",
+      "source_entity_id": "6e7f466d-da66-4976-8de3-89abd5e7825d",
+      "target_entity_id": "d37ad506-5f30-4991-bca1-b86d73982b6f",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Handy habe ich eigentlich fast immer im Flugzeugmodus und ab und zu mache ich an",
+        "extraction_method": "llm",
+        "source_entity_name": "Handy",
+        "target_entity_name": "Flugzeugmodus"
+      }
+    },
+    {
+      "id": "df2a7a1e-f829-4ef9-9bf3-2f2bdab71a75",
+      "type": "USES",
+      "source_entity_id": "6e7f466d-da66-4976-8de3-89abd5e7825d",
+      "target_entity_id": "8a200614-cf0c-43cd-88a2-a79aa655ad26",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "man kann über einen Adapter das Handy mit einem Lahnkabel verbinden. Ach, das habe ich mich immer empfohlen, also wozu man sonst Internet bräuchte,",
+        "extraction_method": "llm",
+        "source_entity_name": "Handy",
+        "target_entity_name": "Internet"
+      }
+    },
+    {
+      "id": "48769bc5-c617-4c61-b8f8-695d6cc8c409",
+      "type": "USES",
+      "source_entity_id": "13ab55e8-b8be-458d-adf3-b5fb47233586",
+      "target_entity_id": "8a200614-cf0c-43cd-88a2-a79aa655ad26",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und natürlich auch Internet jetzt am Laptop oder am Computer würde ich immer Lahnkabel empfehlen",
+        "extraction_method": "llm",
+        "source_entity_name": "Laptop",
+        "target_entity_name": "Internet"
+      }
+    },
+    {
+      "id": "ba6343c9-adec-4eb8-97d0-6f57b6d839fd",
+      "type": "USES",
+      "source_entity_id": "2241b5ae-9609-4e1d-ac0d-a56396f7109e",
+      "target_entity_id": "8a200614-cf0c-43cd-88a2-a79aa655ad26",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "und natürlich auch Internet jetzt am Laptop oder am Computer würde ich immer Lahnkabel empfehlen",
+        "extraction_method": "llm",
+        "source_entity_name": "Computer",
+        "target_entity_name": "Internet"
+      }
+    },
+    {
+      "id": "d959f774-f9ef-462c-9c30-30d636a4f389",
+      "type": "RELATED_TO",
+      "source_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "target_entity_id": "de20fece-66cf-4154-9d00-8aa0893460b7",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass die halt sich um den Faktor 12 vermehrt haben gegenüber der normalen Gruppe",
+        "extraction_method": "llm",
+        "source_entity_name": "Schimmelpilze",
+        "target_entity_name": "12"
+      }
+    },
+    {
+      "id": "2daa2600-fa35-479a-8484-8f6345492869",
+      "type": "RELATED_TO",
+      "source_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "target_entity_id": "2c1c641e-0c0d-437f-8082-7984dd52115c",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass die 600 Mal mehr Toxine ausgeschieden haben",
+        "extraction_method": "llm",
+        "source_entity_name": "Schimmelpilze",
+        "target_entity_name": "600"
+      }
+    },
+    {
+      "id": "e7bc471f-8426-4939-8f7f-dd49b16dc15e",
+      "type": "RELATED_TO",
+      "source_entity_id": "b8dab747-1136-42e4-97b1-b0b54e965849",
+      "target_entity_id": "8b250730-683e-4c09-9fde-1cc2bc7b3b7b",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Melatonin ist das Schlafhormonen",
+        "extraction_method": "llm",
+        "source_entity_name": "Melatonin",
+        "target_entity_name": "Schlafhormonen"
+      }
+    },
+    {
+      "id": "2b732205-640e-48d0-bcf2-9289ead2609e",
+      "type": "USES",
+      "source_entity_id": "6043cde1-131a-45eb-88ab-538448ec502c",
+      "target_entity_id": "8a200614-cf0c-43cd-88a2-a79aa655ad26",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "man kann ja auch dann über diverse andere Anbieter telefonieren, also über das Internet",
+        "extraction_method": "llm",
+        "source_entity_name": "Telefone",
+        "target_entity_name": "Internet"
+      }
+    },
+    {
+      "id": "c505f1bf-93b1-4801-9354-ed88a1c0f670",
+      "type": "AFFECTS",
+      "source_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "target_entity_id": "0cd68aca-4a5c-4ff0-8646-00960e2f05ad",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "also der Schimmel in der Umgebung kann tatsächlich auch dann unsere Darmflora Einfluss nehmen",
+        "extraction_method": "llm",
+        "source_entity_name": "Schimmel",
+        "target_entity_name": "Darmflora"
+      }
+    },
+    {
+      "id": "565530e9-a63e-43fe-9cf4-201d40104c9d",
+      "type": "CAUSES",
+      "source_entity_id": "9261a58a-7e83-46a9-b4aa-5ac967220a22",
+      "target_entity_id": "b0526d0e-fa1f-4cb1-9ae3-e2c849fb6795",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Alles, also alle Schwachstellen, vor allem Neurodermitis wurde halt sehr krass, Verdauung, aber auch psychisch so depressiv, also es ging alles ziemlich so den Bach hinunter, auch starke Erschöpfung. Ich hatte eine Zeit danach auch viel so mit neurologischen Problemen, Koordinationsstörungen zu kämpfen, also ich denke es war nicht nur der Schimmel, aber es hat auf jeden Fall damit mit reingespielt.",
+        "extraction_method": "llm",
+        "source_entity_name": "Schimmel",
+        "target_entity_name": "Neurodermitis"
+      }
+    },
+    {
+      "id": "1a46f3b0-ede9-45a9-87d7-1196a634278e",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "target_entity_id": "189f5349-01f3-4f67-92ae-3927735562b7",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Biofilme, würde ich jetzt einfach mal gesagt, sind das so Parasiten-Hochburgen, das sind quasi so Strukturen, wo verschiedene Krankheitserreger drin wohnen",
+        "extraction_method": "llm",
+        "source_entity_name": "Biofilme",
+        "target_entity_name": "Krankheitserreger"
+      }
+    },
+    {
+      "id": "a0ef4cce-fef3-4882-849c-16729b6c4f39",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Biofilme, würde ich jetzt einfach mal gesagt, sind das so Parasiten-Hochburgen, das sind quasi so Strukturen, wo verschiedene Krankheitserreger drin wohnen",
+        "extraction_method": "llm",
+        "source_entity_name": "Biofilme",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "f3f2923c-a5bc-4788-b3f7-66f9a576aff8",
+      "type": "AFFECTS",
+      "source_entity_id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wo sie aber von dem Immunsystem recht gut geschützt sind, weil das sozusagen so eine Schicht ist aus zum Beispiel unverdauten Nahrungsresten oder auch diversen Toxinen, die sich dort ansammeln und genau in diesem Biofilm sind die halt erstens geschützt vor dem Immunsystem recht gut",
+        "extraction_method": "llm",
+        "source_entity_name": "Biofilme",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "3a2764a5-c87c-4b67-a347-d3150c8623ef",
+      "type": "TREATS",
+      "source_entity_id": "fd0e1c6b-2191-4c09-8235-3fd938668ab3",
+      "target_entity_id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass jetzt von Antibiotika die tausendfache Dosis notwendig wäre, um jetzt so Biofilme aufzubrechen",
+        "extraction_method": "llm",
+        "source_entity_name": "Antibiotika",
+        "target_entity_name": "Biofilme"
+      }
+    },
+    {
+      "id": "66ff29f7-b826-46d9-832b-2cf2ff14f2c5",
+      "type": "CREATED_BY",
+      "source_entity_id": "1669052e-2b4e-4889-a50d-ba4cab9c1eb3",
+      "target_entity_id": "8bb1fe01-7325-4123-ac38-024539b32471",
+      "confidence": 0.98,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also Dr. Klingert schreibt zum Beispiel in seinem Bureiosebuch",
+        "extraction_method": "llm",
+        "source_entity_name": "Dr. Klingert",
+        "target_entity_name": "Bureiosebuch"
+      }
+    },
+    {
+      "id": "5b3ec46d-7f90-4fc7-b2fe-d15c00c0bbf8",
+      "type": "TREATS",
+      "source_entity_id": "d5d1eb8c-7425-4828-a293-852a88216381",
+      "target_entity_id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass jetzt von Antibiotika die tausendfache Dosis notwendig wäre, um jetzt so Biofilme aufzubrechen, also das ist da auf schon medizinischer Seite jetzt nicht so wirklich die Lösung gibt, weil ich glaube so eine tausendfache Dosis ist jetzt auch nicht auf lange Sicht zielführend und es gibt aber halt pflanzliche Mittel, zum Beispiel Zistrose ist anscheinend in der Lage, diese Biofilme aufzubrechen",
+        "extraction_method": "llm",
+        "source_entity_name": "Zistrose",
+        "target_entity_name": "Biofilme"
+      }
+    },
+    {
+      "id": "e34fa7ae-e276-44c6-9265-291c3301b6bc",
+      "type": "TREATS",
+      "source_entity_id": "0ccc7657-6d5f-4304-a0a7-fb2201b15f35",
+      "target_entity_id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "auch gut in Kombination mit dem einjährigen Beifuß Artemisia annua, scheint eine gute Kombination zu sein",
+        "extraction_method": "llm",
+        "source_entity_name": "Artemisia annua",
+        "target_entity_name": "Biofilme"
+      }
+    },
+    {
+      "id": "73dd4444-5b79-4f9b-9668-f499cbc954a7",
+      "type": "CAUSES",
+      "source_entity_id": "4ca52ed8-6f75-4b52-9c9e-0b9de8ea3dad",
+      "target_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass es überhaupt dazu kommt, dass dann halt Kohlenhydrate zum Beispiel jetzt nicht mehr so gut  verträglich sind",
+        "extraction_method": "llm",
+        "source_entity_name": "Düstbiose",
+        "target_entity_name": "Kohlenhydrate"
+      }
+    },
+    {
+      "id": "8892eb45-25bd-492c-8963-604ef094b85d",
+      "type": "PART_OF",
+      "source_entity_id": "dfea3069-f4b1-4b12-88e8-bc1d0dc39edb",
+      "target_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ob es jetzt  Zucker ist oder irgendwelche verarbeiteten Sachen oder ob es jetzt eine Süßkartoffel ist",
+        "extraction_method": "llm",
+        "source_entity_name": "Zucker",
+        "target_entity_name": "Kohlenhydrate"
+      }
+    },
+    {
+      "id": "0a1ea71e-2c28-4117-ac76-02caaa71d14e",
+      "type": "PART_OF",
+      "source_entity_id": "6360769c-36fc-47b7-85b3-3ff26f483ae9",
+      "target_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ob es jetzt  Zucker ist oder irgendwelche verarbeiteten Sachen oder ob es jetzt eine Süßkartoffel ist",
+        "extraction_method": "llm",
+        "source_entity_name": "verarbeiteten Kohlenhydraten",
+        "target_entity_name": "Kohlenhydrate"
+      }
+    },
+    {
+      "id": "bfc3fb5e-4fd3-4f6c-bebb-9f72d87e7f82",
+      "type": "PART_OF",
+      "source_entity_id": "2d0f9121-8f6c-4c2a-8eaf-1fa584b52bbd",
+      "target_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ob es jetzt  Zucker ist oder irgendwelche verarbeiteten Sachen oder ob es jetzt eine Süßkartoffel ist",
+        "extraction_method": "llm",
+        "source_entity_name": "Süßkartoffel",
+        "target_entity_name": "Kohlenhydrate"
+      }
+    },
+    {
+      "id": "c7f3c255-cc9b-4d26-8d15-5a9d1527d693",
+      "type": "CAUSES",
+      "source_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "target_entity_id": "c19ffbef-6f87-457e-b46c-8696f3e14ebe",
+      "confidence": 0.75,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Die Kombination von  Kohlenhydraten und Fetten ist jetzt auch ein Faktor, der das ganze sozusagen diese Probleme  verursachen kann, gerade auch bei Candida zum Beispiel",
+        "extraction_method": "llm",
+        "source_entity_name": "Kohlenhydrate",
+        "target_entity_name": "Candida"
+      }
+    },
+    {
+      "id": "8c05148f-c3b4-455c-af4a-8679c96be107",
+      "type": "PART_OF",
+      "source_entity_id": "18e71d76-450e-4996-ab1c-4bbee0761c04",
+      "target_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn jetzt jemand auch hochwertige  Quellen nicht verträgt, ob es jetzt irgendwie Sprossen sind oder Süßkartoffeln oder auch baumreifes  Obst oder was auch immer",
+        "extraction_method": "llm",
+        "source_entity_name": "Sprossen",
+        "target_entity_name": "Kohlenhydrate"
+      }
+    },
+    {
+      "id": "198ecfc8-d476-4698-a46e-b04dcbcf896a",
+      "type": "PART_OF",
+      "source_entity_id": "0b3524da-a1fa-44d3-a6d1-1f092aea082c",
+      "target_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn jetzt jemand auch hochwertige  Quellen nicht verträgt, ob es jetzt irgendwie Sprossen sind oder Süßkartoffeln oder auch baumreifes  Obst oder was auch immer",
+        "extraction_method": "llm",
+        "source_entity_name": "Obst",
+        "target_entity_name": "Kohlenhydrate"
+      }
+    },
+    {
+      "id": "b1261f29-5bf9-408b-a6dd-8f5190d7489c",
+      "type": "USES",
+      "source_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "target_entity_id": "19959ea8-beb0-43b5-ac4d-0e42c50f5c23",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass diese Parasiten sich eben nicht nur von Kohlenhydraten ernähren können, sondern  im Endeffekt von sich alles, auch irgendwie Protein und Fett wohl auch als Energiequelle  dann darauf umswitchen können",
+        "extraction_method": "llm",
+        "source_entity_name": "Parasiten",
+        "target_entity_name": "Kohlenhydrate"
+      }
+    },
+    {
+      "id": "0408bacb-51a0-408a-afd1-a81b740b1ce2",
+      "type": "TREATS",
+      "source_entity_id": "c4999f0e-1c13-4876-8919-f79747b42d07",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "früher wurde häufig so  ketogene Ernährung zum Beispiel in so einer Parasitenkur empfohlen",
+        "extraction_method": "llm",
+        "source_entity_name": "ketogene Ernährung",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "63880120-1fc2-48b1-be7f-d2a02087043a",
+      "type": "TREATS",
+      "source_entity_id": "8cba5831-e1a0-4ae2-8beb-129f44a77255",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "ich habe persönlich gute Erfahrungen beim Fasten zum Beispiel gesammelt",
+        "extraction_method": "llm",
+        "source_entity_name": "Fasten",
+        "target_entity_name": "Parasiten"
+      }
+    },
+    {
+      "id": "feb37758-9e47-42e8-be90-df841e8bae92",
+      "type": "TREATS",
+      "source_entity_id": "8cba5831-e1a0-4ae2-8beb-129f44a77255",
+      "target_entity_id": "c19ffbef-6f87-457e-b46c-8696f3e14ebe",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn ich das kombiniere mit  Entgiftungsmaßnahmen und noch so antiparasitären Maßnahmen oder jetzt auch Antikandida und so  weiter Maßnahmen kombiniere",
+        "extraction_method": "llm",
+        "source_entity_name": "Fasten",
+        "target_entity_name": "Candida"
+      }
+    },
+    {
+      "id": "256a3b96-57c5-405f-8186-5752b22b375f",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "1d531736-036b-410a-b742-0447bd31d248",
+      "target_entity_id": "8cba5831-e1a0-4ae2-8beb-129f44a77255",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Wenn ich Fasten mit frischen  grünen Säften, mit Gemüse, mit Wildkräutern und so weiter, wenn ich das kombiniere",
+        "extraction_method": "llm",
+        "source_entity_name": "Wildkräutern",
+        "target_entity_name": "Fasten"
+      }
+    },
+    {
+      "id": "19d75307-8fdb-45b3-ace7-4275b122ca74",
+      "type": "RELATED_TO",
+      "source_entity_id": "a63ce311-cb4c-49bc-be90-a14f6c5510d3",
+      "target_entity_id": "4ca52ed8-6f75-4b52-9c9e-0b9de8ea3dad",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn das Milieu sich wieder Richtung Symbiose verschiebt",
+        "extraction_method": "llm",
+        "source_entity_name": "Symbiose",
+        "target_entity_name": "Düstbiose"
+      }
+    },
+    {
+      "id": "f0c5d8c0-e0ee-4103-84fe-95695d6068e7",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "8cba5831-e1a0-4ae2-8beb-129f44a77255",
+      "target_entity_id": "1d531736-036b-410a-b742-0447bd31d248",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Wenn ich Fasten mit frischen  grünen Säften, mit Gemüse, mit Wildkräutern und so weiter, wenn ich das kombiniere",
+        "extraction_method": "llm",
+        "source_entity_name": "Fasten",
+        "target_entity_name": "Wildkräutern"
+      }
+    },
+    {
+      "id": "0173a8b2-d215-497a-8ebd-4ad9433c55d3",
+      "type": "PART_OF",
+      "source_entity_id": "dfea3069-f4b1-4b12-88e8-bc1d0dc39edb",
+      "target_entity_id": "0e031d14-aad2-4064-8e23-fc0cc241c23a",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "jetzt keine irgendwelche Nahrungsmittelzusätze wie  Aromen oder Konservierungsstoffe oder Zucker oder was weiß ich, das sollte natürlich auch nicht  in einem guten Lebensmittel drin sein",
+        "extraction_method": "llm",
+        "source_entity_name": "Zucker",
+        "target_entity_name": "Lebensmittel"
+      }
+    },
+    {
+      "id": "b119fe42-d814-48cf-92fd-6ea82ff24f4e",
+      "type": "RELATED_TO",
+      "source_entity_id": "14e7b80e-4907-40bb-9c0b-83a56367f66a",
+      "target_entity_id": "8991e2c7-8751-478f-abf1-daa0fbc3b1a9",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "so Brennnessel kennt eigentlich jeder,  Löwenzahn kann man auch erkennen und gibt noch viele andere Wildkräuter.",
+        "extraction_method": "llm",
+        "source_entity_name": "Brennnessel",
+        "target_entity_name": "Wildkräuter"
+      }
+    },
+    {
+      "id": "be4a08ce-face-42ef-8ebf-0c48107e841b",
+      "type": "RELATED_TO",
+      "source_entity_id": "7426edae-2d3b-49be-bfa1-fc8b454fd99a",
+      "target_entity_id": "8991e2c7-8751-478f-abf1-daa0fbc3b1a9",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "so Brennnessel kennt eigentlich jeder,  Löwenzahn kann man auch erkennen und gibt noch viele andere Wildkräuter.",
+        "extraction_method": "llm",
+        "source_entity_name": "Löwenzahn",
+        "target_entity_name": "Wildkräuter"
+      }
+    },
+    {
+      "id": "31232675-d753-4a6f-ac46-6d926efb0731",
+      "type": "PART_OF",
+      "source_entity_id": "14e7b80e-4907-40bb-9c0b-83a56367f66a",
+      "target_entity_id": "8991e2c7-8751-478f-abf1-daa0fbc3b1a9",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "so Brennnessel kennt eigentlich jeder,  Löwenzahn kann man auch erkennen und gibt noch viele andere Wildkräuter.",
+        "extraction_method": "llm",
+        "source_entity_name": "Brennnessel",
+        "target_entity_name": "Wildkräuter"
+      }
+    },
+    {
+      "id": "475a5add-1fae-4175-a2f0-31b53b2a9bcd",
+      "type": "PART_OF",
+      "source_entity_id": "7426edae-2d3b-49be-bfa1-fc8b454fd99a",
+      "target_entity_id": "8991e2c7-8751-478f-abf1-daa0fbc3b1a9",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "so Brennnessel kennt eigentlich jeder,  Löwenzahn kann man auch erkennen und gibt noch viele andere Wildkräuter.",
+        "extraction_method": "llm",
+        "source_entity_name": "Löwenzahn",
+        "target_entity_name": "Wildkräuter"
+      }
+    },
+    {
+      "id": "32eb0135-4038-4099-aa8b-e26b0d839d07",
+      "type": "AFFECTS",
+      "source_entity_id": "0bd25297-9f4e-433e-ace5-96c34f94c0ed",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "auch sehr wichtig für die Regeneration des Darmes,",
+        "extraction_method": "llm",
+        "source_entity_name": "Chlorophyll",
+        "target_entity_name": "Darm"
+      }
+    },
+    {
+      "id": "8f24b4df-5d09-49ae-99ab-586f7e69c96b",
+      "type": "CONTAINS",
+      "source_entity_id": "62ed42bb-93ef-4cad-80c3-67ef8edc5a73",
+      "target_entity_id": "e39252c9-b94e-4bfd-bb54-1dcf05f13580",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "zum Beispiel bei dem Smoothie,  die die Zellulose, die quasi so fein aufgespalten wird,",
+        "extraction_method": "llm",
+        "source_entity_name": "Smoothie",
+        "target_entity_name": "Zellulose"
+      }
+    },
+    {
+      "id": "c3e8241f-1baa-4792-bd15-a17f1030379a",
+      "type": "AFFECTS",
+      "source_entity_id": "e39252c9-b94e-4bfd-bb54-1dcf05f13580",
+      "target_entity_id": "0cd68aca-4a5c-4ff0-8646-00960e2f05ad",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "füttert auch sehr gut die gute, sehr stark  gute Darmflora,",
+        "extraction_method": "llm",
+        "source_entity_name": "Zellulose",
+        "target_entity_name": "Darmflora"
+      }
+    },
+    {
+      "id": "1ff06da2-13eb-4e68-8411-85de57b550ae",
+      "type": "PART_OF",
+      "source_entity_id": "4946938c-4058-4460-a0e3-f2b89ea8a332",
+      "target_entity_id": "0b3524da-a1fa-44d3-a6d1-1f092aea082c",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn ich jetzt einfach draußen rumläufe und das  irgendwo ein Apfel oder ein paar Beeren und dann habe ich halt ein Bedürfnis, das zu essen",
+        "extraction_method": "llm",
+        "source_entity_name": "Apfel",
+        "target_entity_name": "Obst"
+      }
+    },
+    {
+      "id": "a29e5fa6-59c5-4ee9-b1d9-66ea19b10ada",
+      "type": "PART_OF",
+      "source_entity_id": "421f22c0-9202-4537-916b-733b0c669548",
+      "target_entity_id": "0b3524da-a1fa-44d3-a6d1-1f092aea082c",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn ich jetzt einfach draußen rumläufe und das  irgendwo ein Apfel oder ein paar Beeren und dann habe ich halt ein Bedürfnis, das zu essen",
+        "extraction_method": "llm",
+        "source_entity_name": "Beeren",
+        "target_entity_name": "Obst"
+      }
+    },
+    {
+      "id": "dc0348ea-b703-4c5c-b864-0549cbf381b8",
+      "type": "AFFECTS",
+      "source_entity_id": "f14e15d8-4950-4858-9d14-25910d9121ec",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "meine Fructose mal  Absorption ist so viel besser geworden eben mit der Heilung des Darmes,",
+        "extraction_method": "llm",
+        "source_entity_name": "Fructose",
+        "target_entity_name": "Darm"
+      }
+    },
+    {
+      "id": "c4c83c99-bc8f-4e69-9b80-17fef920a5f2",
+      "type": "RELATED_TO",
+      "source_entity_id": "d0a5331d-edb8-424c-a438-587ebc9ef31b",
+      "target_entity_id": "a0124180-35e0-4b4f-89c6-22d18ae1cde2",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "zum Beispiel Vermut heißt ja auf Englisch auch Wurmwut",
+        "extraction_method": "llm",
+        "source_entity_name": "Vermut",
+        "target_entity_name": "Wurmwut"
+      }
+    },
+    {
+      "id": "ae11f536-a2ae-4e54-84c9-2c55c3d46e9c",
+      "type": "RELATED_TO",
+      "source_entity_id": "d0a5331d-edb8-424c-a438-587ebc9ef31b",
+      "target_entity_id": "74322cae-e330-4d1d-915e-06f2984d5a66",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "aber das  wird auf jeden Fall auch in diversen parasiten Kuren, ist das ein Bestandteil",
+        "extraction_method": "llm",
+        "source_entity_name": "Vermut",
+        "target_entity_name": "Parasitenkuren"
+      }
+    },
+    {
+      "id": "b4438261-4461-4346-8c9e-d6982b5847c3",
+      "type": "CREATED_BY",
+      "source_entity_id": "6c4e5c8d-27b0-495c-a6a6-af673c2a4567",
+      "target_entity_id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "also von meiner Freundin, Heilpraktikerin Eva Molle und mir, zum Thema, ja also oder mit dem Titel befreie dich von Krankheitsregeln und chronischen Infektionen in den Schritten zu einem starken Immunsystem",
+        "extraction_method": "llm",
+        "source_entity_name": "Eva Molle",
+        "target_entity_name": "E-Book"
+      }
+    },
+    {
+      "id": "a9935c92-c7df-4b6b-b573-373c1f8d35d1",
+      "type": "RELATED_TO",
+      "source_entity_id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "target_entity_id": "15746e0d-a4c6-414a-9b8b-b4674515e360",
+      "confidence": 1.0,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "also von meiner Freundin, Heilpraktikerin Eva Molle und mir, zum Thema, ja also oder mit dem Titel befreie dich von Krankheitsregeln und chronischen Infektionen in den Schritten zu einem starken Immunsystem",
+        "extraction_method": "llm",
+        "source_entity_name": "E-Book",
+        "target_entity_name": "befreie dich von Krankheitsregeln und chronischen Infektionen in den Schritten zu einem starken Immunsystem"
+      }
+    },
+    {
+      "id": "fab8c1e1-4303-4182-8779-a3e7e51195b7",
+      "type": "RELATED_TO",
+      "source_entity_id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "target_entity_id": "5b75d163-e6b0-4f3d-be9b-7c06e2e45768",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da haben wir eigentlich so geschrieben, ja wie so die Zusammenhänge sind zwischen Dysbiose, Symbiose, Krankheitsregeln und Immunsystem",
+        "extraction_method": "llm",
+        "source_entity_name": "E-Book",
+        "target_entity_name": "Dysbiose"
+      }
+    },
+    {
+      "id": "04c88cf9-52b4-421d-9ed9-30796e071563",
+      "type": "RELATED_TO",
+      "source_entity_id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "target_entity_id": "a63ce311-cb4c-49bc-be90-a14f6c5510d3",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da haben wir eigentlich so geschrieben, ja wie so die Zusammenhänge sind zwischen Dysbiose, Symbiose, Krankheitsregeln und Immunsystem",
+        "extraction_method": "llm",
+        "source_entity_name": "E-Book",
+        "target_entity_name": "Symbiose"
+      }
+    },
+    {
+      "id": "1a7ea4b7-c98b-43cc-acad-afa30e43617f",
+      "type": "RELATED_TO",
+      "source_entity_id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da haben wir eigentlich so geschrieben, ja wie so die Zusammenhänge sind zwischen Dysbiose, Symbiose, Krankheitsregeln und Immunsystem",
+        "extraction_method": "llm",
+        "source_entity_name": "E-Book",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "54a7c175-eb6e-4dcb-965f-9b3d511484bf",
+      "type": "AFFECTS",
+      "source_entity_id": "5b75d163-e6b0-4f3d-be9b-7c06e2e45768",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da haben wir eigentlich so geschrieben, ja wie so die Zusammenhänge sind zwischen Dysbiose, Symbiose, Krankheitsregeln und Immunsystem und welche Faktoren, was so die größten Faktoren sind, die uns sozusagen schwächen",
+        "extraction_method": "llm",
+        "source_entity_name": "Dysbiose",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "e246d1b4-a01a-41c4-920a-fa1ee2c56140",
+      "type": "AFFECTS",
+      "source_entity_id": "a63ce311-cb4c-49bc-be90-a14f6c5510d3",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da haben wir eigentlich so geschrieben, ja wie so die Zusammenhänge sind zwischen Dysbiose, Symbiose, Krankheitsregeln und Immunsystem und welche Faktoren, was so die größten Faktoren sind, die uns sozusagen schwächen",
+        "extraction_method": "llm",
+        "source_entity_name": "Symbiose",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "1c8ce16e-1be4-4f4c-ac7a-7cffe5f92298",
+      "type": "AFFECTS",
+      "source_entity_id": "15746e0d-a4c6-414a-9b8b-b4674515e360",
+      "target_entity_id": "6d92d62c-cda1-445b-a93f-190be1542e46",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "da haben wir eigentlich so geschrieben, ja wie so die Zusammenhänge sind zwischen Dysbiose, Symbiose, Krankheitsregeln und Immunsystem und welche Faktoren, was so die größten Faktoren sind, die uns sozusagen schwächen",
+        "extraction_method": "llm",
+        "source_entity_name": "Krankheitsregeln",
+        "target_entity_name": "Immunsystem"
+      }
+    },
+    {
+      "id": "9b743ceb-b1d9-4dec-a9f7-15e137a0abb4",
+      "type": "LOCATED_IN",
+      "source_entity_id": "79f34f70-4eee-4d65-b8e5-764c62bcf944",
+      "target_entity_id": "db8c5315-b783-4b09-bb35-d99d6615634e",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "das ist quasi ein Labormediziner aus Deutschland, der sich darauf spezialisiert hat",
+        "extraction_method": "llm",
+        "source_entity_name": "Dr. Armin Schwarzwagzee",
+        "target_entity_name": "Deutschland"
+      }
+    },
+    {
+      "id": "3e19b6b0-ff98-4acf-8983-43a97943dd33",
+      "type": "TREATS",
+      "source_entity_id": "79f34f70-4eee-4d65-b8e5-764c62bcf944",
+      "target_entity_id": "189f5349-01f3-4f67-92ae-3927735562b7",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "der sich darauf spezialisiert hat, der sehr viele, also für diverse Krankheitserreger halt zielgenau oder treffsichere Tests entwickelt hat",
+        "extraction_method": "llm",
+        "source_entity_name": "Dr. Armin Schwarzwagzee",
+        "target_entity_name": "Krankheitserreger"
+      }
+    },
+    {
+      "id": "ec53d554-5735-4493-8219-ba57df829969",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "1669052e-2b4e-4889-a50d-ba4cab9c1eb3",
+      "target_entity_id": "79f34f70-4eee-4d65-b8e5-764c62bcf944",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Dr. Klingert arbeitet auch mit ihm zusammen",
+        "extraction_method": "llm",
+        "source_entity_name": "Dr. Klingert",
+        "target_entity_name": "Dr. Armin Schwarzwagzee"
+      }
+    },
+    {
+      "id": "14551362-ece9-4977-90df-26483425698f",
+      "type": "USES",
+      "source_entity_id": "8b83b468-7c31-4a0a-a1d0-5a5e1296162c",
+      "target_entity_id": "c05ce84b-0981-4e3c-bcf2-c25c9e373c35",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Ich habe am Anfang so einen Aktivkohlefilter.  Viel trinken.",
+        "extraction_method": "llm",
+        "source_entity_name": "Aktivkohlefilter",
+        "target_entity_name": "Wasser"
+      }
+    },
+    {
+      "id": "87e889d5-7336-4279-bc29-8be873310fbd",
+      "type": "CREATED_BY",
+      "source_entity_id": "7d425e8e-e83b-41c6-9cd4-91bcf93aa8cc",
+      "target_entity_id": "c05ce84b-0981-4e3c-bcf2-c25c9e373c35",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "vor einigen Jahren hat dieser Pollack, also so ein amerikanischer Wissenschaftler, die vierte  Phase des Wassers entdeckt. Darüber hat, glaube ich, mal jemand kurz erwähnt in einem Interview,  wo er auch das Wasser, auch Emotionen so speichert, aber über Wasser speziell haben wir jetzt noch  gar nicht wirklich gesprochen. Genau, also ein wichtiger Punkt, also diese vierte Phase,  sogenanntes Exclusion Zones Wasser.",
+        "extraction_method": "llm",
+        "source_entity_name": "Pollack",
+        "target_entity_name": "Exclusion Zones Wasser"
+      }
+    },
+    {
+      "id": "cea927ee-6df8-44ab-867a-d46e7f320236",
+      "type": "CAUSES",
+      "source_entity_id": "c05ce84b-0981-4e3c-bcf2-c25c9e373c35",
+      "target_entity_id": "472a209f-d4a4-4206-8e39-1f473b29b803",
+      "confidence": 0.75,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dass halt ein gewisses, also einen gewissen Anteil von strukturiertem Wasser da ist,  dass halt ATP produziert werden kann.",
+        "extraction_method": "llm",
+        "source_entity_name": "strukturiertes Wasser",
+        "target_entity_name": "ATP"
+      }
+    },
+    {
+      "id": "172606b6-55f9-4a80-9dad-777be0a4f1ad",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "1bae6726-5a57-4710-9d43-8c88420d7a14",
+      "target_entity_id": "e14f5963-6565-416b-b972-ba5b6b68e2ac",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn wir in der Sonne sind, oder auch in der  Sauna, Infrarotsauna zum Beispiel.",
+        "extraction_method": "llm",
+        "source_entity_name": "Sauna",
+        "target_entity_name": "Infrarotlicht"
+      }
+    },
+    {
+      "id": "393d72a1-c77c-4d68-bc9b-7a272e41b45a",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "d5ae1f79-297f-4b3f-9d82-6e5df6aadb2d",
+      "target_entity_id": "e14f5963-6565-416b-b972-ba5b6b68e2ac",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "wenn wir in der Sonne sind, oder auch in der  Sauna, Infrarotsauna zum Beispiel.",
+        "extraction_method": "llm",
+        "source_entity_name": "Infrarotsauna",
+        "target_entity_name": "Infrarotlicht"
+      }
+    },
+    {
+      "id": "3efb53ef-8193-4f7a-b91a-7de4d9276776",
+      "type": "CONTAINS",
+      "source_entity_id": "0b3524da-a1fa-44d3-a6d1-1f092aea082c",
+      "target_entity_id": "c05ce84b-0981-4e3c-bcf2-c25c9e373c35",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Gemüsesäfte, Obst- und  Gemüsesäfte halt auch dieses strukturierte Wasser enthalten.",
+        "extraction_method": "llm",
+        "source_entity_name": "Obst- und Gemüsesäfte",
+        "target_entity_name": "strukturiertes Wasser"
+      }
+    },
+    {
+      "id": "71aef30d-d1d8-4177-89f1-f9a581bc6256",
+      "type": "RELATED_TO",
+      "source_entity_id": "8cba5831-e1a0-4ae2-8beb-129f44a77255",
+      "target_entity_id": "c05ce84b-0981-4e3c-bcf2-c25c9e373c35",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "warum zum Beispiel auch Fasten mit solchen Säften zum Beispiel auch so förderlich sein kann",
+        "extraction_method": "llm",
+        "source_entity_name": "Fasten mit Säften",
+        "target_entity_name": "strukturiertes Wasser"
+      }
+    },
+    {
+      "id": "eb63a22f-3a62-4fb8-b746-4228901eff8a",
+      "type": "RELATED_TO",
+      "source_entity_id": "fe9b73a3-a960-45a5-929d-a7ecc401ddcf",
+      "target_entity_id": "eef8a4b1-1f5b-44b1-8570-83462d67f1a4",
+      "confidence": 0.7,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also wenn man mal  Leitungsrohr eingibt, dann sozusagen kann man sich das auch so ähnlich wie im Darm vorstellen.",
+        "extraction_method": "llm",
+        "source_entity_name": "Biofilme",
+        "target_entity_name": "Darm"
+      }
+    },
+    {
+      "id": "6f177312-a830-4e37-ad1e-81429e3d0a47",
+      "type": "OWNS",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "0306071e-ffb4-4445-a3dc-047a3de21a60",
+      "confidence": 0.95,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Genau, auf jeden Fall ein tolles Schlusswort von dir und wie findet man mich, also einfach auf  meiner Homepage www.sören-schumann.com zum Beispiel,",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "www.sören-schumann.com"
+      }
+    },
+    {
+      "id": "c3332f58-f839-487f-bd04-453d86bd259d",
+      "type": "OWNS",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "7f401e83-a6dd-4cf0-a2c7-432fd8231100",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "dann habe ich auch noch einen YouTube-Kanal,  wo es auch sehr viele kostenlose Informationen gibt, Sören Schumann, Gesundheit ganzheitlich",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "YouTube-Kanal"
+      }
+    },
+    {
+      "id": "30a2d088-de5f-4c13-bceb-7986b2c08750",
+      "type": "CREATED_BY",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "confidence": 0.8,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Also du hast ja schon erwähnt, du hast dieses E-Book",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "E-Book"
+      }
+    },
+    {
+      "id": "b546d3a4-7b20-4dcb-a78a-e3a71bd41fda",
+      "type": "ASSOCIATED_WITH",
+      "source_entity_id": "625049ac-fbf3-40b4-8687-a2198a1e138c",
+      "target_entity_id": "80072732-9028-4c87-aeb2-887561a99254",
+      "confidence": 0.85,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "Sören Schumann, Gesundheit ganzheitlich",
+        "extraction_method": "llm",
+        "source_entity_name": "Sören Schumann",
+        "target_entity_name": "Gesundheit ganzheitlich"
+      }
+    },
+    {
+      "id": "812134e6-9e93-40e8-9abc-6907e539fc2b",
+      "type": "PART_OF",
+      "source_entity_id": "0306071e-ffb4-4445-a3dc-047a3de21a60",
+      "target_entity_id": "68aa1445-ddf7-47cf-8cd2-ebc3ed9c5c9a",
+      "confidence": 0.9,
+      "source_text": "",
+      "source_doc_id": null,
+      "attributes": {
+        "context": "die Infos zu dem E-Book, worüber wir gesprochen haben, findet ihr auch dort",
+        "extraction_method": "llm",
+        "source_entity_name": "www.sören-schumann.com",
+        "target_entity_name": "E-Book"
+      }
+    }
+  ],
+  "statistics": {
+    "entity_count": 168,
+    "relation_count": 167,
+    "entity_types": {
+      "PERSON": 14,
+      "CONCEPT": 61,
+      "EVENT": 2,
+      "DATE": 4,
+      "PERCENT": 4,
+      "PRODUCT": 70,
+      "LOCATION": 3,
+      "TECHNOLOGY": 4,
+      "WORK_OF_ART": 2,
+      "FACILITY": 2,
+      "WEBSITE": 1,
+      "ORGANIZATION": 1
+    },
+    "relation_types": {
+      "RELATED_TO": 39,
+      "PARTICIPATED_IN": 1,
+      "HAPPENED_ON": 2,
+      "AFFECTS": 31,
+      "ASSOCIATED_WITH": 15,
+      "CAUSES": 22,
+      "TREATS": 20,
+      "PART_OF": 16,
+      "LOCATED_IN": 3,
+      "USES": 10,
+      "CREATED_BY": 4,
+      "CONTAINS": 2,
+      "OWNS": 2
+    }
+  }
+}

@@ -81,7 +81,18 @@ class DocumentConverter(BaseConverter):
             # Detect language if not specified
             if not document.metadata.language and document.raw_text:
                 try:
-                    document.metadata.language = detect(document.raw_text[:1000])
+                    # Try using the new language detection service first
+                    try:
+                        from morag_core.services.language_detection import get_language_service
+                        language_service = get_language_service()
+                        document.metadata.language = language_service.detect_language(document.raw_text[:1000])
+                        logger.debug("Language detected using language service",
+                                   language=document.metadata.language)
+                    except ImportError:
+                        # Fallback to langdetect
+                        document.metadata.language = detect(document.raw_text[:1000])
+                        logger.debug("Language detected using langdetect fallback",
+                                   language=document.metadata.language)
                 except Exception as e:
                     logger.warning(
                         "Failed to detect language",

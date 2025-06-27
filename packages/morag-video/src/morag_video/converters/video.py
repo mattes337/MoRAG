@@ -159,21 +159,21 @@ class VideoConverter:
         # Add transcript section if available
         if options.include_transcript and result.audio_processing_result and result.audio_processing_result.transcript:
             markdown_parts.append("## Transcript\n")
-            
+
             # Handle different transcript formats based on options
-            if options.group_by_speaker and result.audio_processing_result.speaker_segments:
-                # Group by speaker
-                markdown_parts.append(self._format_speaker_segments(result.audio_processing_result.speaker_segments))
-            elif options.group_by_topic and result.audio_processing_result.topic_segments:
-                # Group by topic
-                markdown_parts.append(self._format_topic_segments(result.audio_processing_result.topic_segments))
+            if options.group_by_speaker and result.audio_processing_result.segments:
+                # Group by speaker using segments
+                markdown_parts.append(self._format_segments_by_speaker(result.audio_processing_result.segments))
+            elif options.group_by_topic and result.audio_processing_result.segments:
+                # Group by topic using segments
+                markdown_parts.append(self._format_segments_by_topic(result.audio_processing_result.segments))
             elif result.audio_processing_result.segments:
                 # Use regular segments
                 markdown_parts.append(self._format_segments(result.audio_processing_result.segments))
             else:
                 # Use full transcript
                 markdown_parts.append(result.audio_processing_result.transcript)
-                
+
             markdown_parts.append("\n")
         
         # Add thumbnails section if available
@@ -320,11 +320,56 @@ class VideoConverter:
     def _format_segments(self, segments: List[Any]) -> str:
         """Format transcript segments."""
         result = []
-        
+
         for segment in segments:
             timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
             result.append(f"{timestamp} {segment.text}\n")
-        
+
+        return "\n".join(result)
+
+    def _format_segments_by_speaker(self, segments: List[Any]) -> str:
+        """Format transcript segments grouped by speaker."""
+        # Group segments by speaker
+        speaker_groups = {}
+        for segment in segments:
+            speaker = getattr(segment, 'speaker', 'Unknown Speaker')
+            if speaker not in speaker_groups:
+                speaker_groups[speaker] = []
+            speaker_groups[speaker].append(segment)
+
+        result = []
+        for speaker, speaker_segments in speaker_groups.items():
+            result.append(f"### {speaker}\n")
+
+            for segment in speaker_segments:
+                timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
+                result.append(f"{timestamp} {segment.text}\n")
+
+            result.append("\n")
+
+        return "\n".join(result)
+
+    def _format_segments_by_topic(self, segments: List[Any]) -> str:
+        """Format transcript segments grouped by topic."""
+        # Group segments by topic
+        topic_groups = {}
+        for segment in segments:
+            topic_id = getattr(segment, 'topic_id', None)
+            topic_key = f"Topic {topic_id + 1}" if topic_id is not None else "Ungrouped Content"
+            if topic_key not in topic_groups:
+                topic_groups[topic_key] = []
+            topic_groups[topic_key].append(segment)
+
+        result = []
+        for topic, topic_segments in topic_groups.items():
+            result.append(f"### {topic}\n")
+
+            for segment in topic_segments:
+                timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
+                result.append(f"{timestamp} {segment.text}\n")
+
+            result.append("\n")
+
         return "\n".join(result)
 
     def _format_speaker_segments(self, speaker_segments: Dict[str, List[Any]]) -> str:

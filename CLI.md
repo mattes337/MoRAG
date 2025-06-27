@@ -29,20 +29,43 @@ MoRAG supports two distinct operation modes:
 
 ## 📁 Available CLI Scripts
 
-All CLI scripts are located in `tests/cli/` and support both operation modes.
+All CLI scripts are located in `cli/` and support both operation modes with enhanced graph extraction capabilities.
+
+### Database Setup Scripts
+
+#### `create-databases.py`
+**Purpose**: Create Neo4j databases and Qdrant collections before ingestion
+```bash
+# Create both database and collection
+python cli/create-databases.py --neo4j-database smartcard --qdrant-collection smartcard_docs
+
+# Create only Neo4j database
+python cli/create-databases.py --neo4j-database my_database
+
+# Create only Qdrant collection
+python cli/create-databases.py --qdrant-collection my_collection
+
+# List existing databases and collections
+python cli/create-databases.py --list-existing
+```
+
+**Use Cases**:
+- Neo4j Community Edition (doesn't support automatic database creation)
+- Pre-creating databases/collections for better organization
+- Troubleshooting database connection issues
 
 ### System Validation Scripts
 
 #### `test-simple.py`
 **Purpose**: Quick system validation and health check
 ```bash
-python tests/cli/test-simple.py
+python cli/test-simple.py
 ```
 
 #### `test-all.py`
 **Purpose**: Comprehensive system testing with detailed reporting
 ```bash
-python tests/cli/test-all.py
+python cli/test-all.py
 ```
 
 ### Component Testing Scripts
@@ -52,21 +75,27 @@ python tests/cli/test-all.py
 
 **Processing Mode** (immediate results):
 ```bash
-python tests/cli/test-audio.py my-audio.mp3
-python tests/cli/test-audio.py recording.wav
-python tests/cli/test-audio.py video.mp4  # Extract audio from video
+python cli/test-audio.py my-audio.mp3
+python cli/test-audio.py recording.wav
+python cli/test-audio.py video.mp4  # Extract audio from video
 ```
 
 **Ingestion Mode** (background processing + storage):
 ```bash
-python tests/cli/test-audio.py my-audio.mp3 --ingest
-python tests/cli/test-audio.py recording.wav --ingest --webhook-url https://my-app.com/webhook
+python cli/test-audio.py my-audio.mp3 --ingest --qdrant
+python cli/test-audio.py recording.wav --ingest --qdrant --webhook-url https://my-app.com/webhook
+```
+
+**Graph Extraction Mode** (entities/relations + dual database storage):
+```bash
+python cli/test-audio.py my-audio.mp3 --ingest --qdrant --neo4j
+python cli/test-audio.py recording.wav --ingest --neo4j --webhook-url https://my-app.com/webhook
 ```
 
 **Remote Processing Mode** (offload to remote workers):
 ```bash
-python tests/cli/test-audio.py my-audio.mp3 --ingest --remote
-python tests/cli/test-audio.py recording.wav --ingest --remote --webhook-url https://my-app.com/webhook
+python cli/test-audio.py my-audio.mp3 --ingest --remote --qdrant
+python cli/test-audio.py recording.wav --ingest --remote --qdrant --webhook-url https://my-app.com/webhook
 ```
 
 **Features**:
@@ -81,16 +110,22 @@ python tests/cli/test-audio.py recording.wav --ingest --remote --webhook-url htt
 
 **Processing Mode** (immediate results):
 ```bash
-python tests/cli/test-document.py my-document.pdf
-python tests/cli/test-document.py presentation.pptx
-python tests/cli/test-document.py spreadsheet.xlsx
-python tests/cli/test-document.py document.docx
+python cli/test-document.py my-document.pdf
+python cli/test-document.py presentation.pptx
+python cli/test-document.py spreadsheet.xlsx
+python cli/test-document.py document.docx
 ```
 
 **Ingestion Mode** (background processing + storage):
 ```bash
-python tests/cli/test-document.py my-document.pdf --ingest
-python tests/cli/test-document.py document.docx --ingest --metadata '{"category": "research", "priority": 1}'
+python cli/test-document.py my-document.pdf --ingest --qdrant
+python cli/test-document.py document.docx --ingest --qdrant --metadata '{"category": "research", "priority": 1}'
+```
+
+**Graph Extraction Mode** (entities/relations + dual database storage):
+```bash
+python cli/test-document.py my-document.pdf --ingest --qdrant --neo4j
+python cli/test-document.py document.docx --ingest --neo4j --metadata '{"category": "research", "priority": 1}'
 ```
 
 **Features**:
@@ -104,21 +139,27 @@ python tests/cli/test-document.py document.docx --ingest --metadata '{"category"
 
 **Processing Mode** (immediate results):
 ```bash
-python tests/cli/test-video.py my-video.mp4
-python tests/cli/test-video.py recording.avi
-python tests/cli/test-video.py presentation.mov
+python cli/test-video.py my-video.mp4
+python cli/test-video.py recording.avi
+python cli/test-video.py presentation.mov
 ```
 
 **Ingestion Mode** (background processing + storage):
 ```bash
-python tests/cli/test-video.py my-video.mp4 --ingest
-python tests/cli/test-video.py recording.avi --ingest --thumbnails
+python cli/test-video.py my-video.mp4 --ingest --qdrant
+python cli/test-video.py recording.avi --ingest --qdrant --thumbnails
+```
+
+**Graph Extraction Mode** (entities/relations + dual database storage):
+```bash
+python cli/test-video.py my-video.mp4 --ingest --qdrant --neo4j
+python cli/test-video.py recording.avi --ingest --neo4j --thumbnails
 ```
 
 **Remote Processing Mode** (offload to remote workers):
 ```bash
-python tests/cli/test-video.py my-video.mp4 --ingest --remote
-python tests/cli/test-video.py recording.avi --ingest --remote --thumbnails
+python cli/test-video.py my-video.mp4 --ingest --remote --qdrant
+python cli/test-video.py recording.avi --ingest --remote --qdrant --thumbnails
 ```
 
 **Features**:
@@ -133,15 +174,21 @@ python tests/cli/test-video.py recording.avi --ingest --remote --thumbnails
 
 **Processing Mode** (immediate results):
 ```bash
-python tests/cli/test-image.py image.jpg
-python tests/cli/test-image.py screenshot.png
-python tests/cli/test-image.py diagram.gif
+python cli/test-image.py image.jpg
+python cli/test-image.py screenshot.png
+python cli/test-image.py diagram.gif
 ```
 
 **Ingestion Mode** (background processing + storage):
 ```bash
-python tests/cli/test-image.py image.jpg --ingest
-python tests/cli/test-image.py screenshot.png --ingest --metadata '{"source": "screenshot", "date": "2025-01-01"}'
+python cli/test-image.py image.jpg --ingest --qdrant
+python cli/test-image.py screenshot.png --ingest --qdrant --metadata '{"source": "screenshot", "date": "2025-01-01"}'
+```
+
+**Graph Extraction Mode** (entities/relations + dual database storage):
+```bash
+python cli/test-image.py image.jpg --ingest --qdrant --neo4j
+python cli/test-image.py screenshot.png --ingest --neo4j --metadata '{"source": "screenshot", "date": "2025-01-01"}'
 ```
 
 **Features**:
@@ -154,15 +201,21 @@ python tests/cli/test-image.py screenshot.png --ingest --metadata '{"source": "s
 
 **Processing Mode** (immediate results):
 ```bash
-python tests/cli/test-web.py https://example.com
-python tests/cli/test-web.py https://en.wikipedia.org/wiki/Python
-python tests/cli/test-web.py https://github.com/your-repo
+python cli/test-web.py https://example.com
+python cli/test-web.py https://en.wikipedia.org/wiki/Python
+python cli/test-web.py https://github.com/your-repo
 ```
 
 **Ingestion Mode** (background processing + storage):
 ```bash
-python tests/cli/test-web.py https://example.com --ingest
-python tests/cli/test-web.py https://news-site.com/article --ingest --metadata '{"category": "news"}'
+python cli/test-web.py https://example.com --ingest --qdrant
+python cli/test-web.py https://news-site.com/article --ingest --qdrant --metadata '{"category": "news"}'
+```
+
+**Graph Extraction Mode** (entities/relations + dual database storage):
+```bash
+python cli/test-web.py https://example.com --ingest --qdrant --neo4j
+python cli/test-web.py https://news-site.com/article --ingest --neo4j --metadata '{"category": "news"}'
 ```
 
 **Features**:
@@ -176,14 +229,20 @@ python tests/cli/test-web.py https://news-site.com/article --ingest --metadata '
 
 **Processing Mode** (immediate results):
 ```bash
-python tests/cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID
-python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID
+python cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID
+python cli/test-youtube.py https://youtu.be/VIDEO_ID
 ```
 
 **Ingestion Mode** (background processing + storage):
 ```bash
-python tests/cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest
-python tests/cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --webhook-url https://my-app.com/webhook
+python cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest --qdrant
+python cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --qdrant --webhook-url https://my-app.com/webhook
+```
+
+**Graph Extraction Mode** (entities/relations + dual database storage):
+```bash
+python cli/test-youtube.py https://www.youtube.com/watch?v=VIDEO_ID --ingest --qdrant --neo4j
+python cli/test-youtube.py https://youtu.be/VIDEO_ID --ingest --neo4j --webhook-url https://my-app.com/webhook
 ```
 
 **Features**:
@@ -217,6 +276,10 @@ python cli/test-remote-conversion.py --test api
 | Option | Description | Example |
 |--------|-------------|---------|
 | `--ingest` | Enable ingestion mode (background processing + storage) | `--ingest` |
+| `--qdrant` | Store vectors in Qdrant database (requires `--ingest`) | `--qdrant` |
+| `--qdrant-collection NAME` | Qdrant collection name (auto-created if not exists) | `--qdrant-collection my_docs` |
+| `--neo4j` | Store graph entities/relations in Neo4j (requires `--ingest`) | `--neo4j` |
+| `--neo4j-database NAME` | Neo4j database name (auto-created if not exists) | `--neo4j-database my_graph` |
 | `--remote` | Enable remote processing (requires `--ingest`) | `--remote` |
 | `--webhook-url URL` | Webhook URL for completion notifications | `--webhook-url https://my-app.com/webhook` |
 | `--metadata JSON` | Additional metadata as JSON string | `--metadata '{"category": "research"}'` |

@@ -186,7 +186,7 @@ class EmbeddingConfig(ProcessingConfig):
     provider: str = "gemini"  # gemini, openai, huggingface
     
     # Processing options
-    batch_size: int = 100
+    batch_size: int = 50
     max_tokens: int = 8192
     normalize: bool = True
     

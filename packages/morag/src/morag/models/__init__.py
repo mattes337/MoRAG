@@ -10,6 +10,29 @@ from .remote_job_api import (
     JobStatusResponse,
 )
 
+from .enhanced_query import (
+    QueryType,
+    ExpansionStrategy,
+    FusionStrategy,
+    EnhancedQueryRequest,
+    EntityInfo,
+    RelationInfo,
+    GraphContext,
+    EnhancedResult,
+    EnhancedQueryResponse,
+    EntityQueryRequest,
+    GraphTraversalRequest,
+    GraphPath,
+    GraphTraversalResponse,
+)
+
+# Legacy models temporarily removed - will be recreated
+# from .legacy import (
+#     LegacyQueryRequest,
+#     LegacyQueryResponse,
+#     LegacyResult,
+# )
+
 __all__ = [
     "CreateRemoteJobRequest",
     "CreateRemoteJobResponse",
@@ -18,4 +41,21 @@ __all__ = [
     "SubmitResultRequest",
     "SubmitResultResponse",
     "JobStatusResponse",
+    "QueryType",
+    "ExpansionStrategy",
+    "FusionStrategy",
+    "EnhancedQueryRequest",
+    "EntityInfo",
+    "RelationInfo",
+    "GraphContext",
+    "EnhancedResult",
+    "EnhancedQueryResponse",
+    "EntityQueryRequest",
+    "GraphTraversalRequest",
+    "GraphPath",
+    "GraphTraversalResponse",
+    # Legacy models temporarily removed
+    # "LegacyQueryRequest",
+    # "LegacyQueryResponse",
+    # "LegacyResult",
 ]
