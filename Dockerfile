@@ -34,6 +34,9 @@ COPY requirements.txt ./
 # Install PyTorch CPU-only version first for compatibility
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
+# Install protobuf and grpcio packages first to avoid conflicts
+RUN pip install "protobuf>=6.30.0,<7.0.0" "grpcio>=1.73.0,<2.0.0" "grpcio-status>=1.73.0,<2.0.0" "grpcio-tools>=1.73.0,<2.0.0"
+
 # Install base requirements first - this is the heavy lifting that we want to cache
 RUN pip install -r requirements.txt
 

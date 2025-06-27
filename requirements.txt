@@ -10,9 +10,16 @@ celery==5.3.6
 redis==5.2.1
 qdrant-client==1.12.1
 google-genai==1.18.0
+# Explicitly install grpcio-tools to ensure compatibility
+grpcio-tools>=1.73.0,<2.0.0
 yt-dlp==2024.12.13
 beautifulsoup4==4.12.3
 markdownify==0.14.1
+
+# Fix protobuf version conflict between grpcio-tools and google-generativeai
+protobuf>=6.30.0,<7.0.0
+grpcio>=1.73.0,<2.0.0
+grpcio-status>=1.73.0,<2.0.0
 
 
 markdown==3.7
