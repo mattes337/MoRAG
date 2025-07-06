@@ -37,7 +37,7 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
         # Build language instruction
         language_instruction = ""
         if self.language:
-            language_instruction = f"\n\nLANGUAGE INSTRUCTION: Please extract relations and provide all descriptions, context, and relation types in {self.language}. If the source text is in a different language, translate the relevant parts as needed to provide output in {self.language}.\n"
+            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL relation descriptions, context, and relation types in {self.language} language. This is mandatory. If the source text is in a different language, you MUST translate all descriptions and context to {self.language}. Do NOT provide descriptions in any other language.\n"
 
         if self.dynamic_types and not self.relation_types:
             # Pure dynamic mode - let LLM determine appropriate relation types

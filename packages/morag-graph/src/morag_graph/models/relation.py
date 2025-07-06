@@ -32,6 +32,8 @@ class Relation(BaseModel):
     source_entity_id: EntityId
     target_entity_id: EntityId
     type: str = "CUSTOM"
+    description: str = Field(default="", description="Description of the relation")
+    context: str = Field(default="", description="Context where the relation was found")
     attributes: RelationAttributes = Field(default_factory=dict)
     source_doc_id: Optional[str] = None
     confidence: float = 1.0

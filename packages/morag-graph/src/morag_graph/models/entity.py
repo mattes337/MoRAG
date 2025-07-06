@@ -30,6 +30,7 @@ class Entity(BaseModel):
     id: EntityId = Field(default="")
     name: str
     type: str = "CUSTOM"
+    description: str = Field(default="", description="Description of the entity")
     attributes: EntityAttributes = Field(default_factory=dict)
     source_doc_id: Optional[str] = None
     confidence: float = 1.0

@@ -147,43 +147,64 @@ class IngestionCoordinator:
             content, metadata, chunk_size, chunk_overlap, document_id
         )
         
-        # Step 4: Extract entities and relations for graph databases
+        # Step 4: Determine language for extraction if not provided
+        effective_language = language
+        if not effective_language:
+            # Try to extract language from processing result metadata
+            if hasattr(processing_result, 'document') and processing_result.document:
+                effective_language = getattr(processing_result.document.metadata, 'language', None)
+            # Try to extract from general metadata
+            if not effective_language:
+                effective_language = metadata.get('language')
+            # Try to extract from processing result metadata
+            if not effective_language and hasattr(processing_result, 'metadata'):
+                effective_language = processing_result.metadata.get('language')
+
+        logger.info("Language determined for extraction",
+                   provided_language=language,
+                   effective_language=effective_language,
+                   source_path=source_path)
+
+        # Step 5: Extract entities and relations for graph databases
         # Use the same chunk settings as embeddings to ensure consistency
         effective_chunk_size = embeddings_data['chunk_size']
         effective_chunk_overlap = embeddings_data['chunk_overlap']
         graph_data = await self._extract_graph_data(
-            content, source_path, document_id, metadata, effective_chunk_size, effective_chunk_overlap, language
+            content, source_path, document_id, metadata, effective_chunk_size, effective_chunk_overlap, effective_language
         )
-        
-        # Step 5: Create complete ingest_result.json data
+
+        # Step 6: Generate document summary using LLM
+        document_summary = await self._generate_document_summary(content, metadata, effective_language)
+
+        # Step 7: Create complete ingest_result.json data
         ingest_result = self._create_ingest_result(
             source_path, content_type, metadata, processing_result,
-            embeddings_data, graph_data, database_configs, start_time
+            embeddings_data, graph_data, database_configs, start_time, document_summary
         )
         
-        # Step 6: Write ingest_result.json file
+        # Step 8: Write ingest_result.json file
         result_file_path = self._write_ingest_result_file(source_path, ingest_result)
-        
-        # Step 7: Initialize databases (create collections/databases if needed)
+
+        # Step 9: Initialize databases (create collections/databases if needed)
         await self._initialize_databases(database_configs, embeddings_data)
-        
-        # Step 8: Create and write ingest_data.json file for database writes
+
+        # Step 10: Create and write ingest_data.json file for database writes
         ingest_data = self._create_ingest_data(
             embeddings_data, graph_data, database_configs, document_id
         )
         data_file_path = self._write_ingest_data_file(source_path, ingest_data)
 
-        # Step 9: Write data to databases using the ingest_data
+        # Step 11: Write data to databases using the ingest_data
         database_results = await self._write_to_databases(
             database_configs, embeddings_data, graph_data, document_id, replace_existing
         )
 
-        # Step 10: Update final result with database write results
+        # Step 12: Update final result with database write results
         ingest_result['database_results'] = database_results
         ingest_result['processing_time'] = (datetime.now(timezone.utc) - start_time).total_seconds()
         ingest_result['ingest_data_file'] = data_file_path
 
-        # Step 11: Update the ingest_result.json file with final results
+        # Step 13: Update the ingest_result.json file with final results
         self._write_ingest_result_file(source_path, ingest_result)
         
         logger.info("Ingestion completed successfully",
@@ -356,16 +377,25 @@ class IngestionCoordinator:
             # Process entities from the full document
             if extraction_result.get('entities'):
                 for entity_data in extraction_result['entities']:
-                    # Prepare attributes with description if available
-                    entity_attributes = entity_data.get('attributes', {})
-                    if entity_data.get('description'):
-                        entity_attributes['description'] = entity_data['description']
+                    # Clean up attributes - remove duplicate description/context fields
+                    entity_attributes = entity_data.get('attributes', {}).copy()
+
+                    # Remove duplicate fields - keep only essential attributes
+                    entity_attributes.pop('description', None)  # Remove duplicate description
+                    entity_attributes.pop('context', None)      # Remove duplicate context
+
+                    # Keep only meaningful attributes (positions, metadata, etc.)
+                    cleaned_attributes = {}
+                    for key, value in entity_attributes.items():
+                        if key not in ['description', 'context'] and value is not None:
+                            cleaned_attributes[key] = value
 
                     entity = Entity(
                         # Let Entity model generate unified ID automatically
                         name=entity_data['name'],
                         type=entity_data.get('type', 'UNKNOWN'),
-                        attributes=entity_attributes,
+                        description=entity_data.get('description', ''),
+                        attributes=cleaned_attributes,
                         source_doc_id=document_id,
                         confidence=entity_data.get('confidence', 0.8)
                     )
@@ -374,17 +404,35 @@ class IngestionCoordinator:
             # Process relations from the full document
             if extraction_result.get('relations'):
                 for relation_data in extraction_result['relations']:
-                    # Prepare attributes with description if available
-                    relation_attributes = relation_data.get('attributes', {})
-                    if relation_data.get('description'):
-                        relation_attributes['description'] = relation_data['description']
+                    # Clean up attributes - remove duplicate description/context fields
+                    relation_attributes = relation_data.get('attributes', {}).copy()
+
+                    # Remove duplicate fields from attributes
+                    relation_attributes.pop('description', None)  # Remove duplicate description
+                    relation_attributes.pop('context', None)      # Remove duplicate context
+
+                    # Keep only meaningful attributes (metadata, etc.)
+                    cleaned_attributes = {}
+                    for key, value in relation_attributes.items():
+                        if key not in ['description', 'context'] and value is not None:
+                            cleaned_attributes[key] = value
+
+                    # Extract description and context as separate fields
+                    description = relation_data.get('description', '')
+                    context = relation_attributes.get('context', description)  # Use description as fallback for context
+
+                    # If they're the same, make context more specific
+                    if context == description and description:
+                        context = f"Found in document: {description}"
 
                     relation = Relation(
                         # Let Relation model generate unified ID automatically
                         source_entity_id=relation_data['source_entity_id'],
                         target_entity_id=relation_data['target_entity_id'],
                         type=relation_data['relation_type'],
-                        attributes=relation_attributes,
+                        description=description,
+                        context=context,
+                        attributes=cleaned_attributes,
                         source_doc_id=document_id,
                         confidence=relation_data.get('confidence', 0.8)
                     )
@@ -561,7 +609,8 @@ class IngestionCoordinator:
         embeddings_data: Dict[str, Any],
         graph_data: Dict[str, Any],
         database_configs: List[DatabaseConfig],
-        start_time: datetime
+        start_time: datetime,
+        document_summary: str
     ) -> Dict[str, Any]:
         """Create the complete ingest_result.json data structure."""
         # Extract content length from different ProcessingResult types
@@ -622,7 +671,7 @@ class IngestionCoordinator:
                         'id': entity.id,
                         'name': entity.name,
                         'type': entity.type.value if hasattr(entity.type, 'value') else str(entity.type),
-                        'description': entity.attributes.get('description', ''),
+                        'description': getattr(entity, 'description', ''),
                         'attributes': entity.attributes,
                         'confidence': entity.confidence,
                         'embedding': getattr(entity, 'embedding', None)
@@ -635,7 +684,8 @@ class IngestionCoordinator:
                         'source_entity_id': relation.source_entity_id,
                         'target_entity_id': relation.target_entity_id,
                         'relation_type': relation.type.value if hasattr(relation.type, 'value') else str(relation.type),
-                        'description': relation.attributes.get('description', ''),
+                        'description': getattr(relation, 'description', ''),
+                        'context': getattr(relation, 'context', ''),
                         'attributes': relation.attributes,
                         'confidence': relation.confidence
                     }
@@ -644,6 +694,7 @@ class IngestionCoordinator:
                 'extraction_metadata': graph_data['extraction_metadata']
             },
             'metadata': metadata,
+            'summary': document_summary,
             'status': 'processing',
             'database_results': {}  # Will be filled after database writes
         }
@@ -1096,3 +1147,73 @@ class IngestionCoordinator:
         except Exception as e:
             await neo4j_storage.disconnect()
             raise
+
+    async def _generate_document_summary(
+        self,
+        content: str,
+        metadata: Dict[str, Any],
+        language: Optional[str] = None
+    ) -> str:
+        """Generate a summary of the document using LLM.
+
+        Args:
+            content: Full document content
+            metadata: Document metadata
+            language: Language code for the document
+
+        Returns:
+            Document summary
+        """
+        try:
+            if not self.embedding_service:
+                logger.warning("No embedding service available for summarization")
+                return "Summary not available - no embedding service configured."
+
+            # Extract title from metadata if available
+            title = metadata.get('title') or metadata.get('filename', 'Untitled Document')
+
+            # Determine content type for context
+            content_type = metadata.get('content_type', 'document')
+
+            # Generate summary with appropriate length
+            max_length = 500  # Reasonable summary length
+
+            # Create context for better summarization
+            context_parts = [f"Document Title: {title}"]
+            if content_type:
+                context_parts.append(f"Content Type: {content_type}")
+            if language:
+                context_parts.append(f"Language: {language}")
+
+            context = "\n".join(context_parts)
+
+            # Use the embedding service's summarization capability
+            summary_result = await self.embedding_service.summarize(
+                content,
+                max_length=max_length
+            )
+
+            # Extract summary text
+            if hasattr(summary_result, 'summary'):
+                summary = summary_result.summary
+            else:
+                summary = str(summary_result)
+
+            # Ensure summary is not empty
+            if not summary or summary.strip() == "":
+                summary = f"Document about {title} - content processed successfully."
+
+            logger.info("Document summary generated",
+                       content_length=len(content),
+                       summary_length=len(summary),
+                       language=language)
+
+            return summary
+
+        except Exception as e:
+            logger.error("Failed to generate document summary",
+                        error=str(e),
+                        error_type=type(e).__name__)
+            # Return a fallback summary instead of failing
+            title = metadata.get('title') or metadata.get('filename', 'Document')
+            return f"Summary generation failed for {title}. Content processed successfully."
