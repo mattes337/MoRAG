@@ -300,11 +300,13 @@ class ProcessURLRequest(BaseModel):
     url: str
     content_type: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
+    language: Optional[str] = None  # Language code for processing (auto-detect if not provided)
 
 
 class ProcessBatchRequest(BaseModel):
     items: List[Dict[str, Any]]
     options: Optional[Dict[str, Any]] = None
+    language: Optional[str] = None  # Language code for processing (auto-detect if not provided)
 
 
 class SearchRequest(BaseModel):
@@ -335,6 +337,7 @@ class IngestFileRequest(BaseModel):
     chunking_strategy: Optional[str] = None  # paragraph, sentence, word, character, etc.
     remote: Optional[bool] = False  # Use remote processing for audio/video
     databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    language: Optional[str] = None  # Language code for processing (auto-detect if not provided)
 
 
 class IngestURLRequest(BaseModel):
@@ -344,6 +347,7 @@ class IngestURLRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
     databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    language: Optional[str] = None  # Language code for processing (auto-detect if not provided)
 
 
 class IngestBatchRequest(BaseModel):
@@ -351,6 +355,7 @@ class IngestBatchRequest(BaseModel):
     webhook_url: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
     databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    language: Optional[str] = None  # Language code for processing (auto-detect if not provided)
 
 
 class IngestRemoteFileRequest(BaseModel):
@@ -366,12 +371,14 @@ class IngestRemoteFileRequest(BaseModel):
     chunking_strategy: Optional[str] = None
     remote: Optional[bool] = False  # Use remote processing for audio/video
     databases: Optional[List[DatabaseConfig]] = None  # List of databases to process with
+    language: Optional[str] = None  # Language code for processing (auto-detect if not provided)
 
 
 class ProcessRemoteFileRequest(BaseModel):
     file_path: str  # UNC path or HTTP/HTTPS URL
     content_type: Optional[str] = None  # Auto-detect if not provided
     options: Optional[Dict[str, Any]] = None
+    language: Optional[str] = None  # Language code for processing (auto-detect if not provided)
 
 
 class IngestResponse(BaseModel):

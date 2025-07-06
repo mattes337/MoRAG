@@ -27,13 +27,13 @@ SAMPLE_TEXTS = [
 ]
 
 # Expected entity types in the sample texts (flexible for dynamic types)
-# Since we're using dynamic types, we need to be more flexible with type matching
+# Since we're using dynamic types and type simplification, we expect broader categories
 EXPECTED_ENTITY_PATTERNS = [
     # Apple text - should contain company/organization and person/location entities
     {
-        "company_patterns": ["ORGANIZATION", "COMPANY", "TECHNOLOGY_COMPANY", "CORPORATION"],
+        "company_patterns": ["ORGANIZATION", "COMPANY", "TECHNOLOGY"],  # Simplified from TECHNOLOGY_COMPANY
         "person_patterns": ["PERSON", "CEO", "FOUNDER"],
-        "location_patterns": ["LOCATION", "CITY", "HEADQUARTERS"]
+        "location_patterns": ["LOCATION", "CITY"]  # Simplified from HEADQUARTERS
     },
     # Eiffel Tower text - should contain location and person entities
     {
@@ -43,7 +43,7 @@ EXPECTED_ENTITY_PATTERNS = [
     # Python text - should contain person and technology entities
     {
         "person_patterns": ["PERSON", "CREATOR", "DEVELOPER"],
-        "tech_patterns": ["TECHNOLOGY", "PROGRAMMING_LANGUAGE", "SOFTWARE", "LANGUAGE"]
+        "tech_patterns": ["TECHNOLOGY", "SOFTWARE", "LANGUAGE"]  # Simplified from PROGRAMMING_LANGUAGE
     }
 ]
 
@@ -87,7 +87,7 @@ def gemini_api_key() -> str:
 def entity_extractor(gemini_api_key: str) -> EntityExtractor:
     """Create an EntityExtractor instance for testing."""
     return EntityExtractor(
-        llm_config={
+        config={
             "provider": "gemini",
             "api_key": gemini_api_key,
             "model": "gemini-1.5-flash",  # Use Gemini Flash for testing
@@ -173,14 +173,39 @@ async def test_entity_extraction_multiple_texts(entity_extractor: EntityExtracto
 
 
 @pytest.mark.asyncio
+async def test_entity_extraction_with_language(gemini_api_key: str):
+    """Test entity extraction with language parameter."""
+    # Create extractor with German language
+    extractor_de = EntityExtractor(
+        config={
+            "provider": "gemini",
+            "api_key": gemini_api_key,
+            "model": "gemini-1.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 1000
+        },
+        language="de"
+    )
+
+    # Extract entities from English text but request German output
+    entities = await extractor_de.extract(SAMPLE_TEXTS[0])
+
+    # Verify that entities were extracted
+    assert len(entities) > 0, "No entities were extracted"
+
+    # Note: We can't easily test if the output is actually in German without
+    # complex language detection, but we can verify the extractor accepts the parameter
+
+
+@pytest.mark.asyncio
 async def test_entity_extraction_custom_type(entity_extractor: EntityExtractor):
     """Test entity extraction with custom entity types."""
     # Add custom entity type instructions
     custom_instructions = "Also identify programming languages as TECHNOLOGY entities."
-    
+
     # Extract entities from the Python text with custom instructions
     entities = await entity_extractor.extract(
-        SAMPLE_TEXTS[2], 
+        SAMPLE_TEXTS[2],
         custom_instructions=custom_instructions
     )
     

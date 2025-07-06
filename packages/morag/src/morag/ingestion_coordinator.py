@@ -107,7 +107,8 @@ class IngestionCoordinator:
         chunk_size: Optional[int] = None,
         chunk_overlap: Optional[int] = None,
         document_id: Optional[str] = None,
-        replace_existing: bool = False
+        replace_existing: bool = False,
+        language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Perform comprehensive content ingestion.
@@ -151,7 +152,7 @@ class IngestionCoordinator:
         effective_chunk_size = embeddings_data['chunk_size']
         effective_chunk_overlap = embeddings_data['chunk_overlap']
         graph_data = await self._extract_graph_data(
-            content, source_path, document_id, metadata, effective_chunk_size, effective_chunk_overlap
+            content, source_path, document_id, metadata, effective_chunk_size, effective_chunk_overlap, language
         )
         
         # Step 5: Create complete ingest_result.json data
@@ -336,7 +337,8 @@ class IngestionCoordinator:
         document_id: str,
         metadata: Dict[str, Any],
         chunk_size: int = 4000,
-        chunk_overlap: int = 200
+        chunk_overlap: int = 200,
+        language: Optional[str] = None
     ) -> Dict[str, Any]:
         """Extract entities and relations for graph databases using full document approach."""
         try:
@@ -345,7 +347,7 @@ class IngestionCoordinator:
             # Extract entities and relations from the entire document at once
             # This matches the approach used in run_extraction.py
             extraction_result = await self.graph_extractor.extract_entities_and_relations(
-                content, source_path
+                content, source_path, language
             )
 
             all_entities = []

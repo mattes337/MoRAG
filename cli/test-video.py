@@ -409,6 +409,7 @@ Note: Video processing may take several minutes for large files.
                        help='Number of thumbnails to generate (default: 3)')
     parser.add_argument('--enable-ocr', action='store_true',
                        help='Enable OCR on video frames')
+    parser.add_argument('--language', help='Language code for processing (auto-detect if not specified)')
     parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
     parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
 

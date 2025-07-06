@@ -12,7 +12,7 @@ logger = structlog.get_logger(__name__)
 class EntityExtractor:
     """PydanticAI-based entity extractor - completely new implementation."""
 
-    def __init__(self, config=None, min_confidence: float = 0.6, chunk_size: int = 4000, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(self, config=None, min_confidence: float = 0.6, chunk_size: int = 4000, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, language: Optional[str] = None, **kwargs):
         """Initialize the entity extractor.
 
         Args:
@@ -21,12 +21,14 @@ class EntityExtractor:
             chunk_size: Maximum characters per chunk for large texts
             dynamic_types: Whether to use dynamic entity types (LLM-determined)
             entity_types: Custom entity types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
+            language: Language code for processing (e.g., 'en', 'de', 'fr')
             **kwargs: Additional arguments passed to the agent
         """
         self.min_confidence = min_confidence
         self.chunk_size = chunk_size
         self.dynamic_types = dynamic_types
         self.entity_types = entity_types or {}
+        self.language = language
 
         # Handle config parameter for test compatibility
         if config is not None:
@@ -81,6 +83,7 @@ class EntityExtractor:
             min_confidence=min_confidence,
             dynamic_types=self.dynamic_types,
             entity_types=self.entity_types,
+            language=self.language,
             **agent_kwargs
         )
         self.logger = logger.bind(component="entity_extractor")

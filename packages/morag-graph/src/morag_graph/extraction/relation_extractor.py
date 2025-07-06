@@ -12,7 +12,7 @@ logger = structlog.get_logger(__name__)
 class RelationExtractor:
     """PydanticAI-based relation extractor - completely new implementation."""
 
-    def __init__(self, config=None, min_confidence: float = 0.6, chunk_size: int = 3000, dynamic_types: bool = True, relation_types: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(self, config=None, min_confidence: float = 0.6, chunk_size: int = 3000, dynamic_types: bool = True, relation_types: Optional[Dict[str, str]] = None, language: Optional[str] = None, **kwargs):
         """Initialize the relation extractor.
 
         Args:
@@ -21,12 +21,14 @@ class RelationExtractor:
             chunk_size: Maximum characters per chunk for large texts
             dynamic_types: Whether to use dynamic relation types (LLM-determined)
             relation_types: Custom relation types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
+            language: Language code for processing (e.g., 'en', 'de', 'fr')
             **kwargs: Additional arguments passed to the agent
         """
         self.min_confidence = min_confidence
         self.chunk_size = chunk_size
         self.dynamic_types = dynamic_types
         self.relation_types = relation_types or {}
+        self.language = language
 
         # Handle config parameter for test compatibility
         if config is not None:
@@ -81,6 +83,7 @@ class RelationExtractor:
             min_confidence=min_confidence,
             dynamic_types=self.dynamic_types,
             relation_types=self.relation_types,
+            language=self.language,
             **agent_kwargs
         )
         self.logger = logger.bind(component="relation_extractor")

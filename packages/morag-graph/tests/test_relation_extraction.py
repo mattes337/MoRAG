@@ -54,7 +54,7 @@ def entity_extractor(gemini_api_key: str) -> EntityExtractor:
 def relation_extractor(gemini_api_key: str) -> RelationExtractor:
     """Create a RelationExtractor instance for testing."""
     return RelationExtractor(
-        llm_config={
+        config={
             "provider": "gemini",
             "api_key": gemini_api_key,
             "model": "gemini-1.5-flash",  # Use Gemini Flash for testing
@@ -226,16 +226,44 @@ async def test_relation_extraction_specific_pairs(relation_extractor: RelationEx
 
 
 @pytest.mark.asyncio
+async def test_relation_extraction_with_language(gemini_api_key: str, sample_entities: List[List[Entity]]):
+    """Test relation extraction with language parameter."""
+    # Create extractor with German language
+    extractor_de = RelationExtractor(
+        config={
+            "provider": "gemini",
+            "api_key": gemini_api_key,
+            "model": "gemini-1.5-flash",
+            "temperature": 0.0,
+            "max_tokens": 1000
+        },
+        language="de"
+    )
+
+    # Extract relations from English text but request German output
+    text = SAMPLE_TEXTS[0]
+    entities = sample_entities[0]
+
+    relations = await extractor_de.extract(text, entities)
+
+    # Verify that relations were extracted
+    assert len(relations) > 0, "No relations were extracted"
+
+    # Note: We can't easily test if the output is actually in German without
+    # complex language detection, but we can verify the extractor accepts the parameter
+
+
+@pytest.mark.asyncio
 async def test_relation_extraction_with_document_id(relation_extractor: RelationExtractor, sample_entities: List[List[Entity]]):
     """Test relation extraction with document ID."""
     doc_id = "test-document-123"
-    
+
     # Extract relations with document ID
     text = SAMPLE_TEXTS[0]
     entities = sample_entities[0]
-    
+
     relations = await relation_extractor.extract(text, entities, doc_id=doc_id)
-    
+
     # Verify that relations were extracted
     assert len(relations) > 0, "No relations were extracted"
     

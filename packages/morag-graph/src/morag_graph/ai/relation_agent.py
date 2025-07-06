@@ -13,44 +13,53 @@ logger = structlog.get_logger(__name__)
 class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
     """PydanticAI agent for extracting relations between entities."""
 
-    def __init__(self, min_confidence: float = 0.6, dynamic_types: bool = True, relation_types: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(self, min_confidence: float = 0.6, dynamic_types: bool = True, relation_types: Optional[Dict[str, str]] = None, language: Optional[str] = None, **kwargs):
         """Initialize the relation extraction agent.
 
         Args:
             min_confidence: Minimum confidence threshold for relations
             dynamic_types: Whether to use dynamic relation types (LLM-determined)
             relation_types: Custom relation types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
+            language: Language code for processing (e.g., 'en', 'de', 'fr')
             **kwargs: Additional arguments passed to base agent
         """
         super().__init__(**kwargs)
         self.min_confidence = min_confidence
         self.dynamic_types = dynamic_types
         self.relation_types = relation_types or {}
+        self.language = language
         self.logger = logger.bind(agent="relation_extraction")
 
     def get_result_type(self) -> Type[RelationExtractionResult]:
         return RelationExtractionResult
 
     def get_system_prompt(self) -> str:
+        # Build language instruction
+        language_instruction = ""
+        if self.language:
+            language_instruction = f"\n\nLANGUAGE INSTRUCTION: Please extract relations and provide all descriptions, context, and relation types in {self.language}. If the source text is in a different language, translate the relevant parts as needed to provide output in {self.language}.\n"
+
         if self.dynamic_types and not self.relation_types:
             # Pure dynamic mode - let LLM determine appropriate relation types
-            return """You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.
+            return f"""You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.{language_instruction}
 
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
 1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
 2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
-3. relation_type: A descriptive relation type that captures the semantic meaning (e.g., EMPLOYS, MANUFACTURES, COLLABORATES_WITH, INFLUENCES, DEPENDS_ON, etc.)
+3. relation_type: A SIMPLE, descriptive relation type (e.g., EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
 CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
 
 Guidelines for relation types:
-- Use clear, descriptive names that capture the specific relationship
-- Prefer domain-specific types over generic ones when appropriate
-- Use UPPER_CASE with underscores (e.g., DEVELOPS_SOFTWARE, TREATS_DISEASE, REGULATES_INDUSTRY)
+- Use SIMPLE, clear names that capture the core relationship
+- Prefer GENERAL types over overly specific ones
+- Use SINGLE WORDS when possible (EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES)
+- If compound types are needed, keep them SHORT and GENERAL
+- Avoid complex types like "COLLABORATES_WITH_ON_PROJECT" - use "COLLABORATES"
 - Be consistent within the same document/domain
 - Consider the direction of the relationship (source -> target)
 
@@ -103,23 +112,25 @@ Avoid extracting:
 
         else:
             # No static types - always use dynamic mode
-            return """You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.
+            return f"""You are an expert relation extraction agent. Your task is to identify meaningful relationships between entities mentioned in text.{language_instruction}
 
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
 1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
 2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
-3. relation_type: A descriptive relation type that captures the semantic meaning (e.g., EMPLOYS, MANUFACTURES, COLLABORATES_WITH, INFLUENCES, DEPENDS_ON, etc.)
+3. relation_type: A SIMPLE, descriptive relation type (e.g., EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
 CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
 
 Guidelines for relation types:
-- Use clear, descriptive names that capture the specific relationship
-- Prefer domain-specific types over generic ones when appropriate
-- Use UPPER_CASE with underscores (e.g., DEVELOPS_SOFTWARE, TREATS_DISEASE, REGULATES_INDUSTRY)
+- Use SIMPLE, clear names that capture the core relationship
+- Prefer GENERAL types over overly specific ones
+- Use SINGLE WORDS when possible (EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES)
+- If compound types are needed, keep them SHORT and GENERAL
+- Avoid complex types like "COLLABORATES_WITH_ON_PROJECT" - use "COLLABORATES"
 - Be consistent within the same document/domain
 - Consider the direction of the relationship (source -> target)
 
@@ -273,7 +284,19 @@ Avoid extracting:
             start = end
         
         return chunks
-    
+
+    def _simplify_relation_type(self, relation_type: str) -> str:
+        """Simplify relation type by taking only the first part before underscore.
+
+        Examples:
+        - WORKS_FOR_COMPANY => WORKS
+        - LOCATED_IN_CITY => LOCATED
+        - COLLABORATES_WITH_PERSON => COLLABORATES
+        """
+        if '_' in relation_type:
+            return relation_type.split('_')[0]
+        return relation_type
+
     def _convert_to_graph_relation(
         self,
         relation: Relation,
@@ -312,6 +335,9 @@ Avoid extracting:
         else:
             # Handle enum types by extracting the value (fallback for compatibility)
             graph_type = relation.relation_type.value if hasattr(relation.relation_type, 'value') else str(relation.relation_type)
+
+        # Simplify the relation type to use only the first part
+        graph_type = self._simplify_relation_type(graph_type)
         
         # Create attributes from metadata and context
         attributes = relation.metadata.copy() if relation.metadata else {}

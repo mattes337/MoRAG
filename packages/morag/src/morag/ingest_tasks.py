@@ -82,7 +82,8 @@ async def continue_ingestion_after_remote_processing(
                 chunk_size=options.get('chunk_size'),
                 chunk_overlap=options.get('chunk_overlap'),
                 document_id=document_id,
-                replace_existing=options.get('replace_existing', False)
+                replace_existing=options.get('replace_existing', False),
+                language=options.get('language')
             )
 
             logger.info("Remote processing result stored via comprehensive ingestion",
@@ -487,7 +488,8 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     chunk_size=options.get('chunk_size'),
                     chunk_overlap=options.get('chunk_overlap'),
                     document_id=document_id,
-                    replace_existing=options.get('replace_existing', False)
+                    replace_existing=options.get('replace_existing', False),
+                    language=options.get('language')
                 )
 
                 # Add ingestion info to result
@@ -637,7 +639,8 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                     chunk_size=options.get('chunk_size'),
                     chunk_overlap=options.get('chunk_overlap'),
                     document_id=document_id,
-                    replace_existing=options.get('replace_existing', False)
+                    replace_existing=options.get('replace_existing', False),
+                    language=options.get('language')
                 )
 
                 # Add ingestion info to result
@@ -805,7 +808,8 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
                             processing_result=result,
                             databases=options.get('databases'),
                             chunk_size=options.get('chunk_size'),
-                            chunk_overlap=options.get('chunk_overlap')
+                            chunk_overlap=options.get('chunk_overlap'),
+                            language=options.get('language')
                         )
 
                         # Add ingestion info to result

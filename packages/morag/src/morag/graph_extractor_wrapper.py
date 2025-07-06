@@ -54,8 +54,8 @@ class GraphExtractor:
             "max_tokens": llm_config.max_tokens
         }
 
-        self.entity_extractor = EntityExtractor(llm_config=llm_config_dict, dynamic_types=True)
-        self.relation_extractor = RelationExtractor(llm_config=llm_config_dict, dynamic_types=True)
+        self.entity_extractor = EntityExtractor(config=llm_config_dict, dynamic_types=True)
+        self.relation_extractor = RelationExtractor(config=llm_config_dict, dynamic_types=True)
         self._initialized = True
         
         logger.info("Graph extractor initialized")
@@ -63,28 +63,47 @@ class GraphExtractor:
     async def extract_entities_and_relations(
         self,
         content: str,
-        source_path: str
+        source_path: str,
+        language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Extract entities and relations from text content.
-        
+
         Args:
             content: Text content to extract from
             source_path: Source file path or identifier
-            
+            language: Language code for processing (e.g., 'en', 'de', 'fr')
+
         Returns:
             Dictionary containing entities, relations, and metadata
         """
         if not self._initialized:
             await self.initialize()
-            
+
         try:
+            # Create extractors with language parameter if provided
+            entity_extractor = self.entity_extractor
+            relation_extractor = self.relation_extractor
+
+            if language:
+                # Create new extractors with language parameter
+                llm_config_dict = {
+                    "provider": self.llm_config.provider,
+                    "api_key": self.llm_config.api_key,
+                    "model": self.llm_config.model,
+                    "temperature": self.llm_config.temperature,
+                    "max_tokens": self.llm_config.max_tokens
+                }
+                entity_extractor = EntityExtractor(config=llm_config_dict, dynamic_types=True, language=language)
+                relation_extractor = RelationExtractor(config=llm_config_dict, dynamic_types=True, language=language)
+
             # Extract entities
-            logger.info("Extracting entities from content", 
+            logger.info("Extracting entities from content",
                        content_length=len(content),
-                       source_path=source_path)
-            
-            entities = await self.entity_extractor.extract(
+                       source_path=source_path,
+                       language=language)
+
+            entities = await entity_extractor.extract(
                 text=content,
                 source_doc_id=source_path
             )
@@ -94,7 +113,7 @@ class GraphExtractor:
             # Extract relations using extract method to get missing entities
             logger.info("Extracting relations from content")
 
-            relations = await self.relation_extractor.extract(
+            relations = await relation_extractor.extract(
                 text=content,
                 entities=entities,
                 doc_id=source_path

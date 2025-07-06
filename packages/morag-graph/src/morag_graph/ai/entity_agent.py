@@ -13,28 +13,35 @@ logger = structlog.get_logger(__name__)
 class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
     """PydanticAI agent for extracting entities from text."""
 
-    def __init__(self, min_confidence: float = 0.6, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(self, min_confidence: float = 0.6, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, language: Optional[str] = None, **kwargs):
         """Initialize the entity extraction agent.
 
         Args:
             min_confidence: Minimum confidence threshold for entities
             dynamic_types: Whether to use dynamic entity types (LLM-determined)
             entity_types: Custom entity types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
+            language: Language code for processing (e.g., 'en', 'de', 'fr')
             **kwargs: Additional arguments passed to base agent
         """
         super().__init__(**kwargs)
         self.min_confidence = min_confidence
         self.dynamic_types = dynamic_types
         self.entity_types = entity_types or {}
+        self.language = language
         self.logger = logger.bind(agent="entity_extraction")
 
     def get_result_type(self) -> Type[EntityExtractionResult]:
         return EntityExtractionResult
 
     def get_system_prompt(self) -> str:
+        # Build language instruction
+        language_instruction = ""
+        if self.language:
+            language_instruction = f"\n\nLANGUAGE INSTRUCTION: Please extract entities and provide all descriptions, context, and entity types in {self.language}. If the source text is in a different language, translate the relevant parts as needed to provide output in {self.language}.\n"
+
         if self.dynamic_types and not self.entity_types:
             # Pure dynamic mode - let LLM determine appropriate entity types
-            return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
+            return f"""You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.{language_instruction}
 
 CRITICAL INSTRUCTION: Create BROAD, REUSABLE entity types. Avoid overly specific types that would create duplicate entities. Think of entity types as categories that many similar entities could share.
 
@@ -47,15 +54,17 @@ For each entity, provide:
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities
 - Prefer GENERAL types over specific ones
-- Use UPPER_CASE with underscores for consistency
-- Think: "What GENERAL category does this entity belong to?"
+- Use SIMPLE, SINGLE-WORD types when possible (avoid complex compound types)
+- If you must use compound types, keep them SHORT and GENERAL
+- Think: "What is the SIMPLEST, most GENERAL category this entity belongs to?"
+- Avoid creating types like "BIOLOGICAL_SOMETHING" - just use "BIOLOGICAL"
 
 EXAMPLES OF GOOD BROAD TYPING:
 - "Einstein", "Newton", "Darwin" → ALL should be SCIENTIST
 - "Zirbeldrüse", "Herz", "Leber" → ALL should be BODY_PART
 - "Harvard", "MIT", "Stanford" → ALL should be UNIVERSITY
-- "Python", "Java", "C++" → ALL should be PROGRAMMING_LANGUAGE
-- "Photosynthesis", "Respiration", "Digestion" → ALL should be BIOLOGICAL_PROCESS
+- "Python", "Java", "C++" → ALL should be TECHNOLOGY
+- "Photosynthesis", "Respiration", "Digestion" → ALL should be PROCESS
 - "Berlin", "Paris", "London" → ALL should be CITY
 - "Deutschland", "Frankreich", "England" → ALL should be COUNTRY
 
@@ -63,18 +72,22 @@ EXAMPLES OF BAD (TOO SPECIFIC) TYPING:
 - "Einstein" → THEORETICAL_PHYSICIST (too specific, use SCIENTIST)
 - "Zirbeldrüse" → PINEAL_GLAND (too specific, use BODY_PART)
 - "Harvard" → IVY_LEAGUE_UNIVERSITY (too specific, use UNIVERSITY)
+- "Python" → PROGRAMMING_LANGUAGE_INTERPRETED (too specific, use TECHNOLOGY)
+- "Photosynthesis" → BIOLOGICAL_CELLULAR_PROCESS (too specific, use PROCESS)
 
-PREFERRED BROAD CATEGORIES:
+PREFERRED SIMPLE CATEGORIES:
 PERSON, SCIENTIST, AUTHOR, POLITICIAN, ARTIST, ATHLETE
 ORGANIZATION, COMPANY, UNIVERSITY, HOSPITAL, GOVERNMENT
 LOCATION, CITY, COUNTRY, REGION, BUILDING
 CONCEPT, THEORY, PRINCIPLE, METHOD, TECHNIQUE
-BODY_PART, DISEASE, MEDICATION, TREATMENT
+BIOLOGICAL, DISEASE, MEDICATION, TREATMENT
 TECHNOLOGY, SOFTWARE, DEVICE, SYSTEM
 DOCUMENT, BOOK, ARTICLE, REPORT
 EVENT, CONFERENCE, WAR, DISCOVERY
 SUBSTANCE, CHEMICAL, MATERIAL
 PROCESS, PROCEDURE, ACTIVITY
+
+REMEMBER: Keep types SIMPLE and GENERAL. If in doubt, choose the broader category!
 
 Focus on entities that are:
 - Clearly identifiable and significant
@@ -118,7 +131,7 @@ Avoid extracting:
 
         else:
             # No static types - always use dynamic mode
-            return """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
+            return f"""You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.{language_instruction}
 
 CRITICAL INSTRUCTION: Create BROAD, REUSABLE entity types. Avoid overly specific types that would create duplicate entities. Think of entity types as categories that many similar entities could share.
 
@@ -131,15 +144,17 @@ For each entity, provide:
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities
 - Prefer GENERAL types over specific ones
-- Use UPPER_CASE with underscores for consistency
-- Think: "What GENERAL category does this entity belong to?"
+- Use SIMPLE, SINGLE-WORD types when possible (avoid complex compound types)
+- If you must use compound types, keep them SHORT and GENERAL
+- Think: "What is the SIMPLEST, most GENERAL category this entity belongs to?"
+- Avoid creating types like "BIOLOGICAL_SOMETHING" - just use "BIOLOGICAL"
 
 EXAMPLES OF GOOD BROAD TYPING:
 - "Einstein", "Newton", "Darwin" → ALL should be SCIENTIST
 - "Zirbeldrüse", "Herz", "Leber" → ALL should be BODY_PART
 - "Harvard", "MIT", "Stanford" → ALL should be UNIVERSITY
-- "Python", "Java", "C++" → ALL should be PROGRAMMING_LANGUAGE
-- "Photosynthesis", "Respiration", "Digestion" → ALL should be BIOLOGICAL_PROCESS
+- "Python", "Java", "C++" → ALL should be TECHNOLOGY
+- "Photosynthesis", "Respiration", "Digestion" → ALL should be PROCESS
 - "Berlin", "Paris", "London" → ALL should be CITY
 - "Deutschland", "Frankreich", "England" → ALL should be COUNTRY
 
@@ -147,13 +162,15 @@ EXAMPLES OF BAD (TOO SPECIFIC) TYPING:
 - "Einstein" → THEORETICAL_PHYSICIST (too specific, use SCIENTIST)
 - "Zirbeldrüse" → PINEAL_GLAND (too specific, use BODY_PART)
 - "Harvard" → IVY_LEAGUE_UNIVERSITY (too specific, use UNIVERSITY)
+- "Python" → PROGRAMMING_LANGUAGE_INTERPRETED (too specific, use TECHNOLOGY)
+- "Photosynthesis" → BIOLOGICAL_CELLULAR_PROCESS (too specific, use PROCESS)
 
-PREFERRED BROAD CATEGORIES:
+PREFERRED SIMPLE CATEGORIES:
 PERSON, SCIENTIST, AUTHOR, POLITICIAN, ARTIST, ATHLETE
 ORGANIZATION, COMPANY, UNIVERSITY, HOSPITAL, GOVERNMENT
 LOCATION, CITY, COUNTRY, REGION, BUILDING
 CONCEPT, THEORY, PRINCIPLE, METHOD, TECHNIQUE
-BODY_PART, DISEASE, MEDICATION, TREATMENT
+BIOLOGICAL, DISEASE, MEDICATION, TREATMENT
 TECHNOLOGY, SOFTWARE, DEVICE, SYSTEM
 DOCUMENT, BOOK, ARTICLE, REPORT
 EVENT, CONFERENCE, WAR, DISCOVERY
@@ -324,6 +341,18 @@ REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type 
         
         return chunks
     
+    def _simplify_entity_type(self, entity_type: str) -> str:
+        """Simplify entity type by taking only the first part before underscore.
+
+        Examples:
+        - BIOLOGICAL_SOMETHING => BIOLOGICAL
+        - TECHNOLOGY_FRAMEWORK => TECHNOLOGY
+        - PERSON_SCIENTIST => PERSON
+        """
+        if '_' in entity_type:
+            return entity_type.split('_')[0]
+        return entity_type
+
     def _convert_to_graph_entity(self, entity: Entity, source_doc_id: Optional[str]) -> GraphEntity:
         """Convert AI entity to graph entity."""
         # Always use dynamic entity types - LLM determines the type
@@ -332,6 +361,9 @@ REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type 
         else:
             # Handle enum types by extracting the value (fallback for compatibility)
             graph_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
+
+        # Simplify the entity type to use only the first part
+        graph_type = self._simplify_entity_type(graph_type)
         
         # Create attributes from metadata and context
         attributes = entity.metadata.copy() if entity.metadata else {}
