@@ -205,7 +205,8 @@ async def list_existing_databases() -> None:
                 host=hostname,
                 port=port,
                 https=use_https,
-                api_key=qdrant_api_key
+                api_key=qdrant_api_key,
+                verify=verify_ssl
             )
         else:
             # Fall back to host/port
@@ -217,7 +218,8 @@ async def list_existing_databases() -> None:
                 host=qdrant_host,
                 port=qdrant_port,
                 https=use_https,
-                api_key=qdrant_api_key
+                api_key=qdrant_api_key,
+                verify=verify_ssl
             )
         
         collections = client.get_collections()

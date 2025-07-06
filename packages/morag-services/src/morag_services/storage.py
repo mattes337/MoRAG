@@ -26,7 +26,7 @@ class QdrantVectorStorage(BaseVectorStorage):
         port: int = 6333,
         api_key: Optional[str] = None,
         collection_name: Optional[str] = None,
-        verify_ssl: bool = True
+        verify_ssl: Optional[bool] = None
     ):
         """Initialize Qdrant storage.
 
@@ -35,12 +35,17 @@ class QdrantVectorStorage(BaseVectorStorage):
             port: Qdrant port
             api_key: API key for authentication
             collection_name: Collection name (required, no default)
-            verify_ssl: Whether to verify SSL certificates (default: True)
+            verify_ssl: Whether to verify SSL certificates (default: from environment)
         """
+        import os
         self.host = host
         self.port = port
         self.api_key = api_key
-        self.verify_ssl = verify_ssl
+        # Use environment variable if verify_ssl not explicitly set
+        if verify_ssl is None:
+            self.verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+        else:
+            self.verify_ssl = verify_ssl
         if not collection_name:
             raise ValueError("collection_name is required - set QDRANT_COLLECTION_NAME environment variable")
         self.collection_name = collection_name

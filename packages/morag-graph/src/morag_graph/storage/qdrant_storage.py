@@ -38,7 +38,15 @@ class QdrantConfig(BaseModel):
     timeout: Optional[float] = None
     collection_name: str = "morag_entities"
     vector_size: int = 384  # Default embedding size
-    verify_ssl: bool = True  # Whether to verify SSL certificates
+    verify_ssl: Optional[bool] = None  # Whether to verify SSL certificates (None = use environment)
+
+    def __init__(self, **data):
+        """Initialize with environment variable defaults."""
+        import os
+        # Set verify_ssl from environment if not explicitly provided
+        if 'verify_ssl' not in data or data['verify_ssl'] is None:
+            data['verify_ssl'] = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+        super().__init__(**data)
 
 
 class QdrantStorage(BaseStorage):

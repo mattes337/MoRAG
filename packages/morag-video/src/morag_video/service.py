@@ -235,7 +235,44 @@ class VideoService:
                 raise
             raise VideoServiceError(f"Video processing failed: {str(e)}")
 
-    async def _save_output_files(self, 
+    async def convert_result_to_markdown(self, json_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert a JSON processing result to markdown format.
+
+        Args:
+            json_result: The JSON result from video processing
+
+        Returns:
+            Dictionary with markdown content
+        """
+        try:
+            # Extract the video processing result from the JSON
+            if not json_result.get("success", False):
+                return json_result
+
+            content = json_result.get("content", "")
+            if not content:
+                return json_result
+
+            # If content is already markdown, return as-is
+            if isinstance(content, str):
+                return json_result
+
+            # Convert to markdown using the existing converter
+            logger.info("Converting video processing result to markdown")
+            markdown_content = await self.converter.to_markdown(content)
+
+            # Return the same structure but with markdown content
+            markdown_result = json_result.copy()
+            markdown_result["content"] = markdown_content
+
+            return markdown_result
+
+        except Exception as e:
+            logger.error("Failed to convert result to markdown", error=str(e))
+            # Return original result if conversion fails
+            return json_result
+
+    async def _save_output_files(self,
                                file_path: Path, 
                                result: VideoProcessingResult,
                                markdown_content: Optional[str],

@@ -483,20 +483,17 @@ class MoRAGServices:
                 original_config = self.video_service.config.generate_thumbnails
                 self.video_service.config.generate_thumbnails = False
 
-            # Get both markdown (for Qdrant) and JSON (for API response)
-            markdown_result = await self.video_service.process_file(
+            # Process video once and convert to both formats
+            video_result = await self.video_service.process_file(
                 Path(video_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="markdown",  # Use markdown format for Qdrant storage
+                output_format="json",  # Process once in JSON format
                 progress_callback=progress_callback
             )
 
-            json_result = await self.video_service.process_file(
-                Path(video_path),
-                save_output=False,  # Don't save files, just return content
-                output_format="json",  # Use JSON format for API response
-                progress_callback=progress_callback
-            )
+            # Convert JSON result to markdown for Qdrant storage
+            markdown_result = await self.video_service.convert_result_to_markdown(video_result)
+            json_result = video_result
 
             # Restore original config
             if not include_thumbnails:
