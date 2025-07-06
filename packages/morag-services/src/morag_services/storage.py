@@ -25,7 +25,8 @@ class QdrantVectorStorage(BaseVectorStorage):
         host: str = "localhost",
         port: int = 6333,
         api_key: Optional[str] = None,
-        collection_name: Optional[str] = None
+        collection_name: Optional[str] = None,
+        verify_ssl: bool = True
     ):
         """Initialize Qdrant storage.
 
@@ -34,10 +35,12 @@ class QdrantVectorStorage(BaseVectorStorage):
             port: Qdrant port
             api_key: API key for authentication
             collection_name: Collection name (required, no default)
+            verify_ssl: Whether to verify SSL certificates (default: True)
         """
         self.host = host
         self.port = port
         self.api_key = api_key
+        self.verify_ssl = verify_ssl
         if not collection_name:
             raise ValueError("collection_name is required - set QDRANT_COLLECTION_NAME environment variable")
         self.collection_name = collection_name
@@ -120,7 +123,8 @@ class QdrantVectorStorage(BaseVectorStorage):
                     port=port,
                     https=use_https,
                     api_key=self.api_key,
-                    timeout=30
+                    timeout=30,
+                    verify=self.verify_ssl
                 )
 
                 logger.info("Connecting to Qdrant via URL",
@@ -134,7 +138,8 @@ class QdrantVectorStorage(BaseVectorStorage):
                     host=self.host,
                     port=self.port,
                     api_key=self.api_key,
-                    timeout=30
+                    timeout=30,
+                    verify=self.verify_ssl
                 )
 
                 logger.info("Connecting to Qdrant via host/port",

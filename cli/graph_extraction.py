@@ -184,12 +184,14 @@ class DatabaseIngestionService:
                     port = int(os.getenv('QDRANT_PORT', 6333))
                     https = port == 443  # Auto-detect HTTPS for port 443
 
+                verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
                 qdrant_config = QdrantConfig(
                     host=host,
                     port=port,
                     https=https,
                     api_key=os.getenv('QDRANT_API_KEY'),
-                    collection_name=os.getenv('QDRANT_COLLECTION', 'morag_documents')
+                    collection_name=os.getenv('QDRANT_COLLECTION', 'morag_documents'),
+                    verify_ssl=verify_ssl
                 )
             
             self.qdrant_storage = QdrantStorage(qdrant_config)

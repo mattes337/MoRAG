@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class QdrantConfig(BaseModel):
     """Configuration for Qdrant connection."""
-    
+
     host: str = "localhost"
     port: int = 6333
     grpc_port: int = 6334
@@ -38,6 +38,7 @@ class QdrantConfig(BaseModel):
     timeout: Optional[float] = None
     collection_name: str = "morag_entities"
     vector_size: int = 384  # Default embedding size
+    verify_ssl: bool = True  # Whether to verify SSL certificates
 
 
 class QdrantStorage(BaseStorage):
@@ -79,6 +80,7 @@ class QdrantStorage(BaseStorage):
                     api_key=self.config.api_key,
                     prefix=self.config.prefix,
                     timeout=self.config.timeout,
+                    verify=self.config.verify_ssl,
                 )
             else:
                 # Auto-detect HTTPS if port is 443
@@ -93,6 +95,7 @@ class QdrantStorage(BaseStorage):
                     api_key=self.config.api_key,
                     prefix=self.config.prefix,
                     timeout=self.config.timeout,
+                    verify=self.config.verify_ssl,
                 )
             
             # Create collection if it doesn't exist

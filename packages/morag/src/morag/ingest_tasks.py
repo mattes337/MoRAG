@@ -232,12 +232,15 @@ async def store_content_in_vector_db(
         if not collection_name_env:
             raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
 
+        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+
         if qdrant_url:
             # Use URL-based connection (supports HTTPS automatically)
             vector_storage = QdrantVectorStorage(
                 host=qdrant_url,
                 api_key=qdrant_api_key,
-                collection_name=collection_name_env
+                collection_name=collection_name_env,
+                verify_ssl=verify_ssl
             )
         else:
             # Fall back to host/port connection
@@ -247,7 +250,8 @@ async def store_content_in_vector_db(
                 host=qdrant_host,
                 port=qdrant_port,
                 api_key=qdrant_api_key,
-                collection_name=collection_name_env
+                collection_name=collection_name_env,
+                verify_ssl=verify_ssl
             )
 
         # Get API key from environment (prefer GEMINI_API_KEY for consistency)

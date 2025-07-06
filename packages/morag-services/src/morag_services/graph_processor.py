@@ -247,16 +247,21 @@ Provide only the intention summary (maximum {max_length} characters):
                 hostname = parsed.hostname or "localhost"
                 port = parsed.port or (443 if parsed.scheme == 'https' else port)
                 https = parsed.scheme == 'https'
+                # Use the full URL for QdrantStorage
+                config_host = host
             else:
                 hostname = host
                 https = port == 443  # Auto-detect HTTPS for port 443
+                config_host = hostname
 
+            verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
             qdrant_config = QdrantConfig(
-                host=hostname,
+                host=config_host,
                 port=port,
                 https=https,
                 api_key=db_config.password,  # Use password field for API key
-                collection_name=db_config.database_name or "morag_entities"
+                collection_name=db_config.database_name or "morag_entities",
+                verify_ssl=verify_ssl
             )
             return QdrantStorage(qdrant_config)
             

@@ -66,6 +66,7 @@ class IngestionCoordinator:
         qdrant_url = os.getenv('QDRANT_URL')
         qdrant_api_key = os.getenv('QDRANT_API_KEY')
         collection_name = os.getenv('QDRANT_COLLECTION_NAME')
+        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
         if not collection_name:
             raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
 
@@ -74,7 +75,8 @@ class IngestionCoordinator:
             self.vector_storage = QdrantVectorStorage(
                 host=qdrant_url,
                 api_key=qdrant_api_key,
-                collection_name=collection_name
+                collection_name=collection_name,
+                verify_ssl=verify_ssl
             )
         else:
             # Fall back to host/port connection
@@ -84,7 +86,8 @@ class IngestionCoordinator:
                 host=qdrant_host,
                 port=qdrant_port,
                 api_key=qdrant_api_key,
-                collection_name=collection_name
+                collection_name=collection_name,
+                verify_ssl=verify_ssl
             )
 
         # Initialize vector storage connection and ensure collection exists
@@ -750,17 +753,22 @@ class IngestionCoordinator:
             hostname = parsed.hostname or "localhost"
             port = parsed.port or (443 if parsed.scheme == 'https' else port)
             https = parsed.scheme == 'https'
+            # Use the full URL for QdrantStorage
+            config_host = host
         else:
             hostname = host
             https = port == 443  # Auto-detect HTTPS for port 443
+            config_host = hostname
 
+        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
         qdrant_config = QdrantConfig(
-            host=hostname,
+            host=config_host,
             port=port,
             https=https,
             api_key=os.getenv('QDRANT_API_KEY'),
             collection_name=db_config.database_name or 'morag_documents',
-            vector_size=embeddings_data.get('embedding_dimension', 768)
+            vector_size=embeddings_data.get('embedding_dimension', 768),
+            verify_ssl=verify_ssl
         )
 
         qdrant_storage = QdrantStorage(qdrant_config)
@@ -847,17 +855,22 @@ class IngestionCoordinator:
             hostname = parsed.hostname or "localhost"
             port = parsed.port or (443 if parsed.scheme == 'https' else port)
             https = parsed.scheme == 'https'
+            # Use the full URL for QdrantStorage
+            config_host = host
         else:
             hostname = host
             https = port == 443  # Auto-detect HTTPS for port 443
+            config_host = hostname
 
+        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
         qdrant_config = QdrantConfig(
-            host=hostname,
+            host=config_host,
             port=port,
             https=https,
             api_key=os.getenv('QDRANT_API_KEY'),
             collection_name=db_config.database_name or 'morag_documents',
-            vector_size=embeddings_data.get('embedding_dimension', 768)
+            vector_size=embeddings_data.get('embedding_dimension', 768),
+            verify_ssl=verify_ssl
         )
 
         qdrant_storage = QdrantStorage(qdrant_config)

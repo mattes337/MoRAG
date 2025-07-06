@@ -16,7 +16,7 @@ sys.path.insert(0, str(project_root))
 # Load environment variables
 from dotenv import load_dotenv
 env_path = project_root / '.env'
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 
 def print_header(title: str):
@@ -57,12 +57,21 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
         # Create database configurations
         database_configs = []
         if use_qdrant:
-            database_configs.append(DatabaseConfig(
-                type=DatabaseType.QDRANT,
-                hostname=os.getenv('QDRANT_HOST', 'localhost'),
-                port=int(os.getenv('QDRANT_PORT', '6333')),
-                collection_name=os.getenv('QDRANT_COLLECTION', 'morag_documents')
-            ))
+            # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
+            qdrant_url = os.getenv('QDRANT_URL')
+            if qdrant_url:
+                database_configs.append(DatabaseConfig(
+                    type=DatabaseType.QDRANT,
+                    hostname=qdrant_url,  # Store URL in hostname field
+                    database_name=os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
+                ))
+            else:
+                database_configs.append(DatabaseConfig(
+                    type=DatabaseType.QDRANT,
+                    hostname=os.getenv('QDRANT_HOST', 'localhost'),
+                    port=int(os.getenv('QDRANT_PORT', '6333')),
+                    database_name=os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
+                ))
         
         if use_neo4j:
             database_configs.append(DatabaseConfig(
@@ -141,12 +150,21 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
         # Create database configurations
         database_configs = []
         if use_qdrant:
-            database_configs.append(DatabaseConfig(
-                type=DatabaseType.QDRANT,
-                hostname=os.getenv('QDRANT_HOST', 'localhost'),
-                port=int(os.getenv('QDRANT_PORT', '6333')),
-                collection_name=os.getenv('QDRANT_COLLECTION', 'morag_documents')
-            ))
+            # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
+            qdrant_url = os.getenv('QDRANT_URL')
+            if qdrant_url:
+                database_configs.append(DatabaseConfig(
+                    type=DatabaseType.QDRANT,
+                    hostname=qdrant_url,  # Store URL in hostname field
+                    database_name=os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
+                ))
+            else:
+                database_configs.append(DatabaseConfig(
+                    type=DatabaseType.QDRANT,
+                    hostname=os.getenv('QDRANT_HOST', 'localhost'),
+                    port=int(os.getenv('QDRANT_PORT', '6333')),
+                    database_name=os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
+                ))
         
         if use_neo4j:
             database_configs.append(DatabaseConfig(

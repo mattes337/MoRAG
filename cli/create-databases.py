@@ -114,13 +114,15 @@ async def create_qdrant_collection(collection_name: str, vector_size: int = 768)
         # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
         qdrant_url = os.getenv('QDRANT_URL')
         qdrant_api_key = os.getenv('QDRANT_API_KEY')
+        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
 
         if qdrant_url:
             # Use URL-based connection (supports HTTPS automatically)
             storage = QdrantVectorStorage(
                 host=qdrant_url,
                 api_key=qdrant_api_key,
-                collection_name=collection_name
+                collection_name=collection_name,
+                verify_ssl=verify_ssl
             )
         else:
             # Fall back to host/port connection
@@ -128,7 +130,8 @@ async def create_qdrant_collection(collection_name: str, vector_size: int = 768)
                 host=os.getenv('QDRANT_HOST', 'localhost'),
                 port=int(os.getenv('QDRANT_PORT', '6333')),
                 api_key=qdrant_api_key,
-                collection_name=collection_name
+                collection_name=collection_name,
+                verify_ssl=verify_ssl
             )
         
         await storage.connect()
