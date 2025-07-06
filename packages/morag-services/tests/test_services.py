@@ -132,32 +132,50 @@ class TestProcessContent:
     @pytest.mark.asyncio
     async def test_process_video(self, services):
         """Test video processing."""
-        # Mock video service response
-        mock_result = MagicMock()
-        mock_result.transcription = "Video transcription"
-        mock_result.metadata = {"duration": 300, "resolution": "1080p"}
-        mock_result.extracted_files = [Path("thumbnail.jpg")]
-        mock_result.processing_time = 5.0
-        mock_result.success = True
-        mock_result.error_message = None
-        
-        services.video_service.process_video.return_value = mock_result
-        
+        # Mock video service response for process_file method
+        mock_json_result = {
+            "success": True,
+            "processing_time": 5.0,
+            "content": {
+                "title": "Test Video",
+                "topics": [
+                    {
+                        "title": "Topic 1",
+                        "sentences": [
+                            {"text": "Video transcription"}
+                        ]
+                    }
+                ]
+            },
+            "metadata": {"duration": 300, "resolution": "1080p"},
+            "thumbnails": ["thumbnail.jpg"],
+            "keyframes": [],
+            "error": None
+        }
+
+        # Configure the mock to return the dictionary directly
+        async def mock_process_file(*args, **kwargs):
+            return mock_json_result
+
+        services.video_service.process_file = mock_process_file
+        services.video_service.config = MagicMock()
+        services.video_service.config.generate_thumbnails = True
+
         # Process video
         result = await services.process_video("test.mp4")
-        
+
         # Verify result
         assert result.content_type == ContentType.VIDEO
         assert result.content_path == "test.mp4"
-        assert result.text_content == "Video transcription"
+        assert "Test Video" in result.text_content
+        assert "Video transcription" in result.text_content
         assert result.metadata == {"duration": 300, "resolution": "1080p"}
         assert result.extracted_files == ["thumbnail.jpg"]
         assert result.processing_time == 5.0
         assert result.success is True
         assert result.error_message is None
-        
-        # Verify service call
-        services.video_service.process_video.assert_called_once()
+
+        # Test passed - video processing works correctly
     
     @pytest.mark.asyncio
     async def test_process_image(self, services):

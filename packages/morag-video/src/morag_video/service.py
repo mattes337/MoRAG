@@ -259,7 +259,23 @@ class VideoService:
 
             # Convert to markdown using the existing converter
             logger.info("Converting video processing result to markdown")
-            markdown_content = await self.converter.to_markdown(content)
+
+            # Import here to avoid circular imports
+            from morag_video.converters.video import VideoConversionOptions
+            from morag_video.processor import VideoProcessingResult
+
+            # If content is a VideoProcessingResult, convert it
+            if isinstance(content, VideoProcessingResult):
+                options = VideoConversionOptions()
+                markdown_content = await self.converter.convert_to_markdown(content, options)
+            elif isinstance(content, dict):
+                # Try to reconstruct VideoProcessingResult from dict
+                # For now, just return the original result
+                logger.warning("Cannot convert dict content to markdown, returning original")
+                return json_result
+            else:
+                logger.warning(f"Unknown content type: {type(content)}, returning original")
+                return json_result
 
             # Return the same structure but with markdown content
             markdown_result = json_result.copy()

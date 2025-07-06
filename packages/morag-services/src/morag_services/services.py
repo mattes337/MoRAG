@@ -483,35 +483,60 @@ class MoRAGServices:
                 original_config = self.video_service.config.generate_thumbnails
                 self.video_service.config.generate_thumbnails = False
 
-            # Process video once and convert to both formats
-            video_result = await self.video_service.process_file(
+            # Process video once to get JSON result
+            json_result = await self.video_service.process_file(
                 Path(video_path),
                 save_output=False,  # Don't save files, just return content
                 output_format="json",  # Process once in JSON format
                 progress_callback=progress_callback
             )
 
-            # Convert JSON result to markdown for Qdrant storage
-            markdown_result = await self.video_service.convert_result_to_markdown(video_result)
-            json_result = video_result
-
             # Restore original config
             if not include_thumbnails:
                 self.video_service.config.generate_thumbnails = original_config
 
-            # Use markdown content for text_content (Qdrant storage)
+            # Extract markdown content for text_content (Qdrant storage)
+            # For now, we'll use a simple conversion from JSON to text
             text_content = ""
-            if "content" in markdown_result:
-                text_content = markdown_result["content"]
-            elif "markdown" in markdown_result:
-                text_content = markdown_result["markdown"]
+            if json_result.get("success", False):
+                # Extract text from the JSON structure
+                content = json_result.get("content", {})
+                if isinstance(content, dict):
+                    # Extract title and topics text
+                    title = content.get("title", "")
+                    topics = content.get("topics", [])
+
+                    text_parts = []
+                    if title:
+                        text_parts.append(f"# {title}")
+
+                    for topic in topics:
+                        if isinstance(topic, dict):
+                            topic_title = topic.get("title", "")
+                            if topic_title:
+                                text_parts.append(f"## {topic_title}")
+
+                            sentences = topic.get("sentences", [])
+                            for sentence in sentences:
+                                if isinstance(sentence, dict):
+                                    text = sentence.get("text", "")
+                                    if text:
+                                        text_parts.append(text)
+
+                    text_content = "\n\n".join(text_parts)
+                elif isinstance(content, str):
+                    text_content = content
+
+            # Ensure text_content is a string
+            if not isinstance(text_content, str):
+                text_content = ""
 
             return ProcessingResult(
                 content_type=ContentType.VIDEO,
                 content_path=video_path,
                 text_content=text_content,  # Markdown for Qdrant
                 metadata=json_result.get("metadata", {}),
-                extracted_files=json_result.get("thumbnails", []) + json_result.get("keyframes", []),
+                extracted_files=(json_result.get("thumbnails", []) or []) + (json_result.get("keyframes", []) or []),
                 processing_time=json_result.get("processing_time", 0.0),
                 success=json_result.get("success", False),
                 error_message=json_result.get("error"),
