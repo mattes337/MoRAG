@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class Neo4jConfig(BaseModel):
     """Configuration for Neo4J connection."""
-    
+
     uri: str = "neo4j://localhost:7687"
     username: str = "neo4j"
     password: str = "password"
@@ -25,6 +25,8 @@ class Neo4jConfig(BaseModel):
     max_connection_lifetime: int = 3600
     max_connection_pool_size: int = 50
     connection_acquisition_timeout: int = 60
+    verify_ssl: bool = True  # Whether to verify SSL certificates
+    trust_all_certificates: bool = False  # Trust all certificates (for self-signed)
 
 
 class Neo4jStorage(BaseStorage):
@@ -46,12 +48,28 @@ class Neo4jStorage(BaseStorage):
     async def connect(self) -> None:
         """Connect to Neo4J database."""
         try:
+            # Configure basic driver settings
+            driver_kwargs = {
+                "auth": (self.config.username, self.config.password),
+                "max_connection_lifetime": self.config.max_connection_lifetime,
+                "max_connection_pool_size": self.config.max_connection_pool_size,
+                "connection_acquisition_timeout": self.config.connection_acquisition_timeout,
+            }
+
+            # For encrypted URI schemes (bolt+s://, bolt+ssc://, neo4j+s://, neo4j+ssc://),
+            # encryption and trust settings are handled by the URI scheme itself
+            # Only add SSL configuration for non-encrypted URIs
+            if self.config.uri.startswith(('bolt://', 'neo4j://')) and not self.config.verify_ssl:
+                # For non-encrypted URIs, add SSL context if needed
+                import ssl
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                driver_kwargs["ssl_context"] = ssl_context
+
             self.driver = AsyncGraphDatabase.driver(
                 self.config.uri,
-                auth=(self.config.username, self.config.password),
-                max_connection_lifetime=self.config.max_connection_lifetime,
-                max_connection_pool_size=self.config.max_connection_pool_size,
-                connection_acquisition_timeout=self.config.connection_acquisition_timeout,
+                **driver_kwargs
             )
 
             # Ensure database exists before testing connection

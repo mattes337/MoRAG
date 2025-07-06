@@ -94,7 +94,9 @@ def get_neo4j_storage() -> Optional[Neo4jStorage]:
             uri=os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
             username=os.getenv("NEO4J_USERNAME", "neo4j"),
             password=os.getenv("NEO4J_PASSWORD", "password"),
-            database=os.getenv("NEO4J_DATABASE", "neo4j")
+            database=os.getenv("NEO4J_DATABASE", "neo4j"),
+            verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
+            trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
         )
         return Neo4jStorage(config)
     except Exception as e:

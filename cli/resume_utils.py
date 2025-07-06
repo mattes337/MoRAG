@@ -199,6 +199,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
             # This is ingest_result.json format
             embeddings_data_section = ingestion_data.get('embeddings_data', {})
             chunks_data = embeddings_data_section.get('chunks', [])
+            print(f"🔍 DEBUG: Found {len(chunks_data)} chunks in embeddings_data")
 
             # Extract chunks, embeddings, and metadata from ingest_result format
             chunks = []
@@ -260,8 +261,8 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
         await coordinator._initialize_databases(database_configs, embeddings_data)
 
         # Extract graph data for Neo4j and convert to proper model objects
-        from morag_graph.models.entity import Entity, EntityType
-        from morag_graph.models.relation import Relation, RelationType
+        from morag_graph.models.entity import Entity
+        from morag_graph.models.relation import Relation
 
         if 'graph_data' in ingestion_data:
             # Extract entities and relations data
@@ -274,18 +275,25 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
 
             entities_data = graph_data_section.get('entities', [])
             relations_data = graph_data_section.get('relations', [])
+            print(f"🔍 DEBUG: Found {len(entities_data)} entities and {len(relations_data)} relations in graph_data")
+
+            # Check if chunk_entity_mapping exists, if not, create it
+            chunk_entity_mapping = graph_data_section.get('chunk_entity_mapping', {})
+            if not chunk_entity_mapping:
+                print("🔧 DEBUG: chunk_entity_mapping missing, recreating from entities and chunks...")
+                chunk_entity_mapping = await _recreate_chunk_entity_mapping(
+                    chunks, entities_data, ingestion_data.get('source_info', {}).get('chunk_size', 4000)
+                )
+                print(f"🔧 DEBUG: Recreated chunk_entity_mapping with {len(chunk_entity_mapping)} chunks containing entities")
 
             # Convert dictionary data to proper Entity objects
             entities = []
             for entity_dict in entities_data:
                 try:
-                    # Convert string type back to EntityType enum if needed
+                    # Use string type directly (no enum conversion needed)
                     entity_type = entity_dict.get('type', 'UNKNOWN')
-                    if isinstance(entity_type, str):
-                        try:
-                            entity_type = EntityType(entity_type)
-                        except ValueError:
-                            entity_type = EntityType.UNKNOWN
+                    if not isinstance(entity_type, str):
+                        entity_type = str(entity_type)
 
                     entity = Entity(
                         id=entity_dict.get('id', ''),
@@ -304,13 +312,10 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
             relations = []
             for relation_dict in relations_data:
                 try:
-                    # Convert string type back to RelationType enum if needed
+                    # Use string type directly (no enum conversion needed)
                     relation_type = relation_dict.get('relation_type', 'RELATED_TO')
-                    if isinstance(relation_type, str):
-                        try:
-                            relation_type = RelationType(relation_type)
-                        except ValueError:
-                            relation_type = RelationType.RELATED_TO
+                    if not isinstance(relation_type, str):
+                        relation_type = str(relation_type)
 
                     relation = Relation(
                         id=relation_dict.get('id', ''),
@@ -333,6 +338,10 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
         else:
             # No graph data available
             graph_data = {'entities': [], 'relations': []}
+
+        # Add the recreated chunk_entity_mapping to graph_data if it was created
+        if 'chunk_entity_mapping' in locals() and chunk_entity_mapping:
+            graph_data['chunk_entity_mapping'] = chunk_entity_mapping
 
         # Write to databases using ingestion data
         print_section("Writing to Databases")
@@ -367,6 +376,42 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
         import traceback
         traceback.print_exc()
         return False
+
+
+async def _recreate_chunk_entity_mapping(chunks, entities_data, chunk_size=4000):
+    """Recreate chunk-entity mapping by finding which entities appear in which chunks.
+
+    Args:
+        chunks: List of chunk texts
+        entities_data: List of entity dictionaries
+        chunk_size: Size of chunks (for logging)
+
+    Returns:
+        Dictionary mapping chunk index (as string) to list of entity IDs
+    """
+    chunk_entity_mapping = {}
+
+    print(f"🔍 Analyzing {len(chunks)} chunks for entity mentions...")
+
+    for chunk_index, chunk_text in enumerate(chunks):
+        entities_in_chunk = []
+        chunk_text_lower = chunk_text.lower()
+
+        # Check each entity to see if it appears in this chunk
+        for entity_dict in entities_data:
+            entity_name = entity_dict.get('name', '').lower()
+            entity_id = entity_dict.get('id', '')
+
+            if entity_name and entity_name in chunk_text_lower:
+                entities_in_chunk.append(entity_id)
+                print(f"🔗 Found entity '{entity_dict.get('name', '')}' in chunk {chunk_index}")
+
+        if entities_in_chunk:
+            chunk_entity_mapping[str(chunk_index)] = entities_in_chunk
+            print(f"📋 Chunk {chunk_index} contains {len(entities_in_chunk)} entities")
+
+    print(f"✅ Found entities in {len(chunk_entity_mapping)} out of {len(chunks)} chunks")
+    return chunk_entity_mapping
 
 
 def handle_resume_arguments(args, source_file: str, content_type: str, metadata: Optional[Dict[str, Any]] = None):

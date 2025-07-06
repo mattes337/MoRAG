@@ -782,11 +782,14 @@ class IngestionCoordinator:
 
     async def _initialize_neo4j(self, db_config: DatabaseConfig) -> None:
         """Initialize Neo4j database."""
+        import os
         neo4j_config = Neo4jConfig(
             uri=db_config.hostname or 'bolt://localhost:7687',
             username=db_config.username or 'neo4j',
             password=db_config.password or 'password',
-            database=db_config.database_name or 'neo4j'
+            database=db_config.database_name or 'neo4j',
+            verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
+            trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
         )
 
         neo4j_storage = Neo4jStorage(neo4j_config)
@@ -951,11 +954,14 @@ class IngestionCoordinator:
         document_id: str
     ) -> Dict[str, Any]:
         """Write graph data to Neo4j with proper relationships."""
+        import os
         neo4j_config = Neo4jConfig(
             uri=db_config.hostname or 'bolt://localhost:7687',
             username=db_config.username or 'neo4j',
             password=db_config.password or 'password',
-            database=db_config.database_name or 'neo4j'
+            database=db_config.database_name or 'neo4j',
+            verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
+            trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
         )
 
         neo4j_storage = Neo4jStorage(neo4j_config)
