@@ -20,9 +20,9 @@ try:
     import spacy
     SPACY_AVAILABLE = True
     logger.info("SpaCy is available for NLP processing")
-except ImportError:
+except (ImportError, OSError) as e:
     SPACY_AVAILABLE = False
-    logger.warning("spaCy not available, using basic NLP processing")
+    logger.warning("spaCy not available, using basic NLP processing", error=str(e))
 
 # Import language detection service
 try:
@@ -51,17 +51,17 @@ except ImportError:
 try:
     from sentence_transformers import SentenceTransformer
     SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError) as e:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
-    logger.warning("sentence-transformers not available, using basic topic segmentation")
+    logger.warning("sentence-transformers not available, using basic topic segmentation", error=str(e))
 
 try:
     from sklearn.cluster import AgglomerativeClustering
     from sklearn.metrics.pairwise import cosine_similarity
     SKLEARN_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError) as e:
     SKLEARN_AVAILABLE = False
-    logger.warning("scikit-learn not available, using basic topic segmentation")
+    logger.warning("scikit-learn not available, using basic topic segmentation", error=str(e))
 
 
 @dataclass

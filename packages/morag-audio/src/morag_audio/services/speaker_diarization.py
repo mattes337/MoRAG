@@ -29,8 +29,9 @@ except ImportError:
 try:
     import torch
     TORCH_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError) as e:
     TORCH_AVAILABLE = False
+    logger.warning("PyTorch not available for speaker diarization", error=str(e))
 
 
 @dataclass

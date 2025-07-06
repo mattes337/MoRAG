@@ -86,7 +86,16 @@ class MoRAGServices:
         
         # Initialize specialized services
         self.document_service = DocumentService()
-        self.audio_service = AudioService()
+
+        # Initialize audio service with fallback
+        try:
+            self.audio_service = AudioService()
+            self.audio_available = True
+        except Exception as e:
+            logger.warning("Audio service not available, audio processing disabled", error=str(e))
+            self.audio_service = None
+            self.audio_available = False
+
         self.video_service = VideoService()
         self.image_service = ImageService()
         self.embedding_service = EmbeddingService()
@@ -389,6 +398,10 @@ class MoRAGServices:
             ProcessingResult with transcription and metadata
         """
         try:
+            # Check if audio service is available
+            if not self.audio_available or not self.audio_service:
+                raise ProcessingError("Audio service not available")
+
             # Extract progress callback from options if available
             progress_callback = (options or {}).get('progress_callback')
 
@@ -727,13 +740,16 @@ class MoRAGServices:
         # Check each service
         services_to_check = [
             ("document", self.document_service),
-            ("audio", self.audio_service),
             ("video", self.video_service),
             ("image", self.image_service),
             ("embedding", self.embedding_service),
             ("web", self.web_service),
             ("youtube", self.youtube_service),
         ]
+
+        # Add audio service only if available
+        if self.audio_available and self.audio_service:
+            services_to_check.append(("audio", self.audio_service))
 
         unhealthy_services = []
 

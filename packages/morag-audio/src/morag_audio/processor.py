@@ -114,32 +114,50 @@ class AudioProcessor:
     def _initialize_components(self):
         """Initialize the required components based on configuration."""
         self.transcriber = None
+        self.transcriber_type = None
         self.diarization_pipeline = None
         self.topic_segmenter = None
-        
-        # Initialize transcriber
+
+        # Initialize transcriber with fallback mechanism
         try:
             from faster_whisper import WhisperModel
-            
+
             device = get_safe_device(self.config.device)
-            logger.info("Initializing Whisper model", 
-                       model_size=self.config.model_size, 
+            logger.info("Initializing faster-whisper model",
+                       model_size=self.config.model_size,
                        device=device,
                        compute_type=self.config.compute_type)
-            
+
             self.transcriber = WhisperModel(
                 model_size_or_path=self.config.model_size,
                 device=device,
                 compute_type=self.config.compute_type
             )
-            logger.info("Whisper model initialized successfully")
+            self.transcriber_type = "faster_whisper"
+            logger.info("faster-whisper model initialized successfully")
         except ImportError:
-            logger.error("faster-whisper not installed. Please install with 'pip install faster-whisper'")
-            raise AudioProcessingError("Required dependency 'faster-whisper' not installed")
+            logger.warning("faster-whisper not installed, trying OpenAI whisper fallback")
+            self._initialize_openai_whisper()
         except Exception as e:
-            logger.error("Failed to initialize Whisper model", error=str(e))
-            raise AudioProcessingError(f"Failed to initialize Whisper model: {str(e)}")
-        
+            logger.warning("Failed to initialize faster-whisper model, trying OpenAI whisper fallback", error=str(e))
+            self._initialize_openai_whisper()
+
+    def _initialize_openai_whisper(self):
+        """Initialize OpenAI whisper as fallback."""
+        try:
+            import whisper
+
+            logger.info("Initializing OpenAI whisper model", model_size=self.config.model_size)
+            self.transcriber = whisper.load_model(self.config.model_size)
+            self.transcriber_type = "openai_whisper"
+            logger.info("OpenAI whisper model initialized successfully")
+        except ImportError:
+            logger.error("OpenAI whisper not installed. Please install with 'pip install openai-whisper'")
+            raise AudioProcessingError("No whisper implementation available. Please install either faster-whisper or openai-whisper")
+        except Exception as e:
+            logger.error("Failed to initialize OpenAI whisper model", error=str(e))
+            raise AudioProcessingError(f"Failed to initialize any whisper model: {str(e)}")
+
         # Initialize diarization if enabled
         if self.config.enable_diarization:
             try:
@@ -331,7 +349,16 @@ class AudioProcessor:
         """Transcribe audio file using Whisper."""
         if not self.transcriber:
             raise AudioProcessingError("Transcriber not initialized")
-        
+
+        if self.transcriber_type == "faster_whisper":
+            return await self._transcribe_with_faster_whisper(file_path)
+        elif self.transcriber_type == "openai_whisper":
+            return await self._transcribe_with_openai_whisper(file_path)
+        else:
+            raise AudioProcessingError(f"Unknown transcriber type: {self.transcriber_type}")
+
+    async def _transcribe_with_faster_whisper(self, file_path: Path) -> tuple[List[AudioSegment], str]:
+        """Transcribe audio file using faster-whisper."""
         # Run transcription in a separate thread to avoid blocking
         loop = asyncio.get_event_loop()
         segments_data, info = await loop.run_in_executor(
@@ -345,7 +372,7 @@ class AudioProcessor:
                 word_timestamps=self.config.word_timestamps
             )
         )
-        
+
         # Store language information in metadata
         if hasattr(info, 'language'):
             self.metadata["language"] = info.language
@@ -367,6 +394,37 @@ class AudioProcessor:
             )
             segments.append(segment)
             full_transcript += segment_data.text + " "
+
+        return segments, full_transcript.strip()
+
+    async def _transcribe_with_openai_whisper(self, file_path: Path) -> tuple[List[AudioSegment], str]:
+        """Transcribe audio file using OpenAI whisper."""
+        # Run transcription in a separate thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: self.transcriber.transcribe(
+                str(file_path),
+                language=self.config.language,
+                word_timestamps=self.config.word_timestamps
+            )
+        )
+
+        # Store language information in metadata
+        self.metadata["language"] = result.get("language", self.config.language or "unknown")
+
+        # Convert to our segment format
+        segments = []
+        full_transcript = result["text"]
+
+        for segment_data in result["segments"]:
+            segment = AudioSegment(
+                start=segment_data["start"],
+                end=segment_data["end"],
+                text=segment_data["text"],
+                confidence=segment_data.get("avg_logprob", 0.0)
+            )
+            segments.append(segment)
 
         return segments, full_transcript.strip()
     
