@@ -799,6 +799,11 @@ class IngestionCoordinator:
         host = db_config.hostname or 'localhost'
         port = db_config.port or 6333
 
+        logger.info("Initializing Qdrant with config",
+                   hostname=db_config.hostname,
+                   port=db_config.port,
+                   database_name=db_config.database_name)
+
         # Check if hostname is a URL and extract components
         if host.startswith(('http://', 'https://')):
             from urllib.parse import urlparse
@@ -814,22 +819,26 @@ class IngestionCoordinator:
             config_host = hostname
 
         verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
-        qdrant_config = QdrantConfig(
+
+        logger.info("Creating QdrantVectorStorage with",
+                   config_host=config_host,
+                   port=port,
+                   collection_name=db_config.database_name or 'morag_documents',
+                   verify_ssl=verify_ssl)
+
+        # Use QdrantVectorStorage instead of QdrantStorage for better connection handling
+        qdrant_storage = QdrantVectorStorage(
             host=config_host,
             port=port,
-            https=https,
             api_key=os.getenv('QDRANT_API_KEY'),
             collection_name=db_config.database_name or 'morag_documents',
-            vector_size=embeddings_data.get('embedding_dimension', 768),
             verify_ssl=verify_ssl
         )
-
-        qdrant_storage = QdrantStorage(qdrant_config)
         await qdrant_storage.connect()
 
         logger.info("Qdrant collection initialized",
-                   collection=qdrant_config.collection_name,
-                   vector_size=qdrant_config.vector_size)
+                   collection=db_config.database_name or 'morag_documents',
+                   vector_size=embeddings_data.get('embedding_dimension', 768))
 
         await qdrant_storage.disconnect()
 
@@ -919,17 +928,15 @@ class IngestionCoordinator:
             config_host = hostname
 
         verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
-        qdrant_config = QdrantConfig(
+
+        # Use QdrantVectorStorage instead of QdrantStorage for better connection handling
+        qdrant_storage = QdrantVectorStorage(
             host=config_host,
             port=port,
-            https=https,
             api_key=os.getenv('QDRANT_API_KEY'),
             collection_name=db_config.database_name or 'morag_documents',
-            vector_size=embeddings_data.get('embedding_dimension', 768),
             verify_ssl=verify_ssl
         )
-
-        qdrant_storage = QdrantStorage(qdrant_config)
         await qdrant_storage.connect()
 
         try:
@@ -964,20 +971,11 @@ class IngestionCoordinator:
                     'text_length': len(chunk_meta.get('chunk_text', ''))
                 }
 
-                # Use proper PointStruct format for Qdrant
-                from qdrant_client.models import PointStruct
-
-                # Create point with proper structure
-                point = PointStruct(
-                    id=point_id,
-                    vector=embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
-                    payload=enhanced_metadata
-                )
-
                 try:
-                    await qdrant_storage.client.upsert(
-                        collection_name=qdrant_storage.config.collection_name,
-                        points=[point]
+                    # Use QdrantVectorStorage's store_vectors method
+                    await qdrant_storage.store_vectors(
+                        vectors=[embedding.tolist() if hasattr(embedding, 'tolist') else embedding],
+                        metadata=[enhanced_metadata]
                     )
                 except Exception as e:
                     logger.warning(f"Failed to store chunk in Qdrant: {e}")
@@ -992,7 +990,7 @@ class IngestionCoordinator:
                 'success': True,
                 'points_stored': len(point_ids),
                 'point_ids': point_ids,
-                'collection': qdrant_config.collection_name
+                'collection': db_config.database_name or 'morag_documents'
             }
 
         except Exception as e:
@@ -1188,7 +1186,7 @@ class IngestionCoordinator:
             context = "\n".join(context_parts)
 
             # Use the embedding service's summarization capability
-            summary_result = await self.embedding_service.summarize(
+            summary_result = await self.embedding_service.generate_summary(
                 content,
                 max_length=max_length
             )

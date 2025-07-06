@@ -79,6 +79,13 @@ class QdrantStorage(BaseStorage):
                 port = parsed.port or (443 if parsed.scheme == 'https' else self.config.port)
                 use_https = parsed.scheme == 'https'
 
+                logger.info("Connecting to Qdrant via URL",
+                           url=self.config.host,
+                           hostname=hostname,
+                           port=port,
+                           https=use_https,
+                           verify_ssl=self.config.verify_ssl)
+
                 self.client = AsyncQdrantClient(
                     host=hostname,
                     port=port,
@@ -87,12 +94,18 @@ class QdrantStorage(BaseStorage):
                     https=use_https,
                     api_key=self.config.api_key,
                     prefix=self.config.prefix,
-                    timeout=self.config.timeout,
+                    timeout=self.config.timeout or 30,
                     verify=self.config.verify_ssl,
                 )
             else:
                 # Auto-detect HTTPS if port is 443
                 use_https = self.config.https or (self.config.port == 443)
+
+                logger.info("Connecting to Qdrant via host/port",
+                           host=self.config.host,
+                           port=self.config.port,
+                           https=use_https,
+                           verify_ssl=self.config.verify_ssl)
 
                 self.client = AsyncQdrantClient(
                     host=self.config.host,
@@ -102,7 +115,7 @@ class QdrantStorage(BaseStorage):
                     https=use_https,
                     api_key=self.config.api_key,
                     prefix=self.config.prefix,
-                    timeout=self.config.timeout,
+                    timeout=self.config.timeout or 30,
                     verify=self.config.verify_ssl,
                 )
             

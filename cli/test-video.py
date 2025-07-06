@@ -276,10 +276,23 @@ async def test_video_ingestion(
             database_configs = []
             if use_qdrant:
                 collection_name = qdrant_collection_name or os.getenv('MORAG_QDRANT_COLLECTION', 'morag_videos')
+                # Use environment variables for Qdrant connection
+                qdrant_url = os.getenv('QDRANT_URL')
+                if qdrant_url:
+                    # Parse URL to get hostname and port
+                    from urllib.parse import urlparse
+                    parsed = urlparse(qdrant_url)
+                    hostname = qdrant_url  # Use full URL as hostname for proper parsing
+                    port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
+                else:
+                    # Fallback to individual host/port settings
+                    hostname = os.getenv('QDRANT_HOST', 'localhost')
+                    port = int(os.getenv('QDRANT_PORT', '6333'))
+
                 database_configs.append(DatabaseConfig(
                     type=DatabaseType.QDRANT,
-                    hostname='localhost',
-                    port=6333,
+                    hostname=hostname,
+                    port=port,
                     database_name=collection_name
                 ))
             if use_neo4j:
