@@ -11,6 +11,7 @@ This module handles the complete ingestion flow including:
 
 import json
 import asyncio
+import os
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timezone
@@ -61,19 +62,30 @@ class IngestionCoordinator:
         # Chunking is implemented directly in this class
 
         # Initialize vector storage
-        qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-        qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+        # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
+        qdrant_url = os.getenv('QDRANT_URL')
         qdrant_api_key = os.getenv('QDRANT_API_KEY')
         collection_name = os.getenv('QDRANT_COLLECTION_NAME')
         if not collection_name:
             raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
 
-        self.vector_storage = QdrantVectorStorage(
-            host=qdrant_host,
-            port=qdrant_port,
-            api_key=qdrant_api_key,
-            collection_name=collection_name
-        )
+        if qdrant_url:
+            # Use URL-based connection (supports HTTPS automatically)
+            self.vector_storage = QdrantVectorStorage(
+                host=qdrant_url,
+                api_key=qdrant_api_key,
+                collection_name=collection_name
+            )
+        else:
+            # Fall back to host/port connection
+            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+            self.vector_storage = QdrantVectorStorage(
+                host=qdrant_host,
+                port=qdrant_port,
+                api_key=qdrant_api_key,
+                collection_name=collection_name
+            )
 
         # Initialize graph extractor
         self.graph_extractor = GraphExtractor()
@@ -187,16 +199,25 @@ class IngestionCoordinator:
         
         # Check for Qdrant configuration
         import os
+        qdrant_url = os.getenv('QDRANT_URL')
         qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
         qdrant_collection = os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
-        
-        if qdrant_host and qdrant_collection:
-            default_databases.append(DatabaseConfig(
-                type=DatabaseType.QDRANT,
-                hostname=qdrant_host,
-                port=int(os.getenv('QDRANT_PORT', 6333)),
-                database_name=qdrant_collection
-            ))
+
+        if (qdrant_url or qdrant_host) and qdrant_collection:
+            # Prefer URL if available, otherwise use host/port
+            if qdrant_url:
+                default_databases.append(DatabaseConfig(
+                    type=DatabaseType.QDRANT,
+                    hostname=qdrant_url,  # Store URL in hostname field
+                    database_name=qdrant_collection
+                ))
+            else:
+                default_databases.append(DatabaseConfig(
+                    type=DatabaseType.QDRANT,
+                    hostname=qdrant_host,
+                    port=int(os.getenv('QDRANT_PORT', 6333)),
+                    database_name=qdrant_collection
+                ))
             
         # Check for Neo4j configuration
         neo4j_uri = os.getenv('NEO4J_URI')
@@ -716,9 +737,25 @@ class IngestionCoordinator:
         embeddings_data: Dict[str, Any]
     ) -> None:
         """Initialize Qdrant collection."""
+        host = db_config.hostname or 'localhost'
+        port = db_config.port or 6333
+
+        # Check if hostname is a URL and extract components
+        if host.startswith(('http://', 'https://')):
+            from urllib.parse import urlparse
+            parsed = urlparse(host)
+            hostname = parsed.hostname or "localhost"
+            port = parsed.port or (443 if parsed.scheme == 'https' else port)
+            https = parsed.scheme == 'https'
+        else:
+            hostname = host
+            https = port == 443  # Auto-detect HTTPS for port 443
+
         qdrant_config = QdrantConfig(
-            host=db_config.hostname or 'localhost',
-            port=db_config.port or 6333,
+            host=hostname,
+            port=port,
+            https=https,
+            api_key=os.getenv('QDRANT_API_KEY'),
             collection_name=db_config.database_name or 'morag_documents',
             vector_size=embeddings_data.get('embedding_dimension', 768)
         )

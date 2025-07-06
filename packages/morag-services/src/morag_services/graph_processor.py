@@ -11,6 +11,8 @@ from pathlib import Path
 import structlog
 from pydantic import BaseModel
 
+logger = structlog.get_logger(__name__)
+
 try:
     from morag_graph import (
         EntityExtractor, RelationExtractor, Neo4jStorage, QdrantStorage,
@@ -235,9 +237,24 @@ Provide only the intention summary (maximum {max_length} characters):
             
         elif db_config.type == DatabaseType.QDRANT:
             # Use provided config or fall back to defaults
+            host = db_config.hostname or "localhost"
+            port = db_config.port or 6333
+
+            # Check if hostname is a URL and extract components
+            if host.startswith(('http://', 'https://')):
+                from urllib.parse import urlparse
+                parsed = urlparse(host)
+                hostname = parsed.hostname or "localhost"
+                port = parsed.port or (443 if parsed.scheme == 'https' else port)
+                https = parsed.scheme == 'https'
+            else:
+                hostname = host
+                https = port == 443  # Auto-detect HTTPS for port 443
+
             qdrant_config = QdrantConfig(
-                host=db_config.hostname or "localhost",
-                port=db_config.port or 6333,
+                host=hostname,
+                port=port,
+                https=https,
                 api_key=db_config.password,  # Use password field for API key
                 collection_name=db_config.database_name or "morag_entities"
             )

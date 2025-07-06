@@ -78,6 +78,8 @@ audio = [
     "mutagen>=1.47.0",
     "pyannote.audio>=3.1.0",
     "sentence-transformers>=2.2.0",
+    "audioop-lts>=0.2.1",  # Python 3.13 compatibility
+    "onnxruntime>=1.22.0",  # For VAD filter (optional)
 ]
 
 video = [
@@ -115,6 +117,8 @@ all-extras = [
     "mutagen>=1.47.0",
     "pyannote.audio>=3.1.0",
     "sentence-transformers>=2.2.0",
+    "audioop-lts>=0.2.1",  # Python 3.13 compatibility
+    "onnxruntime>=1.22.0",  # For VAD filter (optional)
     "opencv-python>=4.8.0",
     "Pillow>=10.0.0,<11.0.0",
     "torch>=2.0.0",

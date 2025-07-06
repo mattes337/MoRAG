@@ -361,17 +361,48 @@ class AudioProcessor:
         """Transcribe audio file using faster-whisper."""
         # Run transcription in a separate thread to avoid blocking
         loop = asyncio.get_event_loop()
-        segments_data, info = await loop.run_in_executor(
-            None,
-            lambda: self.transcriber.transcribe(
-                str(file_path),
-                beam_size=self.config.beam_size,
-                language=self.config.language,
-                vad_filter=self.config.vad_filter,
-                vad_parameters=self.config.vad_parameters,
-                word_timestamps=self.config.word_timestamps
+
+        # Check if VAD filter should be used and if onnxruntime is available
+        use_vad = self.config.vad_filter
+        if use_vad:
+            try:
+                import onnxruntime
+            except ImportError:
+                logger.warning("onnxruntime not available, disabling VAD filter")
+                use_vad = False
+            except Exception as e:
+                logger.warning("onnxruntime failed to load, disabling VAD filter", error=str(e))
+                use_vad = False
+
+        try:
+            segments_data, info = await loop.run_in_executor(
+                None,
+                lambda: self.transcriber.transcribe(
+                    str(file_path),
+                    beam_size=self.config.beam_size,
+                    language=self.config.language,
+                    vad_filter=use_vad,
+                    vad_parameters=self.config.vad_parameters if use_vad else None,
+                    word_timestamps=self.config.word_timestamps
+                )
             )
-        )
+        except Exception as e:
+            # If VAD-related error occurs, retry without VAD
+            if use_vad and ("onnxruntime" in str(e).lower() or "vad" in str(e).lower()):
+                logger.warning("VAD filter failed, retrying without VAD", error=str(e))
+                segments_data, info = await loop.run_in_executor(
+                    None,
+                    lambda: self.transcriber.transcribe(
+                        str(file_path),
+                        beam_size=self.config.beam_size,
+                        language=self.config.language,
+                        vad_filter=False,
+                        vad_parameters=None,
+                        word_timestamps=self.config.word_timestamps
+                    )
+                )
+            else:
+                raise
 
         # Store language information in metadata
         if hasattr(info, 'language'):

@@ -62,16 +62,38 @@ class QdrantStorage(BaseStorage):
     async def connect(self) -> None:
         """Connect to Qdrant database."""
         try:
-            self.client = AsyncQdrantClient(
-                host=self.config.host,
-                port=self.config.port,
-                grpc_port=self.config.grpc_port,
-                prefer_grpc=self.config.prefer_grpc,
-                https=self.config.https,
-                api_key=self.config.api_key,
-                prefix=self.config.prefix,
-                timeout=self.config.timeout,
-            )
+            # Check if host is a URL (starts with http:// or https://)
+            if self.config.host.startswith(('http://', 'https://')):
+                from urllib.parse import urlparse
+                parsed = urlparse(self.config.host)
+                hostname = parsed.hostname
+                port = parsed.port or (443 if parsed.scheme == 'https' else self.config.port)
+                use_https = parsed.scheme == 'https'
+
+                self.client = AsyncQdrantClient(
+                    host=hostname,
+                    port=port,
+                    grpc_port=self.config.grpc_port,
+                    prefer_grpc=self.config.prefer_grpc,
+                    https=use_https,
+                    api_key=self.config.api_key,
+                    prefix=self.config.prefix,
+                    timeout=self.config.timeout,
+                )
+            else:
+                # Auto-detect HTTPS if port is 443
+                use_https = self.config.https or (self.config.port == 443)
+
+                self.client = AsyncQdrantClient(
+                    host=self.config.host,
+                    port=self.config.port,
+                    grpc_port=self.config.grpc_port,
+                    prefer_grpc=self.config.prefer_grpc,
+                    https=use_https,
+                    api_key=self.config.api_key,
+                    prefix=self.config.prefix,
+                    timeout=self.config.timeout,
+                )
             
             # Create collection if it doesn't exist
             collections = await self.client.get_collections()

@@ -34,6 +34,11 @@ psutil==6.1.0
 # Audio processing (basic)
 pydub>=0.25.1
 ffmpeg-python>=0.2.0
+# Python 3.13 compatibility for audio processing
+audioop-lts>=0.2.1
+# Optional: onnxruntime for VAD filter (Voice Activity Detection)
+# Note: May have compatibility issues on some Windows systems
+# onnxruntime>=1.22.0
 
 # Image processing (basic)
 Pillow>=10.0.0,<11.0.0

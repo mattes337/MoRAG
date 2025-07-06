@@ -225,19 +225,30 @@ async def store_content_in_vector_db(
                          message=validation_message)
 
         # Initialize services with environment configuration
-        qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-        qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+        # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
+        qdrant_url = os.getenv('QDRANT_URL')
         qdrant_api_key = os.getenv('QDRANT_API_KEY')
         collection_name_env = os.getenv('QDRANT_COLLECTION_NAME')
         if not collection_name_env:
             raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
 
-        vector_storage = QdrantVectorStorage(
-            host=qdrant_host,
-            port=qdrant_port,
-            api_key=qdrant_api_key,
-            collection_name=collection_name_env
-        )
+        if qdrant_url:
+            # Use URL-based connection (supports HTTPS automatically)
+            vector_storage = QdrantVectorStorage(
+                host=qdrant_url,
+                api_key=qdrant_api_key,
+                collection_name=collection_name_env
+            )
+        else:
+            # Fall back to host/port connection
+            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+            vector_storage = QdrantVectorStorage(
+                host=qdrant_host,
+                port=qdrant_port,
+                api_key=qdrant_api_key,
+                collection_name=collection_name_env
+            )
 
         # Get API key from environment (prefer GEMINI_API_KEY for consistency)
         api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')

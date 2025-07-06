@@ -9,6 +9,8 @@ from fastapi import HTTPException
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 
+logger = structlog.get_logger(__name__)
+
 # Try to import graph components, but handle gracefully if not available
 try:
     from morag_graph import HybridRetrievalCoordinator, ContextExpansionEngine, QueryEntityExtractor
@@ -106,9 +108,26 @@ def get_qdrant_storage() -> Optional[QdrantStorage]:
     if not GRAPH_AVAILABLE:
         return None
     try:
+        # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
+        qdrant_url = os.getenv("QDRANT_URL")
+        if qdrant_url:
+            # Parse URL to extract components
+            from urllib.parse import urlparse
+            parsed = urlparse(qdrant_url)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
+            https = parsed.scheme == 'https'
+        else:
+            # Fall back to host/port configuration
+            host = os.getenv("QDRANT_HOST", "localhost")
+            port = int(os.getenv("QDRANT_PORT", "6333"))
+            https = port == 443  # Auto-detect HTTPS for port 443
+
         config = QdrantConfig(
-            host=os.getenv("QDRANT_HOST", "localhost"),
-            port=int(os.getenv("QDRANT_PORT", "6333")),
+            host=host,
+            port=port,
+            https=https,
+            api_key=os.getenv("QDRANT_API_KEY"),
             collection_name=os.getenv("QDRANT_COLLECTION", "morag_vectors")
         )
         return QdrantStorage(config)
