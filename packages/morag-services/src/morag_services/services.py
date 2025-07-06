@@ -123,19 +123,30 @@ class MoRAGServices:
             from .embedding import GeminiEmbeddingService
 
             # Initialize vector storage
-            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+            # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
+            qdrant_url = os.getenv('QDRANT_URL')
             qdrant_api_key = os.getenv('QDRANT_API_KEY')
             collection_name = os.getenv('QDRANT_COLLECTION_NAME')
             if not collection_name:
                 raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
 
-            self._vector_storage = QdrantVectorStorage(
-                host=qdrant_host,
-                port=qdrant_port,
-                api_key=qdrant_api_key,
-                collection_name=collection_name
-            )
+            if qdrant_url:
+                # Use URL-based connection (supports HTTPS automatically)
+                self._vector_storage = QdrantVectorStorage(
+                    host=qdrant_url,
+                    api_key=qdrant_api_key,
+                    collection_name=collection_name
+                )
+            else:
+                # Fall back to host/port connection
+                qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+                qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+                self._vector_storage = QdrantVectorStorage(
+                    host=qdrant_host,
+                    port=qdrant_port,
+                    api_key=qdrant_api_key,
+                    collection_name=collection_name
+                )
 
             # Initialize embedding service
             gemini_api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')

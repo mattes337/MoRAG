@@ -87,6 +87,9 @@ class IngestionCoordinator:
                 collection_name=collection_name
             )
 
+        # Initialize vector storage connection and ensure collection exists
+        await self.vector_storage.initialize()
+
         # Initialize graph extractor
         self.graph_extractor = GraphExtractor()
         
@@ -834,9 +837,25 @@ class IngestionCoordinator:
         replace_existing: bool
     ) -> Dict[str, Any]:
         """Write vector data to Qdrant."""
+        host = db_config.hostname or 'localhost'
+        port = db_config.port or 6333
+
+        # Check if hostname is a URL and extract components
+        if host.startswith(('http://', 'https://')):
+            from urllib.parse import urlparse
+            parsed = urlparse(host)
+            hostname = parsed.hostname or "localhost"
+            port = parsed.port or (443 if parsed.scheme == 'https' else port)
+            https = parsed.scheme == 'https'
+        else:
+            hostname = host
+            https = port == 443  # Auto-detect HTTPS for port 443
+
         qdrant_config = QdrantConfig(
-            host=db_config.hostname or 'localhost',
-            port=db_config.port or 6333,
+            host=hostname,
+            port=port,
+            https=https,
+            api_key=os.getenv('QDRANT_API_KEY'),
             collection_name=db_config.database_name or 'morag_documents',
             vector_size=embeddings_data.get('embedding_dimension', 768)
         )

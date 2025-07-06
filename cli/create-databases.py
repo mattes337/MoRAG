@@ -110,13 +110,26 @@ async def create_qdrant_collection(collection_name: str, vector_size: int = 768)
     """Create a Qdrant collection."""
     try:
         from morag_services.storage import QdrantVectorStorage
-        
-        storage = QdrantVectorStorage(
-            host=os.getenv('QDRANT_HOST', 'localhost'),
-            port=int(os.getenv('QDRANT_PORT', '6333')),
-            api_key=os.getenv('QDRANT_API_KEY'),
-            collection_name=collection_name
-        )
+
+        # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
+        qdrant_url = os.getenv('QDRANT_URL')
+        qdrant_api_key = os.getenv('QDRANT_API_KEY')
+
+        if qdrant_url:
+            # Use URL-based connection (supports HTTPS automatically)
+            storage = QdrantVectorStorage(
+                host=qdrant_url,
+                api_key=qdrant_api_key,
+                collection_name=collection_name
+            )
+        else:
+            # Fall back to host/port connection
+            storage = QdrantVectorStorage(
+                host=os.getenv('QDRANT_HOST', 'localhost'),
+                port=int(os.getenv('QDRANT_PORT', '6333')),
+                api_key=qdrant_api_key,
+                collection_name=collection_name
+            )
         
         await storage.connect()
         await storage.create_collection(collection_name, vector_size, force_recreate=False)
@@ -172,12 +185,37 @@ async def list_existing_databases() -> None:
     
     try:
         from qdrant_client import QdrantClient
-        
-        client = QdrantClient(
-            host=os.getenv('QDRANT_HOST', 'localhost'),
-            port=int(os.getenv('QDRANT_PORT', '6333')),
-            api_key=os.getenv('QDRANT_API_KEY')
-        )
+
+        # Use the same logic as the storage classes for HTTPS support
+        qdrant_url = os.getenv('QDRANT_URL')
+        qdrant_api_key = os.getenv('QDRANT_API_KEY')
+
+        if qdrant_url:
+            # Parse URL for connection
+            from urllib.parse import urlparse
+            parsed = urlparse(qdrant_url)
+            hostname = parsed.hostname or "localhost"
+            port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
+            use_https = parsed.scheme == 'https'
+
+            client = QdrantClient(
+                host=hostname,
+                port=port,
+                https=use_https,
+                api_key=qdrant_api_key
+            )
+        else:
+            # Fall back to host/port
+            qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
+            qdrant_port = int(os.getenv('QDRANT_PORT', '6333'))
+            use_https = qdrant_port == 443
+
+            client = QdrantClient(
+                host=qdrant_host,
+                port=qdrant_port,
+                https=use_https,
+                api_key=qdrant_api_key
+            )
         
         collections = client.get_collections()
         for col in collections.collections:

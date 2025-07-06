@@ -52,6 +52,8 @@ class QdrantVectorStorage(BaseVectorStorage):
         """
         try:
             await self.connect()
+            # Ensure the collection exists
+            await self.ensure_collection_exists()
             self._initialized = True
             logger.info("QdrantVectorStorage initialized successfully")
             return True
@@ -158,6 +160,37 @@ class QdrantVectorStorage(BaseVectorStorage):
             await asyncio.to_thread(self.client.close)
             self.client = None
             logger.info("Disconnected from Qdrant")
+
+    async def ensure_collection_exists(self, vector_size: int = 768) -> None:
+        """Ensure the collection exists, create it if it doesn't.
+
+        Args:
+            vector_size: Size of vectors for the collection (default: 768)
+        """
+        if not self.client:
+            await self.connect()
+
+        try:
+            # Check if collection exists
+            collections = await asyncio.to_thread(self.client.get_collections)
+            collection_exists = any(
+                col.name == self.collection_name
+                for col in collections.collections
+            )
+
+            if not collection_exists:
+                logger.info("Collection does not exist, creating it",
+                           collection=self.collection_name,
+                           vector_size=vector_size)
+                await self.create_collection(self.collection_name, vector_size)
+            else:
+                logger.info("Collection already exists", collection=self.collection_name)
+
+        except Exception as e:
+            logger.error("Failed to ensure collection exists",
+                        collection=self.collection_name,
+                        error=str(e))
+            raise StorageError(f"Failed to ensure collection exists: {str(e)}")
     
     async def create_collection(
         self, 
