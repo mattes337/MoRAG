@@ -46,13 +46,17 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
-1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
-2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
+1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
+2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
 3. relation_type: A SIMPLE, descriptive relation type (e.g., EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
-CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
+CRITICAL ENTITY NAME MATCHING:
+- Use the NORMALIZED form of entity names (singular, unconjugated) that match the known entities list
+- If you see "Schwermetallen" in text, use "Schwermetall" (the normalized form from known entities)
+- If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
+- Only extract relations between entities that are explicitly listed in the "Known entities" section
 
 Guidelines for relation types:
 - Use SIMPLE, clear names that capture the core relationship
@@ -88,13 +92,17 @@ RELATION TYPES:
 {types_section}
 
 For each relation, provide:
-1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
-2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
+1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
+2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
 3. relation_type: Most appropriate relation type from the list above
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
-CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
+CRITICAL ENTITY NAME MATCHING:
+- Use the NORMALIZED form of entity names (singular, unconjugated) that match the known entities list
+- If you see "Schwermetallen" in text, use "Schwermetall" (the normalized form from known entities)
+- If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
+- Only extract relations between entities that are explicitly listed in the "Known entities" section
 
 Focus on relations that are:
 - Explicitly stated or clearly implied in the text
@@ -117,13 +125,17 @@ Avoid extracting:
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
-1. source_entity: Name of the source entity (MUST match exactly one of the known entities)
-2. target_entity: Name of the target entity (MUST match exactly one of the known entities)
+1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
+2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
 3. relation_type: A SIMPLE, descriptive relation type (e.g., EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
-CRITICAL: Only extract relations between entities that are explicitly listed in the "Known entities" section. Do not create relations with entities that are not in that list.
+CRITICAL ENTITY NAME MATCHING:
+- Use the NORMALIZED form of entity names (singular, unconjugated) that match the known entities list
+- If you see "Schwermetallen" in text, use "Schwermetall" (the normalized form from known entities)
+- If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
+- Only extract relations between entities that are explicitly listed in the "Known entities" section
 
 Guidelines for relation types:
 - Use SIMPLE, clear names that capture the core relationship

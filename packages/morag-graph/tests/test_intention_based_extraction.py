@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 from morag_graph.extraction.entity_extractor import EntityExtractor
 from morag_graph.extraction.relation_extractor import RelationExtractor
 from morag_graph.extraction.base import LLMConfig
-from morag_graph.models import Entity, Relation, EntityType, RelationType
+from morag_graph.models import Entity, Relation
 
 
 @pytest.fixture
@@ -168,21 +168,23 @@ class TestIntentionBasedExtraction:
     def test_entity_prompt_includes_abstraction_guidance(self, entity_extractor):
         """Test that entity extraction prompts include abstraction guidance."""
         system_prompt = entity_extractor.get_system_prompt()
-        
+
         # Check for abstraction guidance
-        assert "ABSTRACT, BROAD entity types" in system_prompt
+        assert "BROAD, REUSABLE entity types" in system_prompt
         assert "SINGULAR" in system_prompt
-        assert "ANATOMICAL over BRAIN_REGION/CELL_TYPE" in system_prompt
-        assert "TECHNOLOGY over SOFTWARE_LIBRARY/FRAMEWORK" in system_prompt
+        assert "BODY_PART" in system_prompt  # Example of broad typing
+        assert "TECHNOLOGY" in system_prompt  # Example of broad typing
+        assert "UNCONJUGATED" in system_prompt  # Entity name normalization
     
     def test_relation_prompt_includes_abstraction_guidance(self, relation_extractor):
         """Test that relation extraction prompts include abstraction guidance."""
         system_prompt = relation_extractor.get_system_prompt()
-        
+
         # Check for abstraction guidance
-        assert "BROAD, ABSTRACT relation types" in system_prompt
-        assert "IS_MEMBER over IS_CEO/IS_CTO" in system_prompt
-        assert "AFFECTS over CAUSES_INFLAMMATION/TRIGGERS_RESPONSE" in system_prompt
+        assert "SIMPLE, descriptive relation type" in system_prompt
+        assert "NORMALIZED name" in system_prompt
+        assert "SINGULAR, UNCONJUGATED form" in system_prompt
+        assert "GENERAL types over overly specific ones" in system_prompt
     
     @pytest.mark.asyncio
     async def test_extract_entities_alias_method(self, entity_extractor):

@@ -46,10 +46,18 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
 CRITICAL INSTRUCTION: Create BROAD, REUSABLE entity types. Avoid overly specific types that would create duplicate entities. Think of entity types as categories that many similar entities could share.
 
 For each entity, provide:
-1. name: The exact text as it appears in the source
+1. name: The SINGULAR, UNCONJUGATED base form of the entity (NOT the exact text as it appears)
 2. type: A BROAD, REUSABLE entity type that YOU determine
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
+
+CRITICAL ENTITY NAME NORMALIZATION RULES:
+- ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
+- ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
+- RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
+- If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
+- Use the most CANONICAL form of the entity name
+- Normalize case appropriately: proper nouns capitalized, common nouns lowercase
 
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities
@@ -108,16 +116,24 @@ REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type 
         elif self.entity_types:
             # Custom types mode - use provided entity types
             types_section = "\n".join([f"- {type_name}: {description}" for type_name, description in self.entity_types.items()])
-            return f"""You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.
+            return f"""You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high accuracy.{language_instruction}
 
 Extract entities that represent:
 {types_section}
 
 For each entity, provide:
-1. name: The exact text as it appears in the source
+1. name: The SINGULAR, UNCONJUGATED base form of the entity (NOT the exact text as it appears)
 2. type: The most appropriate entity type from the list above
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
+
+CRITICAL ENTITY NAME NORMALIZATION RULES:
+- ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
+- ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
+- RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
+- If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
+- Use the most CANONICAL form of the entity name
+- Normalize case appropriately: proper nouns capitalized, common nouns lowercase
 
 Focus on entities that are:
 - Clearly identifiable and significant
@@ -136,10 +152,18 @@ Avoid extracting:
 CRITICAL INSTRUCTION: Create BROAD, REUSABLE entity types. Avoid overly specific types that would create duplicate entities. Think of entity types as categories that many similar entities could share.
 
 For each entity, provide:
-1. name: The exact text as it appears in the source
+1. name: The SINGULAR, UNCONJUGATED base form of the entity (NOT the exact text as it appears)
 2. type: A BROAD, REUSABLE entity type that YOU determine
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
+
+CRITICAL ENTITY NAME NORMALIZATION RULES:
+- ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
+- ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
+- RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
+- If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
+- Use the most CANONICAL form of the entity name
+- Normalize case appropriately: proper nouns capitalized, common nouns lowercase
 
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities
