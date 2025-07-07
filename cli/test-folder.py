@@ -55,6 +55,21 @@ from morag.api import MoRAGAPI
 from morag_graph.models.database_config import DatabaseConfig, DatabaseType
 
 
+class ServiceResultWrapper:
+    """Wrapper to convert service dictionary results to object-like interface."""
+
+    def __init__(self, result_dict):
+        self.success = result_dict.get('success', True)
+        self.processing_time = result_dict.get('processing_time', 0.0)
+        self.metadata = result_dict.get('metadata', {})
+        self.error_message = result_dict.get('error', None)
+        self.content = result_dict.get('content', '')
+        self.text_content = result_dict.get('content', '')
+        # Handle document-specific results
+        if 'document' in result_dict:
+            self.document = result_dict['document']
+
+
 def get_supported_extensions() -> Set[str]:
     """Get all supported file extensions for ingestion."""
     return {
@@ -256,17 +271,20 @@ async def process_single_file(
             processor = DocumentProcessor()
             result = await processor.process_file(file_path)
         elif content_type == 'image':
-            from morag_image import ImageProcessor
-            processor = ImageProcessor()
-            result = await processor.process_file(file_path)
+            from morag_image import ImageService
+            processor = ImageService()
+            service_result = await processor.process_image(file_path)
+            result = ServiceResultWrapper(service_result)
         elif content_type == 'audio':
-            from morag_audio import AudioProcessor
-            processor = AudioProcessor()
-            result = await processor.process_file(file_path)
+            from morag_audio import AudioService
+            processor = AudioService()
+            service_result = await processor.process_file(file_path, save_output=False)
+            result = ServiceResultWrapper(service_result)
         elif content_type == 'video':
-            from morag_video import VideoProcessor
-            processor = VideoProcessor()
-            result = await processor.process_file(file_path)
+            from morag_video import VideoService
+            processor = VideoService()
+            service_result = await processor.process_file(file_path, save_output=False)
+            result = ServiceResultWrapper(service_result)
         else:
             # Use the general API for other types
             result = await api.process_file(str(file_path), content_type)
