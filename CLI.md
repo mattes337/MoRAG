@@ -196,6 +196,47 @@ python cli/test-image.py screenshot.png --ingest --neo4j --metadata '{"source": 
 - AI-powered image descriptions
 - Supports JPG, PNG, GIF, BMP, WebP, TIFF, SVG
 
+#### `test-folder.py`
+**Purpose**: Batch processing of all files in a folder
+
+**Processing Mode** (immediate results):
+```bash
+python cli/test-folder.py /path/to/documents
+python cli/test-folder.py /path/to/documents --dry-run
+python cli/test-folder.py /path/to/documents --no-recursive
+```
+
+**Ingestion Mode** (background processing + storage):
+```bash
+python cli/test-folder.py /path/to/documents --ingest --qdrant
+python cli/test-folder.py /path/to/documents --ingest --qdrant --neo4j
+python cli/test-folder.py /path/to/documents --ingest --qdrant --metadata '{"category": "research"}'
+```
+
+**Advanced Options**:
+```bash
+# Force reprocess files even if already processed
+python cli/test-folder.py /path/to/documents --ingest --qdrant --force-reprocess
+
+# Limit concurrent processing
+python cli/test-folder.py /path/to/documents --ingest --qdrant --max-concurrent 1
+
+# Process with custom language
+python cli/test-folder.py /path/to/documents --ingest --qdrant --language en
+```
+
+**Features**:
+- Automatic file type detection (documents, images, audio, video)
+- Recursive folder processing (configurable)
+- Skip already processed files (based on ingest_result.json existence)
+- Resume from existing ingest_data.json files
+- Configurable concurrency (default: 3 files at once)
+- Dry run mode to preview what would be processed
+- Force reprocess option to override skip logic
+- Support for custom metadata and language specification
+- Comprehensive error handling and progress reporting
+- Supports all file types: PDF, DOCX, TXT, MD, MP3, MP4, JPG, PNG, etc.
+
 #### `test-web.py`
 **Purpose**: Web content extraction and processing
 
