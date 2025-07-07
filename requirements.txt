@@ -34,8 +34,8 @@ psutil==6.1.0
 # Audio processing (basic)
 pydub>=0.25.1
 ffmpeg-python>=0.2.0
-# Python 3.13 compatibility for audio processing
-audioop-lts>=0.2.1
+# Python 3.11 compatibility for audio processing
+# audioop-lts>=0.2.1  # Requires Python 3.13+, not compatible with 3.11
 # Optional: onnxruntime for VAD filter (Voice Activity Detection)
 # Note: May have compatibility issues on some Windows systems
 # onnxruntime>=1.22.0
