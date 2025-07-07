@@ -319,30 +319,41 @@ Avoid extracting:
         source_doc_id: Optional[str]
     ) -> Optional[GraphRelation]:
         """Convert AI relation to graph relation with entity ID resolution."""
-        if not entities:
-            self.logger.warning("No entities provided for relation resolution")
-            return None
-        
-        # Create entity name to ID mapping
-        entity_name_to_id = {entity.name.lower().strip(): entity.id for entity in entities}
-        
+        # Create entity name to ID mapping for known entities
+        entity_name_to_id = {}
+        if entities:
+            entity_name_to_id = {entity.name.lower().strip(): entity.id for entity in entities}
+
         # Resolve source entity ID
         source_key = relation.source_entity.lower().strip()
         source_entity_id = entity_name_to_id.get(source_key)
-        
+
         # Resolve target entity ID
         target_key = relation.target_entity.lower().strip()
         target_entity_id = entity_name_to_id.get(target_key)
-        
-        if not source_entity_id or not target_entity_id:
-            self.logger.debug(
-                "Could not resolve entity IDs for relation",
-                source_entity=relation.source_entity,
-                target_entity=relation.target_entity,
-                source_resolved=source_entity_id is not None,
-                target_resolved=target_entity_id is not None
+
+        # Generate IDs for missing entities - let storage layer handle creation
+        if not source_entity_id:
+            from ..utils.id_generation import UnifiedIDGenerator
+            source_entity_id = UnifiedIDGenerator.generate_entity_id(
+                relation.source_entity, "CUSTOM", source_doc_id or ""
             )
-            return None
+            self.logger.debug(
+                "Generated ID for missing source entity",
+                entity_name=relation.source_entity,
+                generated_id=source_entity_id
+            )
+
+        if not target_entity_id:
+            from ..utils.id_generation import UnifiedIDGenerator
+            target_entity_id = UnifiedIDGenerator.generate_entity_id(
+                relation.target_entity, "CUSTOM", source_doc_id or ""
+            )
+            self.logger.debug(
+                "Generated ID for missing target entity",
+                entity_name=relation.target_entity,
+                generated_id=target_entity_id
+            )
         
         # Always use dynamic relation types - LLM determines the type
         if isinstance(relation.relation_type, str):
@@ -358,7 +369,11 @@ Avoid extracting:
         attributes = relation.metadata.copy() if relation.metadata else {}
         if relation.context:
             attributes['context'] = relation.context
-        
+
+        # Add entity names to attributes for storage layer to use when creating missing entities
+        attributes['source_entity_name'] = relation.source_entity
+        attributes['target_entity_name'] = relation.target_entity
+
         return GraphRelation(
             source_entity_id=source_entity_id,
             target_entity_id=target_entity_id,
