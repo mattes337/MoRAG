@@ -10,7 +10,7 @@ import structlog
 
 from morag.dependencies import (
     get_reasoning_path_finder, get_iterative_retriever, get_llm_client,
-    REASONING_AVAILABLE
+    REASONING_AVAILABLE, create_dynamic_graph_engine
 )
 
 logger = structlog.get_logger(__name__)
@@ -27,6 +27,12 @@ class MultiHopQuery(BaseModel):
     max_depth: int = Field(4, ge=1, le=10, description="Maximum reasoning depth")
     max_paths: int = Field(50, ge=1, le=100, description="Maximum paths to discover")
     max_iterations: int = Field(5, ge=1, le=10, description="Maximum refinement iterations")
+
+    # Database server configuration
+    database_servers: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Optional array of database server configurations. If not provided, uses environment defaults."
+    )
 
 
 class PathInfo(BaseModel):
@@ -122,10 +128,17 @@ async def multi_hop_reasoning(
         )
     
     start_time = time.time()
-    
+
     try:
-        logger.info("Starting multi-hop reasoning", 
-                   query=request.query, 
+        # Use dynamic database connections if provided
+        if request.database_servers:
+            # Create dynamic graph engine for reasoning
+            graph_engine = create_dynamic_graph_engine(request.database_servers)
+            # TODO: Create dynamic path finder and iterative retriever with custom graph engine
+            # For now, we'll use the default ones but this could be enhanced
+
+        logger.info("Starting multi-hop reasoning",
+                   query=request.query,
                    strategy=request.strategy,
                    start_entities=request.start_entities)
         

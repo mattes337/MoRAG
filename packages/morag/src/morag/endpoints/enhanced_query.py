@@ -11,11 +11,18 @@ import structlog
 
 from morag.models.enhanced_query import (
     EnhancedQueryRequest, EnhancedQueryResponse, EntityQueryRequest,
-    GraphTraversalRequest, GraphTraversalResponse
+    GraphTraversalRequest, GraphTraversalResponse, GraphAnalyticsRequest
 )
-from morag.dependencies import get_hybrid_retrieval_coordinator, get_graph_engine
+from morag.dependencies import (
+    get_hybrid_retrieval_coordinator, get_graph_engine,
+    create_dynamic_graph_engine, create_dynamic_hybrid_retrieval_coordinator
+)
 from morag.utils.response_builder import EnhancedResponseBuilder
 from morag.utils.query_validator import QueryValidator
+from morag.database_factory import (
+    get_neo4j_storages, get_qdrant_storages,
+    get_default_neo4j_storage, get_default_qdrant_storage
+)
 
 router = APIRouter(prefix="/api/v2", tags=["enhanced-query"])
 logger = structlog.get_logger(__name__)
@@ -32,24 +39,28 @@ async def enhanced_query(
     start_time = datetime.now()
     
     try:
+        # Use dynamic database connections if provided
+        if request.database_servers:
+            hybrid_system = create_dynamic_hybrid_retrieval_coordinator(request.database_servers)
+
         # Validate request
         validator = QueryValidator()
         validation_result = await validator.validate_query_request(request)
         if not validation_result.is_valid:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Invalid query: {validation_result.error_message}"
             )
-        
+
         # Log warnings if any
         if validation_result.warnings:
-            logger.warning("Query validation warnings", 
-                         query_id=query_id, 
+            logger.warning("Query validation warnings",
+                         query_id=query_id,
                          warnings=validation_result.warnings)
-        
+
         # Process query
-        logger.info("Processing enhanced query", 
-                   query_id=query_id, 
+        logger.info("Processing enhanced query",
+                   query_id=query_id,
                    query=request.query[:100],
                    query_type=request.query_type)
         
@@ -114,9 +125,14 @@ async def enhanced_query_stream(
 ):
     """Streaming version of enhanced query for real-time results."""
     query_id = str(uuid.uuid4())
-    
+
     async def generate_stream():
         try:
+            # Use dynamic database connections if provided
+            nonlocal hybrid_system
+            if request.database_servers:
+                hybrid_system = create_dynamic_hybrid_retrieval_coordinator(request.database_servers)
+
             logger.info("Starting streaming query", query_id=query_id)
             
             # For now, we'll simulate streaming by processing normally
@@ -186,7 +202,11 @@ async def entity_query(
 ):
     """Query specific entities and their relationships."""
     try:
-        logger.info("Processing entity query", 
+        # Use dynamic database connections if provided
+        if request.database_servers:
+            graph_engine = create_dynamic_graph_engine(request.database_servers)
+
+        logger.info("Processing entity query",
                    entity_id=request.entity_id,
                    entity_name=request.entity_name)
         
@@ -255,7 +275,11 @@ async def graph_traversal(
     start_time = datetime.now()
     
     try:
-        logger.info("Processing graph traversal", 
+        # Use dynamic database connections if provided
+        if request.database_servers:
+            graph_engine = create_dynamic_graph_engine(request.database_servers)
+
+        logger.info("Processing graph traversal",
                    start_entity=request.start_entity,
                    end_entity=request.end_entity,
                    traversal_type=request.traversal_type)
@@ -321,16 +345,27 @@ async def graph_traversal(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/graph/analytics")
+@router.post("/graph/analytics")
 async def graph_analytics(
-    metric_type: str = "overview",
+    request: GraphAnalyticsRequest,
     graph_engine = Depends(get_graph_engine)
 ):
     """Get graph analytics and statistics."""
     try:
-        logger.info("Processing graph analytics request", metric_type=metric_type)
-        
-        if metric_type == "overview":
+        logger.info("Processing graph analytics request", metric_type=request.metric_type)
+
+        # Handle custom database servers if provided
+        neo4j_storages = []
+        if request.database_servers:
+            neo4j_storages = get_neo4j_storages(request.database_servers)
+
+        # Use custom storages or fall back to default
+        if neo4j_storages:
+            # Use first available custom Neo4j storage
+            # TODO: In future, could aggregate results from multiple storages
+            graph_engine = neo4j_storages[0]  # Simplified for now
+
+        if request.metric_type == "overview":
             try:
                 stats = await graph_engine.get_graph_statistics()
                 return {
@@ -351,7 +386,7 @@ async def graph_analytics(
                     "note": "Statistics not available"
                 }
         
-        elif metric_type == "centrality":
+        elif request.metric_type == "centrality":
             try:
                 centrality = await graph_engine.calculate_centrality_measures()
                 return {
@@ -368,7 +403,7 @@ async def graph_analytics(
                     "note": "Centrality measures not available"
                 }
         
-        elif metric_type == "communities":
+        elif request.metric_type == "communities":
             try:
                 communities = await graph_engine.detect_communities()
                 return {
@@ -388,7 +423,7 @@ async def graph_analytics(
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown metric type: {metric_type}"
+                detail=f"Unknown metric type: {request.metric_type}"
             )
             
     except HTTPException:

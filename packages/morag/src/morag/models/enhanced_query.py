@@ -58,6 +58,12 @@ class EnhancedQueryRequest(BaseModel):
     min_relevance_score: float = Field(default=0.1, ge=0.0, le=1.0, description="Minimum relevance threshold")
     timeout_seconds: int = Field(default=30, ge=1, le=300, description="Query timeout")
 
+    # Database server configuration
+    database_servers: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Optional array of database server configurations. If not provided, uses environment defaults."
+    )
+
 
 class EntityInfo(BaseModel):
     """Information about an entity in the graph context."""
@@ -129,23 +135,46 @@ class EntityQueryRequest(BaseModel):
     entity_id: Optional[str] = Field(default=None, description="Specific entity ID")
     entity_name: Optional[str] = Field(default=None, description="Entity name to search")
     entity_type: Optional[str] = Field(default=None, description="Entity type filter")
-    
+
     include_relations: bool = Field(default=True, description="Include entity relations")
     relation_depth: int = Field(default=1, ge=1, le=3, description="Relation traversal depth")
     max_relations: int = Field(default=50, ge=1, le=200, description="Maximum relations to return")
+
+    # Database server configuration
+    database_servers: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Optional array of database server configurations. If not provided, uses environment defaults."
+    )
 
 
 class GraphTraversalRequest(BaseModel):
     """Request for graph traversal between entities."""
     start_entity: str = Field(..., description="Starting entity ID")
     end_entity: Optional[str] = Field(default=None, description="Target entity ID")
-    
+
     traversal_type: str = Field(default="shortest_path", description="Type of traversal")
     max_depth: int = Field(default=3, ge=1, le=6, description="Maximum traversal depth")
     max_paths: int = Field(default=10, ge=1, le=50, description="Maximum paths to return")
-    
+
     relation_filters: Optional[List[str]] = Field(default=None, description="Allowed relation types")
     entity_filters: Optional[List[str]] = Field(default=None, description="Allowed entity types")
+
+    # Database server configuration
+    database_servers: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Optional array of database server configurations. If not provided, uses environment defaults."
+    )
+
+
+class GraphAnalyticsRequest(BaseModel):
+    """Request for graph analytics and statistics."""
+    metric_type: str = Field(default="overview", description="Type of analytics metric (overview, centrality, communities)")
+
+    # Database server configuration
+    database_servers: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Optional array of database server configurations. If not provided, uses environment defaults."
+    )
 
 
 class GraphPath(BaseModel):

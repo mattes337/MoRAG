@@ -1,7 +1,7 @@
 """FastAPI dependencies for MoRAG API."""
 
 import os
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from functools import lru_cache
 import structlog
 from fastapi import HTTPException
@@ -443,3 +443,83 @@ def get_iterative_retriever() -> Optional[IterativeRetriever]:
     except Exception as e:
         logger.warning("Iterative retriever not available", error=str(e))
         return None
+
+
+def create_dynamic_graph_engine(database_servers: Optional[List[Dict[str, Any]]] = None) -> GraphEngine:
+    """Create a graph engine with dynamic database connections."""
+    if database_servers:
+        from morag.database_factory import get_neo4j_storages
+        neo4j_storages = get_neo4j_storages(database_servers)
+
+        if neo4j_storages:
+            # Create a custom graph engine with the first available storage
+            # TODO: In future, could support multiple storages
+            storage = neo4j_storages[0]
+
+            class DynamicGraphEngine(GraphEngine):
+                def __init__(self, storage):
+                    self.storage = storage
+                    self.available = True
+                    # Initialize components with custom storage
+                    try:
+                        from morag_graph import GraphCRUD, GraphTraversal, GraphAnalytics
+                        self.crud = GraphCRUD(storage)
+                        self.traversal = GraphTraversal(storage)
+                        self.analytics = GraphAnalytics(storage)
+                    except Exception as e:
+                        logger.error("Failed to initialize dynamic graph engine components", error=str(e))
+                        self.available = False
+
+            return DynamicGraphEngine(storage)
+
+    # Fall back to default graph engine
+    return get_graph_engine()
+
+
+def create_dynamic_hybrid_retrieval_coordinator(database_servers: Optional[List[Dict[str, Any]]] = None):
+    """Create a hybrid retrieval coordinator with dynamic database connections."""
+    if database_servers:
+        from morag.database_factory import get_qdrant_storages, get_neo4j_storages
+
+        qdrant_storages = get_qdrant_storages(database_servers)
+        neo4j_storages = get_neo4j_storages(database_servers)
+
+        # Create custom vector retriever if Qdrant storages are available
+        if qdrant_storages:
+            class DynamicVectorRetriever:
+                def __init__(self, qdrant_storage):
+                    self.storage = qdrant_storage
+
+                async def retrieve(self, query: str, max_results: int = 10) -> list:
+                    """Retrieve using custom Qdrant storage."""
+                    try:
+                        # TODO: Generate embedding for query
+                        # For now, return empty results as placeholder
+                        return []
+                    except Exception as e:
+                        logger.error("Dynamic vector retrieval failed", error=str(e))
+                        return []
+
+            vector_retriever = DynamicVectorRetriever(qdrant_storages[0])
+
+            # Create custom context expansion engine if Neo4j storages are available
+            if neo4j_storages:
+                try:
+                    from morag_graph.retrieval import ContextExpansionEngine
+                    context_expansion_engine = ContextExpansionEngine(neo4j_storages[0])
+
+                    # Create query entity extractor
+                    from morag_graph.query import QueryEntityExtractor
+                    query_entity_extractor = QueryEntityExtractor()
+
+                    from morag_graph.retrieval import HybridRetrievalCoordinator
+                    return HybridRetrievalCoordinator(
+                        vector_retriever=vector_retriever,
+                        context_expansion_engine=context_expansion_engine,
+                        query_entity_extractor=query_entity_extractor
+                    )
+                except Exception as e:
+                    logger.error("Failed to create dynamic hybrid coordinator", error=str(e))
+
+    # Fall back to default coordinator
+    return get_hybrid_retrieval_coordinator()

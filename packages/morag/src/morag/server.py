@@ -11,7 +11,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 import structlog
 
@@ -313,6 +313,10 @@ class SearchRequest(BaseModel):
     query: str
     limit: int = 10
     filters: Optional[Dict[str, Any]] = None
+    database_servers: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Optional array of database server configurations. If not provided, uses environment defaults."
+    )
 
 
 class ProcessingResultResponse(BaseModel):
@@ -684,6 +688,26 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     async def search_similar(request: SearchRequest):
         """Search for similar content."""
         try:
+            # Handle custom database servers if provided
+            if request.database_servers:
+                from morag.database_factory import get_qdrant_storages
+                qdrant_storages = get_qdrant_storages(request.database_servers)
+
+                if qdrant_storages:
+                    # Use first available custom Qdrant storage for search
+                    # TODO: In future, could aggregate results from multiple storages
+                    custom_storage = qdrant_storages[0]
+
+                    # Perform search using custom storage
+                    results = await custom_storage.search_similar(
+                        query_vector=None,  # Will need to generate embedding
+                        limit=request.limit,
+                        score_threshold=0.5,
+                        filters=request.filters
+                    )
+                    return {"results": results}
+
+            # Fall back to default search
             results = await get_morag_api().search(
                 request.query,
                 request.limit,

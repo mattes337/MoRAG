@@ -24,6 +24,7 @@ from .enhanced_query import (
     GraphTraversalRequest,
     GraphPath,
     GraphTraversalResponse,
+    GraphAnalyticsRequest,
 )
 
 # Legacy models temporarily removed - will be recreated
@@ -54,6 +55,7 @@ __all__ = [
     "GraphTraversalRequest",
     "GraphPath",
     "GraphTraversalResponse",
+    "GraphAnalyticsRequest",
     # Legacy models temporarily removed
     # "LegacyQueryRequest",
     # "LegacyQueryResponse",

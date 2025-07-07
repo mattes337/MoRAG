@@ -21,7 +21,7 @@ from .operations import GraphCRUD, GraphTraversal, GraphPath, GraphAnalytics
 from .builders import GraphBuilder, GraphBuildResult, GraphBuildError
 
 # Database configuration models
-from .models.database_config import DatabaseType, DatabaseConfig, DatabaseResult
+from .models.database_config import DatabaseType, DatabaseConfig, DatabaseServerConfig, DatabaseServerArray, DatabaseResult
 
 # Query processing
 from .query import QueryEntityExtractor, QueryEntity, QueryAnalysis, QueryIntentAnalyzer
@@ -45,6 +45,8 @@ __all__ = [
     "QdrantConfig",
     "DatabaseType",
     "DatabaseConfig",
+    "DatabaseServerConfig",
+    "DatabaseServerArray",
     "DatabaseResult",
     "GraphCRUD",
     "GraphTraversal",
