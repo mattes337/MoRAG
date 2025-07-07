@@ -53,6 +53,7 @@ For each entity, provide:
 
 CRITICAL ENTITY NAME NORMALIZATION RULES:
 - ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
+- ALWAYS use MASCULINE form: "Zahnmediziner" not "Zahnmedizinerin"
 - ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
 - RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
 - If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
@@ -129,6 +130,7 @@ For each entity, provide:
 
 CRITICAL ENTITY NAME NORMALIZATION RULES:
 - ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
+- ALWAYS use MASCULINE form: "Zahnmediziner" not "Zahnmedizinerin"
 - ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
 - RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
 - If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
@@ -159,6 +161,7 @@ For each entity, provide:
 
 CRITICAL ENTITY NAME NORMALIZATION RULES:
 - ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
+- ALWAYS use MASCULINE form: "Zahnmediziner" not "Zahnmedizinerin"
 - ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
 - RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
 - If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"

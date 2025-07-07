@@ -46,14 +46,15 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
-1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
-2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
+1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
+2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
 3. relation_type: A SIMPLE, descriptive relation type (e.g., EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
 CRITICAL ENTITY NAME MATCHING:
-- Use the NORMALIZED form of entity names (singular, unconjugated) that match the known entities list
+- Use the NORMALIZED form of entity names (singular, unconjugated, masculine) that match the known entities list
+- If you see "Zahnmedizinerin" in text, use "Zahnmediziner" (the normalized form from known entities)
 - If you see "Schwermetallen" in text, use "Schwermetall" (the normalized form from known entities)
 - If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
 - Only extract relations between entities that are explicitly listed in the "Known entities" section
@@ -92,14 +93,15 @@ RELATION TYPES:
 {types_section}
 
 For each relation, provide:
-1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
-2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
+1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
+2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
 3. relation_type: Most appropriate relation type from the list above
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
 CRITICAL ENTITY NAME MATCHING:
-- Use the NORMALIZED form of entity names (singular, unconjugated) that match the known entities list
+- Use the NORMALIZED form of entity names (singular, unconjugated, masculine) that match the known entities list
+- If you see "Zahnmedizinerin" in text, use "Zahnmediziner" (the normalized form from known entities)
 - If you see "Schwermetallen" in text, use "Schwermetall" (the normalized form from known entities)
 - If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
 - Only extract relations between entities that are explicitly listed in the "Known entities" section
@@ -125,14 +127,15 @@ Avoid extracting:
 Extract relations that represent clear, factual connections between entities. Determine the most appropriate relation type based on the semantic meaning and context of the relationship. Do not limit yourself to predefined categories.
 
 For each relation, provide:
-1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
-2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED form that matches the known entities)
+1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
+2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
 3. relation_type: A SIMPLE, descriptive relation type (e.g., EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief explanation of the relationship
 
 CRITICAL ENTITY NAME MATCHING:
-- Use the NORMALIZED form of entity names (singular, unconjugated) that match the known entities list
+- Use the NORMALIZED form of entity names (singular, unconjugated, masculine) that match the known entities list
+- If you see "Zahnmedizinerin" in text, use "Zahnmediziner" (the normalized form from known entities)
 - If you see "Schwermetallen" in text, use "Schwermetall" (the normalized form from known entities)
 - If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
 - Only extract relations between entities that are explicitly listed in the "Known entities" section
