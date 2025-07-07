@@ -34,7 +34,7 @@ class GraphExtractor:
         llm_config = LLMConfig(
             provider="gemini",
             api_key=os.getenv('GEMINI_API_KEY'),
-            model=os.getenv('GEMINI_MODEL', 'gemini-1.5-flash'),  # Use same default as run_extraction.py
+            model=os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash'),  # Use same default as run_extraction.py
             temperature=0.1,
             max_tokens=2000,
             # Retry configuration

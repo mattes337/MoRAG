@@ -74,7 +74,10 @@ class TestGeminiIntegration:
             assert isinstance(result, SummaryResult)
             assert isinstance(result.summary, str)
             assert len(result.summary) > 0
-            assert result.model == "gemini-2.0-flash-001"
+            # Model should be from environment variable or default
+            import os
+            expected_model = os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
+            assert result.model == expected_model
 
     @pytest.mark.asyncio
     async def test_health_check_healthy(self):
@@ -207,7 +210,10 @@ class TestGeminiServiceConfiguration:
 
                 assert service.client is not None
                 assert service.embedding_model == "text-embedding-004"
-                assert service.generation_model == "gemini-2.0-flash-001"
+                # Generation model should be from environment variable or default
+                import os
+                expected_model = os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
+                assert service.generation_model == expected_model
 
     def test_service_initialization_without_api_key(self):
         """Test service initialization without API key."""

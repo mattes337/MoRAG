@@ -353,7 +353,7 @@ def get_llm_client() -> Optional[LLMClient]:
     try:
         config = LLMConfig(
             provider=os.getenv("MORAG_LLM_PROVIDER", "gemini"),
-            model=os.getenv("MORAG_LLM_MODEL", "gemini-1.5-flash"),
+            model=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"),
             api_key=os.getenv("GEMINI_API_KEY"),
             temperature=float(os.getenv("MORAG_LLM_TEMPERATURE", "0.1")),
             max_tokens=int(os.getenv("MORAG_LLM_MAX_TOKENS", "2000")),

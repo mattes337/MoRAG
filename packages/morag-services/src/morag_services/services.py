@@ -154,7 +154,7 @@ class MoRAGServices:
                 self._gemini_embedding_service = GeminiEmbeddingService(
                     api_key=gemini_api_key,
                     embedding_model="text-embedding-004",
-                    generation_model="gemini-2.0-flash-001"
+                    generation_model=None  # Will use environment variable
                 )
                 logger.info("Search services initialized successfully")
             else:

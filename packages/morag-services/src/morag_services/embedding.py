@@ -37,20 +37,24 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         self,
         api_key: str,
         embedding_model: str = "text-embedding-004",
-        generation_model: str = "gemini-2.0-flash-001"
+        generation_model: str = None
     ):
         """Initialize Gemini embedding service.
 
         Args:
             api_key: Gemini API key
             embedding_model: Model for embeddings
-            generation_model: Model for text generation
+            generation_model: Model for text generation (if None, uses environment variable)
         """
         # Create a basic config for the parent class
         from morag_core.interfaces.embedding import EmbeddingConfig, EmbeddingProvider
         # Get batch size from environment or use default
         import os
         batch_size = int(os.getenv('MORAG_EMBEDDING_BATCH_SIZE', '50'))
+
+        # Use environment variable for generation model if not provided
+        if generation_model is None:
+            generation_model = os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
 
         config = EmbeddingConfig(
             provider=EmbeddingProvider.GEMINI,
@@ -757,11 +761,12 @@ class EmbeddingServiceFactory:
 # Legacy compatibility
 class GeminiService(GeminiEmbeddingService):
     """Legacy GeminiService for backward compatibility."""
-    
+
     def __init__(self):
         # Initialize with default settings - these would come from config
+        import os
         super().__init__(
             api_key="",  # Should be set from config
             embedding_model="text-embedding-004",
-            generation_model="gemini-2.0-flash-001"
+            generation_model=None  # Will use environment variable
         )

@@ -37,7 +37,7 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
         # Build language instruction
         language_instruction = ""
         if self.language:
-            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL entity descriptions, context, and entity types in {self.language} language. This is mandatory. If the source text is in a different language, you MUST translate all descriptions and context to {self.language}. Do NOT provide descriptions in any other language.\n"
+            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL entity descriptions and entity types in {self.language} language. This is mandatory. If the source text is in a different language, you MUST translate all descriptions to {self.language}. Do NOT provide descriptions in any other language.\n"
 
         if self.dynamic_types and not self.entity_types:
             # Pure dynamic mode - let LLM determine appropriate entity types
@@ -49,7 +49,7 @@ For each entity, provide:
 1. name: The exact text as it appears in the source
 2. type: A BROAD, REUSABLE entity type that YOU determine
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
-4. context: Brief description of the entity's role or significance
+4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
 
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities
@@ -117,7 +117,7 @@ For each entity, provide:
 1. name: The exact text as it appears in the source
 2. type: The most appropriate entity type from the list above
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
-4. context: Brief description of the entity's role or significance
+4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
 
 Focus on entities that are:
 - Clearly identifiable and significant
@@ -139,7 +139,7 @@ For each entity, provide:
 1. name: The exact text as it appears in the source
 2. type: A BROAD, REUSABLE entity type that YOU determine
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
-4. context: Brief description of the entity's role or significance
+4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
 
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities

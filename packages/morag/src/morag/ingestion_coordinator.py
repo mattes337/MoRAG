@@ -304,7 +304,6 @@ class IngestionCoordinator:
                 'chunk_id': chunk_id,
                 'document_id': document_id,
                 'chunk_index': i,
-                'chunk_text': chunk,
                 'chunk_size': len(chunk),
                 'created_at': datetime.now(timezone.utc).isoformat(),
                 **metadata
@@ -655,12 +654,12 @@ class IngestionCoordinator:
                     {
                         'chunk_id': meta['chunk_id'],
                         'chunk_index': meta['chunk_index'],
-                        'chunk_text': meta['chunk_text'],
+                        'chunk_text': chunk_text,
                         'chunk_size': meta['chunk_size'],
                         'embedding': embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
                         'metadata': {k: v for k, v in meta.items() if k not in ['chunk_text']}
                     }
-                    for meta, embedding in zip(embeddings_data['chunk_metadata'], embeddings_data['embeddings'])
+                    for meta, embedding, chunk_text in zip(embeddings_data['chunk_metadata'], embeddings_data['embeddings'], embeddings_data['chunks'])
                 ]
             },
             'graph_data': {
@@ -726,11 +725,11 @@ class IngestionCoordinator:
                     {
                         'chunk_id': meta['chunk_id'],
                         'chunk_index': meta['chunk_index'],
-                        'chunk_text': meta['chunk_text'],
+                        'chunk_text': chunk_text,
                         'embedding': embedding.tolist() if hasattr(embedding, 'tolist') else embedding,
                         'metadata': meta
                     }
-                    for meta, embedding in zip(embeddings_data['chunk_metadata'], embeddings_data['embeddings'])
+                    for meta, embedding, chunk_text in zip(embeddings_data['chunk_metadata'], embeddings_data['embeddings'], embeddings_data['chunks'])
                 ]
             },
             'graph_data': {
@@ -1100,7 +1099,7 @@ class IngestionCoordinator:
                                 chunk_id, entity_id, context
                             )
                             chunk_entity_relationships_created += 1
-                            logger.debug(f"Created relationship: chunk {chunk_id} -> entity {entity_id}")
+                            #logger.debug(f"Created relationship: chunk {chunk_id} -> entity {entity_id}")
 
                             # Update entity's mentioned_in_chunks field
                             entity = None
@@ -1119,7 +1118,7 @@ class IngestionCoordinator:
                                 entity.add_chunk_reference(chunk_id)
                                 # Update the entity in Neo4j with the new mentioned_in_chunks
                                 await neo4j_storage.store_entity(entity)
-                                logger.debug(f"Updated entity {entity_id} mentioned_in_chunks: {entity.mentioned_in_chunks}")
+                                #logger.debug(f"Updated entity {entity_id} mentioned_in_chunks: {entity.mentioned_in_chunks}")
                             else:
                                 logger.warning(f"Could not find entity {entity_id} to update mentioned_in_chunks")
 
