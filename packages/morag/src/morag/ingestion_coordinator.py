@@ -179,7 +179,7 @@ class IngestionCoordinator:
         # Step 7: Create complete ingest_result.json data
         ingest_result = self._create_ingest_result(
             source_path, content_type, metadata, processing_result,
-            embeddings_data, graph_data, database_configs, start_time, document_summary
+            embeddings_data, graph_data, database_configs, start_time, document_summary, effective_language
         )
         
         # Step 8: Write ingest_result.json file
@@ -609,7 +609,8 @@ class IngestionCoordinator:
         graph_data: Dict[str, Any],
         database_configs: List[DatabaseConfig],
         start_time: datetime,
-        document_summary: str
+        document_summary: str,
+        language: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create the complete ingest_result.json data structure."""
         # Extract content length from different ProcessingResult types
@@ -625,6 +626,7 @@ class IngestionCoordinator:
         return {
             'ingestion_id': str(uuid.uuid4()),
             'timestamp': start_time.isoformat(),
+            'language': language,  # Add language information
             'source_info': {
                 'source_path': source_path,
                 'content_type': content_type,
@@ -663,6 +665,7 @@ class IngestionCoordinator:
                 ]
             },
             'graph_data': {
+                'language': language,  # Add language information to graph data
                 'entities_count': len(graph_data['entities']),
                 'relations_count': len(graph_data['relations']),
                 'entities': [

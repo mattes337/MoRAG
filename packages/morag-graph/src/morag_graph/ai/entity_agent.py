@@ -67,6 +67,10 @@ ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - If you must use compound types, keep them SHORT and GENERAL
 - Think: "What is the SIMPLEST, most GENERAL category this entity belongs to?"
 - Avoid creating types like "BIOLOGICAL_SOMETHING" - just use "BIOLOGICAL"
+- Multiple similar entities should share the same broad type
+- Use the most general category that accurately describes the entity
+- Prefer simple, single-word types over complex compound types
+- Think about what category would allow similar entities to be grouped together
 
 EXAMPLES OF GOOD BROAD TYPING:
 - "Einstein", "Newton", "Darwin" → ALL should be SCIENTIST
@@ -95,6 +99,12 @@ DOCUMENT, BOOK, ARTICLE, REPORT
 EVENT, CONFERENCE, WAR, DISCOVERY
 SUBSTANCE, CHEMICAL, MATERIAL
 PROCESS, PROCEDURE, ACTIVITY
+
+GENERAL GUIDANCE:
+- Use broad, reusable categories that can apply to many similar entities
+- Keep types simple and avoid overly specific classifications
+- Let the content determine the appropriate types rather than forcing predefined categories
+- Focus on the fundamental nature of what the entity represents
 
 REMEMBER: Keep types SIMPLE and GENERAL. If in doubt, choose the broader category!
 
@@ -175,6 +185,10 @@ ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - If you must use compound types, keep them SHORT and GENERAL
 - Think: "What is the SIMPLEST, most GENERAL category this entity belongs to?"
 - Avoid creating types like "BIOLOGICAL_SOMETHING" - just use "BIOLOGICAL"
+- Multiple similar entities should share the same broad type
+- Use the most general category that accurately describes the entity
+- Prefer simple, single-word types over complex compound types
+- Think about what category would allow similar entities to be grouped together
 
 EXAMPLES OF GOOD BROAD TYPING:
 - "Einstein", "Newton", "Darwin" → ALL should be SCIENTIST
@@ -203,6 +217,12 @@ DOCUMENT, BOOK, ARTICLE, REPORT
 EVENT, CONFERENCE, WAR, DISCOVERY
 SUBSTANCE, CHEMICAL, MATERIAL
 PROCESS, PROCEDURE, ACTIVITY
+
+GENERAL GUIDANCE:
+- Use broad, reusable categories that can apply to many similar entities
+- Keep types simple and avoid overly specific classifications
+- Let the content determine the appropriate types rather than forcing predefined categories
+- Focus on the fundamental nature of what the entity represents
 
 Focus on entities that are:
 - Clearly identifiable and significant

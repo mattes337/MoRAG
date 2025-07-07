@@ -400,47 +400,56 @@ class Neo4jStorage(BaseStorage):
     
     async def store_entity(self, entity: Entity) -> EntityId:
         """Store an entity in Neo4J.
-        
-        Uses MERGE based on name and type to prevent duplicate entities.
-        If an entity with the same name and type exists, it will be updated
-        with new attributes and the highest confidence score.
-        
+
+        Uses MERGE based on name only to prevent duplicate entities.
+        If an entity with the same name exists, it will be updated with the
+        highest confidence score and most recent type.
+
         Args:
             entity: Entity to store
-            
+
         Returns:
             ID of the stored entity
         """
         properties = entity.to_neo4j_node()
         labels = properties.pop('_labels', ['Entity'])
-        
-        # Create labels string for Cypher
-        labels_str = ':'.join(labels)
-        
-        # MERGE based on name and type to prevent duplicates
-        query = f"""
-        MERGE (e:{labels_str} {{name: $name, type: $type}})
-        ON CREATE SET e += $properties
-        ON MATCH SET 
+
+        entity_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
+
+        # MERGE based on name only to prevent duplicate entities
+        # Use confidence to determine which type to keep
+        query = """
+        MERGE (e:Entity {name: $name})
+        ON CREATE SET
+            e += $properties,
+            e.type = $type
+        ON MATCH SET
             e.confidence = CASE WHEN e.confidence > $confidence THEN e.confidence ELSE $confidence END,
             e.attributes = $attributes,
             e.source_doc_id = CASE WHEN e.source_doc_id IS NULL THEN $source_doc_id ELSE e.source_doc_id END,
-            e.id = $id
-        RETURN e.id as id
+            e.id = $id,
+            e.type = CASE WHEN $confidence > e.confidence THEN $type ELSE e.type END
+        RETURN e.id as id, e.type as final_type
         """
-        
+
         parameters = {
             "name": entity.name,
-            "type": entity.type.value if hasattr(entity.type, 'value') else str(entity.type),  # Handle both enum and string types
+            "type": entity_type,
             "confidence": entity.confidence,
             "attributes": properties.get('attributes', '{}'),
             "source_doc_id": entity.source_doc_id,
             "id": entity.id,
             "properties": properties
         }
-        
+
         result = await self._execute_query(query, parameters)
-        return result[0]["id"] if result else entity.id
+        if result:
+            logger.debug("Entity stored/updated",
+                        name=entity.name,
+                        final_type=result[0].get('final_type'),
+                        entity_id=result[0].get('id'))
+            return result[0]["id"]
+        return entity.id
 
     async def _create_missing_entity(self, entity_id: str, entity_name: str) -> str:
         """Create a missing entity with minimal information.
