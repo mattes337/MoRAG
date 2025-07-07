@@ -1028,6 +1028,7 @@ class IngestionCoordinator:
                 source_file=source_path,
                 file_name=Path(source_path).name if source_path else 'Unknown',
                 mime_type=embeddings_data['chunk_metadata'][0].get('source_type', 'unknown'),
+                summary=ingest_result.get('summary'),
                 metadata=embeddings_data['chunk_metadata'][0]
             )
 
@@ -1190,7 +1191,8 @@ class IngestionCoordinator:
             # Use the embedding service's summarization capability
             summary_result = await self.embedding_service.generate_summary(
                 content,
-                max_length=max_length
+                max_length=max_length,
+                language=language
             )
 
             # Extract summary text

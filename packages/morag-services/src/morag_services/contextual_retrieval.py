@@ -137,9 +137,11 @@ class ContextualRetrievalService:
                 return "Document content not available."
             
             # Generate summary using Gemini
-            summary_result = await self.embedding_service.summarize(
+            language = document.metadata.get("language") if hasattr(document, 'metadata') else None
+            summary_result = await self.embedding_service.generate_summary(
                 full_text,
-                max_length=max_length
+                max_length=max_length,
+                language=language
             )
             
             return summary_result.summary if hasattr(summary_result, 'summary') else str(summary_result)

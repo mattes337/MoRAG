@@ -533,14 +533,15 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         self,
         text: str,
         max_length: int = 150,
-        style: str = "concise"
+        style: str = "concise",
+        language: Optional[str] = None
     ) -> SummaryResult:
         """Generate a summary of the given text."""
         if not self.client:
             raise ExternalServiceError("Gemini client not initialized", "gemini")
 
         try:
-            prompt = self._build_summary_prompt(text, max_length, style)
+            prompt = self._build_summary_prompt(text, max_length, style, language)
 
             logger.info("Generating summary with Gemini API",
                        text_length=len(text),
@@ -682,7 +683,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
             logger.error("Failed to generate text from prompt", error=str(e))
             raise ExternalServiceError(f"Text generation failed: {str(e)}", "gemini")
     
-    def _build_summary_prompt(self, text: str, max_length: int, style: str) -> str:
+    def _build_summary_prompt(self, text: str, max_length: int, style: str, language: Optional[str] = None) -> str:
         """Build prompt for summary generation."""
         style_instructions = {
             "concise": "Create a concise, factual summary",
@@ -693,8 +694,27 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         instruction = style_instructions.get(style, style_instructions["concise"])
 
+        # Add language instruction if specified
+        language_instruction = ""
+        if language:
+            language_names = {
+                'en': 'English',
+                'de': 'German',
+                'fr': 'French',
+                'es': 'Spanish',
+                'it': 'Italian',
+                'pt': 'Portuguese',
+                'nl': 'Dutch',
+                'ru': 'Russian',
+                'zh': 'Chinese',
+                'ja': 'Japanese',
+                'ko': 'Korean'
+            }
+            language_name = language_names.get(language, language)
+            language_instruction = f"Please write the summary in {language_name}. "
+
         return f"""
-{instruction} of the following text in approximately {max_length} words or less.
+{language_instruction}{instruction} of the following text in approximately {max_length} words or less.
 Focus on the main ideas, key facts, and important details.
 
 Text to summarize:

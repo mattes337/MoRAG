@@ -45,6 +45,7 @@ class Document(BaseModel):
     ingestion_timestamp: datetime = Field(default_factory=datetime.now)
     last_modified: Optional[datetime] = None
     model: Optional[str] = None
+    summary: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     
     # Class variables for Neo4J integration

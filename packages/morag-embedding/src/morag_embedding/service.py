@@ -505,12 +505,13 @@ class GeminiEmbeddingService(BaseService):
             }
         )
 
-    async def generate_summary(self, text: str, max_length: int = 200) -> SummaryResult:
+    async def generate_summary(self, text: str, max_length: int = 200, language: Optional[str] = None) -> SummaryResult:
         """Generate summary for text.
 
         Args:
             text: Text to summarize
             max_length: Maximum length of summary
+            language: Language code for the summary (e.g., 'en', 'de', 'fr')
 
         Returns:
             Summary result
@@ -537,8 +538,26 @@ class GeminiEmbeddingService(BaseService):
                 # Configure the model
                 model = genai.GenerativeModel(self.generation_model)
 
-                # Create prompt for summarization
-                prompt = f"Summarize the following text in {max_length} characters or less:\n\n{text}"
+                # Create prompt for summarization with language specification
+                language_instruction = ""
+                if language:
+                    language_names = {
+                        'en': 'English',
+                        'de': 'German',
+                        'fr': 'French',
+                        'es': 'Spanish',
+                        'it': 'Italian',
+                        'pt': 'Portuguese',
+                        'nl': 'Dutch',
+                        'ru': 'Russian',
+                        'zh': 'Chinese',
+                        'ja': 'Japanese',
+                        'ko': 'Korean'
+                    }
+                    language_name = language_names.get(language, language)
+                    language_instruction = f"Please write the summary in {language_name}. "
+
+                prompt = f"{language_instruction}Summarize the following text in {max_length} characters or less:\n\n{text}"
 
                 # Generate summary
                 response = model.generate_content(prompt)

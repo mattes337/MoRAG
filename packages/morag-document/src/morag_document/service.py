@@ -384,8 +384,9 @@ class DocumentService(BaseService):
 
             # Generate summary
             max_length = kwargs.get("max_length", 1000)
+            language = kwargs.get("language") or document.metadata.get("language")
             summary_result = await self.embedding_service.generate_summary(
-                text, max_length=max_length
+                text, max_length=max_length, language=language
             )
 
             return summary_result.summary
