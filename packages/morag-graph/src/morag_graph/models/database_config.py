@@ -15,7 +15,7 @@ class DatabaseServerConfig(BaseModel):
     """Configuration for a single database server connection."""
 
     type: DatabaseType = Field(..., description="Database type")
-    host: Optional[str] = Field(None, description="Database hostname/URI")
+    hostname: Optional[str] = Field(None, description="Database hostname/URI")
     port: Optional[int] = Field(None, description="Database port")
     username: Optional[str] = Field(None, description="Database username")
     password: Optional[str] = Field(None, description="Database password")
@@ -32,7 +32,7 @@ class DatabaseServerConfig(BaseModel):
         """
         key_parts = [
             self.type.value,
-            self.host or "default",
+            self.hostname or "default",
             str(self.port) if self.port else "default",
             self.username or "default",
             self.database_name or "default"
@@ -42,7 +42,7 @@ class DatabaseServerConfig(BaseModel):
     def is_default_config(self) -> bool:
         """Check if this uses default configuration (no custom connection details)."""
         return all([
-            self.host is None,
+            self.hostname is None,
             self.port is None,
             self.username is None,
             self.password is None,

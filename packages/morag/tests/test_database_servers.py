@@ -19,7 +19,7 @@ class TestDatabaseConnectionFactory:
         server_data = [
             {
                 "type": "neo4j",
-                "host": "localhost",
+                "hostname": "localhost",
                 "port": 7687,
                 "username": "neo4j",
                 "password": "password",
@@ -27,7 +27,7 @@ class TestDatabaseConnectionFactory:
             },
             {
                 "type": "qdrant",
-                "host": "localhost",
+                "hostname": "localhost",
                 "port": 6333,
                 "password": "api_key",
                 "database_name": "test_collection"
@@ -38,10 +38,10 @@ class TestDatabaseConnectionFactory:
         
         assert len(configs) == 2
         assert configs[0].type == DatabaseType.NEO4J
-        assert configs[0].host == "localhost"
+        assert configs[0].hostname == "localhost"
         assert configs[0].port == 7687
         assert configs[1].type == DatabaseType.QDRANT
-        assert configs[1].host == "localhost"
+        assert configs[1].hostname == "localhost"
         assert configs[1].port == 6333
     
     def test_parse_database_servers_invalid(self):
@@ -49,11 +49,11 @@ class TestDatabaseConnectionFactory:
         server_data = [
             {
                 "type": "invalid_type",
-                "host": "localhost"
+                "hostname": "localhost"
             },
             {
                 "type": "neo4j",
-                "host": "localhost",
+                "hostname": "localhost",
                 "port": 7687
             }
         ]
@@ -77,7 +77,7 @@ class TestDatabaseConnectionFactory:
         """Test creating Neo4j storage from configuration."""
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,
-            host="neo4j://localhost:7687",
+            hostname="neo4j://localhost:7687",
             username="neo4j",
             password="password",
             database_name="test_db"
@@ -94,7 +94,7 @@ class TestDatabaseConnectionFactory:
         """Test creating Qdrant storage from configuration."""
         config = DatabaseServerConfig(
             type=DatabaseType.QDRANT,
-            host="localhost",
+            hostname="localhost",
             port=6333,
             password="api_key",
             database_name="test_collection"
@@ -110,7 +110,7 @@ class TestDatabaseConnectionFactory:
         """Test creating storage with invalid type."""
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,
-            host="localhost"
+            hostname="localhost"
         )
         
         factory = DatabaseConnectionFactory()
@@ -138,7 +138,7 @@ class TestDatabaseServerIntegration:
             "database_servers": [
                 {
                     "type": "qdrant",
-                    "host": "localhost",
+                    "hostname": "localhost",
                     "port": 6333,
                     "database_name": "test_collection"
                 }
@@ -158,7 +158,7 @@ class TestDatabaseServerIntegration:
             "database_servers": [
                 {
                     "type": "neo4j",
-                    "host": "neo4j://localhost:7687",
+                    "hostname": "neo4j://localhost:7687",
                     "username": "neo4j",
                     "password": "password",
                     "database_name": "test_db"
@@ -177,7 +177,7 @@ class TestDatabaseServerIntegration:
             "database_servers": [
                 {
                     "type": "neo4j",
-                    "host": "neo4j://localhost:7687",
+                    "hostname": "neo4j://localhost:7687",
                     "username": "neo4j",
                     "password": "password",
                     "database_name": "test_db"
@@ -197,7 +197,7 @@ class TestDatabaseServerConfig:
         """Test creating database server configuration."""
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,
-            host="localhost",
+            hostname="localhost",
             port=7687,
             username="neo4j",
             password="password",
@@ -205,7 +205,7 @@ class TestDatabaseServerConfig:
         )
         
         assert config.type == DatabaseType.NEO4J
-        assert config.host == "localhost"
+        assert config.hostname == "localhost"
         assert config.port == 7687
         assert config.username == "neo4j"
         assert config.password == "password"
@@ -215,7 +215,7 @@ class TestDatabaseServerConfig:
         """Test database server configuration connection key generation."""
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,
-            host="localhost",
+            hostname="localhost",
             port=7687,
             username="neo4j",
             database_name="test_db"
@@ -234,7 +234,7 @@ class TestDatabaseServerConfig:
         # Non-default config
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,
-            host="localhost"
+            hostname="localhost"
         )
         assert not config.is_default_config()
 

@@ -22,7 +22,7 @@ class DatabaseConnectionFactory:
             raise ValueError(f"Expected Neo4j server config, got {server_config.type}")
         
         # Use provided config or fall back to environment defaults
-        uri = server_config.host or os.getenv("NEO4J_URI", "neo4j://localhost:7687")
+        uri = server_config.hostname or os.getenv("NEO4J_URI", "neo4j://localhost:7687")
         username = server_config.username or os.getenv("NEO4J_USERNAME", "neo4j")
         password = server_config.password or os.getenv("NEO4J_PASSWORD", "password")
         database = server_config.database_name or os.getenv("NEO4J_DATABASE", "neo4j")
@@ -60,7 +60,7 @@ class DatabaseConnectionFactory:
             raise ValueError(f"Expected Qdrant server config, got {server_config.type}")
         
         # Use provided config or fall back to environment defaults
-        host = server_config.host or os.getenv("QDRANT_HOST", "localhost")
+        host = server_config.hostname or os.getenv("QDRANT_HOST", "localhost")
         port = server_config.port or int(os.getenv("QDRANT_PORT", "6333"))
         api_key = server_config.password or os.getenv("QDRANT_API_KEY")  # Use password field for API key
         collection_name = server_config.database_name or os.getenv("QDRANT_COLLECTION", "morag_vectors")
