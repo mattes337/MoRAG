@@ -196,7 +196,7 @@ class IngestionCoordinator:
 
         # Step 11: Write data to databases using the ingest_data
         database_results = await self._write_to_databases(
-            database_configs, embeddings_data, graph_data, document_id, replace_existing
+            database_configs, embeddings_data, graph_data, document_id, replace_existing, document_summary
         )
 
         # Step 12: Update final result with database write results
@@ -874,7 +874,8 @@ class IngestionCoordinator:
         embeddings_data: Dict[str, Any],
         graph_data: Dict[str, Any],
         document_id: str,
-        replace_existing: bool
+        replace_existing: bool,
+        document_summary: Optional[str] = None
     ) -> Dict[str, Any]:
         """Write data to all configured databases."""
         results = {}
@@ -889,7 +890,7 @@ class IngestionCoordinator:
 
                 elif db_config.type == DatabaseType.NEO4J:
                     result = await self._write_to_neo4j(
-                        db_config, graph_data, embeddings_data, document_id
+                        db_config, graph_data, embeddings_data, document_id, document_summary
                     )
                     results['neo4j'] = result
 
@@ -1004,7 +1005,8 @@ class IngestionCoordinator:
         db_config: DatabaseConfig,
         graph_data: Dict[str, Any],
         embeddings_data: Dict[str, Any],
-        document_id: str
+        document_id: str,
+        document_summary: Optional[str] = None
     ) -> Dict[str, Any]:
         """Write graph data to Neo4j with proper relationships."""
         import os
@@ -1023,12 +1025,15 @@ class IngestionCoordinator:
         try:
             # Store document
             source_path = embeddings_data['chunk_metadata'][0].get('source_path', 'Unknown')
+            # Use the provided summary or fallback to metadata or default
+            summary = document_summary or embeddings_data['chunk_metadata'][0].get('summary', 'Document processed successfully')
+
             document = Document(
                 id=document_id,
                 source_file=source_path,
                 file_name=Path(source_path).name if source_path else 'Unknown',
                 mime_type=embeddings_data['chunk_metadata'][0].get('source_type', 'unknown'),
-                summary=ingest_result.get('summary'),
+                summary=summary,
                 metadata=embeddings_data['chunk_metadata'][0]
             )
 
