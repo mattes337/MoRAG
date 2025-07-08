@@ -10,7 +10,7 @@ from morag_graph.retrieval import (
 )
 from morag_graph.retrieval.models import VectorRetriever, DocumentResult
 from morag_graph.query import QueryEntityExtractor, QueryAnalysis, QueryEntity
-from morag_graph.models import Entity, EntityType
+from morag_graph.models import Entity
 from morag_graph.operations.traversal import GraphPath
 from morag_graph.storage.base import BaseStorage
 
@@ -43,7 +43,7 @@ def mock_context_expansion_engine():
     mock_entity = Entity(
         id="ent_test_entity_person",
         name="Test Entity",
-        type=EntityType.PERSON,
+        type="PERSON",
         confidence=0.9
     )
     # Add source_doc_id attribute for document retrieval
@@ -224,7 +224,7 @@ class TestHybridRetrievalCoordinator:
         entity = Entity(
             id="ent_test_entity_person",
             name="Test Entity",
-            type=EntityType.PERSON,
+            type="PERSON",
             confidence=0.9
         )
         
@@ -276,8 +276,8 @@ class TestContextExpansionEngine:
         
         # Mock the graph traversal to return some neighbors
         context_engine.graph_traversal.find_neighbors = AsyncMock(return_value=[
-            Entity(id="ent_neighbor_1", name="Neighbor 1", type=EntityType.PERSON),
-            Entity(id="ent_neighbor_2", name="Neighbor 2", type=EntityType.CONCEPT)
+            Entity(id="ent_neighbor_1", name="Neighbor 1", type="PERSON"),
+            Entity(id="ent_neighbor_2", name="Neighbor 2", type="CONCEPT")
         ])
         
         context = await context_engine.expand_context(query_analysis)
@@ -337,8 +337,8 @@ class TestContextExpansionEngine:
     def test_context_score_calculation(self, context_engine):
         """Test context score calculation."""
         entities = [
-            Entity(id="ent_1", name="Entity 1", type=EntityType.PERSON),
-            Entity(id="ent_2", name="Entity 2", type=EntityType.CONCEPT)
+            Entity(id="ent_1", name="Entity 1", type="PERSON"),
+            Entity(id="ent_2", name="Entity 2", type="CONCEPT")
         ]
         
         paths = [GraphPath(entities=entities, relations=[])]
@@ -357,9 +357,9 @@ class TestContextExpansionEngine:
     
     def test_deduplicate_entities(self, context_engine):
         """Test entity deduplication."""
-        entity1 = Entity(id="ent_1", name="Entity 1", type=EntityType.PERSON)
-        entity2 = Entity(id="ent_2", name="Entity 2", type=EntityType.CONCEPT)
-        entity1_dup = Entity(id="ent_1", name="Entity 1 Duplicate", type=EntityType.PERSON)
+        entity1 = Entity(id="ent_1", name="Entity 1", type="PERSON")
+        entity2 = Entity(id="ent_2", name="Entity 2", type="CONCEPT")
+        entity1_dup = Entity(id="ent_1", name="Entity 1 Duplicate", type="PERSON")
         
         entities = [entity1, entity2, entity1_dup, entity2]
         unique_entities = context_engine._deduplicate_entities(entities)

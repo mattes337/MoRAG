@@ -1023,18 +1023,31 @@ class IngestionCoordinator:
         await neo4j_storage.connect()
 
         try:
-            # Store document
-            source_path = embeddings_data['chunk_metadata'][0].get('source_path', 'Unknown')
+            # Store document - extract metadata from first chunk
+            chunk_meta = embeddings_data['chunk_metadata'][0]
+            source_path = chunk_meta.get('source_path', 'Unknown')
+
+            # Extract filename for name property
+            if source_path and source_path != 'Unknown':
+                file_name = Path(source_path).name
+                name = file_name
+            else:
+                file_name = chunk_meta.get('source_name', 'Unknown')
+                name = file_name
+
             # Use the provided summary or fallback to metadata or default
-            summary = document_summary or embeddings_data['chunk_metadata'][0].get('summary', 'Document processed successfully')
+            summary = document_summary or chunk_meta.get('summary', 'Document processed successfully')
 
             document = Document(
                 id=document_id,
+                name=name,
                 source_file=source_path,
-                file_name=Path(source_path).name if source_path else 'Unknown',
-                mime_type=embeddings_data['chunk_metadata'][0].get('source_type', 'unknown'),
+                file_name=file_name,
+                file_size=chunk_meta.get('file_size'),
+                checksum=chunk_meta.get('checksum') or chunk_meta.get('content_checksum'),
+                mime_type=chunk_meta.get('mime_type', chunk_meta.get('source_type', 'unknown')),
                 summary=summary,
-                metadata=embeddings_data['chunk_metadata'][0]
+                metadata=chunk_meta
             )
 
             document_id_stored = await neo4j_storage.store_document(document)

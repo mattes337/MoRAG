@@ -252,6 +252,7 @@ class FileIngestion:
             # Create Document node
             document = Document(
                 id=file_metadata.source_doc_id,
+                name=file_metadata.file_name,  # Add name property
                 source_file=file_metadata.file_path,
                 file_name=file_metadata.file_name,
                 file_size=file_metadata.file_size,

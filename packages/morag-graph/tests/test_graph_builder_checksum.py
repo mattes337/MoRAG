@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from morag_graph.builders.graph_builder import GraphBuilder, GraphBuildResult
-from morag_graph.models.entity import Entity, EntityType
-from morag_graph.models.relation import Relation, RelationType
+from morag_graph.models.entity import Entity
+from morag_graph.models.relation import Relation
 from morag_graph.updates.cleanup_manager import CleanupResult
 from morag_graph.storage.base import BaseStorage
 
@@ -97,12 +97,12 @@ def sample_entities():
     return [
         Entity(
             name="John Doe",
-            type=EntityType.PERSON,
+            type="PERSON",
             source_doc_id="doc_test_abc123"
         ),
         Entity(
             name="Acme Corp",
-            type=EntityType.ORGANIZATION,
+            type="ORGANIZATION",
             source_doc_id="doc_test_abc123"
         )
     ]
@@ -114,7 +114,7 @@ def sample_relations(sample_entities):
         Relation(
             source_entity_id=sample_entities[0].id,
             target_entity_id=sample_entities[1].id,
-            type=RelationType.WORKS_FOR
+            type="WORKS_FOR"
         )
     ]
 
@@ -223,13 +223,13 @@ class TestGraphBuilderChecksum:
             # Add some existing entities and relations to storage
             old_entity = Entity(
                 name="Old Entity",
-                type=EntityType.PERSON,
+                type="PERSON",
                 source_doc_id=document_id
             )
             old_relation = Relation(
                 source_entity_id=old_entity.id,
                 target_entity_id=sample_entities[0].id,
-                type=RelationType.RELATED_TO
+                type="RELATED_TO"
             )
             
             mock_storage.entities[old_entity.id] = old_entity

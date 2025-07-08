@@ -18,13 +18,14 @@ from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 
 class Document(BaseModel):
     """Document model representing a source document in the knowledge graph.
-    
+
     A document represents a source file or data source that has been ingested
     into the knowledge graph. It contains metadata about the source and is
     linked to DocumentChunk nodes that contain the actual text content.
-    
+
     Attributes:
         id: Unique identifier for the document
+        name: Display name of the document (typically the filename)
         source_file: Path or identifier of the source file
         file_name: Name of the source file
         file_size: Size of the source file in bytes
@@ -35,8 +36,9 @@ class Document(BaseModel):
         model: Model used for extraction (e.g., 'gemini-1.5-flash')
         metadata: Additional metadata about the document
     """
-    
+
     id: EntityId = Field(default="")
+    name: str  # Display name for the document (required)
     source_file: str
     file_name: Optional[str] = None
     file_size: Optional[int] = None

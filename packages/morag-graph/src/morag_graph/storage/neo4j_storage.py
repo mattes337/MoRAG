@@ -205,23 +205,29 @@ class Neo4jStorage(BaseStorage):
         # Store document with unified ID
         query = """
         MERGE (d:Document {id: $id})
-        SET d.source_file = $source_file,
-            d.file_name = $file_name,
+        SET d.name = $name,
+            d.source_file = $source_file,
+            d.file_size = $file_size,
             d.checksum = $checksum,
+            d.mime_type = $mime_type,
             d.ingestion_timestamp = $ingestion_timestamp,
+            d.summary = $summary,
             d.metadata = $metadata,
             d.unified_id_format = true
         RETURN d.id as document_id
         """
-        
+
         result = await self._execute_query(
             query,
             {
                 "id": document.id,
+                "name": document.name,
                 "source_file": document.source_file,
-                "file_name": document.file_name,
+                "file_size": document.file_size,
                 "checksum": document.checksum,
+                "mime_type": document.mime_type,
                 "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
+                "summary": document.summary,
                 "metadata": document.metadata or {}
             }
         )

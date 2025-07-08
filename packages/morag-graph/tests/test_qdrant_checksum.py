@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from typing import List, Optional
 
 from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
-from morag_graph.models.entity import Entity, EntityType
+from morag_graph.models.entity import Entity
 
 
 class MockFilter:
