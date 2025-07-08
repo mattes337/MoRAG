@@ -43,13 +43,13 @@ class WebService(BaseService):
     
     async def process_url(self, url: str, config_options: Optional[Dict[str, Any]] = None) -> WebScrapingResult:
         """Process a single URL with the given configuration options.
-        
+
         Args:
             url: URL to process
             config_options: Optional configuration options
-            
+
         Returns:
-            WebScrapingResult with processed content
+            WebScrapingResult with processed content and enhanced metadata
         """
         # Create config from options
         config = WebScrapingConfig()
@@ -57,8 +57,16 @@ class WebService(BaseService):
             for key, value in config_options.items():
                 if hasattr(config, key):
                     setattr(config, key, value)
-        
-        return await self.processor.process_url(url, config)
+
+        result = await self.processor.process_url(url, config)
+
+        # Enhance metadata with required document fields
+        if result.success and result.content:
+            enhanced_metadata = self._create_comprehensive_metadata(url, result)
+            # Update the content metadata
+            result.content.metadata.update(enhanced_metadata)
+
+        return result
     
     async def process_multiple_urls(
         self,
@@ -214,3 +222,54 @@ class WebService(BaseService):
             raise ProcessingError(f"Failed to extract images: {result.error_message}")
         
         return result.content.images
+
+    def _create_comprehensive_metadata(self, url: str, result: WebScrapingResult) -> Dict[str, Any]:
+        """Create comprehensive metadata including all required document fields."""
+        from urllib.parse import urlparse
+        import hashlib
+
+        # Parse URL for metadata
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc
+
+        # Create a pseudo-filename from URL
+        path_parts = parsed_url.path.strip('/').split('/')
+        if path_parts and path_parts[-1]:
+            filename = f"{path_parts[-1]}.html"
+        else:
+            filename = f"{domain.replace('.', '_')}.html"
+
+        # Calculate content checksum for document identification
+        content_text = result.content.content if result.content else ""
+        checksum = hashlib.sha256(content_text.encode('utf-8')).hexdigest()
+
+        # Build comprehensive metadata with all required fields for document creation
+        metadata = {
+            # Core document metadata fields (REQUIRED for proper Neo4j document creation)
+            "source_path": url,
+            "source_name": filename,
+            "file_name": filename,
+            "mime_type": "text/html",
+            "file_size": len(content_text.encode('utf-8')) if content_text else 0,
+            "checksum": checksum,
+
+            # Web-specific metadata
+            "url": url,
+            "domain": domain,
+            "title": result.content.title if result.content else "",
+            "content_type": result.content.content_type if result.content else "text/html",
+            "content_length": result.content.content_length if result.content else 0,
+            "links_count": len(result.content.links) if result.content else 0,
+            "images_count": len(result.content.images) if result.content else 0,
+            "extraction_time": result.content.extraction_time if result.content else 0.0,
+            "chunks_count": len(result.chunks) if result.chunks else 0,
+        }
+
+        # Add existing metadata from web processor
+        if result.content and result.content.metadata:
+            # Add web-specific metadata but don't override core document fields
+            for key, value in result.content.metadata.items():
+                if key not in metadata:  # Don't override core fields
+                    metadata[key] = value
+
+        return metadata

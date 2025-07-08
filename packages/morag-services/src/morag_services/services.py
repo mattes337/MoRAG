@@ -665,10 +665,11 @@ class MoRAGServices:
             extracted_files.extend([str(p) for p in result.subtitle_paths])
             extracted_files.extend([str(p) for p in result.thumbnail_paths])
             
-            # Convert metadata to dictionary
-            metadata = {}
+            # Convert metadata to dictionary with required document fields
+            metadata = self._create_youtube_comprehensive_metadata(url, result)
             if result.metadata:
-                metadata = {
+                # Add YouTube-specific metadata
+                metadata.update({
                     'id': result.metadata.id,
                     'title': result.metadata.title,
                     'description': result.metadata.description,
@@ -684,7 +685,7 @@ class MoRAGServices:
                     'webpage_url': result.metadata.webpage_url,
                     'channel_id': result.metadata.channel_id,
                     'channel_url': result.metadata.channel_url,
-                }
+                })
             
             return ProcessingResult(
                 content_type=ContentType.YOUTUBE,
@@ -919,3 +920,58 @@ class MoRAGServices:
         """Clean up resources used by services."""
         # Implement cleanup for each service if needed
         pass
+
+    def _create_youtube_comprehensive_metadata(self, url: str, result) -> Dict[str, Any]:
+        """Create comprehensive metadata for YouTube videos including all required document fields."""
+        import hashlib
+        from urllib.parse import urlparse, parse_qs
+
+        # Extract video ID from URL
+        parsed_url = urlparse(url)
+        video_id = None
+        if 'youtube.com' in parsed_url.netloc:
+            video_id = parse_qs(parsed_url.query).get('v', [None])[0]
+        elif 'youtu.be' in parsed_url.netloc:
+            video_id = parsed_url.path.strip('/')
+
+        # Create filename from video title or ID
+        if result.metadata and result.metadata.title:
+            # Sanitize title for filename
+            title = result.metadata.title
+            filename = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+            filename = f"{filename[:50]}.mp4"  # Limit length and add extension
+        elif video_id:
+            filename = f"youtube_{video_id}.mp4"
+        else:
+            filename = "youtube_video.mp4"
+
+        # Calculate content checksum (use URL + video ID for consistency)
+        content_for_hash = f"{url}_{video_id or 'unknown'}"
+        checksum = hashlib.sha256(content_for_hash.encode('utf-8')).hexdigest()
+
+        # Estimate file size (rough estimate based on duration if available)
+        file_size = 0
+        if result.metadata and result.metadata.duration:
+            # Rough estimate: 1MB per minute for standard quality
+            file_size = int(result.metadata.duration * 60 * 1024 * 1024)
+
+        # Build comprehensive metadata with all required fields for document creation
+        metadata = {
+            # Core document metadata fields (REQUIRED for proper Neo4j document creation)
+            "source_path": url,
+            "source_name": filename,
+            "file_name": filename,
+            "mime_type": "video/mp4",
+            "file_size": file_size,
+            "checksum": checksum,
+
+            # YouTube-specific metadata
+            "video_id": video_id,
+            "platform": "youtube",
+            "url": url,
+            "extracted_files_count": len([f for f in [result.video_path, result.audio_path] if f]) +
+                                   len(result.subtitle_paths or []) +
+                                   len(result.thumbnail_paths or []),
+        }
+
+        return metadata

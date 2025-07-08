@@ -207,10 +207,13 @@ class Neo4jStorage(BaseStorage):
         MERGE (d:Document {id: $id})
         SET d.name = $name,
             d.source_file = $source_file,
+            d.file_name = $file_name,
             d.file_size = $file_size,
             d.checksum = $checksum,
             d.mime_type = $mime_type,
             d.ingestion_timestamp = $ingestion_timestamp,
+            d.last_modified = $last_modified,
+            d.model = $model,
             d.summary = $summary,
             d.metadata = $metadata,
             d.unified_id_format = true
@@ -223,10 +226,13 @@ class Neo4jStorage(BaseStorage):
                 "id": document.id,
                 "name": document.name,
                 "source_file": document.source_file,
+                "file_name": document.file_name,
                 "file_size": document.file_size,
                 "checksum": document.checksum,
                 "mime_type": document.mime_type,
                 "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
+                "last_modified": document.last_modified.isoformat() if document.last_modified else None,
+                "model": document.model,
                 "summary": document.summary,
                 "metadata": document.metadata or {}
             }

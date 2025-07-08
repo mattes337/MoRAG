@@ -190,13 +190,13 @@ class IngestionCoordinator:
 
         # Step 10: Create and write ingest_data.json file for database writes
         ingest_data = self._create_ingest_data(
-            embeddings_data, graph_data, database_configs, document_id
+            embeddings_data, graph_data, database_configs, document_id, source_path, metadata
         )
         data_file_path = self._write_ingest_data_file(source_path, ingest_data)
 
         # Step 11: Write data to databases using the ingest_data
         database_results = await self._write_to_databases(
-            database_configs, embeddings_data, graph_data, document_id, replace_existing, document_summary
+            database_configs, embeddings_data, graph_data, document_id, replace_existing, document_summary, ingest_data
         )
 
         # Step 12: Update final result with database write results
@@ -716,13 +716,37 @@ class IngestionCoordinator:
         embeddings_data: Dict[str, Any],
         graph_data: Dict[str, Any],
         database_configs: List[DatabaseConfig],
-        document_id: str
+        document_id: str,
+        source_path: str,
+        metadata: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Create the ingest_data.json data structure for database writes."""
+        # Extract document metadata from chunk metadata (first chunk contains document metadata)
+        document_metadata = {}
+        if embeddings_data['chunk_metadata']:
+            first_chunk_meta = embeddings_data['chunk_metadata'][0]
+
+            # Extract core document fields from metadata
+            source_path_obj = Path(source_path)
+            document_metadata = {
+                'file_name': first_chunk_meta.get('file_name', source_path_obj.name),
+                'source_file': first_chunk_meta.get('source_path', source_path),
+                'name': first_chunk_meta.get('source_name', first_chunk_meta.get('file_name', source_path_obj.name)),
+                'mime_type': first_chunk_meta.get('mime_type', 'unknown'),
+                'file_size': first_chunk_meta.get('file_size'),
+                'checksum': first_chunk_meta.get('checksum', first_chunk_meta.get('content_checksum')),
+                'summary': first_chunk_meta.get('summary'),
+                'metadata': metadata
+            }
+
+            # Remove None values
+            document_metadata = {k: v for k, v in document_metadata.items() if v is not None}
+
         return {
             'document_id': document_id,
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'databases': [db.type.value for db in database_configs],
+            'document_metadata': document_metadata,
             'vector_data': {
                 'chunks': [
                     {
@@ -875,7 +899,8 @@ class IngestionCoordinator:
         graph_data: Dict[str, Any],
         document_id: str,
         replace_existing: bool,
-        document_summary: Optional[str] = None
+        document_summary: Optional[str] = None,
+        ingest_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Write data to all configured databases."""
         results = {}
@@ -889,8 +914,9 @@ class IngestionCoordinator:
                     results['qdrant'] = result
 
                 elif db_config.type == DatabaseType.NEO4J:
+                    document_metadata = ingest_data.get('document_metadata', {}) if ingest_data else {}
                     result = await self._write_to_neo4j(
-                        db_config, graph_data, embeddings_data, document_id, document_summary
+                        db_config, graph_data, embeddings_data, document_id, document_summary, document_metadata
                     )
                     results['neo4j'] = result
 
@@ -1006,7 +1032,8 @@ class IngestionCoordinator:
         graph_data: Dict[str, Any],
         embeddings_data: Dict[str, Any],
         document_id: str,
-        document_summary: Optional[str] = None
+        document_summary: Optional[str] = None,
+        document_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Write graph data to Neo4j with proper relationships."""
         import os
@@ -1023,31 +1050,46 @@ class IngestionCoordinator:
         await neo4j_storage.connect()
 
         try:
-            # Store document - extract metadata from first chunk
-            chunk_meta = embeddings_data['chunk_metadata'][0]
-            source_path = chunk_meta.get('source_path', 'Unknown')
-
-            # Extract filename for name property
-            if source_path and source_path != 'Unknown':
-                file_name = Path(source_path).name
-                name = file_name
+            # Store document - use document_metadata if available, otherwise fallback to chunk metadata
+            if document_metadata:
+                # Use the structured document metadata from ingest_data
+                source_path = document_metadata.get('source_file', 'Unknown')
+                file_name = document_metadata.get('file_name', 'Unknown')
+                name = document_metadata.get('name', file_name)
+                mime_type = document_metadata.get('mime_type', 'unknown')
+                file_size = document_metadata.get('file_size')
+                checksum = document_metadata.get('checksum')
+                summary = document_summary or document_metadata.get('summary', 'Document processed successfully')
+                metadata = document_metadata.get('metadata', {})
             else:
-                file_name = chunk_meta.get('source_name', 'Unknown')
-                name = file_name
+                # Fallback to extracting from first chunk metadata
+                chunk_meta = embeddings_data['chunk_metadata'][0]
+                source_path = chunk_meta.get('source_path', 'Unknown')
 
-            # Use the provided summary or fallback to metadata or default
-            summary = document_summary or chunk_meta.get('summary', 'Document processed successfully')
+                # Extract filename for name property
+                if source_path and source_path != 'Unknown':
+                    file_name = Path(source_path).name
+                    name = file_name
+                else:
+                    file_name = chunk_meta.get('source_name', 'Unknown')
+                    name = file_name
+
+                mime_type = chunk_meta.get('mime_type', chunk_meta.get('source_type', 'unknown'))
+                file_size = chunk_meta.get('file_size')
+                checksum = chunk_meta.get('checksum') or chunk_meta.get('content_checksum')
+                summary = document_summary or chunk_meta.get('summary', 'Document processed successfully')
+                metadata = chunk_meta
 
             document = Document(
                 id=document_id,
                 name=name,
                 source_file=source_path,
                 file_name=file_name,
-                file_size=chunk_meta.get('file_size'),
-                checksum=chunk_meta.get('checksum') or chunk_meta.get('content_checksum'),
-                mime_type=chunk_meta.get('mime_type', chunk_meta.get('source_type', 'unknown')),
+                file_size=file_size,
+                checksum=checksum,
+                mime_type=mime_type,
                 summary=summary,
-                metadata=chunk_meta
+                metadata=metadata
             )
 
             document_id_stored = await neo4j_storage.store_document(document)

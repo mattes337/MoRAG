@@ -283,19 +283,24 @@ class DocumentService(BaseService):
                     "metadata": {}
                 })
 
-            # Build metadata
+            # Build metadata with all required document fields
             metadata = {
-                "source_type": result.document.metadata.source_type.value if result.document.metadata.source_type else "unknown",
-                "source_name": result.document.metadata.source_name,
+                # Core document metadata fields (REQUIRED for proper Neo4j document creation)
                 "source_path": result.document.metadata.source_path,
+                "source_name": result.document.metadata.source_name,
+                "file_name": filename,  # Add file_name field
+                "mime_type": result.document.metadata.mime_type,
                 "file_size": result.document.metadata.file_size,
+                "checksum": result.document.metadata.checksum,  # Add checksum field
+
+                # Document-specific metadata
+                "source_type": result.document.metadata.source_type.value if result.document.metadata.source_type else "unknown",
                 "page_count": result.document.metadata.page_count,
                 "word_count": result.document.metadata.word_count,
                 "author": result.document.metadata.author,
                 "created_at": result.document.metadata.created_at.isoformat() if result.document.metadata.created_at else None,
                 "modified_at": result.document.metadata.modified_at.isoformat() if result.document.metadata.modified_at else None,
                 "language": result.document.metadata.language,
-                "mime_type": result.document.metadata.mime_type,
                 "quality_score": result.metadata.get("quality_score", 0.0),
                 "quality_issues": result.metadata.get("quality_issues", []),
                 "warnings": result.metadata.get("warnings", []),

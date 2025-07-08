@@ -307,14 +307,57 @@ class AudioProcessor:
     async def _extract_metadata(self, file_path: Path) -> Dict[str, Any]:
         """Extract metadata from audio file."""
         metadata = {}
-        
+
         try:
             import mutagen
-            
-            # Basic file info
-            metadata["filename"] = file_path.name
+            import hashlib
+
+            # Core document metadata fields
+            metadata["source_path"] = str(file_path.absolute())
+            metadata["source_name"] = file_path.name
+            metadata["file_name"] = file_path.name
             metadata["file_size"] = file_path.stat().st_size
             metadata["file_extension"] = file_path.suffix.lower()[1:]
+
+            # Determine MIME type based on file extension
+            ext = file_path.suffix.lower()
+            mime_type_map = {
+                '.mp3': 'audio/mpeg',
+                '.wav': 'audio/wav',
+                '.flac': 'audio/flac',
+                '.aac': 'audio/aac',
+                '.ogg': 'audio/ogg',
+                '.m4a': 'audio/mp4',
+                '.wma': 'audio/x-ms-wma'
+            }
+            metadata["mime_type"] = mime_type_map.get(ext, 'audio/mpeg')
+
+            # Calculate file checksum for document identification
+            sha256_hash = hashlib.sha256()
+            try:
+                with open(file_path, "rb") as f:
+                    # Read file in chunks to handle large files efficiently
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        sha256_hash.update(chunk)
+                metadata["checksum"] = sha256_hash.hexdigest()
+            except Exception as e:
+                logger.warning(f"Failed to calculate checksum for {file_path}: {e}")
+
+            # Determine MIME type based on file extension
+            ext = file_path.suffix.lower()
+            mime_type_map = {
+                '.mp3': 'audio/mpeg',
+                '.wav': 'audio/wav',
+                '.flac': 'audio/flac',
+                '.ogg': 'audio/ogg',
+                '.m4a': 'audio/mp4',
+                '.aac': 'audio/aac',
+                '.wma': 'audio/x-ms-wma'
+            }
+            metadata["mime_type"] = mime_type_map.get(ext, 'audio/mpeg')
+
+            # Legacy fields for compatibility
+            metadata["filename"] = file_path.name
             
             # Try to extract audio properties with pydub (may fail on Python 3.13+ due to missing audioop)
             try:

@@ -121,6 +121,9 @@ class VideoService:
             if progress_callback:
                 progress_callback(0.1, "Initializing video processing")
             result = await self.processor.process_video(file_path, progress_callback)
+
+            # Add file_path to result for metadata extraction
+            result.file_path = file_path
             
             # Generate embeddings if embedding service is available
             if self.embedding_service and result.audio_processing_result and result.audio_processing_result.transcript:
@@ -182,17 +185,15 @@ class VideoService:
 
             # Prepare response
             processing_time = time.time() - start_time
+
+            # Create comprehensive metadata including all required document fields
+            comprehensive_metadata = self._create_comprehensive_metadata(file_path, result)
+
             response = {
                 "success": True,
                 "processing_time": processing_time,
                 "content": formatted_content or "",  # Include formatted content
-                "metadata": {
-                    "duration": result.metadata.duration,
-                    "resolution": f"{result.metadata.width}x{result.metadata.height}",
-                    "fps": result.metadata.fps,
-                    "format": result.metadata.format,
-                    "has_audio": result.metadata.has_audio
-                },
+                "metadata": comprehensive_metadata,
                 "thumbnails": [str(path) for path in result.thumbnails],
                 "keyframes": [str(path) for path in result.keyframes],
                 "output_files": output_files
@@ -401,12 +402,53 @@ class VideoService:
             Dictionary with structured JSON data
         """
         try:
-            # Extract title from file path if available
+            # Extract title and file info from file path if available
             title = ""
             filename = ""
+            source_path = ""
+            source_name = ""
+            mime_type = "video/mp4"  # Default video MIME type
+            file_size = 0
+            checksum = None
+
             if hasattr(result, 'file_path') and result.file_path:
-                filename = Path(result.file_path).name
-                title = Path(result.file_path).stem
+                file_path = Path(result.file_path)
+                filename = file_path.name
+                source_name = filename
+                source_path = str(file_path.absolute())
+                title = file_path.stem
+
+                # Get file size from metadata or file system
+                if result.metadata and result.metadata.file_size:
+                    file_size = result.metadata.file_size
+                elif file_path.exists():
+                    file_size = file_path.stat().st_size
+
+                # Calculate file checksum for document identification
+                if file_path.exists():
+                    import hashlib
+                    sha256_hash = hashlib.sha256()
+                    try:
+                        with open(file_path, "rb") as f:
+                            # Read file in chunks to handle large files efficiently
+                            for chunk in iter(lambda: f.read(4096), b""):
+                                sha256_hash.update(chunk)
+                        checksum = sha256_hash.hexdigest()
+                    except Exception as e:
+                        logger.warning(f"Failed to calculate checksum for {file_path}: {e}")
+
+                # Determine MIME type based on file extension
+                ext = file_path.suffix.lower()
+                mime_type_map = {
+                    '.mp4': 'video/mp4',
+                    '.avi': 'video/x-msvideo',
+                    '.mov': 'video/quicktime',
+                    '.wmv': 'video/x-ms-wmv',
+                    '.flv': 'video/x-flv',
+                    '.webm': 'video/webm',
+                    '.mkv': 'video/x-matroska'
+                }
+                mime_type = mime_type_map.get(ext, 'video/mp4')
 
             # Build topics from audio processing result
             topics = []
@@ -457,13 +499,28 @@ class VideoService:
 
                     topics.append(topic_data)
 
-            # Build metadata
+            # Build metadata with all required fields for document creation
             metadata = {
+                # Core document metadata fields
+                "source_path": source_path,
+                "source_name": source_name,
+                "file_name": filename,
+                "mime_type": mime_type,
+                "file_size": file_size,
+                "checksum": checksum,
+
+                # Video-specific metadata
                 "duration": result.metadata.duration,
                 "resolution": f"{result.metadata.width}x{result.metadata.height}",
+                "width": result.metadata.width,
+                "height": result.metadata.height,
                 "fps": result.metadata.fps,
                 "format": result.metadata.format,
+                "codec": result.metadata.codec,
+                "bitrate": result.metadata.bitrate,
                 "has_audio": result.metadata.has_audio,
+                "audio_codec": result.metadata.audio_codec,
+                "creation_time": result.metadata.creation_time,
                 "thumbnails_count": len(result.thumbnails),
                 "keyframes_count": len(result.keyframes)
             }
@@ -493,3 +550,79 @@ class VideoService:
                 "topics": [],
                 "error": str(e)
             }
+
+    def _create_comprehensive_metadata(self, file_path: Path, result: VideoProcessingResult) -> Dict[str, Any]:
+        """Create comprehensive metadata including all required document fields."""
+        # Extract file information
+        source_path = str(file_path.absolute())
+        filename = file_path.name
+        source_name = filename
+        file_size = 0
+        checksum = None
+
+        # Get file size from metadata or file system
+        if result.metadata and result.metadata.file_size:
+            file_size = result.metadata.file_size
+        elif file_path.exists():
+            file_size = file_path.stat().st_size
+
+        # Calculate file checksum for document identification
+        if file_path.exists():
+            import hashlib
+            sha256_hash = hashlib.sha256()
+            try:
+                with open(file_path, "rb") as f:
+                    # Read file in chunks to handle large files efficiently
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        sha256_hash.update(chunk)
+                checksum = sha256_hash.hexdigest()
+            except Exception as e:
+                logger.warning(f"Failed to calculate checksum for {file_path}: {e}")
+
+        # Determine MIME type based on file extension
+        ext = file_path.suffix.lower()
+        mime_type_map = {
+            '.mp4': 'video/mp4',
+            '.avi': 'video/x-msvideo',
+            '.mov': 'video/quicktime',
+            '.wmv': 'video/x-ms-wmv',
+            '.flv': 'video/x-flv',
+            '.webm': 'video/webm',
+            '.mkv': 'video/x-matroska'
+        }
+        mime_type = mime_type_map.get(ext, 'video/mp4')
+
+        # Build comprehensive metadata with all required fields for document creation
+        metadata = {
+            # Core document metadata fields (REQUIRED for proper Neo4j document creation)
+            "source_path": source_path,
+            "source_name": source_name,
+            "file_name": filename,
+            "mime_type": mime_type,
+            "file_size": file_size,
+            "checksum": checksum,
+
+            # Video-specific metadata
+            "duration": result.metadata.duration,
+            "resolution": f"{result.metadata.width}x{result.metadata.height}",
+            "width": result.metadata.width,
+            "height": result.metadata.height,
+            "fps": result.metadata.fps,
+            "format": result.metadata.format,
+            "codec": result.metadata.codec,
+            "bitrate": result.metadata.bitrate,
+            "has_audio": result.metadata.has_audio,
+            "audio_codec": result.metadata.audio_codec,
+            "creation_time": result.metadata.creation_time,
+        }
+
+        # Add audio processing metadata if available
+        if result.audio_processing_result:
+            metadata.update({
+                "transcript_length": len(result.audio_processing_result.transcript) if result.audio_processing_result.transcript else 0,
+                "segments_count": len(result.audio_processing_result.segments) if result.audio_processing_result.segments else 0,
+                "has_speaker_diarization": result.audio_processing_result.metadata.get("has_speaker_info", False),
+                "has_topic_segmentation": result.audio_processing_result.metadata.get("has_topic_info", False)
+            })
+
+        return metadata

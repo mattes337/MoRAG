@@ -308,12 +308,18 @@ async def test_video_ingestion(
             # Initialize ingestion coordinator
             coordinator = IngestionCoordinator()
 
+            # Use processing result metadata which contains comprehensive document metadata
+            ingestion_metadata = result.metadata or {}
+            # Merge with any CLI-provided metadata
+            if metadata:
+                ingestion_metadata.update(metadata)
+
             # Perform comprehensive ingestion (let coordinator generate proper document ID)
             ingestion_result = await coordinator.ingest_content(
                 content=result.text_content,
                 source_path=str(video_file),
                 content_type='video',
-                metadata=metadata or {},
+                metadata=ingestion_metadata,
                 processing_result=result,
                 databases=database_configs,
                 document_id=None,  # Let coordinator generate proper unified ID
