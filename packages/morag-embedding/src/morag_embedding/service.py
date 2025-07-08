@@ -538,7 +538,7 @@ class GeminiEmbeddingService(BaseService):
                 # Configure the model
                 model = genai.GenerativeModel(self.generation_model)
 
-                # Create prompt for summarization with language specification
+                # Create prompt for summarization with strong language specification
                 language_instruction = ""
                 if language:
                     language_names = {
@@ -555,7 +555,7 @@ class GeminiEmbeddingService(BaseService):
                         'ko': 'Korean'
                     }
                     language_name = language_names.get(language, language)
-                    language_instruction = f"Please write the summary in {language_name}. "
+                    language_instruction = f"CRITICAL: You MUST write the summary ONLY in {language_name}. Do NOT use any other language. The summary language MUST match the specified language ({language_name}). "
 
                 prompt = f"{language_instruction}Summarize the following text in {max_length} characters or less:\n\n{text}"
 

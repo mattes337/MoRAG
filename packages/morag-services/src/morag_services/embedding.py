@@ -694,7 +694,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         instruction = style_instructions.get(style, style_instructions["concise"])
 
-        # Add language instruction if specified
+        # Add strong language instruction if specified
         language_instruction = ""
         if language:
             language_names = {
@@ -711,7 +711,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                 'ko': 'Korean'
             }
             language_name = language_names.get(language, language)
-            language_instruction = f"Please write the summary in {language_name}. "
+            language_instruction = f"CRITICAL: You MUST write the summary ONLY in {language_name}. Do NOT use any other language. The summary language MUST match the specified language ({language_name}). "
 
         return f"""
 {language_instruction}{instruction} of the following text in approximately {max_length} words or less.

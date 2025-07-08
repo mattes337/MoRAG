@@ -34,10 +34,10 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
         return RelationExtractionResult
 
     def get_system_prompt(self) -> str:
-        # Build language instruction
+        # Build strong language instruction
         language_instruction = ""
         if self.language:
-            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL relation descriptions, context, and relation types in {self.language} language. This is mandatory. If the source text is in a different language, you MUST translate all descriptions and context to {self.language}. Do NOT provide descriptions in any other language.\n"
+            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL relation types, descriptions, and context in {self.language} language. This is mandatory and non-negotiable. If the source text is in a different language, you MUST translate all relation types, descriptions, and context to {self.language}. Do NOT provide relation types, descriptions, or context in any other language. ALL RELATIONSHIP TYPES MUST BE IN {self.language} USING CANONICAL FORMS.\n"
 
         if self.dynamic_types and not self.relation_types:
             # Pure dynamic mode - let LLM determine appropriate relation types
@@ -67,6 +67,9 @@ Guidelines for relation types:
 - Avoid complex types like "COLLABORATES_WITH_ON_PROJECT" - use "COLLABORATES"
 - Be consistent within the same document/domain
 - Consider the direction of the relationship (source -> target)
+- ENSURE LANGUAGE CONSISTENCY: All relation types must be in the same language
+- AVOID MIXED LANGUAGES: Never mix languages within relation types or across relations
+- USE CANONICAL FORMS: Use the standard, dictionary form of relation types in the target language
 
 Focus on relations that are:
 - Explicitly stated or clearly implied in the text

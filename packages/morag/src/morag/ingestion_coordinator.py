@@ -285,8 +285,9 @@ class IngestionCoordinator:
         if chunk_overlap is None:
             chunk_overlap = 200
             
-        # Create chunks
-        chunks = self._create_chunks(content, chunk_size, chunk_overlap)
+        # Create chunks with content-type-aware strategy
+        content_type = metadata.get('content_type', 'document')
+        chunks = self._create_chunks(content, chunk_size, chunk_overlap, content_type, metadata)
         
         # Generate embeddings for all chunks
         embedding_results = await self.embedding_service.generate_embeddings_batch(
@@ -296,10 +297,12 @@ class IngestionCoordinator:
         # Extract embeddings from results
         embeddings = [result.embedding for result in embedding_results]
         
-        # Create chunk metadata
+        # Create chunk metadata with content-type-specific enhancements
         chunk_metadata = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             chunk_id = UnifiedIDGenerator.generate_chunk_id(document_id, i)
+
+            # Base chunk metadata
             chunk_meta = {
                 'chunk_id': chunk_id,
                 'document_id': document_id,
@@ -308,6 +311,17 @@ class IngestionCoordinator:
                 'created_at': datetime.now(timezone.utc).isoformat(),
                 **metadata
             }
+
+            # Add content-type-specific metadata
+            content_type = metadata.get('content_type', 'document')
+            chunk_meta['chunk_type'] = self._determine_chunk_type(content_type, metadata)
+
+            # Add position/timestamp information based on content type
+            if content_type in ['audio', 'video']:
+                chunk_meta.update(self._add_audio_video_chunk_metadata(chunk, i, metadata))
+            elif content_type == 'document':
+                chunk_meta.update(self._add_document_chunk_metadata(chunk, i, metadata))
+
             chunk_metadata.append(chunk_meta)
             
         return {
@@ -319,17 +333,216 @@ class IngestionCoordinator:
             'chunk_overlap': chunk_overlap
         }
         
-    def _create_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
-        """Create text chunks with word boundary preservation."""
+    def _create_chunks(self, content: str, chunk_size: int, chunk_overlap: int, content_type: str = 'document', metadata: Dict[str, Any] = None) -> List[str]:
+        """Create text chunks with content-type-aware strategy.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+            content_type: Type of content (audio, video, document, etc.)
+            metadata: Additional metadata for chunking decisions
+
+        Returns:
+            List of text chunks
+        """
         if len(content) <= chunk_size:
             return [content]
-            
+
+        # Use topic-based chunking for audio/video content
+        if content_type in ['audio', 'video'] and metadata:
+            return self._create_topic_based_chunks(content, chunk_size, chunk_overlap, metadata)
+
+        # Use document-aware chunking for documents
+        elif content_type == 'document':
+            return self._create_document_chunks(content, chunk_size, chunk_overlap)
+
+        # Fallback to character-based chunking with word boundaries
+        return self._create_character_chunks(content, chunk_size, chunk_overlap)
+
+    def _create_topic_based_chunks(self, content: str, chunk_size: int, chunk_overlap: int, metadata: Dict[str, Any]) -> List[str]:
+        """Create chunks based on topic boundaries for audio/video content.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+            metadata: Metadata containing topic information
+
+        Returns:
+            List of topic-based chunks
+        """
+        import re
+
+        # Look for topic headers in the content
+        topic_pattern = r'^###?\s*(.+?)(?:\n|$)'
+        topic_matches = list(re.finditer(topic_pattern, content, re.MULTILINE))
+
+        if not topic_matches:
+            # No topics found, fall back to timestamp-based chunking
+            return self._create_timestamp_chunks(content, chunk_size, chunk_overlap)
+
+        chunks = []
+
+        for i, match in enumerate(topic_matches):
+            # Determine the start and end of this topic section
+            topic_start = match.start()
+            topic_end = topic_matches[i + 1].start() if i + 1 < len(topic_matches) else len(content)
+
+            topic_content = content[topic_start:topic_end].strip()
+
+            # If topic content is too large, split it further
+            if len(topic_content) > chunk_size:
+                # Split large topics at timestamp boundaries
+                sub_chunks = self._split_topic_at_timestamps(topic_content, chunk_size, chunk_overlap)
+                chunks.extend(sub_chunks)
+            else:
+                chunks.append(topic_content)
+
+        return chunks
+
+    def _create_timestamp_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks based on timestamp boundaries for audio/video content.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of timestamp-based chunks
+        """
+        import re
+
+        # Look for timestamp patterns
+        timestamp_pattern = r'\[(\d{2}:\d{2}:\d{2})\]|\[(\d+:\d{2})\]|(\d+:\d{2}:\d{2})|(\d+:\d{2})'
+        timestamp_matches = list(re.finditer(timestamp_pattern, content))
+
+        if not timestamp_matches:
+            # No timestamps found, fall back to character chunking
+            return self._create_character_chunks(content, chunk_size, chunk_overlap)
+
+        chunks = []
+        current_chunk = ""
+
+        for i, match in enumerate(timestamp_matches):
+            # Find the end of this timestamp segment
+            next_match_start = timestamp_matches[i + 1].start() if i + 1 < len(timestamp_matches) else len(content)
+            segment = content[match.start():next_match_start].strip()
+
+            # If adding this segment would exceed chunk size, finalize current chunk
+            if current_chunk and len(current_chunk) + len(segment) > chunk_size:
+                chunks.append(current_chunk.strip())
+                current_chunk = segment
+            else:
+                current_chunk += "\n" + segment if current_chunk else segment
+
+        # Add the last chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
+    def _split_topic_at_timestamps(self, topic_content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Split a large topic at timestamp boundaries.
+
+        Args:
+            topic_content: Content of a single topic
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of sub-chunks
+        """
+        import re
+
+        # Extract topic header
+        header_pattern = r'^(###?\s*.+?)(?:\n|$)'
+        header_match = re.search(header_pattern, topic_content, re.MULTILINE)
+        topic_header = header_match.group(1) if header_match else ""
+
+        # Get content after header
+        content_start = header_match.end() if header_match else 0
+        remaining_content = topic_content[content_start:].strip()
+
+        # Split remaining content at timestamps
+        timestamp_chunks = self._create_timestamp_chunks(remaining_content, chunk_size - len(topic_header), chunk_overlap)
+
+        # Add topic header to each chunk
+        result_chunks = []
+        for chunk in timestamp_chunks:
+            if topic_header:
+                full_chunk = topic_header + "\n\n" + chunk
+            else:
+                full_chunk = chunk
+            result_chunks.append(full_chunk)
+
+        return result_chunks
+
+    def _create_document_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks optimized for document content.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of document chunks
+        """
+        import re
+
+        # Try to split at section boundaries first
+        section_pattern = r'\n\n+'
+        sections = re.split(section_pattern, content)
+
+        chunks = []
+        current_chunk = ""
+
+        for section in sections:
+            section = section.strip()
+            if not section:
+                continue
+
+            # If adding this section would exceed chunk size, finalize current chunk
+            if current_chunk and len(current_chunk) + len(section) > chunk_size:
+                chunks.append(current_chunk.strip())
+                current_chunk = section
+            else:
+                current_chunk += "\n\n" + section if current_chunk else section
+
+        # Add the last chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # If any chunk is still too large, split it further
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) > chunk_size:
+                sub_chunks = self._create_character_chunks(chunk, chunk_size, chunk_overlap)
+                final_chunks.extend(sub_chunks)
+            else:
+                final_chunks.append(chunk)
+
+        return final_chunks
+
+    def _create_character_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks using character-based splitting with word boundary preservation.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of character-based chunks
+        """
         chunks = []
         start = 0
-        
+
         while start < len(content):
             end = start + chunk_size
-            
+
             if end >= len(content):
                 # Last chunk
                 chunk = content[start:]
@@ -340,14 +553,14 @@ class IngestionCoordinator:
                 if last_space > chunk_size // 2:  # Only break on word if reasonable
                     chunk = content[start:start + last_space]
                     end = start + last_space
-                    
+
             if chunk.strip():
                 chunks.append(chunk.strip())
-                
+
             start = end - chunk_overlap
             if start >= len(content):
                 break
-                
+
         return chunks
 
     async def _extract_graph_data(
@@ -491,7 +704,7 @@ class IngestionCoordinator:
             Dictionary mapping chunk index (as string) to list of entity IDs
         """
         # Create chunks using the same method as the ingestion coordinator
-        chunks = self._create_chunks(content, chunk_size, chunk_overlap)
+        chunks = self._create_chunks(content, chunk_size, chunk_overlap, 'document', {})
 
         chunk_entity_mapping = {}
 
@@ -572,7 +785,7 @@ class IngestionCoordinator:
         logger.info(f"Found {len(auto_created_entities)} auto-created entities to map to chunks")
 
         # Create chunks for searching
-        chunks = self._create_chunks(content, chunk_size, chunk_overlap)
+        chunks = self._create_chunks(content, chunk_size, chunk_overlap, 'document', {})
 
         # Search for auto-created entities in chunks
         entities_added_to_chunks = 0
@@ -1279,3 +1492,120 @@ class IngestionCoordinator:
             # Return a fallback summary instead of failing
             title = metadata.get('title') or metadata.get('filename', 'Document')
             return f"Summary generation failed for {title}. Content processed successfully."
+
+    def _determine_chunk_type(self, content_type: str, metadata: Dict[str, Any]) -> str:
+        """Determine the appropriate chunk type based on content type and metadata.
+
+        Args:
+            content_type: Type of content (audio, video, document, etc.)
+            metadata: Content metadata
+
+        Returns:
+            Chunk type string
+        """
+        if content_type in ['audio', 'video']:
+            # Check if topic segmentation was used
+            if metadata.get('has_topic_info', False) or metadata.get('num_topics', 0) > 1:
+                return 'topic'
+            else:
+                return 'segment'
+        elif content_type == 'document':
+            # Check document structure
+            if metadata.get('has_chapters', False):
+                return 'chapter'
+            elif metadata.get('has_sections', False):
+                return 'section'
+            else:
+                return 'paragraph'
+        else:
+            return 'section'  # Default fallback
+
+    def _add_audio_video_chunk_metadata(self, chunk_text: str, chunk_index: int, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Add audio/video-specific metadata to chunk.
+
+        Args:
+            chunk_text: Text content of the chunk
+            chunk_index: Index of the chunk
+            metadata: Source metadata
+
+        Returns:
+            Dictionary with additional metadata
+        """
+        additional_meta = {}
+
+        # Try to extract timestamp information from the chunk text or metadata
+        # Look for timestamp patterns in the chunk text
+        import re
+        timestamp_pattern = r'\[(\d{2}:\d{2}:\d{2})\]|\[(\d+:\d{2})\]|(\d+:\d{2}:\d{2})|(\d+:\d{2})'
+        timestamp_matches = re.findall(timestamp_pattern, chunk_text)
+
+        if timestamp_matches:
+            # Use the first timestamp found
+            timestamp_str = next(filter(None, timestamp_matches[0]))
+            additional_meta['start_timestamp'] = timestamp_str
+
+            # Try to convert to seconds for easier processing
+            try:
+                time_parts = timestamp_str.split(':')
+                if len(time_parts) == 3:  # HH:MM:SS
+                    seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
+                elif len(time_parts) == 2:  # MM:SS
+                    seconds = int(time_parts[0]) * 60 + int(time_parts[1])
+                else:
+                    seconds = int(time_parts[0])
+                additional_meta['start_timestamp_seconds'] = seconds
+            except (ValueError, IndexError):
+                pass
+
+        # Add topic information if available
+        if metadata.get('has_topic_info', False):
+            # Try to extract topic title from chunk text
+            topic_title_pattern = r'^###?\s*(.+?)(?:\n|$)'
+            topic_match = re.search(topic_title_pattern, chunk_text, re.MULTILINE)
+            if topic_match:
+                additional_meta['topic_title'] = topic_match.group(1).strip()
+                additional_meta['chunk_summary'] = f"Topic: {topic_match.group(1).strip()}"
+
+        # Add speaker information if available
+        speaker_pattern = r'Speaker (\d+):|Speaker ([A-Z]+):'
+        speaker_matches = re.findall(speaker_pattern, chunk_text)
+        if speaker_matches:
+            speakers = set()
+            for match in speaker_matches:
+                speaker = match[0] or match[1]
+                speakers.add(speaker)
+            additional_meta['speakers'] = list(speakers)
+
+        return additional_meta
+
+    def _add_document_chunk_metadata(self, chunk_text: str, chunk_index: int, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Add document-specific metadata to chunk.
+
+        Args:
+            chunk_text: Text content of the chunk
+            chunk_index: Index of the chunk
+            metadata: Source metadata
+
+        Returns:
+            Dictionary with additional metadata
+        """
+        additional_meta = {}
+
+        # Try to extract section/chapter information
+        import re
+
+        # Look for chapter/section headers
+        header_pattern = r'^(#{1,6})\s*(.+?)(?:\n|$)'
+        header_match = re.search(header_pattern, chunk_text, re.MULTILINE)
+        if header_match:
+            header_level = len(header_match.group(1))
+            header_text = header_match.group(2).strip()
+            additional_meta['section_title'] = header_text
+            additional_meta['section_level'] = header_level
+            additional_meta['chunk_summary'] = f"Section: {header_text}"
+
+        # Add page information if available from metadata
+        if 'page_number' in metadata:
+            additional_meta['page_number'] = metadata['page_number']
+
+        return additional_meta

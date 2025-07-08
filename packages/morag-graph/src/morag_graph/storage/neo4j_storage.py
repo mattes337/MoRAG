@@ -428,10 +428,13 @@ class Neo4jStorage(BaseStorage):
 
         entity_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
 
+        # Create labels string for Cypher - use LLM-determined type as label
+        labels_str = ':'.join(labels)
+
         # MERGE based on name only to prevent duplicate entities
         # Use confidence to determine which type to keep
-        query = """
-        MERGE (e:Entity {name: $name})
+        query = f"""
+        MERGE (e:{labels_str} {{name: $name}})
         ON CREATE SET
             e += $properties,
             e.type = $type
@@ -557,7 +560,8 @@ class Neo4jStorage(BaseStorage):
             chunk_id: Chunk ID
         """
         query = """
-        MATCH (e:Entity {id: $entity_id})
+        MATCH (e {id: $entity_id})
+        WHERE e.type IS NOT NULL
         MATCH (c:DocumentChunk {id: $chunk_id})
         MERGE (e)-[:MENTIONED_IN]->(c)
         """
@@ -583,7 +587,8 @@ class Neo4jStorage(BaseStorage):
             raise ValueError(f"Invalid chunk ID format: {chunk_id}")
         
         query = """
-        MATCH (e:Entity)-[:MENTIONED_IN]->(c:DocumentChunk {id: $chunk_id})
+        MATCH (e)-[:MENTIONED_IN]->(c:DocumentChunk {id: $chunk_id})
+        WHERE e.type IS NOT NULL
         RETURN e
         """
         
@@ -606,7 +611,8 @@ class Neo4jStorage(BaseStorage):
             List of chunk IDs
         """
         query = """
-        MATCH (e:Entity {id: $entity_id})-[:MENTIONED_IN]->(c:DocumentChunk)
+        MATCH (e {id: $entity_id})-[:MENTIONED_IN]->(c:DocumentChunk)
+        WHERE e.type IS NOT NULL
         RETURN c.id as chunk_id
         ORDER BY c.chunk_index
         """
@@ -629,7 +635,8 @@ class Neo4jStorage(BaseStorage):
         
         # Remove all existing relationships
         delete_query = """
-        MATCH (e:Entity {id: $entity_id})-[r:MENTIONED_IN]->()
+        MATCH (e {id: $entity_id})-[r:MENTIONED_IN]->()
+        WHERE e.type IS NOT NULL
         DELETE r
         """
         
@@ -655,7 +662,8 @@ class Neo4jStorage(BaseStorage):
             Entity if found, None otherwise
         """
         query = """
-        MATCH (e:Entity {id: $entity_id})
+        MATCH (e {id: $entity_id})
+        WHERE e.type IS NOT NULL
         RETURN e
         """
         
@@ -680,8 +688,8 @@ class Neo4jStorage(BaseStorage):
             return []
         
         query = """
-        MATCH (e:Entity)
-        WHERE e.id IN $entity_ids
+        MATCH (e)
+        WHERE e.id IN $entity_ids AND e.type IS NOT NULL
         RETURN e
         """
         
@@ -703,7 +711,7 @@ class Neo4jStorage(BaseStorage):
         Returns:
             List of all entities
         """
-        query = "MATCH (e:Entity) RETURN e"
+        query = "MATCH (e) WHERE e.type IS NOT NULL RETURN e"
         result = await self._execute_query(query)
         
         entities = []
@@ -733,8 +741,8 @@ class Neo4jStorage(BaseStorage):
             List of matching entities
         """
         cypher_query = """
-        MATCH (e:Entity)
-        WHERE toLower(e.name) CONTAINS toLower($query)
+        MATCH (e)
+        WHERE e.type IS NOT NULL AND toLower(e.name) CONTAINS toLower($query)
         """
         
         parameters = {"query": query, "limit": limit}
@@ -774,7 +782,8 @@ class Neo4jStorage(BaseStorage):
         properties.pop('_labels', None)  # Don't update labels
         
         query = """
-        MATCH (e:Entity {id: $id})
+        MATCH (e {id: $id})
+        WHERE e.type IS NOT NULL
         SET e += $properties
         RETURN e.id as id
         """
@@ -796,7 +805,8 @@ class Neo4jStorage(BaseStorage):
             True if entity was deleted, False if not found
         """
         query = """
-        MATCH (e:Entity {id: $entity_id})
+        MATCH (e {id: $entity_id})
+        WHERE e.type IS NOT NULL
         DETACH DELETE e
         RETURN count(e) as deleted_count
         """
@@ -820,8 +830,10 @@ class Neo4jStorage(BaseStorage):
 
         # First check if both entities exist
         check_query = """
-        OPTIONAL MATCH (source:Entity {id: $source_id})
-        OPTIONAL MATCH (target:Entity {id: $target_id})
+        OPTIONAL MATCH (source {id: $source_id})
+        WHERE source.type IS NOT NULL
+        OPTIONAL MATCH (target {id: $target_id})
+        WHERE target.type IS NOT NULL
         RETURN source.id as source_exists, target.id as target_exists
         """
 
@@ -848,8 +860,10 @@ class Neo4jStorage(BaseStorage):
 
         # Both entities now exist (or have been created), create the relation
         query = f"""
-        MATCH (source:Entity {{id: $source_id}})
-        MATCH (target:Entity {{id: $target_id}})
+        MATCH (source {{id: $source_id}})
+        WHERE source.type IS NOT NULL
+        MATCH (target {{id: $target_id}})
+        WHERE target.type IS NOT NULL
         MERGE (source)-[r:{relation_type} {{id: $relation_id}}]->(target)
         SET r += $properties
         RETURN r.id as id
@@ -972,7 +986,8 @@ class Neo4jStorage(BaseStorage):
             return_clause = "r, n1.id as source_id, e.id as target_id"
         
         query = f"""
-        MATCH (e:Entity {{id: $entity_id}})
+        MATCH (e {{id: $entity_id}})
+        WHERE e.type IS NOT NULL
         MATCH {pattern}
         """
         
@@ -1006,7 +1021,8 @@ class Neo4jStorage(BaseStorage):
             List of all relations
         """
         query = """
-        MATCH (source:Entity)-[r]->(target:Entity)
+        MATCH (source)-[r]->(target)
+        WHERE source.type IS NOT NULL AND target.type IS NOT NULL
         RETURN r, source.id as source_id, target.id as target_id
         """
         
@@ -1087,9 +1103,10 @@ class Neo4jStorage(BaseStorage):
         relation_filter = f":{relation_type}" if relation_type else ""
         
         query = f"""
-        MATCH (e:Entity {{id: $entity_id}})
-        MATCH (e)-[{relation_filter}*1..{max_depth}]-(neighbor:Entity)
-        WHERE neighbor.id <> e.id
+        MATCH (e {{id: $entity_id}})
+        WHERE e.type IS NOT NULL
+        MATCH (e)-[{relation_filter}*1..{max_depth}]-(neighbor)
+        WHERE neighbor.id <> e.id AND neighbor.type IS NOT NULL
         RETURN DISTINCT neighbor
         """
         
@@ -1122,9 +1139,10 @@ class Neo4jStorage(BaseStorage):
             List of paths (each path is a list of entity IDs)
         """
         query = f"""
-        MATCH path = (source:Entity {{id: $source_id}})
+        MATCH path = (source {{id: $source_id}})
         -[*1..{max_depth}]-
-        (target:Entity {{id: $target_id}})
+        (target {{id: $target_id}})
+        WHERE source.type IS NOT NULL AND target.type IS NOT NULL
         RETURN [node in nodes(path) | node.id] as path_ids
         LIMIT 10
         """
@@ -1169,7 +1187,7 @@ class Neo4jStorage(BaseStorage):
             entities = await self.get_entities(entity_ids)
         else:
             # Get all entities
-            query = "MATCH (e:Entity) RETURN e"
+            query = "MATCH (e) WHERE e.type IS NOT NULL RETURN e"
             result = await self._execute_query(query)
             entities = []
             for record in result:
@@ -1187,8 +1205,9 @@ class Neo4jStorage(BaseStorage):
         if graph.entities:
             entity_id_list = list(graph.entities.keys())
             query = """
-            MATCH (source:Entity)-[r]->(target:Entity)
-            WHERE source.id IN $entity_ids AND target.id IN $entity_ids
+            MATCH (source)-[r]->(target)
+            WHERE source.type IS NOT NULL AND target.type IS NOT NULL
+            AND source.id IN $entity_ids AND target.id IN $entity_ids
             RETURN r, source.id as source_id, target.id as target_id
             """
             
@@ -1232,12 +1251,13 @@ class Neo4jStorage(BaseStorage):
                 RETURN type(r) as type, count(r) as count 
                 ORDER BY count DESC
             """,
-            "entity_count": "MATCH (e:Entity) RETURN count(e) as count",
+            "entity_count": "MATCH (e) WHERE e.type IS NOT NULL RETURN count(e) as count",
             "document_count": "MATCH (d:Document) RETURN count(d) as count",
             "chunk_count": "MATCH (c:DocumentChunk) RETURN count(c) as count",
             "entity_types": """
-                MATCH (e:Entity) 
-                RETURN e.type as type, count(e) as count 
+                MATCH (e)
+                WHERE e.type IS NOT NULL
+                RETURN e.type as type, count(e) as count
                 ORDER BY count DESC
             """
         }
@@ -1346,7 +1366,8 @@ class Neo4jStorage(BaseStorage):
         """
         query = """
         MATCH (c:DocumentChunk {id: $chunk_id})
-        MATCH (e:Entity {id: $entity_id})
+        MATCH (e {id: $entity_id})
+        WHERE e.type IS NOT NULL
         MERGE (c)-[r:MENTIONS]->(e)
         SET r.context = $context
         """
@@ -1416,10 +1437,12 @@ class Neo4jStorage(BaseStorage):
             List of entities from this document
         """
         query = """
-        MATCH (d:Document {id: $document_id})-[:CONTAINS]->(c:DocumentChunk)-[:MENTIONS]->(e:Entity)
+        MATCH (d:Document {id: $document_id})-[:CONTAINS]->(c:DocumentChunk)-[:MENTIONS]->(e)
+        WHERE e.type IS NOT NULL
         RETURN DISTINCT e
         UNION
-        MATCH (e:Entity {source_doc_id: $document_id})
+        MATCH (e {source_doc_id: $document_id})
+        WHERE e.type IS NOT NULL
         RETURN e
         """
         

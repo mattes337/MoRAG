@@ -34,10 +34,10 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
         return EntityExtractionResult
 
     def get_system_prompt(self) -> str:
-        # Build language instruction
+        # Build strong language instruction
         language_instruction = ""
         if self.language:
-            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL entity descriptions and entity types in {self.language} language. This is mandatory. If the source text is in a different language, you MUST translate all descriptions to {self.language}. Do NOT provide descriptions in any other language.\n"
+            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL entity names, descriptions, and entity types in {self.language} language. This is mandatory and non-negotiable. If the source text is in a different language, you MUST translate all entity names, descriptions, and types to {self.language}. Do NOT provide names, descriptions, or types in any other language. Entity names MUST be in {self.language} using the canonical form in that language.\n"
 
         if self.dynamic_types and not self.entity_types:
             # Pure dynamic mode - let LLM determine appropriate entity types
@@ -53,12 +53,13 @@ For each entity, provide:
 
 CRITICAL ENTITY NAME NORMALIZATION RULES:
 - ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
-- ALWAYS use MASCULINE form: "Zahnmediziner" not "Zahnmedizinerin"
+- ALWAYS use MASCULINE form when applicable: "Zahnmediziner" not "Zahnmedizinerin"
 - ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
-- RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
-- If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
-- Use the most CANONICAL form of the entity name
+- RESOLVE abbreviations to their canonical form in the target language
+- Use the most CANONICAL form of the entity name in the target language
 - Normalize case appropriately: proper nouns capitalized, common nouns lowercase
+- ENSURE LANGUAGE CONSISTENCY: All entity names must be in the same language as specified
+- AVOID MIXED LANGUAGES: Never mix languages within entity names or across entities
 
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities

@@ -37,7 +37,6 @@ class Entity(BaseModel):
     
     # Cross-system integration fields
     mentioned_in_chunks: Set[str] = Field(default_factory=set, description="Set of chunk IDs where this entity is mentioned")
-    qdrant_vector_ids: Set[str] = Field(default_factory=set, description="Set of Qdrant vector IDs associated with this entity")
     
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "Entity"
@@ -191,8 +190,7 @@ class Entity(BaseModel):
         if 'mentioned_in_chunks' in data and isinstance(data['mentioned_in_chunks'], set):
             data['mentioned_in_chunks'] = list(data['mentioned_in_chunks'])
 
-        if 'qdrant_vector_ids' in data and isinstance(data['qdrant_vector_ids'], set):
-            data['qdrant_vector_ids'] = list(data['qdrant_vector_ids'])
+
 
         return data
     
@@ -218,14 +216,19 @@ class Entity(BaseModel):
         if 'mentioned_in_chunks' in properties:
             properties['mentioned_in_chunks'] = list(properties['mentioned_in_chunks'])
 
+        # Remove qdrant_vector_ids from Neo4j storage
         if 'qdrant_vector_ids' in properties:
-            properties['qdrant_vector_ids'] = list(properties['qdrant_vector_ids'])
+            del properties['qdrant_vector_ids']
 
-        # Add label for Neo4J (sanitize type for valid Neo4j label)
-        # Use only the clean type value without any prefixes
-        type_label = type_value.replace('.', '_').replace(' ', '_').replace('-', '_')
+        # Add label for Neo4J - use only the LLM-determined type as label
+        # Sanitize type for valid Neo4j label (no generic "Entity" label)
+        type_label = type_value.replace('.', '_').replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '')
 
-        properties['_labels'] = [self._neo4j_label, type_label]
+        # Ensure the label is valid (starts with letter, contains only alphanumeric and underscore)
+        if not type_label or not type_label[0].isalpha():
+            type_label = f"Type_{type_label}" if type_label else "UnknownType"
+
+        properties['_labels'] = [type_label]
 
         return properties
     
