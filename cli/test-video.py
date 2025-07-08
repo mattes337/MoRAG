@@ -76,7 +76,7 @@ def print_result(key: str, value: str, indent: int = 0):
 
 
 async def test_video_processing(video_file: Path, generate_thumbnails: bool = False,
-                               thumbnail_count: int = 3, enable_ocr: bool = False) -> bool:
+                               thumbnail_count: int = 3, enable_ocr: bool = False, language: Optional[str] = None) -> bool:
     """Test video processing functionality."""
     print_header("MoRAG Video Processing Test")
 
@@ -99,7 +99,8 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
             enable_speaker_diarization=False,  # Disable for faster processing
             enable_topic_segmentation=False,  # Disable for faster processing
             audio_model_size="base",  # Use base model for faster processing
-            enable_ocr=enable_ocr
+            enable_ocr=enable_ocr,
+            language=language  # Pass language for consistent processing
         )
         print_result("Video Configuration", "✅ Created successfully")
         print_result("Generate Thumbnails", "✅ Enabled" if generate_thumbnails else "❌ Disabled")
@@ -215,7 +216,8 @@ async def test_video_ingestion(
     use_qdrant: bool = True,
     use_neo4j: bool = True,
     qdrant_collection_name: Optional[str] = None,
-    neo4j_database_name: Optional[str] = None
+    neo4j_database_name: Optional[str] = None,
+    language: Optional[str] = None
 ) -> bool:
     """
     Test video ingestion using the proper ingestion coordinator.
@@ -226,6 +228,7 @@ async def test_video_ingestion(
         metadata: Optional metadata dictionary
         use_qdrant: Whether to use Qdrant vector database
         use_neo4j: Whether to use Neo4j graph database
+        language: Language code for processing (e.g., 'en', 'de', 'fr')
 
     Returns:
         True if ingestion was successful, False otherwise
@@ -241,6 +244,7 @@ async def test_video_ingestion(
     print_result("File Extension", video_file.suffix.lower())
     print_result("Webhook URL", webhook_url or "None")
     print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+    print_result("Language", language or "Auto-detect")
     print_result("Use Qdrant", "✅ Yes" if use_qdrant else "❌ No")
     print_result("Use Neo4j", "✅ Yes" if use_neo4j else "❌ No")
 
@@ -265,6 +269,13 @@ async def test_video_ingestion(
 
         # Process the video file
         result = await api.process_file(str(video_file), 'video', options)
+
+        # Create intermediate file with transcription for resumable processing
+        if result.success and result.text_content:
+            intermediate_file = video_file.parent / f"{video_file.stem}_intermediate.md"
+            with open(intermediate_file, 'w', encoding='utf-8') as f:
+                f.write(result.text_content)
+            print_result("Intermediate File Created", str(intermediate_file))
 
         if result.success and result.text_content:
             print("✅ Video processing completed successfully!")
@@ -323,7 +334,8 @@ async def test_video_ingestion(
                 processing_result=result,
                 databases=database_configs,
                 document_id=None,  # Let coordinator generate proper unified ID
-                replace_existing=False
+                replace_existing=False,
+                language=language  # Pass language for consistent extraction
             )
 
             print("✅ Content ingested successfully!")
@@ -407,6 +419,9 @@ Examples:
   Resume from Ingestion Data:
     python test-video.py my-video.mp4 --use-ingestion-data my-video.ingest_data.json
 
+  Resume from Intermediate File:
+    python test-video.py my-video.mp4 --use-intermediate my-video_intermediate.md --ingest --language de
+
 Note: Video processing may take several minutes for large files.
         """
     )
@@ -431,6 +446,7 @@ Note: Video processing may take several minutes for large files.
     parser.add_argument('--language', required=True, help='Language code for processing (e.g., en, de, fr) - MANDATORY for consistent processing')
     parser.add_argument('--use-process-result', help='Skip processing and use existing process result file (e.g., my-file.process_result.json)')
     parser.add_argument('--use-ingestion-data', help='Skip processing and ingestion calculation, use existing ingestion data file (e.g., my-file.ingest_data.json)')
+    parser.add_argument('--use-intermediate', help='Skip video processing and use existing intermediate file (e.g., my-file_intermediate.md)')
 
     args = parser.parse_args()
 
@@ -444,6 +460,102 @@ Note: Video processing may take several minutes for large files.
         except json.JSONDecodeError as e:
             print(f"❌ Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
+
+    # Handle intermediate file argument
+    if args.use_intermediate:
+        async def handle_intermediate_file():
+            intermediate_file = Path(args.use_intermediate)
+            if not intermediate_file.exists():
+                print(f"❌ Error: Intermediate file not found: {intermediate_file}")
+                return False
+
+            try:
+                with open(intermediate_file, 'r', encoding='utf-8') as f:
+                    text_content = f.read()
+                print(f"✅ Using existing intermediate file: {intermediate_file}")
+                print("💡 Skipping video processing, using transcription from intermediate file...")
+
+                # Create a mock processing result with the intermediate content
+                from morag_core.models.config import ProcessingResult
+                mock_result = ProcessingResult(
+                    success=True,
+                    task_id="intermediate-resume",
+                    source_type="video",
+                    content=text_content,
+                    metadata=metadata or {}
+                )
+
+                if args.ingest:
+                    # Continue with ingestion using the intermediate content
+                    from morag.ingestion_coordinator import IngestionCoordinator, DatabaseConfig, DatabaseType
+
+                    print_section("Ingesting to Databases")
+                    print("📊 Starting comprehensive ingestion from intermediate file...")
+
+                    # Configure databases based on flags
+                    database_configs = []
+                    if args.qdrant:
+                        collection_name = args.qdrant_collection or os.getenv('MORAG_QDRANT_COLLECTION', 'morag_videos')
+                        qdrant_url = os.getenv('QDRANT_URL')
+                        if qdrant_url:
+                            from urllib.parse import urlparse
+                            parsed = urlparse(qdrant_url)
+                            hostname = qdrant_url
+                            port = parsed.port or (443 if parsed.scheme == 'https' else 6333)
+                        else:
+                            hostname = os.getenv('QDRANT_HOST', 'localhost')
+                            port = int(os.getenv('QDRANT_PORT', '6333'))
+
+                        database_configs.append(DatabaseConfig(
+                            type=DatabaseType.QDRANT,
+                            hostname=hostname,
+                            port=port,
+                            database_name=collection_name
+                        ))
+                    if args.neo4j:
+                        db_name = args.neo4j_database or os.getenv('NEO4J_DATABASE', 'neo4j')
+                        database_configs.append(DatabaseConfig(
+                            type=DatabaseType.NEO4J,
+                            hostname=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
+                            username=os.getenv('NEO4J_USERNAME', 'neo4j'),
+                            password=os.getenv('NEO4J_PASSWORD', 'password'),
+                            database_name=db_name
+                        ))
+
+                    # Initialize ingestion coordinator
+                    coordinator = IngestionCoordinator()
+
+                    # Use CLI-provided metadata
+                    ingestion_metadata = metadata or {}
+
+                    # Perform comprehensive ingestion
+                    ingestion_result = await coordinator.ingest_content(
+                        content=text_content,
+                        source_path=str(video_file),
+                        content_type='video',
+                        metadata=ingestion_metadata,
+                        processing_result=mock_result,
+                        databases=database_configs,
+                        document_id=None,
+                        replace_existing=False,
+                        language=args.language
+                    )
+
+                    print("✅ Content ingested successfully from intermediate file!")
+                    print(f"\n🎉 Video ingestion from intermediate file completed successfully!")
+                    return True
+                else:
+                    print("✅ Intermediate file loaded successfully!")
+                    print(f"Content length: {len(text_content)} characters")
+                    return True
+
+            except Exception as e:
+                print(f"❌ Error reading intermediate file: {e}")
+                return False
+
+        # Run the async function
+        success = asyncio.run(handle_intermediate_file())
+        sys.exit(0 if success else 1)
 
     # Handle resume arguments
     from resume_utils import handle_resume_arguments
@@ -459,7 +571,8 @@ Note: Video processing may take several minutes for large files.
                 use_qdrant=args.qdrant,
                 use_neo4j=args.neo4j,
                 qdrant_collection_name=args.qdrant_collection,
-                neo4j_database_name=args.neo4j_database
+                neo4j_database_name=args.neo4j_database,
+                language=args.language
             ))
             if success:
                 print("\n🎉 Video ingestion test completed successfully!")
@@ -474,7 +587,8 @@ Note: Video processing may take several minutes for large files.
                 video_file,
                 generate_thumbnails=args.thumbnails,
                 thumbnail_count=args.thumbnail_count,
-                enable_ocr=args.enable_ocr
+                enable_ocr=args.enable_ocr,
+                language=args.language
             ))
             if success:
                 print("\n🎉 Video processing test completed successfully!")

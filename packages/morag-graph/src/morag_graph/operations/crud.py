@@ -32,26 +32,23 @@ class GraphCRUD:
         self.logger = logger.getChild(self.__class__.__name__)
     
     async def create_entity(self, entity: Entity) -> Entity:
-        """Create a new entity in the graph.
-        
+        """Create or update an entity in the graph.
+
+        Uses MERGE strategy to handle entity deduplication by name.
+        If an entity with the same name exists, it will be updated with
+        the highest confidence score and most recent type.
+
         Args:
-            entity: Entity to create
-            
+            entity: Entity to create or update
+
         Returns:
-            Created entity with any generated fields
-            
-        Raises:
-            ValueError: If entity already exists
+            Created or updated entity with any generated fields
         """
-        self.logger.info(f"Creating entity: {entity.name} ({entity.type})")
-        
-        # Check if entity already exists
-        existing = await self.get_entity_by_name(entity.name)
-        if existing:
-            raise ValueError(f"Entity '{entity.name}' already exists")
-        
+        self.logger.info(f"Creating/updating entity: {entity.name} ({entity.type})")
+
+        # Use storage layer's MERGE strategy for deduplication
         await self.storage.store_entity(entity)
-        self.logger.debug(f"Entity created successfully: {entity.id}")
+        self.logger.debug(f"Entity created/updated successfully: {entity.id}")
         return entity
     
     async def create_relation(self, relation: Relation) -> Relation:

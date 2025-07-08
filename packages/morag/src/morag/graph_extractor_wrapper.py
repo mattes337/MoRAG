@@ -23,6 +23,7 @@ class GraphExtractor:
         """Initialize the graph extractor."""
         self.entity_extractor = None
         self.relation_extractor = None
+        self.llm_config = None
         self._initialized = False
         
     async def initialize(self):
@@ -31,7 +32,7 @@ class GraphExtractor:
             return
             
         # Get LLM configuration from environment
-        llm_config = LLMConfig(
+        self.llm_config = LLMConfig(
             provider="gemini",
             api_key=os.getenv('GEMINI_API_KEY'),
             model=os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash'),  # Use same default as run_extraction.py
@@ -44,14 +45,14 @@ class GraphExtractor:
             exponential_base=float(os.getenv('MORAG_GRAPH_EXPONENTIAL_BASE', '2.0')),
             jitter=os.getenv('MORAG_GRAPH_JITTER', 'true').lower() == 'true'
         )
-        
+
         # Convert LLMConfig to dict for the extractors
         llm_config_dict = {
-            "provider": llm_config.provider,
-            "api_key": llm_config.api_key,
-            "model": llm_config.model,
-            "temperature": llm_config.temperature,
-            "max_tokens": llm_config.max_tokens
+            "provider": self.llm_config.provider,
+            "api_key": self.llm_config.api_key,
+            "model": self.llm_config.model,
+            "temperature": self.llm_config.temperature,
+            "max_tokens": self.llm_config.max_tokens
         }
 
         self.entity_extractor = EntityExtractor(config=llm_config_dict, dynamic_types=True)

@@ -39,6 +39,8 @@ class VideoConfig:
     enable_speaker_diarization: bool = False
     enable_topic_segmentation: bool = False
     audio_model_size: str = "base"
+    # Language configuration
+    language: Optional[str] = None  # Language for audio transcription
     # OCR options
     enable_ocr: bool = False
     ocr_engine: str = "tesseract"  # tesseract or easyocr
@@ -65,6 +67,11 @@ class VideoConfig:
         env_topic_segmentation = os.environ.get("MORAG_ENABLE_TOPIC_SEGMENTATION")
         if env_topic_segmentation is not None:
             self.enable_topic_segmentation = env_topic_segmentation.lower() in ("true", "1", "yes", "on")
+
+        # Override language if set in environment
+        env_language = os.environ.get("MORAG_VIDEO_LANGUAGE")
+        if env_language and self.language is None:
+            self.language = env_language
 
 
 @dataclass
@@ -136,6 +143,9 @@ class VideoProcessor:
                     audio_config.enable_diarization = self.config.enable_speaker_diarization
                 if self.config.enable_topic_segmentation != False:
                     audio_config.enable_topic_segmentation = self.config.enable_topic_segmentation
+                # Pass language configuration to audio processor
+                if self.config.language is not None:
+                    audio_config.language = self.config.language
 
                 # Always set device to auto for video processing
                 audio_config.device = "auto"
