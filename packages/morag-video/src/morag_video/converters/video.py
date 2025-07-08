@@ -322,8 +322,11 @@ class VideoConverter:
         result = []
 
         for segment in segments:
+            # Skip empty segments
+            if not segment.text or not segment.text.strip():
+                continue
             timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-            result.append(f"{timestamp} {segment.text}\n")
+            result.append(f"{timestamp} {segment.text.strip()}")
 
         return "\n".join(result)
 
@@ -339,15 +342,27 @@ class VideoConverter:
 
         result = []
         for speaker, speaker_segments in speaker_groups.items():
-            result.append(f"### {speaker}\n")
+            # Calculate speaker timestamp range
+            if speaker_segments:
+                start_time = min(seg.start for seg in speaker_segments)
+                end_time = max(seg.end for seg in speaker_segments)
+                speaker_timestamp = f"({self._format_duration(start_time)} - {self._format_duration(end_time)})"
+                result.append(f"### {speaker} {speaker_timestamp}")
+            else:
+                result.append(f"### {speaker}")
 
             for segment in speaker_segments:
+                # Skip empty segments
+                if not segment.text or not segment.text.strip():
+                    continue
                 timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-                result.append(f"{timestamp} {segment.text}\n")
+                result.append(f"{timestamp} {segment.text.strip()}")
 
-            result.append("\n")
+            result.append("")  # Single empty line between speakers
 
-        return "\n".join(result)
+        # Filter out any empty lines and join
+        filtered_result = [line for line in result if line is not None]
+        return "\n".join(filtered_result)
 
     def _format_segments_by_topic(self, segments: List[Any]) -> str:
         """Format transcript segments grouped by topic."""
@@ -362,15 +377,27 @@ class VideoConverter:
 
         result = []
         for topic, topic_segments in topic_groups.items():
-            result.append(f"### {topic}\n")
+            # Calculate topic timestamp range
+            if topic_segments:
+                start_time = min(seg.start for seg in topic_segments)
+                end_time = max(seg.end for seg in topic_segments)
+                topic_timestamp = f"({self._format_duration(start_time)} - {self._format_duration(end_time)})"
+                result.append(f"### {topic} {topic_timestamp}")
+            else:
+                result.append(f"### {topic}")
 
             for segment in topic_segments:
+                # Skip empty segments
+                if not segment.text or not segment.text.strip():
+                    continue
                 timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-                result.append(f"{timestamp} {segment.text}\n")
+                result.append(f"{timestamp} {segment.text.strip()}")
 
-            result.append("\n")
+            result.append("")  # Single empty line between topics
 
-        return "\n".join(result)
+        # Filter out any empty lines and join
+        filtered_result = [line for line in result if line is not None]
+        return "\n".join(filtered_result)
 
     def _format_speaker_segments(self, speaker_segments: Dict[str, List[Any]]) -> str:
         """Format transcript segments grouped by speaker."""

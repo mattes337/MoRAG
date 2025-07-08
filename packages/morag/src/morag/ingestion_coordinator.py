@@ -809,6 +809,58 @@ class IngestionCoordinator:
                         entities_added_to_chunks += 1
                         logger.debug(f"Added auto-created entity '{entity_name}' ({entity_id}) to chunk {chunk_index}")
 
+        # For auto-created entities that weren't found in any chunk,
+        # connect them to chunks where their related entities are found
+        unconnected_entities = []
+        for entity_name, entity_id in auto_created_entities:
+            # Check if this entity was added to any chunk
+            found_in_chunk = False
+            for chunk_entities in chunk_entity_mapping.values():
+                if entity_id in chunk_entities:
+                    found_in_chunk = True
+                    break
+
+            if not found_in_chunk:
+                unconnected_entities.append((entity_name, entity_id))
+
+        if unconnected_entities:
+            logger.info(f"Found {len(unconnected_entities)} unconnected auto-created entities, connecting via relations")
+
+            # For each unconnected entity, find relations it's involved in
+            for entity_name, entity_id in unconnected_entities:
+                connected_to_chunk = False
+
+                for relation in relations:
+                    related_entity_id = None
+
+                    # Check if this entity is source or target in the relation
+                    if relation.source_entity_id == entity_id:
+                        related_entity_id = relation.target_entity_id
+                    elif relation.target_entity_id == entity_id:
+                        related_entity_id = relation.source_entity_id
+
+                    if related_entity_id:
+                        # Find which chunk the related entity is in
+                        for chunk_index_str, chunk_entities in chunk_entity_mapping.items():
+                            if related_entity_id in chunk_entities:
+                                # Add the unconnected entity to the same chunk
+                                if entity_id not in chunk_entities:
+                                    chunk_entities.append(entity_id)
+                                    entities_added_to_chunks += 1
+                                    connected_to_chunk = True
+                                    logger.debug(f"Connected auto-created entity '{entity_name}' ({entity_id}) to chunk {chunk_index_str} via related entity {related_entity_id}")
+                                break
+
+                    if connected_to_chunk:
+                        break
+
+                # If still not connected, add to the first chunk as fallback
+                if not connected_to_chunk and chunk_entity_mapping:
+                    first_chunk = next(iter(chunk_entity_mapping.keys()))
+                    chunk_entity_mapping[first_chunk].append(entity_id)
+                    entities_added_to_chunks += 1
+                    logger.warning(f"Connected auto-created entity '{entity_name}' ({entity_id}) to first chunk {first_chunk} as fallback")
+
         logger.info(f"Enhanced chunk-entity mapping: added {entities_added_to_chunks} auto-created entity mappings")
         return chunk_entity_mapping
 
@@ -1405,6 +1457,14 @@ class IngestionCoordinator:
                     logger.warning(f"Could not find chunk_id for chunk_index {chunk_index}. Available chunks: {list(chunk_id_to_index.values())}")
 
             logger.info(f"Created {chunk_entity_relationships_created} chunk-entity relationships")
+
+            # Fix any unconnected entities
+            try:
+                fixed_entities = await neo4j_storage.fix_unconnected_entities()
+                if fixed_entities > 0:
+                    logger.info(f"Fixed {fixed_entities} unconnected entities")
+            except Exception as e:
+                logger.warning(f"Failed to fix unconnected entities: {e}")
 
             await neo4j_storage.disconnect()
 

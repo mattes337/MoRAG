@@ -433,16 +433,18 @@ class Neo4jStorage(BaseStorage):
 
         # MERGE based on name only to prevent duplicate entities
         # Use confidence to determine which type to keep
-        query = f"""
-        MERGE (e:{labels_str} {{name: $name}})
+        # Use a two-step approach: first find/create by name, then ensure proper labels
+        query = """
+        MERGE (e {name: $name})
         ON CREATE SET
             e += $properties,
-            e.type = $type
+            e.type = $type,
+            e.id = $id
         ON MATCH SET
             e.confidence = CASE WHEN e.confidence > $confidence THEN e.confidence ELSE $confidence END,
             e.attributes = $attributes,
             e.source_doc_id = CASE WHEN e.source_doc_id IS NULL THEN $source_doc_id ELSE e.source_doc_id END,
-            e.id = $id,
+            e.id = CASE WHEN e.id IS NULL THEN $id ELSE e.id END,
             e.type = CASE WHEN $confidence > e.confidence THEN $type ELSE e.type END
         RETURN e.id as id, e.type as final_type
         """
@@ -458,8 +460,28 @@ class Neo4jStorage(BaseStorage):
         }
 
         result = await self._execute_query(query, parameters)
+
+        # Ensure the entity has proper labels
+        if result and labels:
+            entity_id = result[0]["id"]
+            # Add labels to the entity (this is additive, won't remove existing labels)
+            labels_str = ':'.join(labels)
+            label_query = f"""
+            MATCH (e {{id: $entity_id}})
+            SET e:{labels_str}
+            RETURN e.id as id
+            """
+            await self._execute_query(label_query, {"entity_id": entity_id})
+
+            logger.debug("Entity stored/updated with labels",
+                        name=entity.name,
+                        final_type=result[0].get('final_type'),
+                        entity_id=entity_id,
+                        labels=labels)
+            return entity_id
+
         if result:
-            logger.debug("Entity stored/updated",
+            logger.debug("Entity stored/updated without labels",
                         name=entity.name,
                         final_type=result[0].get('final_type'),
                         entity_id=result[0].get('id'))
@@ -554,7 +576,7 @@ class Neo4jStorage(BaseStorage):
     
     async def _create_entity_chunk_relationship(self, entity_id: EntityId, chunk_id: str) -> None:
         """Create MENTIONED_IN relationship between entity and chunk.
-        
+
         Args:
             entity_id: Entity ID
             chunk_id: Chunk ID
@@ -564,15 +586,94 @@ class Neo4jStorage(BaseStorage):
         WHERE e.type IS NOT NULL
         MATCH (c:DocumentChunk {id: $chunk_id})
         MERGE (e)-[:MENTIONED_IN]->(c)
+        RETURN e.id as entity_id, c.id as chunk_id
         """
-        
-        await self._execute_query(
+
+        result = await self._execute_query(
             query,
             {
                 "entity_id": entity_id,
                 "chunk_id": chunk_id
             }
         )
+
+        if not result:
+            logger.warning(f"Failed to create entity-chunk relationship: entity {entity_id} or chunk {chunk_id} not found")
+        else:
+            logger.debug(f"Created MENTIONED_IN relationship: entity {entity_id} -> chunk {chunk_id}")
+
+    async def fix_unconnected_entities(self) -> int:
+        """Find and fix entities that are not connected to any chunks.
+
+        Returns:
+            Number of entities that were fixed
+        """
+        # Find entities that have no MENTIONED_IN relationships
+        query = """
+        MATCH (e)
+        WHERE e.type IS NOT NULL
+        AND NOT (e)-[:MENTIONED_IN]->(:DocumentChunk)
+        RETURN e.id as entity_id, e.name as entity_name, e.source_doc_id as source_doc_id
+        """
+
+        unconnected_entities = await self._execute_query(query)
+
+        if not unconnected_entities:
+            logger.info("No unconnected entities found")
+            return 0
+
+        logger.info(f"Found {len(unconnected_entities)} unconnected entities, attempting to fix")
+        fixed_count = 0
+
+        for entity_data in unconnected_entities:
+            entity_id = entity_data["entity_id"]
+            entity_name = entity_data["entity_name"]
+            source_doc_id = entity_data["source_doc_id"]
+
+            # Try to find a chunk from the same document that mentions this entity
+            chunk_query = """
+            MATCH (c:DocumentChunk)
+            WHERE c.document_id = $source_doc_id
+            AND toLower(c.text) CONTAINS toLower($entity_name)
+            RETURN c.id as chunk_id
+            LIMIT 1
+            """
+
+            chunk_result = await self._execute_query(
+                chunk_query,
+                {"source_doc_id": source_doc_id, "entity_name": entity_name}
+            )
+
+            if chunk_result:
+                # Connect entity to the found chunk
+                chunk_id = chunk_result[0]["chunk_id"]
+                await self._create_entity_chunk_relationship(entity_id, chunk_id)
+                fixed_count += 1
+                logger.debug(f"Connected entity {entity_name} ({entity_id}) to chunk {chunk_id}")
+            else:
+                # As a fallback, connect to any chunk from the same document
+                fallback_query = """
+                MATCH (c:DocumentChunk)
+                WHERE c.document_id = $source_doc_id
+                RETURN c.id as chunk_id
+                LIMIT 1
+                """
+
+                fallback_result = await self._execute_query(
+                    fallback_query,
+                    {"source_doc_id": source_doc_id}
+                )
+
+                if fallback_result:
+                    chunk_id = fallback_result[0]["chunk_id"]
+                    await self._create_entity_chunk_relationship(entity_id, chunk_id)
+                    fixed_count += 1
+                    logger.warning(f"Connected entity {entity_name} ({entity_id}) to fallback chunk {chunk_id}")
+                else:
+                    logger.error(f"Could not find any chunk to connect entity {entity_name} ({entity_id})")
+
+        logger.info(f"Fixed {fixed_count} out of {len(unconnected_entities)} unconnected entities")
+        return fixed_count
     
     async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
         """Get all entities mentioned in a specific chunk.

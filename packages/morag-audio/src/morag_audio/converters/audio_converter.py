@@ -154,8 +154,12 @@ class AudioConverter:
         options = options or AudioConversionOptions()
         
         try:
-            if not result.success or not result.segments:
+            if not result.success:
                 raise ConversionError(f"Cannot convert unsuccessful processing result: {result.error_message}")
+
+            # Check if we have either segments or transcript
+            if not result.segments and not result.transcript:
+                raise ConversionError("Cannot convert result: no segments or transcript available")
             
             markdown_content = []
             
@@ -177,39 +181,74 @@ class AudioConverter:
                         markdown_content.append(f"- **{field.replace('_', ' ').title()}**: {value}")
                 markdown_content.append("\n")
             
-            # Add transcript section
-            markdown_content.append("## Full Transcript\n")
-            markdown_content.append(result.transcript)
-            markdown_content.append("\n")
-            
-            # Add detailed transcript section with speakers and timestamps
-            markdown_content.append("## Detailed Transcript\n")
-            
-            # Group segments by topic if requested
-            if options.group_by_topic and any(segment.topic_id is not None for segment in result.segments):
-                topic_groups = {}
-                for segment in result.segments:
-                    topic_id = segment.topic_id if segment.topic_id is not None else -1
-                    if topic_id not in topic_groups:
-                        topic_groups[topic_id] = []
-                    topic_groups[topic_id].append(segment)
-                
-                # Process each topic group
-                for topic_id, segments in sorted(topic_groups.items()):
-                    if topic_id != -1:
-                        markdown_content.append(f"### Topic {topic_id + 1}\n")
-                    else:
-                        markdown_content.append("### Ungrouped Content\n")
-                    
-                    # Process segments within this topic
-                    markdown_content.extend(self._format_segments(segments, options))
-                    markdown_content.append("\n")
+            # Choose between Full Transcript and Detailed Transcript (mutually exclusive)
+            # Prefer detailed transcript when segments are available, otherwise use full transcript
+            if result.segments and len(result.segments) > 0:
+                # Add detailed transcript section with speakers and timestamps
+                markdown_content.append("## Detailed Transcript")
+                markdown_content.append("")
+
+                # Group segments by topic if requested and topic information is available
+                if options.group_by_topic and any(hasattr(segment, 'topic_id') and segment.topic_id is not None for segment in result.segments):
+                    topic_groups = {}
+                    for segment in result.segments:
+                        topic_id = getattr(segment, 'topic_id', None)
+                        if topic_id is not None:
+                            if topic_id not in topic_groups:
+                                topic_groups[topic_id] = []
+                            topic_groups[topic_id].append(segment)
+                        else:
+                            # Handle segments without topic_id
+                            if -1 not in topic_groups:
+                                topic_groups[-1] = []
+                            topic_groups[-1].append(segment)
+
+                    # Process each topic group
+                    for topic_id, segments in sorted(topic_groups.items()):
+                        if topic_id != -1:
+                            # Calculate topic timestamp range
+                            if segments:
+                                start_time = min(seg.start for seg in segments)
+                                end_time = max(seg.end for seg in segments)
+
+                                # Format timestamps
+                                start_hours, start_remainder = divmod(int(start_time), 3600)
+                                start_minutes, start_seconds = divmod(start_remainder, 60)
+                                end_hours, end_remainder = divmod(int(end_time), 3600)
+                                end_minutes, end_seconds = divmod(end_remainder, 60)
+
+                                start_formatted = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
+                                end_formatted = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
+
+                                markdown_content.append(f"### Topic {topic_id + 1} ({start_formatted} - {end_formatted})")
+                            else:
+                                markdown_content.append(f"### Topic {topic_id + 1}")
+                        else:
+                            markdown_content.append("### Ungrouped Content")
+
+                        markdown_content.append("")
+
+                        # Process segments within this topic
+                        formatted_segments = self._format_segments(segments, options)
+                        markdown_content.extend(formatted_segments)
+                        markdown_content.append("")
+                else:
+                    # Process all segments without topic grouping
+                    formatted_segments = self._format_segments(result.segments, options)
+                    markdown_content.extend(formatted_segments)
             else:
-                # Process all segments without topic grouping
-                markdown_content.extend(self._format_segments(result.segments, options))
-            
-            # Join all content
+                # Fallback to full transcript when no segments are available
+                markdown_content.append("## Full Transcript")
+                markdown_content.append("")
+                if result.transcript and result.transcript.strip():
+                    markdown_content.append(result.transcript.strip())
+                markdown_content.append("")
+
+            # Join all content and remove excessive empty lines
             content = "\n".join(markdown_content)
+            # Clean up multiple consecutive empty lines
+            import re
+            content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
             
             processing_time = time.time() - start_time
             
@@ -235,27 +274,17 @@ class AudioConverter:
     def _format_segments(self, segments: List[AudioSegment], options: AudioConversionOptions) -> List[str]:
         """Format segments into markdown lines."""
         markdown_lines = []
-        
+
         if options.group_by_speaker and any(segment.speaker for segment in segments):
             # Group consecutive segments by speaker
             current_speaker = None
             current_speaker_text = []
             current_start = None
             current_end = None
-            
+
             for segment in segments:
                 speaker = segment.speaker or "Unknown"
-                
-                # Format timestamp if requested
-                timestamp = ""
-                if options.include_timestamps:
-                    # Convert seconds to HH:MM:SS format
-                    hours, remainder = divmod(int(segment.start), 3600)
-                    minutes, seconds = divmod(remainder, 60)
-                    timestamp = options.timestamp_format.replace("%H", f"{hours:02d}")\
-                                                .replace("%M", f"{minutes:02d}")\
-                                                .replace("%S", f"{seconds:02d}")
-                
+
                 if speaker != current_speaker:
                     # Output the previous speaker's text
                     if current_speaker and current_speaker_text:
@@ -266,23 +295,27 @@ class AudioConverter:
                             start_minutes, start_seconds = divmod(start_remainder, 60)
                             end_hours, end_remainder = divmod(int(current_end), 3600)
                             end_minutes, end_seconds = divmod(end_remainder, 60)
-                            
+
                             start_time = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
                             end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
                             speaker_timestamp = f" ({start_time} - {end_time})"
-                        
-                        markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {' '.join(current_speaker_text)}\n")
-                    
+
+                        # Join text without extra spaces and strip any trailing whitespace
+                        text_content = ' '.join(current_speaker_text).strip()
+                        if text_content:  # Only add non-empty content
+                            markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {text_content}")
+
                     # Start new speaker
                     current_speaker = speaker
-                    current_speaker_text = [segment.text]
+                    current_speaker_text = [segment.text.strip()] if segment.text.strip() else []
                     current_start = segment.start
                     current_end = segment.end
                 else:
                     # Continue with the same speaker
-                    current_speaker_text.append(segment.text)
+                    if segment.text.strip():  # Only add non-empty text
+                        current_speaker_text.append(segment.text.strip())
                     current_end = segment.end
-            
+
             # Output the last speaker's text
             if current_speaker and current_speaker_text:
                 speaker_timestamp = ""
@@ -292,17 +325,24 @@ class AudioConverter:
                     start_minutes, start_seconds = divmod(start_remainder, 60)
                     end_hours, end_remainder = divmod(int(current_end), 3600)
                     end_minutes, end_seconds = divmod(end_remainder, 60)
-                    
+
                     start_time = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
                     end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
                     speaker_timestamp = f" ({start_time} - {end_time})"
-                
-                markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {' '.join(current_speaker_text)}\n")
+
+                # Join text without extra spaces and strip any trailing whitespace
+                text_content = ' '.join(current_speaker_text).strip()
+                if text_content:  # Only add non-empty content
+                    markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {text_content}")
         else:
             # Process each segment individually
             for segment in segments:
+                # Skip empty segments
+                if not segment.text or not segment.text.strip():
+                    continue
+
                 line_parts = []
-                
+
                 # Add timestamp if requested
                 if options.include_timestamps:
                     hours, remainder = divmod(int(segment.start), 3600)
@@ -311,19 +351,16 @@ class AudioConverter:
                                                 .replace("%M", f"{minutes:02d}")\
                                                 .replace("%S", f"{seconds:02d}")
                     line_parts.append(timestamp)
-                
+
                 # Add speaker if available and requested
                 if options.include_speakers and segment.speaker:
                     line_parts.append(f"**{segment.speaker}**:")
-                
-                # Add the text
-                line_parts.append(segment.text)
-                
+
+                # Add the text (stripped of whitespace)
+                line_parts.append(segment.text.strip())
+
                 # Join parts and add to markdown lines
                 markdown_lines.append(" ".join(line_parts))
-            
-            # Add a blank line at the end
-            if markdown_lines:
-                markdown_lines.append("")
-        
-        return markdown_lines
+
+        # Filter out any empty lines that might have been added
+        return [line for line in markdown_lines if line.strip()]
