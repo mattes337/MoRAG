@@ -51,6 +51,12 @@ from typing import Dict, List, Optional, Set
 cli_dir = Path(__file__).parent
 sys.path.insert(0, str(cli_dir))
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+project_root = Path(__file__).parent.parent
+env_path = project_root / '.env'
+load_dotenv(env_path)
+
 from morag.api import MoRAGAPI
 from morag_graph.models.database_config import DatabaseConfig, DatabaseType
 
@@ -85,10 +91,20 @@ def get_supported_extensions() -> Set[str]:
     }
 
 
+def is_intermediate_file(file_path: Path) -> bool:
+    """Check if a file is an intermediate file that should be skipped."""
+    stem = file_path.stem
+    return stem.endswith('_intermediate')
+
+
 def detect_content_type(file_path: Path) -> Optional[str]:
     """Detect content type from file extension."""
+    # Skip intermediate files - they should not be processed as regular documents
+    if is_intermediate_file(file_path):
+        return None
+
     suffix = file_path.suffix.lower()
-    
+
     # Document types
     if suffix in ['.pdf', '.doc', '.docx', '.txt', '.md', '.rtf', '.pptx', '.ppt', '.xlsx', '.xls', '.csv', '.html', '.htm']:
         return 'document'
@@ -101,7 +117,7 @@ def detect_content_type(file_path: Path) -> Optional[str]:
     # Image types
     elif suffix in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg']:
         return 'image'
-    
+
     return None
 
 
@@ -109,7 +125,7 @@ def get_output_file_paths(file_path: Path) -> Dict[str, Path]:
     """Get the expected output file paths for a given input file."""
     stem = file_path.stem
     parent = file_path.parent
-    
+
     return {
         'ingest_result': parent / f"{stem}.ingest_result.json",
         'ingest_data': parent / f"{stem}.ingest_data.json",
@@ -117,6 +133,17 @@ def get_output_file_paths(file_path: Path) -> Dict[str, Path]:
         'intermediate_json': parent / f"{stem}_intermediate.json",
         'intermediate_md': parent / f"{stem}_intermediate.md"
     }
+
+
+def get_intermediate_file_path(file_path: Path) -> Optional[Path]:
+    """Get the intermediate markdown file path for a given input file."""
+    stem = file_path.stem
+    parent = file_path.parent
+    intermediate_md = parent / f"{stem}_intermediate.md"
+
+    if intermediate_md.exists():
+        return intermediate_md
+    return None
 
 
 def should_skip_file(file_path: Path, force_reprocess: bool = False) -> tuple[bool, str]:
@@ -162,19 +189,21 @@ def get_file_info(file_path: Path) -> Dict[str, any]:
 
 
 def find_processable_files(folder_path: Path, recursive: bool = True) -> List[Path]:
-    """Find all processable files in the folder."""
+    """Find all processable files in the folder, excluding intermediate files."""
     supported_extensions = get_supported_extensions()
     processable_files = []
-    
+
     if recursive:
         pattern = "**/*"
     else:
         pattern = "*"
-    
+
     for file_path in folder_path.glob(pattern):
-        if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
+        if (file_path.is_file() and
+            file_path.suffix.lower() in supported_extensions and
+            not is_intermediate_file(file_path)):
             processable_files.append(file_path)
-    
+
     return sorted(processable_files)
 
 
@@ -218,12 +247,16 @@ async def process_single_file(
             'reason': 'Dry run mode'
         }
     
+    # Initialize variables for error handling
+    original_file_path = file_path
+    original_content_type = content_type
+
     try:
         file_info = get_file_info(file_path)
         print(f"[PROCESSING] Processing: {file_path}")
         print(f"   Content type: {content_type}")
         print(f"   File size: {file_info['size_formatted']}")
-        
+
         # Check if ingest_data file exists (can skip processing and go straight to ingestion)
         output_paths = get_output_file_paths(file_path)
         if output_paths['ingest_data'].exists():
@@ -264,30 +297,70 @@ async def process_single_file(
             except Exception as e:
                 print(f"   [WARNING] Failed to use existing ingest_data, will reprocess: {e}")
                 # Fall through to normal processing
-        
-        # Process the file using the appropriate processor
-        if content_type == 'document':
-            from morag_document import DocumentProcessor
-            processor = DocumentProcessor()
-            result = await processor.process_file(file_path)
-        elif content_type == 'image':
-            from morag_image import ImageService
-            processor = ImageService()
-            service_result = await processor.process_image(file_path)
-            result = ServiceResultWrapper(service_result)
-        elif content_type == 'audio':
-            from morag_audio import AudioService
-            processor = AudioService()
-            service_result = await processor.process_file(file_path, save_output=False)
-            result = ServiceResultWrapper(service_result)
-        elif content_type == 'video':
-            from morag_video import VideoService
-            processor = VideoService()
-            service_result = await processor.process_file(file_path, save_output=False)
-            result = ServiceResultWrapper(service_result)
+
+        # Check for intermediate file for audio/video content types and create mock result
+
+        if content_type in ['audio', 'video']:
+            intermediate_file = get_intermediate_file_path(file_path)
+            if intermediate_file:
+                print(f"   [INFO] Found intermediate file: {intermediate_file}")
+                print(f"   [INFO] Using intermediate file instead of processing original {content_type}")
+
+                # Read the intermediate file content
+                try:
+                    with open(intermediate_file, 'r', encoding='utf-8') as f:
+                        text_content = f.read()
+
+                    # Create a mock processing result with the intermediate content (like test-video.py)
+                    from morag_core.models.config import ProcessingResult
+                    result = ProcessingResult(
+                        success=True,
+                        task_id="intermediate-resume",
+                        source_type=content_type,
+                        content=text_content,
+                        metadata=metadata or {},
+                        processing_time=0.0
+                    )
+
+                    # Add text_content attribute for compatibility with ingestion logic
+                    result.text_content = text_content
+
+                    print(f"   [SUCCESS] Loaded content from intermediate file ({len(text_content)} chars)")
+
+                except Exception as e:
+                    print(f"   [WARNING] Failed to read intermediate file: {e}")
+                    print(f"   [INFO] Falling back to processing original {content_type} file")
+                    # Fall through to normal processing
+                    result = None
+            else:
+                result = None
         else:
-            # Use the general API for other types
-            result = await api.process_file(str(file_path), content_type)
+            result = None
+
+        # If we don't have a result from intermediate file, process normally
+        if result is None:
+            if content_type == 'document':
+                from morag_document import DocumentProcessor
+                processor = DocumentProcessor()
+                result = await processor.process_file(file_path)
+            elif content_type == 'image':
+                from morag_image import ImageService
+                processor = ImageService()
+                service_result = await processor.process_image(file_path)
+                result = ServiceResultWrapper(service_result)
+            elif content_type == 'audio':
+                from morag_audio import AudioService
+                processor = AudioService()
+                service_result = await processor.process_file(file_path, save_output=False)
+                result = ServiceResultWrapper(service_result)
+            elif content_type == 'video':
+                from morag_video import VideoService
+                processor = VideoService()
+                service_result = await processor.process_file(file_path, save_output=False)
+                result = ServiceResultWrapper(service_result)
+            else:
+                # Use the general API for other types
+                result = await api.process_file(str(file_path), content_type)
 
         if not result.success:
             raise Exception(f"Processing failed: {result.error_message or 'Unknown error'}")
@@ -297,10 +370,10 @@ async def process_single_file(
             from morag.ingestion_coordinator import IngestionCoordinator
             coordinator = IngestionCoordinator()
 
-            # Prepare enhanced metadata
+            # Prepare enhanced metadata (use original file path for source_path)
             enhanced_metadata = {
-                'source_type': content_type,
-                'source_path': str(file_path),
+                'source_type': original_content_type,
+                'source_path': str(original_file_path),
                 'processing_time': result.processing_time,
                 **(metadata or {}),
                 **(result.metadata or {})
@@ -321,11 +394,11 @@ async def process_single_file(
             if not content:
                 raise Exception("No content extracted from processing result")
 
-            # Perform comprehensive ingestion
+            # Perform comprehensive ingestion (use original file path and content type)
             ingestion_result = await coordinator.ingest_content(
                 content=content,
-                source_path=str(file_path),
-                content_type=content_type,
+                source_path=str(original_file_path),
+                content_type=original_content_type,
                 metadata=enhanced_metadata,
                 processing_result=result,
                 databases=database_configs,
@@ -335,22 +408,22 @@ async def process_single_file(
                 replace_existing=True,
                 language=language
             )
-        
-        print(f"   [SUCCESS] Success: {file_path}")
+
+        print(f"   [SUCCESS] Success: {original_file_path}")
         return {
-            'file': str(file_path),
+            'file': str(original_file_path),
             'status': 'success',
-            'content_type': content_type,
+            'content_type': original_content_type,
             'task_id': getattr(result, 'task_id', None),
             'processing_time': getattr(result, 'processing_time', None)
         }
 
     except Exception as e:
-        print(f"   [ERROR] Error processing {file_path}: {e}")
+        print(f"   [ERROR] Error processing {original_file_path}: {e}")
         return {
-            'file': str(file_path),
+            'file': str(original_file_path),
             'status': 'error',
-            'content_type': content_type,
+            'content_type': original_content_type,
             'error': str(e)
         }
 
