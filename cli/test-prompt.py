@@ -6,6 +6,13 @@ Usage: python test-prompt.py [OPTIONS] "your prompt here"
 
 This script allows testing LLM prompts with multi-hop reasoning and RAG capabilities,
 showing all LLM interactions step by step.
+
+Key options:
+  --model MODEL         Specify LLM model (fallback: MORAG_GEMINI_MODEL env var or gemini-2.5-flash)
+  --neo4j              Enable Neo4j graph operations
+  --qdrant             Enable Qdrant vector search
+  --enable-multi-hop   Enable multi-hop reasoning
+  --verbose            Show detailed LLM interactions
 """
 
 import sys
@@ -186,22 +193,29 @@ async def execute_prompt_with_reasoning(
     logger: PromptLogger
 ) -> Dict[str, Any]:
     """Execute prompt with multi-hop reasoning and RAG."""
-    
+
     results = {
         "prompt": prompt,
         "timestamp": datetime.now().isoformat(),
         "steps": [],
         "final_result": None,
-        "performance": {}
+        "performance": {},
+        "context_data": {
+            "vector_chunks": [],
+            "graph_entities": [],
+            "graph_relations": [],
+            "reasoning_paths": []
+        }
     }
     
     start_time = time.time()
     
     # Initialize LLM client with logging
+    model = args.model or os.getenv("MORAG_GEMINI_MODEL", "gemini-2.5-flash")
     llm_config = LLMConfig(
         provider="gemini",
         api_key=os.getenv("GEMINI_API_KEY"),
-        model=os.getenv("MORAG_GEMINI_MODEL", "gemini-2.5-flash"),
+        model=model,
         temperature=0.1,
         max_tokens=args.max_tokens
     )
@@ -243,130 +257,150 @@ Return only the entity names, one per line.
             start_entities = [e.strip() for e in entity_response.split('\n') if e.strip()]
             results["steps"].append({"step": "entity_extraction", "result": start_entities})
             
-            # Step 3: Multi-hop reasoning
+            # Step 3: Multi-hop reasoning and graph traversal
+            graph_entities = []
+            graph_relations = []
+            reasoning_paths = []
+
             if start_entities:
-                logger.log_step("Step 3: Multi-hop Reasoning", f"Finding reasoning paths from entities: {start_entities}")
-                
-                path_selector = PathSelectionAgent(llm_client, max_paths=5)
-                
-                # Mock graph engine for demonstration
-                class MockGraphEngine:
-                    async def find_paths_between_entities(self, entities, max_paths=10):
-                        # Convert string entities to mock entity objects
-                        entity_objects = []
-                        for entity in entities:
-                            if isinstance(entity, str):
-                                entity_obj = type('Entity', (), {
-                                    'id': entity.lower().replace(' ', '_'),
-                                    'name': entity,
-                                    'type': 'CONCEPT'
-                                })()
-                                entity_objects.append(entity_obj)
-                            else:
-                                entity_objects.append(entity)
-
-                        return [
-                            type('Path', (), {
-                                'entities': entity_objects[:2] + [type('Entity', (), {'name': 'intermediate_entity'})(), entity_objects[-1]] if len(entity_objects) > 1 else entity_objects,
-                                'relations': [
-                                    type('Relation', (), {'type': 'RELATED_TO'})(),
-                                    type('Relation', (), {'type': 'INFLUENCES'})(),
-                                    type('Relation', (), {'type': 'CONNECTED_TO'})()
-                                ]
-                            })()
-                            for _ in range(min(3, max_paths))
-                        ]
-
-                    async def find_neighbors(self, entity_id, max_distance=2):
-                        # Mock neighbor finding
-                        return [
-                            type('Entity', (), {'id': f'neighbor_{i}', 'name': f'Related Entity {i}', 'type': 'CONCEPT'})()
-                            for i in range(3)
-                        ]
-
-                    async def find_shortest_path(self, start_entity, end_entity):
-                        # Mock shortest path finding
-                        return type('Path', (), {
-                            'entities': [start_entity, 'intermediate', end_entity],
-                            'relations': [
-                                type('Relation', (), {'type': 'CONNECTED_TO'})(),
-                                type('Relation', (), {'type': 'RELATED_TO'})()
-                            ],
-                            'total_weight': 1.0
-                        })()
-
-                    async def search_entities(self, query, limit=10):
-                        # Mock entity search
-                        return [
-                            type('Entity', (), {
-                                'id': f'entity_{i}',
-                                'name': f'Mock Entity {i}',
-                                'type': 'CONCEPT',
-                                'description': f'Mock entity related to {query}'
-                            })()
-                            for i in range(min(3, limit))
-                        ]
+                logger.log_step("Step 3: Graph Traversal", f"Finding entities and relations from: {start_entities}")
 
                 try:
-                    # Simplified multi-hop reasoning using LLM directly
-                    reasoning_prompt = f"""
-Analyze potential reasoning paths directly without preambles.
+                    # Real Neo4j entity search and traversal
+                    for entity_name in start_entities[:3]:  # Limit to first 3 entities
+                        # Search for entities matching the name
+                        entity_query = """
+                        MATCH (e)
+                        WHERE toLower(e.name) CONTAINS toLower($entity_name)
+                        RETURN e.name as name, labels(e) as types, e.description as description
+                        LIMIT 5
+                        """
+                        entity_results = await neo4j_storage._execute_query(entity_query, {"entity_name": entity_name})
 
-Query: "{prompt}"
-Starting entities: {start_entities}
+                        for record in entity_results:
+                            graph_entities.append({
+                                "name": record["name"],
+                                "types": record["types"],
+                                "description": record.get("description", "")
+                            })
 
-Provide structured analysis of:
-1. How these entities might be connected
-2. What intermediate entities or concepts might link them
-3. What reasoning paths could help answer the query
+                        # Find relations from these entities
+                        relation_query = """
+                        MATCH (e1)-[r]->(e2)
+                        WHERE toLower(e1.name) CONTAINS toLower($entity_name)
+                        RETURN e1.name as source, type(r) as relation_type, e2.name as target, r.description as description
+                        LIMIT 10
+                        """
+                        relation_results = await neo4j_storage._execute_query(relation_query, {"entity_name": entity_name})
 
-Focus on logical connections and relationships. Be direct and concise.
-"""
+                        for record in relation_results:
+                            graph_relations.append({
+                                "source": record["source"],
+                                "relation": record["relation_type"],
+                                "target": record["target"],
+                                "description": record.get("description", "")
+                            })
 
-                    reasoning_analysis = await llm_client.generate(reasoning_prompt, context="multi_hop_reasoning")
+                    results["context_data"]["graph_entities"] = graph_entities
+                    results["context_data"]["graph_relations"] = graph_relations
 
-                    results["steps"].append({
-                        "step": "multi_hop_reasoning",
-                        "result": f"Analyzed reasoning paths for {len(start_entities)} entities"
-                    })
+                    logger.log_step("Graph Traversal", f"Found {len(graph_entities)} entities and {len(graph_relations)} relations")
 
-                    logger.log_step("Multi-hop Reasoning", "Completed LLM-based reasoning analysis")
+                    # Multi-hop reasoning with actual graph data
+                    if graph_entities or graph_relations:
+                        reasoning_prompt = f"""
+                        Analyze reasoning paths using the actual graph data found:
+
+                        Query: "{prompt}"
+
+                        Graph Entities Found:
+                        {chr(10).join([f"- {e['name']} ({', '.join(e['types'])}): {e['description']}" for e in graph_entities[:10]])}
+
+                        Graph Relations Found:
+                        {chr(10).join([f"- {r['source']} --{r['relation']}--> {r['target']}: {r['description']}" for r in graph_relations[:10]])}
+
+                        Identify key reasoning paths and connections that help answer the query. Be direct and concise.
+                        """
+
+                        reasoning_analysis = await llm_client.generate(reasoning_prompt, context="multi_hop_reasoning")
+                        reasoning_paths.append(reasoning_analysis)
+                        results["context_data"]["reasoning_paths"] = reasoning_paths
+
+                        results["steps"].append({
+                            "step": "multi_hop_reasoning",
+                            "result": f"Analyzed {len(graph_entities)} entities and {len(graph_relations)} relations"
+                        })
+
                 except Exception as e:
-                    logger.log_step("Multi-hop Reasoning Failed", str(e))
-                    results["steps"].append({
-                        "step": "multi_hop_reasoning",
-                        "result": f"Failed: {str(e)}"
-                    })
+                    logger.log_step("Graph Traversal Failed", str(e))
+                    # Fallback to simple reasoning without graph data
+
 
         
         # Step 4: Vector search if Qdrant is available
+        vector_chunks = []
         if qdrant_storage:
             logger.log_step("Step 4: Vector Search", "Searching for relevant documents using vector similarity")
-            
+
             try:
                 vector_results = await qdrant_storage.search_entities(prompt, limit=5)
+                vector_chunks = [
+                    {
+                        "content": result.get("content", ""),
+                        "metadata": result.get("metadata", {}),
+                        "score": result.get("score", 0.0)
+                    }
+                    for result in vector_results
+                ]
+                results["context_data"]["vector_chunks"] = vector_chunks
                 results["steps"].append({
-                    "step": "vector_search", 
+                    "step": "vector_search",
                     "result": f"Found {len(vector_results)} relevant documents"
                 })
+                logger.log_step("Vector Search", f"Retrieved {len(vector_chunks)} chunks")
             except Exception as e:
                 logger.log_step("Vector Search Failed", str(e))
         
-        # Step 5: Final synthesis
-        logger.log_step("Step 5: Final Synthesis", "Combining all information to generate final response")
-        
+        # Step 5: Final synthesis with actual context
+        logger.log_step("Step 5: Final Synthesis", "Combining all retrieved information to generate final response")
+
+        # Prepare context sections
+        vector_context = ""
+        if vector_chunks:
+            vector_context = "\n\nRELEVANT DOCUMENT CHUNKS:\n" + "\n".join([
+                f"- {chunk['content'][:200]}..." if len(chunk['content']) > 200 else f"- {chunk['content']}"
+                for chunk in vector_chunks[:5]
+            ])
+
+        graph_context = ""
+        if graph_entities or graph_relations:
+            graph_context = "\n\nGRAPH KNOWLEDGE:\n"
+            if graph_entities:
+                graph_context += "Entities:\n" + "\n".join([
+                    f"- {e['name']} ({', '.join(e['types'])}): {e['description']}"
+                    for e in graph_entities[:10]
+                ])
+            if graph_relations:
+                graph_context += "\nRelations:\n" + "\n".join([
+                    f"- {r['source']} --{r['relation']}--> {r['target']}: {r['description']}"
+                    for r in graph_relations[:10]
+                ])
+
+        reasoning_context = ""
+        if reasoning_paths:
+            reasoning_context = "\n\nREASONING ANALYSIS:\n" + "\n".join(reasoning_paths)
+
         synthesis_prompt = f"""
 You are a direct, professional assistant. Provide a comprehensive answer to this query without any preambles, introductions, or conversational phrases like "Absolut! Basierend auf..." or "Certainly! Based on...". Start directly with the substantive content.
 
 Query: "{prompt}"
 
-Consider:
-- The query analysis performed
-- Any entities and relationships identified
-- Relevant information from the knowledge base
-- Multi-hop reasoning paths explored
+Use the following information to provide a well-reasoned, comprehensive response:
+{vector_context}
+{graph_context}
+{reasoning_context}
 
-Provide a detailed, well-reasoned response. Be direct and start immediately with the main content.
+Synthesize all available information to provide a detailed, accurate response. Be direct and start immediately with the main content.
 """
         
         final_response = await llm_client.generate(synthesis_prompt, context="final_synthesis")
@@ -396,6 +430,7 @@ async def main():
   python test-prompt.py --neo4j --qdrant "mit welchen lebensmitteln kann ich ADHS eindämmen?"
   python test-prompt.py --neo4j --enable-multi-hop --max-tokens 4000 "How are Apple's AI efforts connected to universities?"
   python test-prompt.py --qdrant --verbose --max-tokens 12000 "What are the latest developments in machine learning?"
+  python test-prompt.py --neo4j --qdrant --model gemini-1.5-pro "Analyze complex relationships in the data"
 """
     )
     
@@ -407,6 +442,7 @@ async def main():
     parser.add_argument("--enable-multi-hop", action="store_true", help="Enable multi-hop reasoning")
 
     # LLM options
+    parser.add_argument("--model", type=str, help="LLM model to use (default: from MORAG_GEMINI_MODEL env var or gemini-2.5-flash)")
     parser.add_argument("--max-tokens", type=int, default=8000, help="Maximum tokens for LLM responses (default: 8000)")
 
     # Output options
@@ -429,6 +465,7 @@ async def main():
     print(f"🚀 Testing prompt: '{args.prompt}'")
     print(f"📊 Databases: Neo4j={args.neo4j}, Qdrant={args.qdrant}")
     print(f"🧠 Multi-hop reasoning: {args.enable_multi_hop}")
+    print(f"🤖 Model: {args.model or os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.5-flash')}")
     print(f"🎯 Max tokens: {args.max_tokens}")
     
     # Initialize logger
