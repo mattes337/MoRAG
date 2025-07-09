@@ -350,12 +350,36 @@ async def process_single_file(
                 result = ServiceResultWrapper(service_result)
             elif content_type == 'audio':
                 from morag_audio import AudioService
-                processor = AudioService()
+                from morag_audio.processor import AudioConfig
+
+                # Configure audio processing for consistent language handling
+                audio_config = AudioConfig(
+                    enable_enhanced_audio=True,
+                    enable_speaker_diarization=True,
+                    enable_topic_segmentation=True,
+                    language=language
+                )
+
+                processor = AudioService(config=audio_config)
                 service_result = await processor.process_file(file_path, save_output=False)
                 result = ServiceResultWrapper(service_result)
             elif content_type == 'video':
                 from morag_video import VideoService
-                processor = VideoService()
+                from morag_video.processor import VideoConfig
+
+                # Configure video processing to disable thumbnail generation for faster processing
+                video_config = VideoConfig(
+                    extract_audio=True,
+                    generate_thumbnails=False,  # Disable to prevent hanging
+                    extract_keyframes=False,    # Disable for faster processing
+                    enable_enhanced_audio=True,
+                    enable_speaker_diarization=True,
+                    enable_topic_segmentation=True,
+                    enable_ocr=False,           # Disable for faster processing
+                    language=language
+                )
+
+                processor = VideoService(config=video_config)
                 service_result = await processor.process_file(file_path, save_output=False)
                 result = ServiceResultWrapper(service_result)
             else:
