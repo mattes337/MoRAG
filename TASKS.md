@@ -587,9 +587,51 @@ For detailed information about completed tasks and implementation history, see [
   - **Consistent Environment**: Same `.env` configuration used by CLI and API
 - **Status**: CLI scripts now work completely independently with full ingestion capabilities
 
+### ✅ Neo4j Graph Database Optimization (January 2025)
+
+#### 17. **Neo4j Graph Database Memory and Performance Fixes** ✅ IMPLEMENTED
+- **Issue**: Multiple Neo4j graph database issues causing high memory consumption and inconsistent node labels
+- **Problems Identified**:
+  - Node labels were mixed case (BIOLOGICAL, BIOLOGISCH, BIOLOGISCHE, BIOLOGISCHES) instead of consistent uppercase canonical form
+  - Relationships contained full chunk text causing excessive memory consumption
+  - Node properties included unnecessary fields (attributes, source_doc_id, mentioned_in_chunk, description)
+  - Relationship properties included redundant fields (source_doc_id, context, description)
+  - No proper label normalization for Neo4j compatibility
+- **Solution**: Comprehensive graph database optimization with simplified normalization
+- **Changes Implemented**:
+  - **Node Label Normalization**: All node labels now converted to uppercase with Neo4j-compatible formatting
+    - Simple normalization: uppercase + special character sanitization only
+    - LLM responsible for generating consistent entity types (no hardcoded mappings)
+    - Valid Neo4j label format (alphanumeric and underscore only)
+  - **Memory Optimization**: Removed unnecessary fields from nodes and relationships
+    - **Node properties removed**: attributes, source_doc_id, mentioned_in_chunks, description
+    - **Relationship properties removed**: context (full chunk text), source_doc_id, description
+    - Entities connect to chunks via relationships, not node properties
+  - **Simplified Architecture**: Clean separation of concerns
+    - Entities have minimal properties: id, name, type, confidence
+    - Relationships have minimal properties: id, type, confidence, weight, attributes
+    - Cross-system fields (qdrant_vector_ids) excluded from Neo4j storage
+- **Technical Details**:
+  - **Label Normalization**: `_normalize_label()` method handles uppercase conversion and special character sanitization
+  - **Memory Reduction**: Removed full chunk text from relationship context (entities already reference chunks)
+  - **Neo4j Compatibility**: All labels follow Neo4j naming conventions (start with letter, alphanumeric + underscore)
+  - **LLM Responsibility**: Entity type consistency handled by LLM prompts, not code normalization
+- **Files Modified**:
+  - `packages/morag-graph/src/morag_graph/models/entity.py`: Simplified label normalization and removed unnecessary node properties
+  - `packages/morag-graph/src/morag_graph/models/relation.py`: Removed unnecessary relationship properties
+- **Files Added**:
+  - `packages/morag-graph/tests/test_label_normalization.py`: Comprehensive tests for label normalization
+- **Benefits**:
+  - **Consistent Labels**: All node labels now uppercase and Neo4j-compatible
+  - **Reduced Memory**: Eliminated full chunk text storage in relationships
+  - **Simplified Graph**: Clean node and relationship structure without redundant fields
+  - **Better Performance**: Smaller graph database with faster queries
+  - **LLM-Driven**: Entity type consistency handled by AI, not hardcoded rules
+- **Status**: ✅ **COMPLETED** - All graph database issues resolved, memory optimized, labels normalized
+
 ### ✅ Audio Model Configuration Support (January 2025)
 
-#### 17. **Environment Variable Model Override Support** ✅ IMPLEMENTED
+#### 19. **Environment Variable Model Override Support** ✅ IMPLEMENTED
 - **Issue**: Remote converter couldn't override Whisper model size or spaCy models through environment variables
 - **Problems Identified**:
   - `AudioConfig` class didn't read environment variables during initialization
@@ -640,25 +682,25 @@ For detailed information about completed tasks and implementation history, see [
 
 ### ✅ Critical Bug Fixes (January 2025)
 
-#### 18. **Image Processing API Error** ✅ FIXED
+#### 19. **Image Processing API Error** ✅ FIXED
 - **Issue**: `AttributeError: module 'google.generativeai' has no attribute 'get_api_key'` in image caption generation
 - **Root Cause**: Code was calling `genai.get_api_key()` which doesn't exist in the Google Generative AI library
 - **Solution**: Replaced with proper environment variable check using `os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")`
 - **Files Modified**: `packages/morag-image/src/morag_image/processor.py`
 - **Status**: Image processing now fails gracefully with proper error message instead of AttributeError
 
-#### 19. **Web Service Method Signature Mismatch** ✅ FIXED
+#### 20. **Web Service Method Signature Mismatch** ✅ FIXED
 - **Issue**: `TypeError: WebService.process_url() got an unexpected keyword argument 'config'` in web URL processing
 - **Root Cause**: `MoRAGServices.process_url()` was calling `self.web_service.process_url()` with `config` parameter but method expects `config_options`
 - **Solution**: Fixed parameter name from `config` to `config_options` and added proper config conversion
 - **Files Modified**: `packages/morag-services/src/morag_services/services.py`
 - **Status**: Web URL processing now works without method signature errors
 
-#### 20. **Search Endpoint Implementation** ✅ IMPLEMENTED
+#### 21. **Search Endpoint Implementation** ✅ IMPLEMENTED
 - **Issue**: Search functionality returned empty list with warning "Search functionality not yet implemented"
 - **Root Cause**: The `search_similar` method in MoRAGServices was not implemented
 
-#### 21. **API Parameter Defaults and Qdrant Collection Validation** ✅ FIXED
+#### 22. **API Parameter Defaults and Qdrant Collection Validation** ✅ FIXED
 - **Issue**: Two critical API usability issues:
   1. Optional API parameters required manual "send empty value" clicks in Swagger UI
   2. Qdrant collection environment variable validation error on startup due to `env_prefix="MORAG_"` conflict
@@ -693,7 +735,7 @@ For detailed information about completed tasks and implementation history, see [
 - **Files Modified**: `packages/morag-services/src/morag_services/services.py`
 - **Status**: Search endpoint now fully functional with vector similarity search
 
-#### 20. **YouTube Processing Bot Detection** ✅ FIXED
+#### 23. **YouTube Processing Bot Detection** ✅ FIXED
 - **Issue**: YouTube URL processing failed with "Sign in to confirm you're not a bot" error from yt-dlp
 - **Root Cause**: YouTube's bot detection was triggered by default yt-dlp configuration
 - **Solution**: Added comprehensive bot detection avoidance measures
@@ -711,14 +753,14 @@ For detailed information about completed tasks and implementation history, see [
   - Applied to all yt-dlp operations: metadata extraction, video download, playlist processing
 - **Status**: YouTube processing now works reliably without bot detection errors
 
-#### 21. **Speaker Diarization Coroutine Error** ✅ FIXED
+#### 24. **Speaker Diarization Coroutine Error** ✅ FIXED
 - **Issue**: `AttributeError: 'coroutine' object has no attribute 'segments'` in audio processing speaker diarization
 - **Root Cause**: `_apply_diarization` method incorrectly wrapped async `diarize_audio()` method in `run_in_executor`
 - **Solution**: Removed `run_in_executor` wrapper and directly awaited the async `diarize_audio()` method
 - **Files Modified**: `packages/morag-audio/src/morag_audio/processor.py`
 - **Status**: Speaker diarization now works correctly without coroutine access errors
 
-#### 22. **Gemini API Rate Limiting** ✅ FIXED
+#### 25. **Gemini API Rate Limiting** ✅ FIXED
 - **Issue**: `429 RESOURCE_EXHAUSTED` errors from Gemini API without proper retry logic and exponential backoff
 - **Root Cause**: Embedding services lacked specific handling for 429 errors and proper retry mechanisms
 - **Solution**: Implemented comprehensive rate limiting with exponential backoff and jitter

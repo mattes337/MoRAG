@@ -119,7 +119,13 @@ class Relation(BaseModel):
         return data
     
     def to_neo4j_relationship(self) -> Dict[str, Any]:
-        """Convert relation to Neo4J relationship properties."""
+        """Convert relation to Neo4J relationship properties.
+
+        Excludes unnecessary fields to reduce memory consumption:
+        - context: Full chunk text (entities already refer to chunks)
+        - source_doc_id: Document reference (entities already have chunk references)
+        - description: Redundant with relation type
+        """
         # Get the clean type value - always a string now
         type_value = str(self.type)
         # Clean up any enum string representations that might still exist
@@ -139,6 +145,11 @@ class Relation(BaseModel):
         # Remove entity IDs as they are handled by Neo4J relationship structure
         properties.pop('source_entity_id', None)
         properties.pop('target_entity_id', None)
+
+        # Remove unnecessary fields to reduce memory consumption
+        properties.pop('context', None)  # Full chunk text - entities already refer to chunks
+        properties.pop('source_doc_id', None)  # Document reference - entities have chunk references
+        properties.pop('description', None)  # Redundant with relation type
 
         return properties
     

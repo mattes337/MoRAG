@@ -81,6 +81,45 @@ class Entity(BaseModel):
     def is_unified_format(self) -> bool:
         """Check if using unified ID format."""
         return IDValidator.validate_entity_id(self.id)
+
+    def _normalize_label(self, type_value: str) -> str:
+        """Normalize entity type to valid Neo4j label format.
+
+        This method only handles basic formatting for Neo4j compatibility:
+        - Uppercase
+        - Valid Neo4j label format (alphanumeric and underscore only)
+
+        The LLM is responsible for generating consistent entity types.
+
+        Args:
+            type_value: The entity type to normalize
+
+        Returns:
+            Normalized uppercase label suitable for Neo4j
+        """
+        if not type_value:
+            return "UNKNOWN_TYPE"
+
+        # Convert to uppercase and clean whitespace
+        normalized = type_value.upper().strip()
+
+        # Sanitize for valid Neo4j label (no dots, spaces, special chars)
+        normalized = normalized.replace('.', '_').replace(' ', '_').replace('-', '_')
+        normalized = normalized.replace('(', '').replace(')', '').replace('/', '_')
+        normalized = normalized.replace('&', '_AND_').replace('+', '_PLUS_')
+
+        # Remove any double underscores
+        while '__' in normalized:
+            normalized = normalized.replace('__', '_')
+
+        # Remove leading/trailing underscores
+        normalized = normalized.strip('_')
+
+        # Ensure the label is valid (starts with letter, contains only alphanumeric and underscore)
+        if not normalized or not normalized[0].isalpha():
+            normalized = f"TYPE_{normalized}" if normalized else "UNKNOWN_TYPE"
+
+        return normalized
     
     def add_chunk_reference(self, chunk_id: str) -> None:
         """Add a reference to a chunk where this entity is mentioned.
@@ -195,7 +234,14 @@ class Entity(BaseModel):
         return data
     
     def to_neo4j_node(self) -> Dict[str, Any]:
-        """Convert entity to Neo4J node properties."""
+        """Convert entity to Neo4J node properties.
+
+        Excludes unnecessary fields to simplify graph structure:
+        - attributes: Used for auto creation, not needed in graph
+        - source_doc_id: Document reference, entities connect via chunks
+        - mentioned_in_chunks: Handled via relationships, not node properties
+        - description: Redundant with entity type and name
+        """
         # Get the clean type value - always a string now
         type_value = str(self.type)
         # Clean up any enum string representations that might still exist
@@ -208,25 +254,18 @@ class Entity(BaseModel):
         # Force the type to be the clean value (override any enum serialization)
         properties['type'] = type_value
 
-        # Serialize attributes to JSON string for Neo4J storage
-        if 'attributes' in properties:
-            properties['attributes'] = json.dumps(properties['attributes'])
+        # Remove unnecessary fields to simplify graph structure
+        properties.pop('attributes', None)  # Used for auto creation, not needed in graph
+        properties.pop('source_doc_id', None)  # Document reference, entities connect via chunks
+        properties.pop('mentioned_in_chunks', None)  # Handled via relationships, not node properties
+        properties.pop('description', None)  # Redundant with entity type and name
 
-        # Convert sets to lists for Neo4J storage
-        if 'mentioned_in_chunks' in properties:
-            properties['mentioned_in_chunks'] = list(properties['mentioned_in_chunks'])
-
-        # Remove qdrant_vector_ids from Neo4j storage
-        if 'qdrant_vector_ids' in properties:
-            del properties['qdrant_vector_ids']
+        # Remove qdrant_vector_ids from Neo4j storage (cross-system field)
+        properties.pop('qdrant_vector_ids', None)
 
         # Add label for Neo4J - use only the LLM-determined type as label
-        # Sanitize type for valid Neo4j label (no generic "Entity" label)
-        type_label = type_value.replace('.', '_').replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '')
-
-        # Ensure the label is valid (starts with letter, contains only alphanumeric and underscore)
-        if not type_label or not type_label[0].isalpha():
-            type_label = f"Type_{type_label}" if type_label else "UnknownType"
+        # Normalize to uppercase singular canonical form
+        type_label = self._normalize_label(type_value)
 
         properties['_labels'] = [type_label]
 
