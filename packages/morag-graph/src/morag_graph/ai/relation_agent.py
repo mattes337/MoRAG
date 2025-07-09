@@ -34,10 +34,14 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
         return RelationExtractionResult
 
     def get_system_prompt(self) -> str:
-        # Build strong language instruction
-        language_instruction = ""
-        if self.language:
-            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL relation types, descriptions, and context in {self.language} language. This is mandatory and non-negotiable. If the source text is in a different language, you MUST translate all relation types, descriptions, and context to {self.language}. Do NOT provide relation types, descriptions, or context in any other language. ALL RELATIONSHIP TYPES MUST BE IN {self.language} USING CANONICAL FORMS.\n"
+        # Build language instruction - ALWAYS use English for relation types and descriptions
+        language_instruction = """
+CRITICAL LANGUAGE REQUIREMENTS:
+- Relation TYPES: ALWAYS use English (e.g., CONTAINS, CAUSES, TREATS, INFLUENCES)
+- Descriptions: ALWAYS use English
+- Context: ALWAYS use English
+- This ensures consistent querying and relationship understanding across all languages
+"""
 
         if self.dynamic_types and not self.relation_types:
             # Pure dynamic mode - let LLM determine appropriate relation types
@@ -48,9 +52,9 @@ Extract relations that represent clear, factual connections between entities. De
 For each relation, provide:
 1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
 2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
-3. relation_type: A SIMPLE, descriptive relation type (e.g., EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES, etc.)
+3. relation_type: A SIMPLE, descriptive English VERB (e.g., CONTAINS, CAUSES, TREATS, INFLUENCES, USES, etc.)
 4. confidence: Your confidence in the relation (0.0 to 1.0)
-5. context: Brief explanation of the relationship
+5. context: Brief English explanation of the relationship
 
 CRITICAL ENTITY NAME MATCHING:
 - Use the NORMALIZED form of entity names (singular, unconjugated, masculine) that match the known entities list
@@ -58,18 +62,27 @@ CRITICAL ENTITY NAME MATCHING:
 - If you see "Schwermetallen" in text, use "Schwermetall" (the normalized form from known entities)
 - If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
 - Only extract relations between entities that are explicitly listed in the "Known entities" section
+- AVOID creating relations with conjugated or inflected entity names
+- Example: Use "ADHS" not "ADHS-Symptomatik" or "ADHS-Kind"
+- Example: Use "Ernährung" not "Ernährungsweise" or "Ernährungsverhalten"
 
-Guidelines for relation types:
-- Use SIMPLE, clear names that capture the core relationship
-- Prefer GENERAL types over overly specific ones
-- Use SINGLE WORDS when possible (EMPLOYS, CREATES, INFLUENCES, CONTAINS, USES)
-- If compound types are needed, keep them SHORT and GENERAL
+RELATION TYPE RULES (ALWAYS IN ENGLISH):
+- Relation types should be VERBS (not nouns or adjectives)
+- Use SIMPLE, clear English VERBS that capture the core action/relationship
+- Prefer GENERAL verbs over overly specific ones
+- Use SINGLE English VERB WORDS when possible: CONTAINS, CAUSES, TREATS, INFLUENCES, USES, AFFECTS, PRODUCES
+- If compound types needed, keep them SHORT and use VERB forms: BELONGS_TO, LOCATED_IN, ASSOCIATED_WITH
 - Avoid complex types like "COLLABORATES_WITH_ON_PROJECT" - use "COLLABORATES"
 - Be consistent within the same document/domain
 - Consider the direction of the relationship (source -> target)
-- ENSURE LANGUAGE CONSISTENCY: All relation types must be in the same language
-- AVOID MIXED LANGUAGES: Never mix languages within relation types or across relations
-- USE CANONICAL FORMS: Use the standard, dictionary form of relation types in the target language
+- ALL relation types MUST be in English regardless of source text language
+- Use VERB forms, not nouns: "TREATS" not "treatment", "CONTAINS" not "containment"
+- Use present tense, third person singular form when appropriate
+- Relation types are VERBS describing what the source entity DOES to the target entity
+- AVOID conjugated German verbs: use "CONTAINS" not "enthalten", "enthält", "enthaltet"
+- AVOID German verb forms: use "CAUSES" not "verursacht", "TREATS" not "behandelt"
+- STANDARDIZE similar concepts: "empfehlt" and "empfehlung" should both become "RECOMMENDS"
+- Example good verbs: CONTAINS, CAUSES, TREATS, INFLUENCES, AFFECTS, PRODUCES, REQUIRES, PREVENTS
 
 Focus on relations that are:
 - Explicitly stated or clearly implied in the text

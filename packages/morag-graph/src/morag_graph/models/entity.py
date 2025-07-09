@@ -85,11 +85,11 @@ class Entity(BaseModel):
     def _normalize_label(self, type_value: str) -> str:
         """Normalize entity type to valid Neo4j label format.
 
-        This method only handles basic formatting for Neo4j compatibility:
+        Simple normalization that only ensures Neo4j compatibility:
         - Uppercase
         - Valid Neo4j label format (alphanumeric and underscore only)
 
-        The LLM is responsible for generating consistent entity types.
+        The LLM is responsible for generating appropriate entity types.
 
         Args:
             type_value: The entity type to normalize
@@ -98,7 +98,7 @@ class Entity(BaseModel):
             Normalized uppercase label suitable for Neo4j
         """
         if not type_value:
-            return "UNKNOWN_TYPE"
+            return "UNKNOWN"
 
         # Convert to uppercase and clean whitespace
         normalized = type_value.upper().strip()
@@ -117,7 +117,7 @@ class Entity(BaseModel):
 
         # Ensure the label is valid (starts with letter, contains only alphanumeric and underscore)
         if not normalized or not normalized[0].isalpha():
-            normalized = f"TYPE_{normalized}" if normalized else "UNKNOWN_TYPE"
+            normalized = f"TYPE_{normalized}" if normalized else "UNKNOWN"
 
         return normalized
     

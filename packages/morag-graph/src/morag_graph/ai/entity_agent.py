@@ -34,10 +34,24 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
         return EntityExtractionResult
 
     def get_system_prompt(self) -> str:
-        # Build strong language instruction
+        # Build language instruction - ALWAYS use English for entity types and descriptions
+        # but preserve original language for entity names when appropriate
         language_instruction = ""
-        if self.language:
-            language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST provide ALL entity names, descriptions, and entity types in {self.language} language. This is mandatory and non-negotiable. If the source text is in a different language, you MUST translate all entity names, descriptions, and types to {self.language}. Do NOT provide names, descriptions, or types in any other language. Entity names MUST be in {self.language} using the canonical form in that language.\n"
+        if self.language and self.language != "en":
+            language_instruction = f"""
+CRITICAL LANGUAGE REQUIREMENTS:
+- Entity NAMES: Use the original language ({self.language}) in canonical form
+- Entity TYPES: ALWAYS use English (e.g., PERSON, ORGANIZATION, CONCEPT, SUBSTANCE)
+- Descriptions: ALWAYS use English
+- This ensures consistent querying while preserving linguistic accuracy of entity names
+"""
+        else:
+            language_instruction = """
+CRITICAL LANGUAGE REQUIREMENTS:
+- Entity NAMES: Use English in canonical form
+- Entity TYPES: Use English (e.g., PERSON, ORGANIZATION, CONCEPT, SUBSTANCE)
+- Descriptions: Use English
+"""
 
         if self.dynamic_types and not self.entity_types:
             # Pure dynamic mode - let LLM determine appropriate entity types
@@ -55,29 +69,31 @@ CRITICAL ENTITY NAME NORMALIZATION RULES:
 - ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
 - ALWAYS use MASCULINE form when applicable: "Zahnmediziner" not "Zahnmedizinerin"
 - ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
-- RESOLVE abbreviations to their canonical form in the target language
-- Use the most CANONICAL form of the entity name in the target language
+- RESOLVE abbreviations to their canonical form
+- Use the most CANONICAL form of the entity name
 - Normalize case appropriately: proper nouns capitalized, common nouns lowercase
-- ENSURE LANGUAGE CONSISTENCY: All entity names must be in the same language as specified
-- AVOID MIXED LANGUAGES: Never mix languages within entity names or across entities
+- PRESERVE original language for entity names but ensure canonical form
+- AVOID creating multiple entities for the same concept with different forms
+- Example: "ADHS", "Aufmerksamkeitsdefizit-Hyperaktivitätsstörung" should both become "ADHS"
+- Example: "Ernährung", "Ernährungsweise", "Ernährungsverhalten" should all become "Ernährung"
 
-ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
-- Use BROAD categories that can apply to many similar entities
-- Prefer GENERAL types over specific ones
-- Use SIMPLE, SINGLE-WORD types when possible (avoid complex compound types)
-- If you must use compound types, keep them SHORT and GENERAL
-- Think: "What is the SIMPLEST, most GENERAL category this entity belongs to?"
-- Avoid creating types like "BIOLOGICAL_SOMETHING" - just use "BIOLOGICAL"
-- Multiple similar entities should share the same broad type
-- Use the most general category that accurately describes the entity
-- Prefer simple, single-word types over complex compound types
-- Think about what category would allow similar entities to be grouped together
+ENTITY TYPE CREATION RULES - FOLLOW STRICTLY (ALWAYS IN ENGLISH):
+- Entity types should be NOUNS (not verbs or adjectives)
+- Use BROAD English categories that can apply to many similar entities
+- Let the LLM determine appropriate types based on the domain - NO static predefined categories
+- Use SIMPLE, SINGLE-WORD English nouns when possible
+- If compound types needed, keep them SHORT and use NOUN forms
+- Think: "What is the SIMPLEST, most GENERAL English NOUN category this entity belongs to?"
+- Multiple similar entities should share the same broad English noun type
+- ALL entity types MUST be in English regardless of source text language
+- Entity types are NOUNS describing what the entity IS
 
-EXAMPLES OF GOOD BROAD TYPING:
-- "Einstein", "Newton", "Darwin" → ALL should be SCIENTIST
-- "Zirbeldrüse", "Herz", "Leber" → ALL should be BODY_PART
-- "Harvard", "MIT", "Stanford" → ALL should be UNIVERSITY
-- "Python", "Java", "C++" → ALL should be TECHNOLOGY
+EXAMPLES OF GOOD ENTITY TYPING (NOUNS):
+- People: PERSON, SCIENTIST, DOCTOR, RESEARCHER
+- Places: LOCATION, COUNTRY, CITY, BUILDING
+- Things: SUBSTANCE, TECHNOLOGY, DEVICE, TOOL
+- Concepts: CONCEPT, PROCESS, METHOD, THEORY
+- Organizations: ORGANIZATION, COMPANY, INSTITUTION
 - "Photosynthesis", "Respiration", "Digestion" → ALL should be PROCESS
 - "Berlin", "Paris", "London" → ALL should be CITY
 - "Deutschland", "Frankreich", "England" → ALL should be COUNTRY

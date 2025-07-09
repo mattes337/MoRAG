@@ -603,27 +603,34 @@ class Neo4jStorage(BaseStorage):
             logger.debug(f"Created MENTIONED_IN relationship: entity {entity_id} -> chunk {chunk_id}")
 
     async def fix_unconnected_entities(self) -> int:
-        """Find and fix entities that are not connected to any chunks.
+        """DEPRECATED: Find and fix entities that are not connected to any chunks.
+
+        This method should no longer be needed with chunk-based extraction.
+        Entities are now extracted directly from chunks and automatically connected.
 
         Returns:
-            Number of entities that were fixed
+            Number of entities that were fixed (always 0 now)
         """
+        logger.info("fix_unconnected_entities called but is deprecated with chunk-based extraction")
+        return 0
+
+        # OLD CODE - commented out since chunk-based extraction should eliminate unconnected entities
         # Find entities that have no MENTIONED_IN relationships
-        query = """
-        MATCH (e)
-        WHERE e.type IS NOT NULL
-        AND NOT (e)-[:MENTIONED_IN]->(:DocumentChunk)
-        RETURN e.id as entity_id, e.name as entity_name, e.source_doc_id as source_doc_id
-        """
+        # query = """
+        # MATCH (e)
+        # WHERE e.type IS NOT NULL
+        # AND NOT (e)-[:MENTIONED_IN]->(:DocumentChunk)
+        # RETURN e.id as entity_id, e.name as entity_name, e.source_doc_id as source_doc_id
+        # """
 
-        unconnected_entities = await self._execute_query(query)
+        # unconnected_entities = await self._execute_query(query)
 
-        if not unconnected_entities:
-            logger.info("No unconnected entities found")
-            return 0
+        # if not unconnected_entities:
+        #     logger.info("No unconnected entities found")
+        #     return 0
 
-        logger.info(f"Found {len(unconnected_entities)} unconnected entities, attempting to fix")
-        fixed_count = 0
+        # logger.info(f"Found {len(unconnected_entities)} unconnected entities, attempting to fix")
+        # fixed_count = 0
 
         for entity_data in unconnected_entities:
             entity_id = entity_data["entity_id"]

@@ -573,95 +573,126 @@ class IngestionCoordinator:
         chunk_overlap: int = 200,
         language: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Extract entities and relations for graph databases using full document approach."""
+        """Extract entities and relations for graph databases using chunk-based approach."""
         try:
-            logger.info(f"Extracting graph data from full document ({len(content)} chars)")
+            logger.info(f"Extracting graph data from chunks ({len(content)} chars)")
 
-            # Extract entities and relations from the entire document at once
-            # This matches the approach used in run_extraction.py
-            extraction_result = await self.graph_extractor.extract_entities_and_relations(
-                content, source_path, language
-            )
+            # Create chunks using the same logic as embeddings
+            content_type = metadata.get('content_type', 'document')
+            chunks = self._create_chunks(content, chunk_size, chunk_overlap, content_type, metadata)
+
+            logger.info(f"Processing {len(chunks)} chunks for entity and relation extraction")
 
             all_entities = []
             all_relations = []
+            chunk_entity_mapping = {}
 
-            # Process entities from the full document
-            if extraction_result.get('entities'):
-                for entity_data in extraction_result['entities']:
-                    # Clean up attributes - remove duplicate description/context fields
-                    entity_attributes = entity_data.get('attributes', {}).copy()
+            # Process each chunk individually for entity and relation extraction
+            for i, chunk_content in enumerate(chunks):
+                try:
+                    logger.debug(f"Processing chunk {i+1}/{len(chunks)} for entity extraction")
 
-                    # Remove duplicate fields - keep only essential attributes
-                    entity_attributes.pop('description', None)  # Remove duplicate description
-                    entity_attributes.pop('context', None)      # Remove duplicate context
-
-                    # Keep only meaningful attributes (positions, metadata, etc.)
-                    cleaned_attributes = {}
-                    for key, value in entity_attributes.items():
-                        if key not in ['description', 'context'] and value is not None:
-                            cleaned_attributes[key] = value
-
-                    entity = Entity(
-                        # Let Entity model generate unified ID automatically
-                        name=entity_data['name'],
-                        type=entity_data.get('type', 'UNKNOWN'),
-                        description=entity_data.get('description', ''),
-                        attributes=cleaned_attributes,
-                        source_doc_id=document_id,
-                        confidence=entity_data.get('confidence', 0.8)
+                    # Extract entities and relations from this chunk
+                    chunk_extraction_result = await self.graph_extractor.extract_entities_and_relations(
+                        chunk_content, source_path, language
                     )
-                    all_entities.append(entity)
 
-            # Process relations from the full document
-            if extraction_result.get('relations'):
-                for relation_data in extraction_result['relations']:
-                    # Clean up attributes - remove duplicate description/context fields
-                    relation_attributes = relation_data.get('attributes', {}).copy()
+                    chunk_entities = []
+                    chunk_relations = []
 
-                    # Remove duplicate fields from attributes
-                    relation_attributes.pop('description', None)  # Remove duplicate description
-                    relation_attributes.pop('context', None)      # Remove duplicate context
+                    # Process entities from this chunk
+                    if chunk_extraction_result and chunk_extraction_result.get('entities'):
+                        for entity_data in chunk_extraction_result['entities']:
+                            # Clean up attributes - remove duplicate description/context fields
+                            entity_attributes = entity_data.get('attributes', {}).copy()
 
-                    # Keep only meaningful attributes (metadata, etc.)
-                    cleaned_attributes = {}
-                    for key, value in relation_attributes.items():
-                        if key not in ['description', 'context'] and value is not None:
-                            cleaned_attributes[key] = value
+                            # Remove duplicate fields - keep only essential attributes
+                            entity_attributes.pop('description', None)  # Remove duplicate description
+                            entity_attributes.pop('context', None)      # Remove duplicate context
 
-                    # Extract description and context as separate fields
-                    description = relation_data.get('description', '')
-                    context = relation_attributes.get('context', description)  # Use description as fallback for context
+                            # Keep only meaningful attributes (positions, metadata, etc.)
+                            cleaned_attributes = {}
+                            for key, value in entity_attributes.items():
+                                if key not in ['description', 'context'] and value is not None:
+                                    cleaned_attributes[key] = value
 
-                    # If they're the same, make context more specific
-                    if context == description and description:
-                        context = f"Found in document: {description}"
+                            # Add chunk metadata
+                            cleaned_attributes['chunk_index'] = i
+                            cleaned_attributes['chunk_content_preview'] = chunk_content[:100] + "..." if len(chunk_content) > 100 else chunk_content
 
-                    relation = Relation(
-                        # Let Relation model generate unified ID automatically
-                        source_entity_id=relation_data['source_entity_id'],
-                        target_entity_id=relation_data['target_entity_id'],
-                        type=relation_data['relation_type'],
-                        description=description,
-                        context=context,
-                        attributes=cleaned_attributes,
-                        source_doc_id=document_id,
-                        confidence=relation_data.get('confidence', 0.8)
-                    )
-                    all_relations.append(relation)
+                            entity = Entity(
+                                # Let Entity model generate unified ID automatically
+                                name=entity_data['name'],
+                                type=entity_data.get('type', 'UNKNOWN'),
+                                description=entity_data.get('description', ''),
+                                attributes=cleaned_attributes,
+                                source_doc_id=source_path,
+                                confidence=entity_data.get('confidence', 0.8)
+                            )
+                            chunk_entities.append(entity)
 
-            logger.info(f"Extracted {len(all_entities)} entities and {len(all_relations)} relations from full document")
+                    # Process relations from this chunk
+                    if chunk_extraction_result and chunk_extraction_result.get('relations'):
+                        for relation_data in chunk_extraction_result['relations']:
+                            # Clean up attributes - remove duplicate description/context fields
+                            relation_attributes = relation_data.get('attributes', {}).copy()
 
-            # Create chunk-entity mapping by finding which entities appear in which chunks
-            chunk_entity_mapping = self._create_chunk_entity_mapping(
-                content, all_entities, chunk_size, chunk_overlap
-            )
+                            # Remove duplicate fields from attributes
+                            relation_attributes.pop('description', None)  # Remove duplicate description
+                            relation_attributes.pop('context', None)      # Remove duplicate context
 
-            # Enhance chunk-entity mapping with auto-created entities from relations
-            chunk_entity_mapping = self._enhance_chunk_entity_mapping_with_missing_entities(
-                content, all_relations, chunk_entity_mapping, chunk_size, chunk_overlap
-            )
+                            # Keep only meaningful attributes (metadata, etc.)
+                            cleaned_attributes = {}
+                            for key, value in relation_attributes.items():
+                                if key not in ['description', 'context'] and value is not None:
+                                    cleaned_attributes[key] = value
 
+                            # Add chunk metadata
+                            cleaned_attributes['chunk_index'] = i
+
+                            # Extract description and context as separate fields
+                            description = relation_data.get('description', '')
+                            context = relation_attributes.get('context', description)  # Use description as fallback for context
+
+                            # If they're the same, make context more specific
+                            if context == description and description:
+                                context = f"Found in chunk {i+1}: {description}"
+
+                            relation = Relation(
+                                # Let Relation model generate unified ID automatically
+                                source_entity_id=relation_data['source_entity_id'],
+                                target_entity_id=relation_data['target_entity_id'],
+                                type=relation_data['relation_type'],
+                                description=description,
+                                context=context,
+                                attributes=cleaned_attributes,
+                                source_doc_id=source_path,
+                                confidence=relation_data.get('confidence', 0.8)
+                            )
+                            chunk_relations.append(relation)
+
+                    # Add entities and relations to global lists
+                    all_entities.extend(chunk_entities)
+                    all_relations.extend(chunk_relations)
+
+                    # Create chunk-entity mapping for this chunk
+                    chunk_id = f"{document_id}:chunk:{i}"
+                    chunk_entity_mapping[chunk_id] = [entity.id for entity in chunk_entities]
+
+                    logger.debug(f"Chunk {i+1} processed: {len(chunk_entities)} entities, {len(chunk_relations)} relations")
+
+                except Exception as e:
+                    logger.warning(f"Failed to process chunk {i+1} for entity extraction", error=str(e))
+                    # Continue with other chunks
+                    continue
+
+            # Deduplicate entities across chunks (entities with same name should be merged)
+            all_entities = self._deduplicate_entities_across_chunks(all_entities)
+
+            # Update chunk-entity mapping after deduplication
+            chunk_entity_mapping = self._update_chunk_mapping_after_deduplication(chunk_entity_mapping, all_entities)
+
+            logger.info(f"Extracted {len(all_entities)} entities and {len(all_relations)} relations from {len(chunks)} chunks")
             logger.info(f"Created chunk-entity mapping: {len(chunk_entity_mapping)} chunks with entities")
 
             return {
@@ -671,7 +702,8 @@ class IngestionCoordinator:
                 'extraction_metadata': {
                     'total_entities': len(all_entities),
                     'total_relations': len(all_relations),
-                    'extraction_method': 'full_document',
+                    'extraction_method': 'chunk_based',
+                    'chunks_processed': len(chunks),
                     'chunks_with_entities': len(chunk_entity_mapping)
                 }
             }
@@ -684,6 +716,65 @@ class IngestionCoordinator:
                 'chunk_entity_mapping': {},
                 'extraction_metadata': {'error': str(e)}
             }
+
+    def _deduplicate_entities_across_chunks(self, entities: List[Entity]) -> List[Entity]:
+        """Deduplicate entities across chunks by merging entities with the same name."""
+        entity_map = {}
+
+        for entity in entities:
+            # Use normalized name as key for deduplication
+            key = entity.name.lower().strip()
+
+            if key in entity_map:
+                # Merge with existing entity - keep highest confidence
+                existing = entity_map[key]
+                if entity.confidence > existing.confidence:
+                    # Update with higher confidence entity but merge chunk info
+                    chunk_indices = set()
+                    if 'chunk_index' in existing.attributes:
+                        chunk_indices.add(existing.attributes['chunk_index'])
+                    if 'chunk_index' in entity.attributes:
+                        chunk_indices.add(entity.attributes['chunk_index'])
+
+                    entity.attributes['chunk_indices'] = list(chunk_indices)
+                    entity_map[key] = entity
+                else:
+                    # Keep existing but add chunk info
+                    chunk_indices = set()
+                    if 'chunk_index' in existing.attributes:
+                        chunk_indices.add(existing.attributes['chunk_index'])
+                    if 'chunk_index' in entity.attributes:
+                        chunk_indices.add(entity.attributes['chunk_index'])
+
+                    existing.attributes['chunk_indices'] = list(chunk_indices)
+            else:
+                entity_map[key] = entity
+
+        return list(entity_map.values())
+
+    def _update_chunk_mapping_after_deduplication(self, chunk_entity_mapping: Dict[str, List[str]], entities: List[Entity]) -> Dict[str, List[str]]:
+        """Update chunk-entity mapping after entity deduplication."""
+        # Create a mapping from old entity IDs to new deduplicated entity IDs
+        entity_name_to_id = {entity.name.lower().strip(): entity.id for entity in entities}
+
+        updated_mapping = {}
+        for chunk_id, entity_ids in chunk_entity_mapping.items():
+            updated_entity_ids = []
+            for old_entity_id in entity_ids:
+                # Find the entity by ID and get its deduplicated version
+                for entity in entities:
+                    if entity.id == old_entity_id:
+                        # Check if this entity appears in this chunk
+                        chunk_indices = entity.attributes.get('chunk_indices', [entity.attributes.get('chunk_index')])
+                        chunk_index = int(chunk_id.split(':')[-1])
+                        if chunk_index in chunk_indices:
+                            updated_entity_ids.append(entity.id)
+                        break
+
+            if updated_entity_ids:
+                updated_mapping[chunk_id] = list(set(updated_entity_ids))  # Remove duplicates
+
+        return updated_mapping
 
     def _create_chunk_entity_mapping(
         self,
