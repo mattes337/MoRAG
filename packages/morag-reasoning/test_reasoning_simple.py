@@ -42,26 +42,26 @@ except ImportError as e:
 def create_sample_paths() -> List[GraphPath]:
     """Create sample graph paths for testing."""
     # Create mock entities and relations for GraphPath
-    from morag_graph.models import Entity, Relation, EntityType, RelationType
+    from morag_graph.models import Entity, Relation
 
     # Create sample entities
-    apple = Entity(name="Apple Inc.", type=EntityType.ORGANIZATION)
-    steve = Entity(name="Steve Jobs", type=EntityType.PERSON)
-    iphone = Entity(name="iPhone", type=EntityType.PRODUCT)
-    ai_research = Entity(name="AI research", type=EntityType.CONCEPT)
-    stanford = Entity(name="Stanford University", type=EntityType.ORGANIZATION)
-    product_dev = Entity(name="product development", type=EntityType.CONCEPT)
-    innovation = Entity(name="innovation", type=EntityType.CONCEPT)
+    apple = Entity(name="Apple Inc.", type="ORGANIZATION")
+    steve = Entity(name="Steve Jobs", type="PERSON")
+    iphone = Entity(name="iPhone", type="PRODUCT")
+    ai_research = Entity(name="AI research", type="CONCEPT")
+    stanford = Entity(name="Stanford University", type="ORGANIZATION")
+    product_dev = Entity(name="product development", type="CONCEPT")
+    innovation = Entity(name="innovation", type="CONCEPT")
 
-    # Create sample relations using available RelationType values
-    founded_rel = Relation(source_entity_id=steve.id, target_entity_id=apple.id, type=RelationType.FOUNDED)
-    created_rel = Relation(source_entity_id=steve.id, target_entity_id=iphone.id, type=RelationType.CREATED_BY)
-    conducts_rel = Relation(source_entity_id=apple.id, target_entity_id=ai_research.id, type=RelationType.USES)
-    partners_rel = Relation(source_entity_id=apple.id, target_entity_id=stanford.id, type=RelationType.WORKS_WITH)
-    led_rel = Relation(source_entity_id=steve.id, target_entity_id=product_dev.id, type=RelationType.LEADS)
-    resulted_rel = Relation(source_entity_id=product_dev.id, target_entity_id=iphone.id, type=RelationType.CREATED_BY)
-    influences_rel = Relation(source_entity_id=ai_research.id, target_entity_id=product_dev.id, type=RelationType.AFFECTS)
-    drives_rel = Relation(source_entity_id=product_dev.id, target_entity_id=innovation.id, type=RelationType.ENABLES)
+    # Create sample relations using string types
+    founded_rel = Relation(source_entity_id=steve.id, target_entity_id=apple.id, type="FOUNDED")
+    created_rel = Relation(source_entity_id=steve.id, target_entity_id=iphone.id, type="CREATED_BY")
+    conducts_rel = Relation(source_entity_id=apple.id, target_entity_id=ai_research.id, type="USES")
+    partners_rel = Relation(source_entity_id=apple.id, target_entity_id=stanford.id, type="WORKS_WITH")
+    led_rel = Relation(source_entity_id=steve.id, target_entity_id=product_dev.id, type="LEADS")
+    resulted_rel = Relation(source_entity_id=product_dev.id, target_entity_id=iphone.id, type="CREATED_BY")
+    influences_rel = Relation(source_entity_id=ai_research.id, target_entity_id=product_dev.id, type="AFFECTS")
+    drives_rel = Relation(source_entity_id=product_dev.id, target_entity_id=innovation.id, type="ENABLES")
 
     return [
         GraphPath(

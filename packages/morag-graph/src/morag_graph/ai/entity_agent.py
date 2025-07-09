@@ -396,11 +396,7 @@ REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type 
     def _convert_to_graph_entity(self, entity: Entity, source_doc_id: Optional[str]) -> GraphEntity:
         """Convert AI entity to graph entity."""
         # Always use dynamic entity types - LLM determines the type
-        if isinstance(entity.type, str):
-            graph_type = entity.type
-        else:
-            # Handle enum types by extracting the value (fallback for compatibility)
-            graph_type = entity.type.value if hasattr(entity.type, 'value') else str(entity.type)
+        graph_type = str(entity.type).value if hasattr(entity.type, 'value') else str(entity.type)
 
         # Simplify the entity type to use only the first part
         graph_type = self._simplify_entity_type(graph_type)

@@ -171,15 +171,18 @@ For detailed information about completed tasks and implementation history, see [
 - **Status**: ✅ **COMPLETED** - Pure dynamic extraction, LLM-driven type selection, all tests passing
 
 ### ✅ Remove Hardcoded Entity Classifications ✅ COMPLETED
-- **Feature**: Removed all hardcoded content-specific entity classifications from the codebase
-- **Implementation**: Cleaned up `EntityTypeNormalizer` to remove predefined medical conditions, organizations, and person names
+- **Feature**: Completely removed hardcoded content-specific entity classifications from the codebase
+- **Implementation**: Removed the entire `EntityTypeNormalizer` class and all hardcoded entity type definitions
 - **Key Changes**:
-  - Removed `MEDICAL_CONDITIONS`, `ORGANIZATIONS`, and `KNOWN_PERSONS` hardcoded sets
-  - Simplified `normalize_entity_type()` method to be content-agnostic
-  - Removed methods for adding content-specific classifications (`add_medical_condition`, `add_organization`, `add_person`)
-  - Updated class documentation to clarify that LLM should handle entity classification
+  - Deleted `EntityTypeNormalizer` class entirely (was providing no functionality)
+  - Removed all hardcoded entity type enums (`EntityType`, `RelationType`)
+  - Updated all models to use dynamic string-based types
+  - Fixed all test files to use string literals instead of enum references
+  - Cleaned up obsolete enum handling code in entity and relation models
 - **Benefits**:
-  - Domain-agnostic entity extraction system
+  - Fully domain-agnostic entity extraction system
+  - LLM-driven dynamic type generation
+  - Simplified codebase without obsolete patterns
   - LLM-driven classification instead of hardcoded rules
   - Eliminates bias toward specific content domains
   - More flexible and adaptable to different use cases

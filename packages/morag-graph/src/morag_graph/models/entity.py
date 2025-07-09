@@ -3,7 +3,7 @@
 import json
 import uuid
 import hashlib
-from typing import Dict, List, Optional, Any, Union, ClassVar, Set
+from typing import Dict, List, Optional, Any, Union, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -35,8 +35,7 @@ class Entity(BaseModel):
     source_doc_id: Optional[str] = None
     confidence: float = 1.0
     
-    # Cross-system integration fields
-    mentioned_in_chunks: Set[str] = Field(default_factory=set, description="Set of chunk IDs where this entity is mentioned")
+
     
     # Class variables for Neo4J integration
     _neo4j_label: ClassVar[str] = "Entity"
@@ -46,10 +45,8 @@ class Entity(BaseModel):
         if 'id' not in data or not data['id']:
             # Generate unified deterministic ID based on name, type, and source document
             name = data.get('name', '')
-            entity_type = data.get('type', "CUSTOM")
+            entity_type = str(data.get('type', "CUSTOM"))
             source_doc_id = data.get('source_doc_id', '')
-            if hasattr(entity_type, 'value'):
-                entity_type = entity_type.value
             data['id'] = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
         super().__init__(**data)
     
@@ -67,9 +64,7 @@ class Entity(BaseModel):
             # Set the new value first
             super().__setattr__(name, value)
             # Regenerate ID with new source_doc_id using unified generator
-            entity_type = self.type
-            if hasattr(entity_type, 'value'):
-                entity_type = entity_type.value
+            entity_type = str(self.type)
             super().__setattr__('id', UnifiedIDGenerator.generate_entity_id(self.name, entity_type, value or ''))
         else:
             super().__setattr__(name, value)
@@ -121,71 +116,7 @@ class Entity(BaseModel):
 
         return normalized
     
-    def add_chunk_reference(self, chunk_id: str) -> None:
-        """Add a reference to a chunk where this entity is mentioned.
-        
-        Args:
-            chunk_id: Unified chunk ID
-        """
-        if not IDValidator.validate_chunk_id(chunk_id):
-            raise ValueError(f"Invalid chunk ID format: {chunk_id}")
-        self.mentioned_in_chunks.add(chunk_id)
-    
-    def remove_chunk_reference(self, chunk_id: str) -> None:
-        """Remove a reference to a chunk.
-        
-        Args:
-            chunk_id: Unified chunk ID
-        """
-        self.mentioned_in_chunks.discard(chunk_id)
-    
-    def add_qdrant_vector_id(self, vector_id: str) -> None:
-        """Add a Qdrant vector ID associated with this entity.
-        
-        Args:
-            vector_id: Qdrant vector ID
-        """
-        self.qdrant_vector_ids.add(vector_id)
-    
-    def remove_qdrant_vector_id(self, vector_id: str) -> None:
-        """Remove a Qdrant vector ID.
-        
-        Args:
-            vector_id: Qdrant vector ID
-        """
-        self.qdrant_vector_ids.discard(vector_id)
-    
-    def get_document_ids_from_chunks(self) -> Set[str]:
-        """Get unique document IDs from all referenced chunks.
-        
-        Returns:
-            Set of document IDs
-        """
-        document_ids = set()
-        for chunk_id in self.mentioned_in_chunks:
-            try:
-                doc_id = UnifiedIDGenerator.extract_document_id_from_chunk(chunk_id)
-                document_ids.add(doc_id)
-            except ValueError:
-                # Skip invalid chunk IDs
-                continue
-        return document_ids
-    
-    def get_chunk_count(self) -> int:
-        """Get the number of chunks this entity is mentioned in.
-        
-        Returns:
-            Number of chunks
-        """
-        return len(self.mentioned_in_chunks)
-    
-    def get_qdrant_vector_count(self) -> int:
-        """Get the number of Qdrant vectors associated with this entity.
-        
-        Returns:
-            Number of Qdrant vectors
-        """
-        return len(self.qdrant_vector_ids)
+
     
     @field_validator('confidence')
     @classmethod
@@ -217,19 +148,8 @@ class Entity(BaseModel):
         """Convert entity to dictionary for JSON serialization."""
         data = self.model_dump()
 
-        # Convert type to string for JSON serialization
-        if hasattr(data['type'], 'value'):
-            # Handle enum types - get just the value without the class prefix
-            data['type'] = data['type'].value
-        else:
-            # Handle string types
-            data['type'] = str(data['type'])
-
-        # Convert sets to lists for JSON serialization
-        if 'mentioned_in_chunks' in data and isinstance(data['mentioned_in_chunks'], set):
-            data['mentioned_in_chunks'] = list(data['mentioned_in_chunks'])
-
-
+        # Ensure type is string for JSON serialization
+        data['type'] = str(data['type'])
 
         return data
     
@@ -242,26 +162,19 @@ class Entity(BaseModel):
         - mentioned_in_chunks: Handled via relationships, not node properties
         - description: Redundant with entity type and name
         """
-        # Get the clean type value - always a string now
+        # Get the type value as string
         type_value = str(self.type)
-        # Clean up any enum string representations that might still exist
-        if type_value.startswith('EntityType.'):
-            type_value = type_value.replace('EntityType.', '')
 
-        # Use model_dump but manually handle enum serialization
+        # Use model_dump for properties
         properties = self.model_dump()
 
-        # Force the type to be the clean value (override any enum serialization)
+        # Ensure type is clean string value
         properties['type'] = type_value
 
         # Remove unnecessary fields to simplify graph structure
         properties.pop('attributes', None)  # Used for auto creation, not needed in graph
         properties.pop('source_doc_id', None)  # Document reference, entities connect via chunks
-        properties.pop('mentioned_in_chunks', None)  # Handled via relationships, not node properties
         properties.pop('description', None)  # Redundant with entity type and name
-
-        # Remove qdrant_vector_ids from Neo4j storage (cross-system field)
-        properties.pop('qdrant_vector_ids', None)
 
         # Add label for Neo4J - use only the LLM-determined type as label
         # Normalize to uppercase singular canonical form
@@ -280,13 +193,6 @@ class Entity(BaseModel):
         # Deserialize attributes from JSON string
         if 'attributes' in node and isinstance(node['attributes'], str):
             node['attributes'] = json.loads(node['attributes'])
-        
-        # Convert lists back to sets
-        if 'mentioned_in_chunks' in node and isinstance(node['mentioned_in_chunks'], list):
-            node['mentioned_in_chunks'] = set(node['mentioned_in_chunks'])
-        
-        if 'qdrant_vector_ids' in node and isinstance(node['qdrant_vector_ids'], list):
-            node['qdrant_vector_ids'] = set(node['qdrant_vector_ids'])
         
         # Remove Neo4J specific properties
         if '_labels' in node:

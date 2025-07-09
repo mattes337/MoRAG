@@ -185,12 +185,12 @@ class MockGraphEngine:
         """Find shortest path between entities."""
         # Simple mock implementation
         from morag_graph.operations import GraphPath
-        from morag_graph.models import Entity, Relation, EntityType, RelationType
+        from morag_graph.models import Entity, Relation
 
         if start in self.entities and end in self.entities:
             # Create mock entities and relations with correct types
-            start_type = getattr(EntityType, self._get_entity_type(start), EntityType.CONCEPT)
-            end_type = getattr(EntityType, self._get_entity_type(end), EntityType.CONCEPT)
+            start_type = self._get_entity_type(start)
+            end_type = self._get_entity_type(end)
 
             start_entity = Entity(name=start, type=start_type)
             end_entity = Entity(name=end, type=end_type)
@@ -228,25 +228,25 @@ class MockGraphEngine:
             # Add current path if it has more than one entity
             if len(path) > 1:
                 # Create Entity and Relation objects for GraphPath
-                from morag_graph.models import Entity, Relation, EntityType, RelationType
+                from morag_graph.models import Entity, Relation
 
                 path_entities = []
                 path_relations = []
 
                 for i, entity_name in enumerate(path):
-                    entity_type = getattr(EntityType, self._get_entity_type(entity_name), EntityType.CONCEPT)
+                    entity_type = self._get_entity_type(entity_name)
                     entity = Entity(name=entity_name, type=entity_type)
                     path_entities.append(entity)
 
                     # Create relation for each connection
                     if i < len(relations):
                         if i + 1 < len(path):
-                            next_entity_type = getattr(EntityType, self._get_entity_type(path[i + 1]), EntityType.CONCEPT)
+                            next_entity_type = self._get_entity_type(path[i + 1])
                             next_entity = Entity(name=path[i + 1], type=next_entity_type)
                             relation = Relation(
                                 source_entity_id=entity.id,
                                 target_entity_id=next_entity.id,
-                                type=RelationType.RELATED_TO
+                                type="RELATED_TO"
                             )
                             path_relations.append(relation)
 

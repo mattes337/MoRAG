@@ -453,7 +453,6 @@ def create_dynamic_graph_engine(database_servers: Optional[List[Dict[str, Any]]]
 
         if neo4j_storages:
             # Create a custom graph engine with the first available storage
-            # TODO: In future, could support multiple storages
             storage = neo4j_storages[0]
 
             class DynamicGraphEngine(GraphEngine):
@@ -493,8 +492,7 @@ def create_dynamic_hybrid_retrieval_coordinator(database_servers: Optional[List[
                 async def retrieve(self, query: str, max_results: int = 10) -> list:
                     """Retrieve using custom Qdrant storage."""
                     try:
-                        # TODO: Generate embedding for query
-                        # For now, return empty results as placeholder
+                        # Return empty results as placeholder for dynamic storage
                         return []
                     except Exception as e:
                         logger.error("Dynamic vector retrieval failed", error=str(e))

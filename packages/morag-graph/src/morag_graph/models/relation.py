@@ -31,7 +31,7 @@ class Relation(BaseModel):
     id: RelationId = Field(default="")
     source_entity_id: EntityId
     target_entity_id: EntityId
-    type: str = "CUSTOM"
+    type: str = Field(default="CUSTOM", description="Relation type")
     description: str = Field(default="", description="Description of the relation")
     context: str = Field(default="", description="Context where the relation was found")
     attributes: RelationAttributes = Field(default_factory=dict)
@@ -46,9 +46,7 @@ class Relation(BaseModel):
         """Initialize relation with unified ID generation."""
         # Generate unified relation ID if not provided
         if 'id' not in data or not data['id']:
-            relation_type = data.get('type', "CUSTOM")
-            if hasattr(relation_type, 'value'):
-                relation_type = relation_type.value
+            relation_type = str(data.get('type', "CUSTOM"))
             data['id'] = UnifiedIDGenerator.generate_relation_id(
                 source_entity_id=data['source_entity_id'],
                 target_entity_id=data['target_entity_id'],
@@ -63,6 +61,14 @@ class Relation(BaseModel):
         if v and not IDValidator.validate_relation_id(v):
             raise ValueError(f"Invalid relation ID format: {v}")
         return v
+
+    @field_validator('type')
+    @classmethod
+    def validate_type_format(cls, v):
+        """Validate relation type format."""
+        if not v or not v.strip():
+            raise ValueError("Relation type must be a non-empty string")
+        return v.strip()
     
     def get_unified_id(self) -> str:
         """Get unified relation ID."""
@@ -108,13 +114,8 @@ class Relation(BaseModel):
         """Convert relation to dictionary for JSON serialization."""
         data = self.model_dump()
 
-        # Convert type to string for JSON serialization
-        if hasattr(data['type'], 'value'):
-            # Handle enum types - get just the value without the class prefix
-            data['type'] = data['type'].value
-        else:
-            # Handle string types
-            data['type'] = str(data['type'])
+        # Ensure type is string for JSON serialization
+        data['type'] = str(data['type'])
 
         return data
     
@@ -126,16 +127,13 @@ class Relation(BaseModel):
         - source_doc_id: Document reference (entities already have chunk references)
         - description: Redundant with relation type
         """
-        # Get the clean type value - always a string now
+        # Get the type value as string
         type_value = str(self.type)
-        # Clean up any enum string representations that might still exist
-        if type_value.startswith('RelationType.'):
-            type_value = type_value.replace('RelationType.', '')
 
-        # Use model_dump but manually handle enum serialization
+        # Use model_dump for properties
         properties = self.model_dump()
 
-        # Force the type to be the clean value (override any enum serialization)
+        # Ensure type is clean string value
         properties['type'] = type_value
 
         # Serialize attributes to JSON string for Neo4J storage
@@ -203,12 +201,92 @@ class Relation(BaseModel):
     
     def get_neo4j_type(self) -> str:
         """Get the Neo4J relationship type."""
-        # Get the type value - always a string now
+        # Get the type value as string
         type_value = str(self.type)
-        # Clean up any enum string representations that might still exist
-        if type_value.startswith('RelationType.'):
-            type_value = type_value.replace('RelationType.', '')
 
-        # Sanitize type for valid Neo4j relationship type (no dots, spaces, etc.)
-        type_str = type_value.replace('.', '_').replace(' ', '_').replace('-', '_')
-        return type_str
+        # Normalize relation type: uppercase, singular form, and sanitize
+        normalized_type = self._normalize_relation_type(type_value)
+        return normalized_type
+
+    def _normalize_relation_type(self, relation_type: str) -> str:
+        """Normalize relation type to uppercase singular form.
+
+        Args:
+            relation_type: Raw relation type string
+
+        Returns:
+            Normalized relation type (uppercase, singular, Neo4j-compatible)
+        """
+        if not relation_type:
+            return "RELATES"
+
+        # Convert to uppercase and clean whitespace
+        normalized = relation_type.upper().strip()
+
+        # Convert common plural forms to singular
+        plural_to_singular = {
+            'AFFECTS': 'AFFECTS',  # AFFECTS is already correct (3rd person singular)
+            'CAUSES': 'CAUSES',    # CAUSES is already correct (3rd person singular)
+            'PRODUCES': 'PRODUCES', # PRODUCES is already correct (3rd person singular)
+            'REDUCES': 'REDUCES',   # REDUCES is already correct (3rd person singular)
+            'REQUIRES': 'REQUIRES', # REQUIRES is already correct (3rd person singular)
+            'TREATS': 'TREATS',     # TREATS is already correct (3rd person singular)
+            'USES': 'USES',         # USES is already correct (3rd person singular)
+            'HELPS': 'HELPS',       # HELPS is already correct (3rd person singular)
+            'IMPROVES': 'IMPROVES', # IMPROVES is already correct (3rd person singular)
+            'INFLUENCES': 'INFLUENCES', # INFLUENCES is already correct (3rd person singular)
+            'DISCUSSES': 'DISCUSSES',   # DISCUSSES is already correct (3rd person singular)
+            'CONNECTS': 'CONNECTS',     # CONNECTS is already correct (3rd person singular)
+            'CONTAINS': 'CONTAINS',     # CONTAINS is already correct (3rd person singular)
+            'ASSOCIATES': 'ASSOCIATES', # ASSOCIATES is already correct (3rd person singular)
+
+            # Handle incorrect plural/base forms
+            'AFFECT': 'AFFECTS',
+            'CAUSE': 'CAUSES',
+            'PRODUCE': 'PRODUCES',
+            'REDUCE': 'REDUCES',
+            'REQUIRE': 'REQUIRES',
+            'TREAT': 'TREATS',
+            'USE': 'USES',
+            'HELP': 'HELPS',
+            'IMPROVE': 'IMPROVES',
+            'INFLUENCE': 'INFLUENCES',
+            'DISCUSS': 'DISCUSSES',
+            'CONNECT': 'CONNECTS',
+            'CONTAIN': 'CONTAINS',
+            'ASSOCIATE': 'ASSOCIATES',
+            'ASSOCIATED': 'ASSOCIATES',  # Past participle form
+
+            # Handle common variations
+            'HAS': 'HAS',
+            'HAVE': 'HAS',
+            'IS': 'IS',
+            'LOCATED': 'LOCATES',
+            'SUFFERS': 'SUFFERS',
+            'ADVISES': 'ADVISES',
+            'FOCUSES': 'FOCUSES',
+            'MODERATES': 'MODERATES',
+            'PARTICIPATES': 'PARTICIPATES',
+        }
+
+        # Apply singular form conversion
+        if normalized in plural_to_singular:
+            normalized = plural_to_singular[normalized]
+
+        # Sanitize for valid Neo4j relationship type (no dots, spaces, special chars)
+        normalized = normalized.replace('.', '_').replace(' ', '_').replace('-', '_')
+        normalized = normalized.replace('(', '').replace(')', '').replace('/', '_')
+        normalized = normalized.replace('&', '_AND_').replace('+', '_PLUS_')
+
+        # Remove any double underscores
+        while '__' in normalized:
+            normalized = normalized.replace('__', '_')
+
+        # Remove leading/trailing underscores
+        normalized = normalized.strip('_')
+
+        # Ensure the type is valid (starts with letter, contains only alphanumeric and underscore)
+        if not normalized or not normalized[0].isalpha():
+            normalized = f"REL_{normalized}" if normalized else "RELATES"
+
+        return normalized

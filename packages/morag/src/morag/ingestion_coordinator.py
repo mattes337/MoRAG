@@ -1495,15 +1495,21 @@ class IngestionCoordinator:
 
             logger.info(f"Creating chunk-entity relationships: {len(chunk_entity_mapping)} chunks with entities, {len(chunk_ids)} total chunks")
 
-            for chunk_index_str, entity_ids_in_chunk in chunk_entity_mapping.items():
-                chunk_index = int(chunk_index_str)
-
-                # Find the chunk_id for this chunk_index
-                chunk_id = None
-                for cid, cidx in chunk_id_to_index.items():
-                    if cidx == chunk_index:
-                        chunk_id = cid
-                        break
+            for chunk_key, entity_ids_in_chunk in chunk_entity_mapping.items():
+                # Handle both chunk IDs and chunk indices as keys
+                if ':chunk:' in chunk_key:
+                    # chunk_key is a chunk ID (e.g., "doc_file_hash:chunk:0")
+                    chunk_id = chunk_key
+                    chunk_index = int(chunk_key.split(':')[-1])
+                else:
+                    # chunk_key is a chunk index (e.g., "0")
+                    chunk_index = int(chunk_key)
+                    # Find the chunk_id for this chunk_index
+                    chunk_id = None
+                    for cid, cidx in chunk_id_to_index.items():
+                        if cidx == chunk_index:
+                            chunk_id = cid
+                            break
 
                 if chunk_id:
                     # Get the chunk text for context
@@ -1534,18 +1540,10 @@ class IngestionCoordinator:
                                 except Exception as fetch_error:
                                     logger.warning(f"Failed to fetch entity {entity_id} from Neo4j: {fetch_error}")
 
-                            if entity:
-                                entity.add_chunk_reference(chunk_id)
-                                # Update the entity in Neo4j with the new mentioned_in_chunks
-                                await neo4j_storage.store_entity(entity)
-                                #logger.debug(f"Updated entity {entity_id} mentioned_in_chunks: {entity.mentioned_in_chunks}")
-                            else:
-                                logger.warning(f"Could not find entity {entity_id} to update mentioned_in_chunks")
-
                         except Exception as e:
                             logger.warning(f"Failed to create chunk-entity relationship: chunk {chunk_id} -> entity {entity_id}: {e}")
                 else:
-                    logger.warning(f"Could not find chunk_id for chunk_index {chunk_index}. Available chunks: {list(chunk_id_to_index.values())}")
+                    logger.warning(f"Could not find chunk_id for chunk_key '{chunk_key}' (parsed as chunk_index {chunk_index}). Available chunks: {list(chunk_id_to_index.values())}")
 
             logger.info(f"Created {chunk_entity_relationships_created} chunk-entity relationships")
 

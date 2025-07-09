@@ -129,16 +129,16 @@ Entities and relations no longer include document-specific attributes like:
 
 This makes the knowledge graph more generic and reusable across different contexts.
 
-### Enhanced Relation Types
+### Dynamic Relation Types
 
-New relation types have been added to replace generic `CUSTOM` relations:
-- `PLAYED_ROLE`: Person -> Role/Character
-- `PORTRAYED`: Person -> Character/Role  
-- `PRACTICES`: Person -> Activity/Belief
-- `ENGAGED_IN`: Person -> Activity
-- `STUDIED`: Person -> Subject/Field
+The system uses LLM-based dynamic relation type detection to automatically generate appropriate relation types based on textual context. Common relation types that may be extracted include:
+- Employment relations: `WORKS_FOR`, `EMPLOYED_BY`
+- Organizational relations: `FOUNDED`, `OWNS`, `PART_OF`
+- Location relations: `LOCATED_IN`, `BASED_IN`
+- Technical relations: `USES`, `DEVELOPS`, `IMPLEMENTS`
+- General relations: `RELATED_TO`, `ASSOCIATED_WITH`
 
-The system now uses context-aware detection to automatically suggest appropriate relation types based on textual context.
+All relation types are determined dynamically by the LLM based on the content being processed.
 
 ### Intention-Based Extraction
 

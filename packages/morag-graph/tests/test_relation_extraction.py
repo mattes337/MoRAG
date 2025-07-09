@@ -96,8 +96,8 @@ async def test_relation_extraction_basic(relation_extractor: RelationExtractor, 
     relation_types = {relation.type for relation in relations}
 
     # Core expected types
-    assert RelationType.WORKS_FOR in relation_types, "Expected WORKS_FOR relation not found"
-    assert RelationType.LOCATED_IN in relation_types, "Expected LOCATED_IN relation not found"
+    assert "WORKS_FOR" in relation_types, "Expected WORKS_FOR relation not found"
+    assert "LOCATED_IN" in relation_types, "Expected LOCATED_IN relation not found"
 
     # Accept any founding-related relation (FOUNDED, FOUNDED_BY, FOUNDED_IN)
     founding_types = {"FOUNDED", "FOUNDED_BY", "FOUNDED_IN"}
@@ -129,8 +129,8 @@ async def test_relation_extraction_with_context(relation_extractor: RelationExtr
     assert len(relations) > 0, "No relations were extracted"
     
     # Check that employment and founding relations are present
-    employment_relations = [r for r in relations if r.type == RelationType.WORKS_FOR]
-    founding_relations = [r for r in relations if r.type == RelationType.FOUNDED]
+    employment_relations = [r for r in relations if r.type == "WORKS_FOR"]
+    founding_relations = [r for r in relations if r.type == "FOUNDED"]
     
     assert len(employment_relations) > 0, "No employment relations found"
     assert len(founding_relations) > 0, "No founding relations found"
@@ -138,12 +138,12 @@ async def test_relation_extraction_with_context(relation_extractor: RelationExtr
     # Check for specific relationships
     # Find Tim Cook and Apple entities
     tim_cook = next((e for e in entities if "tim cook" in e.name.lower()), None)
-    apple = next((e for e in entities if "apple" in e.name.lower() and e.type == EntityType.ORGANIZATION), None)
+    apple = next((e for e in entities if "apple" in e.name.lower() and e.type == "ORGANIZATION"), None)
     
     if tim_cook and apple:
         # Check if there's a WORKS_FOR relation between Tim Cook and Apple
         tim_cook_works_for_apple = any(
-            r.source_entity_id == tim_cook.id and r.target_entity_id == apple.id and r.type == RelationType.WORKS_FOR
+            r.source_entity_id == tim_cook.id and r.target_entity_id == apple.id and r.type == "WORKS_FOR"
             for r in relations
         )
         assert tim_cook_works_for_apple, "Expected WORKS_FOR relation between Tim Cook and Apple not found"
@@ -181,7 +181,7 @@ async def test_relation_extraction_specific_pairs(relation_extractor: RelationEx
     entities = sample_entities[0]
     
     # Find specific entities
-    apple = next((e for e in entities if "apple" in e.name.lower() and e.type == EntityType.ORGANIZATION), None)
+    apple = next((e for e in entities if "apple" in e.name.lower() and e.type == "ORGANIZATION"), None)
     steve_jobs = next((e for e in entities if "steve jobs" in e.name.lower()), None)
     tim_cook = next((e for e in entities if "tim cook" in e.name.lower()), None)
     
@@ -217,7 +217,7 @@ async def test_relation_extraction_specific_pairs(relation_extractor: RelationEx
     
     tim_cook_works_for_apple = any(
         ((r.source_entity_id == tim_cook.id and r.target_entity_id == apple.id) or
-         (r.source_entity_id == apple.id and r.target_entity_id == tim_cook.id)) and r.type == RelationType.WORKS_FOR
+         (r.source_entity_id == apple.id and r.target_entity_id == tim_cook.id)) and r.type == "WORKS_FOR"
         for r in relations
     )
     
@@ -331,7 +331,7 @@ def test_relation_neo4j_conversion():
         id="test-relation-1",
         source_entity_id="entity-1",
         target_entity_id="entity-2",
-        type=RelationType.WORKS_FOR,
+        type="WORKS_FOR",
         attributes={"role": "CEO", "since": 2011},
         # source_doc_id removed for document-agnostic extraction
         confidence=0.95,
@@ -399,7 +399,7 @@ async def test_graph_construction(entity_extractor: EntityExtractor, relation_ex
     
     # Test graph queries
     # Find Apple entity
-    apple = next((e for e in entities if "apple" in e.name.lower() and e.type == EntityType.ORGANIZATION), None)
+    apple = next((e for e in entities if "apple" in e.name.lower() and e.type == "ORGANIZATION"), None)
     if apple:
         # Get relations involving Apple
         apple_relations = graph.get_entity_relations(apple.id)
