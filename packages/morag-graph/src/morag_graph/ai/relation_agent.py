@@ -345,57 +345,6 @@ Avoid extracting:
 
         # Convert to uppercase and clean whitespace
         normalized = relation_type.upper().strip()
-
-        # Convert common plural forms to singular
-        plural_to_singular = {
-            'AFFECTS': 'AFFECTS',  # AFFECTS is already correct (3rd person singular)
-            'CAUSES': 'CAUSES',    # CAUSES is already correct (3rd person singular)
-            'PRODUCES': 'PRODUCES', # PRODUCES is already correct (3rd person singular)
-            'REDUCES': 'REDUCES',   # REDUCES is already correct (3rd person singular)
-            'REQUIRES': 'REQUIRES', # REQUIRES is already correct (3rd person singular)
-            'TREATS': 'TREATS',     # TREATS is already correct (3rd person singular)
-            'USES': 'USES',         # USES is already correct (3rd person singular)
-            'HELPS': 'HELPS',       # HELPS is already correct (3rd person singular)
-            'IMPROVES': 'IMPROVES', # IMPROVES is already correct (3rd person singular)
-            'INFLUENCES': 'INFLUENCES', # INFLUENCES is already correct (3rd person singular)
-            'DISCUSSES': 'DISCUSSES',   # DISCUSSES is already correct (3rd person singular)
-            'CONNECTS': 'CONNECTS',     # CONNECTS is already correct (3rd person singular)
-            'CONTAINS': 'CONTAINS',     # CONTAINS is already correct (3rd person singular)
-            'ASSOCIATES': 'ASSOCIATES', # ASSOCIATES is already correct (3rd person singular)
-
-            # Handle incorrect plural/base forms
-            'AFFECT': 'AFFECTS',
-            'CAUSE': 'CAUSES',
-            'PRODUCE': 'PRODUCES',
-            'REDUCE': 'REDUCES',
-            'REQUIRE': 'REQUIRES',
-            'TREAT': 'TREATS',
-            'USE': 'USES',
-            'HELP': 'HELPS',
-            'IMPROVE': 'IMPROVES',
-            'INFLUENCE': 'INFLUENCES',
-            'DISCUSS': 'DISCUSSES',
-            'CONNECT': 'CONNECTS',
-            'CONTAIN': 'CONTAINS',
-            'ASSOCIATE': 'ASSOCIATES',
-            'ASSOCIATED': 'ASSOCIATES',  # Past participle form
-
-            # Handle common variations
-            'HAS': 'HAS',
-            'HAVE': 'HAS',
-            'IS': 'IS',
-            'LOCATED': 'LOCATES',
-            'SUFFERS': 'SUFFERS',
-            'ADVISES': 'ADVISES',
-            'FOCUSES': 'FOCUSES',
-            'MODERATES': 'MODERATES',
-            'PARTICIPATES': 'PARTICIPATES',
-        }
-
-        # Apply singular form conversion
-        if normalized in plural_to_singular:
-            normalized = plural_to_singular[normalized]
-
         # Sanitize for valid Neo4j relationship type (no dots, spaces, special chars)
         normalized = normalized.replace('.', '_').replace(' ', '_').replace('-', '_')
         normalized = normalized.replace('(', '').replace(')', '').replace('/', '_')
