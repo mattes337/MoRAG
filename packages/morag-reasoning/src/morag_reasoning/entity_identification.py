@@ -1,0 +1,216 @@
+"""Entity identification service for intelligent retrieval."""
+
+import structlog
+from typing import List, Optional, Dict, Any
+from pydantic_ai import Agent
+from pydantic import BaseModel, Field
+
+from morag_reasoning.llm import LLMClient
+from morag_graph.storage.neo4j_storage import Neo4jStorage
+
+
+class IdentifiedEntity(BaseModel):
+    """An entity identified from a user query."""
+    name: str = Field(..., description="Entity name")
+    entity_type: str = Field(..., description="Entity type")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
+    context: str = Field(..., description="Context in which entity appears")
+    graph_entity_id: Optional[str] = Field(None, description="Linked graph entity ID if found")
+
+
+class EntityIdentificationResult(BaseModel):
+    """Result of entity identification from query."""
+    entities: List[IdentifiedEntity] = Field(..., description="Identified entities")
+
+
+class EntityIdentificationService:
+    """Service for identifying entities from user queries."""
+    
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        graph_storage: Optional[Neo4jStorage] = None,
+        min_confidence: float = 0.5,
+        max_entities: int = 10
+    ):
+        """Initialize the entity identification service.
+        
+        Args:
+            llm_client: LLM client for entity extraction
+            graph_storage: Neo4j storage for entity linking
+            min_confidence: Minimum confidence threshold
+            max_entities: Maximum entities to extract
+        """
+        self.llm_client = llm_client
+        self.graph_storage = graph_storage
+        self.min_confidence = min_confidence
+        self.max_entities = max_entities
+        self.logger = structlog.get_logger(__name__)
+        
+        # Create PydanticAI agent for entity identification
+        self.agent = Agent(
+            model=llm_client.get_model(),
+            result_type=EntityIdentificationResult,
+            system_prompt=self._get_system_prompt()
+        )
+    
+    def _get_system_prompt(self) -> str:
+        """Get the system prompt for entity identification."""
+        return """You are an expert entity identification system. Your task is to identify key entities from user queries that would be useful for graph-based information retrieval.
+
+Guidelines:
+1. Focus on entities that are likely to exist in a knowledge graph (people, organizations, concepts, technologies, locations, etc.)
+2. Prioritize entities that are central to answering the user's question
+3. Assign appropriate entity types (PERSON, ORGANIZATION, CONCEPT, TECHNOLOGY, LOCATION, EVENT, etc.)
+4. Provide confidence scores based on how important each entity is for the query
+5. Include context about how the entity relates to the query
+6. Limit to the most relevant entities (typically 3-8 entities)
+
+Entity Types to Consider:
+- PERSON: Individual people, authors, researchers, leaders
+- ORGANIZATION: Companies, institutions, governments, groups
+- CONCEPT: Abstract ideas, theories, methodologies, principles
+- TECHNOLOGY: Software, hardware, tools, platforms, programming languages
+- LOCATION: Countries, cities, regions, specific places
+- EVENT: Historical events, conferences, incidents, periods
+- PRODUCT: Specific products, services, applications
+- FIELD: Academic or professional domains, industries
+- DOCUMENT: Specific papers, books, standards, specifications
+
+Return only the most relevant entities that would help retrieve information to answer the user's query."""
+    
+    async def identify_entities(self, query: str) -> List[IdentifiedEntity]:
+        """Identify entities from a user query.
+        
+        Args:
+            query: User query text
+            
+        Returns:
+            List of identified entities
+        """
+        if not query or not query.strip():
+            return []
+        
+        self.logger.info("Starting entity identification", query=query)
+        
+        try:
+            # Use PydanticAI agent to identify entities
+            prompt = f"""Identify the key entities from this user query that would be useful for graph-based information retrieval:
+
+Query: "{query}"
+
+Focus on entities that are likely to exist in a knowledge graph and are essential for answering the user's question."""
+            
+            result = await self.agent.run(prompt)
+            entities = result.data.entities
+            
+            # Filter by confidence and limit count
+            filtered_entities = [
+                entity for entity in entities 
+                if entity.confidence >= self.min_confidence
+            ]
+            
+            # Sort by confidence and limit
+            filtered_entities.sort(key=lambda x: x.confidence, reverse=True)
+            filtered_entities = filtered_entities[:self.max_entities]
+            
+            # Link to graph entities if graph storage is available
+            if self.graph_storage:
+                await self._link_to_graph_entities(filtered_entities)
+            
+            self.logger.info(
+                "Entity identification completed",
+                total_entities=len(filtered_entities),
+                query=query
+            )
+            
+            return filtered_entities
+            
+        except Exception as e:
+            self.logger.error(
+                "Entity identification failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                query=query
+            )
+            raise
+    
+    async def _link_to_graph_entities(self, entities: List[IdentifiedEntity]) -> None:
+        """Link identified entities to existing graph entities.
+        
+        Args:
+            entities: List of identified entities to link
+        """
+        if not self.graph_storage:
+            return
+        
+        for entity in entities:
+            try:
+                # Search for similar entities in the graph
+                candidates = await self.graph_storage.search_entities(
+                    entity.name,
+                    entity_type=entity.entity_type,
+                    limit=5
+                )
+                
+                if candidates:
+                    # Find best match based on name similarity
+                    best_match = None
+                    best_score = 0.0
+                    
+                    for candidate in candidates:
+                        # Simple similarity scoring
+                        similarity = self._calculate_name_similarity(
+                            entity.name.lower(),
+                            candidate.name.lower()
+                        )
+                        
+                        if similarity > best_score and similarity >= 0.8:
+                            best_score = similarity
+                            best_match = candidate
+                    
+                    if best_match:
+                        entity.graph_entity_id = best_match.id
+                        self.logger.debug(
+                            "Linked entity to graph",
+                            entity_name=entity.name,
+                            graph_entity_id=best_match.id,
+                            similarity=best_score
+                        )
+                
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to link entity to graph",
+                    entity_name=entity.name,
+                    error=str(e)
+                )
+    
+    def _calculate_name_similarity(self, name1: str, name2: str) -> float:
+        """Calculate similarity between two entity names.
+        
+        Args:
+            name1: First entity name
+            name2: Second entity name
+            
+        Returns:
+            Similarity score between 0 and 1
+        """
+        # Simple similarity calculation
+        if name1 == name2:
+            return 1.0
+        
+        # Check if one is contained in the other
+        if name1 in name2 or name2 in name1:
+            return 0.9
+        
+        # Check word overlap
+        words1 = set(name1.split())
+        words2 = set(name2.split())
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+        
+        return len(intersection) / len(union) if union else 0.0

@@ -27,6 +27,8 @@ from .enhanced_query import (
     GraphAnalyticsRequest,
 )
 
+
+
 # Legacy models temporarily removed - will be recreated
 # from .legacy import (
 #     LegacyQueryRequest,

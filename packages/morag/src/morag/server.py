@@ -1204,6 +1204,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     except ImportError as e:
         logger.warning("Enhanced query endpoints not available", error=str(e))
 
+    # Include intelligent retrieval router (v2 API)
+    try:
+        from morag.endpoints.intelligent_retrieval import router as intelligent_retrieval_router
+        app.include_router(intelligent_retrieval_router)
+        logger.info("Intelligent retrieval API endpoints loaded")
+    except ImportError as e:
+        logger.warning("Intelligent retrieval endpoints not available", error=str(e))
+
     # Legacy router temporarily disabled
     # try:
     #     from morag.endpoints import legacy_router
