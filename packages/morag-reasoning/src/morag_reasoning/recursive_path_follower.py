@@ -27,10 +27,10 @@ class RecursivePathFollower:
         self,
         llm_client: LLMClient,
         graph_storage: Neo4jStorage,
-        max_iterations: int = 5,
-        max_paths_per_entity: int = 5,
+        max_iterations: int = 8,
+        max_paths_per_entity: int = 10,
         max_depth: int = 3,
-        min_relevance_threshold: float = 0.3
+        min_relevance_threshold: float = 0.2
     ):
         """Initialize the recursive path follower.
         
@@ -229,17 +229,18 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                 
                 # Convert neighbors to paths
                 for neighbor in neighbors[:self.max_paths_per_entity]:
-                    if neighbor.id in explored_entities:
+                    # Check if neighbor name is already explored (use names for consistency)
+                    if neighbor.name in explored_entities:
                         continue
-                    
+
                     # Create a simple path (could be enhanced with actual path finding)
                     path = EntityPath(
                         entity_id=entity.id,
                         entity_name=entity.name,
-                        path_entities=[entity.id, neighbor.id],
+                        path_entities=[entity.name, neighbor.name],  # Use names for consistency
                         path_relations=["RELATED_TO"],  # Simplified - could get actual relation types
                         depth=1,
-                        relevance_score=0.5,  # Could be enhanced with actual scoring
+                        relevance_score=0.7,  # Higher default relevance to encourage exploration
                         llm_decision=PathDecision.FOLLOW,  # Will be updated by LLM
                         decision_reasoning=""  # Will be updated by LLM
                     )
@@ -337,12 +338,15 @@ AVAILABLE PATHS:
 {chr(10).join(paths_info) if paths_info else 'No paths available'}
 
 DECISION REQUIRED:
-1. Should exploration continue? Consider if we have sufficient information or if more exploration would be beneficial.
-2. Which specific paths (by index) should be followed? Select paths most likely to provide relevant information.
+1. Should exploration continue? Generally continue unless you have very comprehensive coverage or are at max iterations.
+2. Which specific paths (by index) should be followed? Be generous - select multiple paths that could provide relevant information.
 3. Provide clear reasoning for your decision.
 
 Consider:
-- Relevance to answering the query
-- Potential for discovering new information
-- Efficiency of exploration
-- Current coverage of the topic"""
+- Relevance to answering the query comprehensively
+- Potential for discovering new information and perspectives
+- Value of exploring related concepts and entities
+- Aim for thorough coverage rather than minimal exploration
+- Early iterations should be more exploratory, later iterations more selective
+
+BIAS TOWARD EXPLORATION: Unless you have very strong reasons to stop, continue exploring to gather comprehensive information."""

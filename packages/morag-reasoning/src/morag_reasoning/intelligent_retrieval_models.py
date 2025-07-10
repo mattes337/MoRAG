@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
 
+# Import existing database configuration models
+from morag_graph.models.database_config import DatabaseServerConfig, DatabaseType
+
 
 class PathDecision(str, Enum):
     """LLM decisions for path following."""
@@ -71,6 +74,10 @@ class IntelligentRetrievalRequest(BaseModel):
     neo4j_database: Optional[str] = Field(None, description="Neo4j database name")
     qdrant_collection: Optional[str] = Field(None, description="Qdrant collection name")
     language: Optional[str] = Field(None, description="Language for processing")
+
+    # Custom database server configurations (optional - overrides server defaults)
+    neo4j_server: Optional[DatabaseServerConfig] = Field(None, description="Custom Neo4j server configuration")
+    qdrant_server: Optional[DatabaseServerConfig] = Field(None, description="Custom Qdrant server configuration")
 
 
 class IntelligentRetrievalResponse(BaseModel):

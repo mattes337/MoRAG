@@ -14,6 +14,19 @@ class ExtractedFacts(BaseModel):
     facts: List[KeyFact] = Field(..., description="Extracted key facts")
 
 
+class FactSourceMapping(BaseModel):
+    """Mapping of facts to their supporting chunks."""
+    fact_index: int = Field(..., description="Index of the fact in the facts list")
+    supporting_chunk_indices: List[int] = Field(..., description="Indices of chunks that support this fact")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the source mapping")
+    reasoning: str = Field(..., description="Reasoning for why these chunks support the fact")
+
+
+class SourceMappingResult(BaseModel):
+    """Result of source mapping analysis."""
+    mappings: List[FactSourceMapping] = Field(..., description="Fact to source mappings")
+
+
 class FactExtractionService:
     """Service for extracting key facts from retrieved chunks."""
     
@@ -40,6 +53,13 @@ class FactExtractionService:
             model=llm_client.get_model(),
             result_type=ExtractedFacts,
             system_prompt=self._get_system_prompt()
+        )
+
+        # Create PydanticAI agent for source mapping
+        self.source_mapping_agent = Agent(
+            model=llm_client.get_model(),
+            result_type=SourceMappingResult,
+            system_prompt=self._get_source_mapping_prompt()
         )
     
     def _get_system_prompt(self) -> str:
@@ -132,9 +152,13 @@ Return only the most relevant and well-supported facts."""
             enhanced_facts = []
             for fact in extracted_facts:
                 if fact.confidence >= confidence_threshold:
-                    # Add source information
-                    fact.sources = self._create_source_info(fact, chunk_metadata)
                     enhanced_facts.append(fact)
+
+            # Map facts to their supporting sources using LLM
+            if enhanced_facts:
+                enhanced_facts = await self._map_facts_to_sources(
+                    enhanced_facts, chunk_metadata, query
+                )
             
             # Sort by relevance and confidence, then limit
             enhanced_facts.sort(
@@ -194,7 +218,113 @@ Focus on facts that are:
 - Self-contained and clear
 
 Limit to the most important facts (typically 5-15 facts)."""
-    
+
+    def _get_source_mapping_prompt(self) -> str:
+        """Get the system prompt for source mapping."""
+        return """You are an expert at analyzing which text chunks support specific facts.
+
+Your task is to determine which chunks from the provided text support each extracted fact.
+
+For each fact, analyze:
+1. Which chunks contain information that directly supports or validates the fact
+2. Which chunks provide context or background that strengthens the fact
+3. The confidence level of the mapping (how certain you are that the chunk supports the fact)
+
+Guidelines:
+- A chunk supports a fact if it contains direct evidence, data, or statements that validate the fact
+- A chunk may partially support a fact if it provides relevant context or background
+- Be conservative - only map chunks that genuinely support the fact
+- Provide clear reasoning for each mapping
+- A fact may be supported by multiple chunks
+- Some facts may not be supported by any specific chunk (if they are inferred or synthesized)
+
+Return mappings with high confidence only for clear, direct support."""
+
+    async def _map_facts_to_sources(
+        self,
+        facts: List[KeyFact],
+        chunk_metadata: List[Dict[str, Any]],
+        query: str
+    ) -> List[KeyFact]:
+        """Map facts to their supporting source chunks using LLM analysis.
+
+        Args:
+            facts: List of extracted facts
+            chunk_metadata: Metadata for all chunks
+            query: Original user query
+
+        Returns:
+            List of facts with proper source mappings
+        """
+        if not facts or not chunk_metadata:
+            return facts
+
+        try:
+            # Create prompt for source mapping
+            facts_text = "\n".join([
+                f"Fact {i}: {fact.fact} (Type: {fact.fact_type}, Confidence: {fact.confidence:.2f})"
+                for i, fact in enumerate(facts)
+            ])
+
+            chunks_text = "\n".join([
+                f"Chunk {i}: {chunk.get('content', chunk.get('text', ''))[:500]}..."
+                for i, chunk in enumerate(chunk_metadata)
+            ])
+
+            prompt = f"""Original Query: {query}
+
+EXTRACTED FACTS:
+{facts_text}
+
+AVAILABLE CHUNKS:
+{chunks_text}
+
+Analyze which chunks support each fact. For each fact, identify the chunk indices that provide evidence or support for that fact."""
+
+            # Get source mappings from LLM
+            result = await self.source_mapping_agent.run(prompt)
+            mappings = result.data.mappings
+
+            # Apply mappings to facts
+            for mapping in mappings:
+                if 0 <= mapping.fact_index < len(facts):
+                    fact = facts[mapping.fact_index]
+                    supporting_sources = []
+
+                    for chunk_idx in mapping.supporting_chunk_indices:
+                        if 0 <= chunk_idx < len(chunk_metadata):
+                            chunk = chunk_metadata[chunk_idx]
+                            source = SourceInfo(
+                                document_id=chunk.get('document_id', f"doc_{chunk_idx}"),
+                                chunk_id=chunk.get('chunk_id', chunk.get('id', f"chunk_{chunk_idx}")),
+                                document_name=chunk.get('document_name', chunk.get('source', f"Document {chunk_idx+1}")),
+                                chunk_text=chunk.get('content', chunk.get('text', '')),
+                                relevance_score=chunk.get('score', chunk.get('relevance_score', 0.5)),
+                                page_number=chunk.get('page_number'),
+                                section=chunk.get('section'),
+                                metadata=chunk.get('metadata', {})
+                            )
+                            supporting_sources.append(source)
+
+                    fact.sources = supporting_sources
+
+            # For facts without mapped sources, provide fallback
+            for fact in facts:
+                if not hasattr(fact, 'sources') or not fact.sources:
+                    fact.sources = []
+
+            return facts
+
+        except Exception as e:
+            self.logger.warning(
+                "Source mapping failed, falling back to basic source info",
+                error=str(e)
+            )
+            # Fallback to original method
+            for fact in facts:
+                fact.sources = self._create_source_info(fact, chunk_metadata)
+            return facts
+
     def _create_source_info(
         self,
         fact: KeyFact,

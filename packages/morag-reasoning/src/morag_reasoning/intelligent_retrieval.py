@@ -54,7 +54,9 @@ class IntelligentRetrievalService:
         # Initialize sub-services (will be updated with language in retrieve_intelligently)
         self.entity_service = EntityIdentificationService(
             llm_client=llm_client,
-            graph_storage=neo4j_storage
+            graph_storage=neo4j_storage,
+            min_confidence=0.2,
+            max_entities=50
         )
         self.base_llm_client = llm_client
         self.base_neo4j_storage = neo4j_storage
@@ -103,11 +105,13 @@ class IntelligentRetrievalService:
         )
         
         try:
-            # Initialize entity service with language parameter
+            # Initialize entity service with language parameter and increased limits
             if not self.entity_service or (hasattr(self.entity_service, 'language') and self.entity_service.language != request.language):
                 self.entity_service = EntityIdentificationService(
                     llm_client=self.base_llm_client,
                     graph_storage=self.base_neo4j_storage,
+                    min_confidence=0.2,  # Lower threshold for more entities
+                    max_entities=request.max_entities_per_iteration * 3,  # Allow more initial entities
                     language=request.language
                 )
 

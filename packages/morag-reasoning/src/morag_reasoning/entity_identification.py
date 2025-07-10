@@ -30,8 +30,8 @@ class EntityIdentificationService:
         self,
         llm_client: LLMClient,
         graph_storage: Optional[Neo4jStorage] = None,
-        min_confidence: float = 0.5,
-        max_entities: int = 10,
+        min_confidence: float = 0.3,
+        max_entities: int = 50,
         language: Optional[str] = None
     ):
         """Initialize the entity identification service.

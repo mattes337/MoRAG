@@ -11,65 +11,96 @@ from morag_reasoning import (
 from morag.dependencies import get_llm_client
 from morag.database_factory import (
     get_default_neo4j_storage, get_default_qdrant_storage,
-    get_neo4j_storages, get_qdrant_storages
+    get_neo4j_storages, get_qdrant_storages, DatabaseConnectionFactory
 )
+from morag_graph import DatabaseType
 
 router = APIRouter(prefix="/api/v2", tags=["intelligent-retrieval"])
 logger = structlog.get_logger(__name__)
 
 
 def get_intelligent_retrieval_service(
-    neo4j_database: Optional[str] = None,
-    qdrant_collection: Optional[str] = None
+    request: IntelligentRetrievalRequest
 ) -> IntelligentRetrievalService:
     """Get intelligent retrieval service with specified databases.
-    
+
     Args:
-        neo4j_database: Neo4j database name (optional)
-        qdrant_collection: Qdrant collection name (optional)
-        
+        request: Intelligent retrieval request with database configurations
+
     Returns:
         Configured intelligent retrieval service
     """
     # Get LLM client
     llm_client = get_llm_client()
-    
+
     # Get Neo4j storage
-    if neo4j_database:
+    if request.neo4j_server:
+        # Use custom Neo4j server configuration
+        if request.neo4j_server.type != DatabaseType.NEO4J:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid database type for Neo4j server: {request.neo4j_server.type}"
+            )
+        try:
+            neo4j_storage = DatabaseConnectionFactory.create_neo4j_storage(request.neo4j_server)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to create Neo4j connection: {str(e)}"
+            )
+    elif request.neo4j_database:
+        # Use pre-configured database by name
         neo4j_storages = get_neo4j_storages()
-        neo4j_storage = neo4j_storages.get(neo4j_database)
+        neo4j_storage = neo4j_storages.get(request.neo4j_database)
         if not neo4j_storage:
             raise HTTPException(
                 status_code=400,
-                detail=f"Neo4j database '{neo4j_database}' not found"
+                detail=f"Neo4j database '{request.neo4j_database}' not found"
             )
     else:
+        # Use default configuration
         neo4j_storage = get_default_neo4j_storage()
-    
+
     # Get Qdrant storage
-    if qdrant_collection:
+    if request.qdrant_server:
+        # Use custom Qdrant server configuration
+        if request.qdrant_server.type != DatabaseType.QDRANT:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid database type for Qdrant server: {request.qdrant_server.type}"
+            )
+        try:
+            qdrant_storage = DatabaseConnectionFactory.create_qdrant_storage(request.qdrant_server)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to create Qdrant connection: {str(e)}"
+            )
+    elif request.qdrant_collection:
+        # Use pre-configured collection by name
         qdrant_storages = get_qdrant_storages()
-        qdrant_storage = qdrant_storages.get(qdrant_collection)
+        qdrant_storage = qdrant_storages.get(request.qdrant_collection)
         if not qdrant_storage:
             raise HTTPException(
                 status_code=400,
-                detail=f"Qdrant collection '{qdrant_collection}' not found"
+                detail=f"Qdrant collection '{request.qdrant_collection}' not found"
             )
     else:
+        # Use default configuration
         qdrant_storage = get_default_qdrant_storage()
-    
+
     if not neo4j_storage:
         raise HTTPException(
             status_code=503,
             detail="Neo4j storage not available"
         )
-    
+
     if not qdrant_storage:
         raise HTTPException(
             status_code=503,
             detail="Qdrant storage not available"
         )
-    
+
     return IntelligentRetrievalService(
         llm_client=llm_client,
         neo4j_storage=neo4j_storage,
@@ -98,10 +129,7 @@ async def intelligent_retrieval(
         )
         
         # Get service with specified databases
-        service = get_intelligent_retrieval_service(
-            neo4j_database=request.neo4j_database,
-            qdrant_collection=request.qdrant_collection
-        )
+        service = get_intelligent_retrieval_service(request)
         
         # Perform intelligent retrieval
         response = await service.retrieve_intelligently(request)
@@ -173,7 +201,8 @@ async def get_endpoint_info():
             "Recursive graph path following with LLM decisions",
             "Key fact extraction with source tracking",
             "Configurable iteration limits and thresholds",
-            "Support for multiple Neo4j databases and Qdrant collections"
+            "Support for multiple Neo4j databases and Qdrant collections",
+            "Custom database server connections with full configuration support"
         ],
         "parameters": {
             "query": "User query/prompt (required)",
@@ -185,7 +214,9 @@ async def get_endpoint_info():
             "include_debug_info": "Include debug information (default: false)",
             "neo4j_database": "Neo4j database name (optional)",
             "qdrant_collection": "Qdrant collection name (optional)",
-            "language": "Language for processing (optional)"
+            "language": "Language for processing (optional)",
+            "neo4j_server": "Custom Neo4j server configuration (optional)",
+            "qdrant_server": "Custom Qdrant server configuration (optional)"
         },
         "response_format": {
             "query_id": "Unique query identifier",
