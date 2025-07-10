@@ -11,6 +11,7 @@ from morag_reasoning import (
 from morag.dependencies import get_llm_client
 from morag.database_factory import (
     get_default_neo4j_storage, get_default_qdrant_storage,
+    get_connected_default_neo4j_storage, get_connected_default_qdrant_storage,
     get_neo4j_storages, get_qdrant_storages, DatabaseConnectionFactory
 )
 from morag_graph import DatabaseType
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api/v2", tags=["intelligent-retrieval"])
 logger = structlog.get_logger(__name__)
 
 
-def get_intelligent_retrieval_service(
+async def get_intelligent_retrieval_service(
     request: IntelligentRetrievalRequest
 ) -> IntelligentRetrievalService:
     """Get intelligent retrieval service with specified databases.
@@ -42,7 +43,7 @@ def get_intelligent_retrieval_service(
                 detail=f"Invalid database type for Neo4j server: {request.neo4j_server.type}"
             )
         try:
-            neo4j_storage = DatabaseConnectionFactory.create_neo4j_storage(request.neo4j_server)
+            neo4j_storage = await DatabaseConnectionFactory.create_neo4j_storage(request.neo4j_server)
         except Exception as e:
             raise HTTPException(
                 status_code=400,
@@ -59,7 +60,7 @@ def get_intelligent_retrieval_service(
             )
     else:
         # Use default configuration
-        neo4j_storage = get_default_neo4j_storage()
+        neo4j_storage = await get_connected_default_neo4j_storage()
 
     # Get Qdrant storage
     if request.qdrant_server:
@@ -70,7 +71,7 @@ def get_intelligent_retrieval_service(
                 detail=f"Invalid database type for Qdrant server: {request.qdrant_server.type}"
             )
         try:
-            qdrant_storage = DatabaseConnectionFactory.create_qdrant_storage(request.qdrant_server)
+            qdrant_storage = await DatabaseConnectionFactory.create_qdrant_storage(request.qdrant_server)
         except Exception as e:
             raise HTTPException(
                 status_code=400,
@@ -87,7 +88,7 @@ def get_intelligent_retrieval_service(
             )
     else:
         # Use default configuration
-        qdrant_storage = get_default_qdrant_storage()
+        qdrant_storage = await get_connected_default_qdrant_storage()
 
     if not neo4j_storage:
         raise HTTPException(
@@ -129,7 +130,7 @@ async def intelligent_retrieval(
         )
         
         # Get service with specified databases
-        service = get_intelligent_retrieval_service(request)
+        service = await get_intelligent_retrieval_service(request)
         
         # Perform intelligent retrieval
         response = await service.retrieve_intelligently(request)

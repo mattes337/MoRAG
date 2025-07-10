@@ -357,7 +357,7 @@ async def graph_analytics(
         # Handle custom database servers if provided
         neo4j_storages = []
         if request.database_servers:
-            neo4j_storages = get_neo4j_storages(request.database_servers)
+            neo4j_storages = await get_neo4j_storages(request.database_servers)
 
         # Use custom storages or fall back to default
         if neo4j_storages:

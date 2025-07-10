@@ -1,7 +1,7 @@
 """Tests for database server array functionality."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
 
 from morag.database_factory import (
@@ -73,7 +73,7 @@ class TestDatabaseConnectionFactory:
         assert configs == []
     
     @patch('morag.database_factory.Neo4jStorage')
-    def test_create_neo4j_storage(self, mock_neo4j_storage):
+    async def test_create_neo4j_storage(self, mock_neo4j_storage):
         """Test creating Neo4j storage from configuration."""
         config = DatabaseServerConfig(
             type=DatabaseType.NEO4J,
@@ -82,11 +82,16 @@ class TestDatabaseConnectionFactory:
             password="password",
             database_name="test_db"
         )
-        
+
+        # Mock the connect method
+        mock_storage_instance = mock_neo4j_storage.return_value
+        mock_storage_instance.connect = AsyncMock()
+
         factory = DatabaseConnectionFactory()
-        storage = factory.create_neo4j_storage(config)
-        
+        storage = await factory.create_neo4j_storage(config)
+
         mock_neo4j_storage.assert_called_once()
+        mock_storage_instance.connect.assert_called_once()
         assert storage is not None
     
     @patch('morag.database_factory.QdrantStorage')
