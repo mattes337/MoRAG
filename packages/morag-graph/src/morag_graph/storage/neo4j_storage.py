@@ -641,22 +641,22 @@ class Neo4jStorage(BaseStorage):
     
     async def get_chunks_by_entity_id(self, entity_id: EntityId) -> List[str]:
         """Get all chunk IDs where an entity is mentioned.
-        
+
         Args:
             entity_id: Entity ID
-            
+
         Returns:
             List of chunk IDs
         """
         query = """
-        MATCH (e {id: $entity_id})-[:MENTIONED_IN]->(c:DocumentChunk)
+        MATCH (c:DocumentChunk)-[:MENTIONS]->(e {id: $entity_id})
         WHERE e.type IS NOT NULL
         RETURN c.id as chunk_id
         ORDER BY c.chunk_index
         """
-        
+
         result = await self._execute_query(query, {"entity_id": entity_id})
-        
+
         return [record['chunk_id'] for record in result]
     
     async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:

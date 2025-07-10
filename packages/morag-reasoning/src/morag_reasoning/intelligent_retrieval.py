@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Set
 from dataclasses import dataclass
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from morag_reasoning.llm import LLMClient
 from morag_reasoning.intelligent_retrieval_models import (
@@ -39,7 +40,7 @@ class IntelligentRetrievalService:
         qdrant_storage: QdrantStorage
     ):
         """Initialize the intelligent retrieval service.
-        
+
         Args:
             llm_client: LLM client for various AI tasks
             neo4j_storage: Neo4j storage for graph operations
@@ -49,21 +50,35 @@ class IntelligentRetrievalService:
         self.neo4j_storage = neo4j_storage
         self.qdrant_storage = qdrant_storage
         self.logger = structlog.get_logger(__name__)
-        
-        # Initialize sub-services
+
+        # Initialize sub-services (will be updated with language in retrieve_intelligently)
         self.entity_service = EntityIdentificationService(
             llm_client=llm_client,
             graph_storage=neo4j_storage
         )
-        
+        self.base_llm_client = llm_client
+        self.base_neo4j_storage = neo4j_storage
+
         self.path_follower = RecursivePathFollower(
             llm_client=llm_client,
             graph_storage=neo4j_storage
         )
-        
+
         self.fact_extractor = FactExtractionService(
             llm_client=llm_client
         )
+
+    def _chunk_id_to_point_id(self, chunk_id: str) -> int:
+        """Convert chunk ID to Qdrant point ID using the same logic as ingestion.
+
+        Args:
+            chunk_id: Neo4j chunk ID
+
+        Returns:
+            Qdrant point ID (integer)
+        """
+        # Use the same conversion logic as the ingestion coordinator
+        return abs(hash(chunk_id)) % (2**31)
     
     async def retrieve_intelligently(
         self,
@@ -88,6 +103,14 @@ class IntelligentRetrievalService:
         )
         
         try:
+            # Initialize entity service with language parameter
+            if not self.entity_service or (hasattr(self.entity_service, 'language') and self.entity_service.language != request.language):
+                self.entity_service = EntityIdentificationService(
+                    llm_client=self.base_llm_client,
+                    graph_storage=self.base_neo4j_storage,
+                    language=request.language
+                )
+
             # Step 1: Identify entities from the query
             self.logger.info("Step 1: Identifying entities from query")
             identified_entities = await self.entity_service.identify_entities(request.query)
@@ -236,29 +259,62 @@ class IntelligentRetrievalService:
                     
                     for chunk_id in chunk_ids:
                         try:
-                            # Get the actual chunk content from Qdrant using retrieve method
-                            points = await self.qdrant_storage.client.retrieve(
-                                collection_name=self.qdrant_storage.config.collection_name,
-                                ids=[chunk_id],
-                                with_payload=True,
-                                with_vectors=False
-                            )
-                            
-                            if points:
-                                point = points[0]
-                                payload = point.payload
+                            # First, get the actual chunk content from Neo4j
+                            query = "MATCH (c:DocumentChunk {id: $chunk_id}) RETURN c.text as text, c.document_id as document_id"
+                            neo4j_result = await self.neo4j_storage._execute_query(query, {"chunk_id": chunk_id})
+
+                            if neo4j_result:
+                                chunk_data = neo4j_result[0]
+                                neo4j_content = chunk_data.get('text', '')
+                                neo4j_document_id = chunk_data.get('document_id', '')
+
+                                # Get metadata from Qdrant for additional information
+                                qdrant_metadata = {}
+                                document_name = ''
+                                try:
+                                    scroll_result = await self.qdrant_storage.client.scroll(
+                                        collection_name=self.qdrant_storage.config.collection_name,
+                                        scroll_filter=Filter(
+                                            must=[
+                                                FieldCondition(
+                                                    key="chunk_id",
+                                                    match=MatchValue(value=chunk_id)
+                                                )
+                                            ]
+                                        ),
+                                        limit=1,
+                                        with_payload=True,
+                                        with_vectors=False
+                                    )
+                                    points, _ = scroll_result
+                                    if points:
+                                        qdrant_metadata = points[0].payload
+                                        document_name = qdrant_metadata.get('source_name', qdrant_metadata.get('file_name', ''))
+                                except Exception as e:
+                                    self.logger.warning(
+                                        "Failed to retrieve metadata from Qdrant",
+                                        chunk_id=chunk_id,
+                                        error=str(e)
+                                    )
+
+                                # Use Neo4j content (which has the actual transcript) instead of Qdrant content
                                 chunk = RetrievedChunk(
                                     id=chunk_id,
-                                    content=payload.get('content', payload.get('text', '')),
-                                    document_id=payload.get('document_id', ''),
-                                    document_name=payload.get('document_name', payload.get('source', '')),
+                                    content=neo4j_content,  # Use actual content from Neo4j
+                                    document_id=neo4j_document_id or qdrant_metadata.get('document_id', ''),
+                                    document_name=document_name,
                                     score=1.0,  # High score for entity-linked chunks
-                                    metadata=payload
+                                    metadata=qdrant_metadata
                                 )
                                 all_chunks.append(chunk)
+                            else:
+                                self.logger.warning(
+                                    "Chunk not found in Neo4j",
+                                    chunk_id=chunk_id
+                                )
                         except Exception as e:
                             self.logger.warning(
-                                "Failed to retrieve chunk from Qdrant",
+                                "Failed to retrieve chunk content",
                                 chunk_id=chunk_id,
                                 error=str(e)
                             )

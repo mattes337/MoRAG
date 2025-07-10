@@ -9,6 +9,10 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 import structlog
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the packages to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
@@ -52,15 +56,15 @@ class IntelligentRetrievalTester:
 
     def __init__(
         self,
-        neo4j_uri: str = "bolt://localhost:7687",
-        neo4j_user: str = "neo4j",
-        neo4j_password: str = "password",
-        neo4j_database: str = "neo4j",
-        qdrant_host: str = "localhost",
-        qdrant_port: int = 6333,
-        qdrant_collection: str = "morag_chunks",
+        neo4j_uri: str = None,
+        neo4j_user: str = None,
+        neo4j_password: str = None,
+        neo4j_database: str = None,
+        qdrant_host: str = None,
+        qdrant_port: int = None,
+        qdrant_collection: str = None,
         gemini_api_key: Optional[str] = None,
-        gemini_model: str = "gemini-1.5-flash"
+        gemini_model: str = None
     ):
         """Initialize the tester.
 
@@ -75,15 +79,29 @@ class IntelligentRetrievalTester:
             gemini_api_key: Gemini API key
             gemini_model: Gemini model name
         """
-        self.neo4j_uri = neo4j_uri
-        self.neo4j_user = neo4j_user
-        self.neo4j_password = neo4j_password
-        self.neo4j_database = neo4j_database
-        self.qdrant_host = qdrant_host
-        self.qdrant_port = qdrant_port
-        self.qdrant_collection = qdrant_collection
+        # Use environment variables with fallbacks
+        self.neo4j_uri = neo4j_uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        self.neo4j_user = neo4j_user or os.getenv("NEO4J_USERNAME", "neo4j")
+        self.neo4j_password = neo4j_password or os.getenv("NEO4J_PASSWORD", "password")
+        self.neo4j_database = neo4j_database or os.getenv("NEO4J_DATABASE", "neo4j")
+
+        # Parse Qdrant URL if provided, otherwise use host/port
+        qdrant_url = os.getenv("QDRANT_URL")
+        if qdrant_url and not qdrant_host:
+            # Extract host and port from URL
+            from urllib.parse import urlparse
+            parsed = urlparse(qdrant_url)
+            self.qdrant_host = parsed.hostname
+            self.qdrant_port = parsed.port or (443 if parsed.scheme == "https" else 6333)
+            self.qdrant_use_ssl = parsed.scheme == "https"
+        else:
+            self.qdrant_host = qdrant_host or os.getenv("QDRANT_HOST", "localhost")
+            self.qdrant_port = qdrant_port or int(os.getenv("QDRANT_PORT", "6333"))
+            self.qdrant_use_ssl = False
+
+        self.qdrant_collection = qdrant_collection or os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks")
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
-        self.gemini_model = gemini_model
+        self.gemini_model = gemini_model or os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash")
 
         self.service = None
     
@@ -119,7 +137,9 @@ class IntelligentRetrievalTester:
             qdrant_config = QdrantConfig(
                 host=self.qdrant_host,
                 port=self.qdrant_port,
-                collection_name=self.qdrant_collection
+                collection_name=self.qdrant_collection,
+                api_key=os.getenv("QDRANT_API_KEY"),
+                use_ssl=self.qdrant_use_ssl
             )
             qdrant_storage = QdrantStorage(qdrant_config)
             await qdrant_storage.connect()
@@ -268,7 +288,7 @@ class IntelligentRetrievalTester:
 
             return {
                 "success": True,
-                "data": response.dict()
+                "data": response.model_dump()
             }
 
         except Exception as e:
@@ -352,17 +372,17 @@ async def main():
     parser.add_argument("query", help="Query to test")
 
     # Database configuration
-    parser.add_argument("--neo4j-uri", default="bolt://localhost:7687", help="Neo4j URI")
-    parser.add_argument("--neo4j-user", default="neo4j", help="Neo4j username")
-    parser.add_argument("--neo4j-password", default="password", help="Neo4j password")
-    parser.add_argument("--neo4j-database", default="neo4j", help="Neo4j database")
-    parser.add_argument("--qdrant-host", default="localhost", help="Qdrant host")
-    parser.add_argument("--qdrant-port", type=int, default=6333, help="Qdrant port")
-    parser.add_argument("--qdrant-collection", default="morag_chunks", help="Qdrant collection")
+    parser.add_argument("--neo4j-uri", default=os.getenv("NEO4J_URI", "bolt://localhost:7687"), help="Neo4j URI")
+    parser.add_argument("--neo4j-user", default=os.getenv("NEO4J_USERNAME", "neo4j"), help="Neo4j username")
+    parser.add_argument("--neo4j-password", default=os.getenv("NEO4J_PASSWORD", "password"), help="Neo4j password")
+    parser.add_argument("--neo4j-database", default=os.getenv("NEO4J_DATABASE", "neo4j"), help="Neo4j database")
+    parser.add_argument("--qdrant-host", help="Qdrant host (auto-detected from QDRANT_URL if not specified)")
+    parser.add_argument("--qdrant-port", type=int, help="Qdrant port (auto-detected from QDRANT_URL if not specified)")
+    parser.add_argument("--qdrant-collection", default=os.getenv("MORAG_QDRANT_COLLECTION", "morag_chunks"), help="Qdrant collection")
 
     # LLM configuration
-    parser.add_argument("--gemini-api-key", help="Gemini API key (or set GEMINI_API_KEY env var)")
-    parser.add_argument("--gemini-model", default="gemini-1.5-flash", help="Gemini model")
+    parser.add_argument("--gemini-api-key", default=os.getenv("GEMINI_API_KEY"), help="Gemini API key (or set GEMINI_API_KEY env var)")
+    parser.add_argument("--gemini-model", default=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"), help="Gemini model")
 
     # Retrieval parameters
     parser.add_argument("--max-iterations", type=int, default=3, help="Maximum iterations")
@@ -421,6 +441,30 @@ async def main():
         print(f"   Min relevance threshold: {args.min_relevance}")
         if args.language:
             print(f"   Language: {args.language}")
+        print()
+
+        # Test entity search to debug the issue
+        print("🔍 Testing entity search in database...")
+        try:
+            # Get a sample of entities from the database
+            all_entities = await tester.service.neo4j_storage.get_all_entities()
+            print(f"   Found {len(all_entities)} total entities in database:")
+            # Show a sample of different entity types
+            entity_types = {}
+            for entity in all_entities:
+                if entity.type not in entity_types:
+                    entity_types[entity.type] = []
+                entity_types[entity.type].append(entity)
+
+            # Show up to 2 entities per type, max 5 types
+            shown_count = 0
+            for entity_type, entities in list(entity_types.items())[:5]:
+                for entity in entities[:2]:
+                    if shown_count < 10:  # Limit total shown entities
+                        print(f"     - {entity.name} (type: {entity.type})")
+                        shown_count += 1
+        except Exception as e:
+            print(f"   Error testing entity search: {e}")
         print()
 
         results = await tester.test_intelligent_retrieval(

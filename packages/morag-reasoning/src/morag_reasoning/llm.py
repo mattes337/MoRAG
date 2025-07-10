@@ -65,7 +65,17 @@ class LLMClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.client.aclose()
-    
+
+    def get_model(self) -> str:
+        """Get the model name for PydanticAI compatibility.
+
+        Returns:
+            Model name in PydanticAI format
+        """
+        # PydanticAI expects just the model name for Gemini models
+        # It will automatically detect the provider based on the model name
+        return self.config.model
+
     async def generate(
         self, 
         prompt: str, 

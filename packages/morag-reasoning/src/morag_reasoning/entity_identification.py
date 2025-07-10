@@ -31,22 +31,25 @@ class EntityIdentificationService:
         llm_client: LLMClient,
         graph_storage: Optional[Neo4jStorage] = None,
         min_confidence: float = 0.5,
-        max_entities: int = 10
+        max_entities: int = 10,
+        language: Optional[str] = None
     ):
         """Initialize the entity identification service.
-        
+
         Args:
             llm_client: LLM client for entity extraction
             graph_storage: Neo4j storage for entity linking
             min_confidence: Minimum confidence threshold
             max_entities: Maximum entities to extract
+            language: Language code for processing (e.g., 'en', 'de', 'fr')
         """
         self.llm_client = llm_client
         self.graph_storage = graph_storage
         self.min_confidence = min_confidence
         self.max_entities = max_entities
+        self.language = language
         self.logger = structlog.get_logger(__name__)
-        
+
         # Create PydanticAI agent for entity identification
         self.agent = Agent(
             model=llm_client.get_model(),
@@ -61,10 +64,11 @@ class EntityIdentificationService:
 Guidelines:
 1. Focus on entities that are likely to exist in a knowledge graph (people, organizations, concepts, technologies, locations, etc.)
 2. Prioritize entities that are central to answering the user's question
-3. Assign appropriate entity types (PERSON, ORGANIZATION, CONCEPT, TECHNOLOGY, LOCATION, EVENT, etc.)
-4. Provide confidence scores based on how important each entity is for the query
-5. Include context about how the entity relates to the query
-6. Limit to the most relevant entities (typically 3-8 entities)
+3. Use the same language as the user query for entity names to ensure accurate matching
+4. Assign appropriate entity types using English (PERSON, ORGANIZATION, CONCEPT, TECHNOLOGY, LOCATION, EVENT, etc.)
+5. Provide confidence scores based on how important each entity is for the query
+6. Include context about how the entity relates to the query
+7. Limit to the most relevant entities (typically 3-8 entities)
 
 Entity Types to Consider:
 - PERSON: Individual people, authors, researchers, leaders
@@ -146,14 +150,21 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
         
         for entity in entities:
             try:
-                # Search for similar entities in the graph
+                # Search for similar entities in the graph (without entity type filter for better matching)
                 candidates = await self.graph_storage.search_entities(
                     entity.name,
-                    entity_type=entity.entity_type,
-                    limit=5
+                    entity_type=None,  # Don't filter by type to allow cross-type matching
+                    limit=10  # Get more candidates for better matching
                 )
                 
                 if candidates:
+                    # Debug: Log candidates found
+                    self.logger.debug(
+                        "Entity linking candidates found",
+                        entity_name=entity.name,
+                        candidates=[f"{c.name} ({c.type})" for c in candidates]
+                    )
+
                     # Find best match based on name similarity
                     best_match = None
                     best_score = 0.0
@@ -164,8 +175,17 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
                             entity.name.lower(),
                             candidate.name.lower()
                         )
-                        
-                        if similarity > best_score and similarity >= 0.8:
+
+                        # Debug logging for entity linking
+                        self.logger.debug(
+                            "Entity similarity check",
+                            entity_name=entity.name,
+                            candidate_name=candidate.name,
+                            similarity=similarity,
+                            threshold=0.7
+                        )
+
+                        if similarity > best_score and similarity >= 0.7:  # Lower threshold for cross-language matching
                             best_score = similarity
                             best_match = candidate
                     
@@ -187,30 +207,30 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
     
     def _calculate_name_similarity(self, name1: str, name2: str) -> float:
         """Calculate similarity between two entity names.
-        
+
         Args:
             name1: First entity name
             name2: Second entity name
-            
+
         Returns:
             Similarity score between 0 and 1
         """
         # Simple similarity calculation
         if name1 == name2:
             return 1.0
-        
+
         # Check if one is contained in the other
         if name1 in name2 or name2 in name1:
             return 0.9
-        
+
         # Check word overlap
         words1 = set(name1.split())
         words2 = set(name2.split())
-        
+
         if not words1 or not words2:
             return 0.0
-        
+
         intersection = words1.intersection(words2)
         union = words1.union(words2)
-        
+
         return len(intersection) / len(union) if union else 0.0
