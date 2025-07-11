@@ -25,6 +25,16 @@ from .entity_identification import EntityIdentificationService
 from .recursive_path_follower import RecursivePathFollower
 from .fact_extraction import FactExtractionService
 
+# Recursive fact retrieval components
+from .recursive_fact_models import (
+    RawFact, ScoredFact, FinalFact,
+    RecursiveFactRetrievalRequest, RecursiveFactRetrievalResponse,
+    TraversalStep, GTAResponse, FCAResponse
+)
+from .graph_traversal_agent import GraphTraversalAgent
+from .fact_critic_agent import FactCriticAgent
+from .recursive_fact_retrieval_service import RecursiveFactRetrievalService
+
 __all__ = [
     "LLMClient",
     "LLMConfig",
@@ -48,4 +58,16 @@ __all__ = [
     "EntityIdentificationService",
     "RecursivePathFollower",
     "FactExtractionService",
+    # Recursive fact retrieval
+    "RawFact",
+    "ScoredFact",
+    "FinalFact",
+    "RecursiveFactRetrievalRequest",
+    "RecursiveFactRetrievalResponse",
+    "TraversalStep",
+    "GTAResponse",
+    "FCAResponse",
+    "GraphTraversalAgent",
+    "FactCriticAgent",
+    "RecursiveFactRetrievalService",
 ]

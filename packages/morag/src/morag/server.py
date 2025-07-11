@@ -1228,6 +1228,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     except ImportError as e:
         logger.warning("Multi-hop reasoning endpoints not available", error=str(e))
 
+    # Include recursive fact retrieval router (recursive fact retrieval API)
+    try:
+        from morag.endpoints.recursive_fact_retrieval import router as recursive_fact_retrieval_router
+        app.include_router(recursive_fact_retrieval_router)
+        logger.info("Recursive fact retrieval API endpoints loaded")
+    except ImportError as e:
+        logger.warning("Recursive fact retrieval endpoints not available", error=str(e))
+
     return app
 
 

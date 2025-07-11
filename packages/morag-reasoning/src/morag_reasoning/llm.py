@@ -74,9 +74,17 @@ class LLMClient:
         Returns:
             Model name in PydanticAI format
         """
-        # PydanticAI expects just the model name for Gemini models
-        # It will automatically detect the provider based on the model name
-        return self.config.model
+        # PydanticAI expects provider:model format for Gemini models
+        if self.config.provider == "gemini":
+            if self.config.model.startswith("google-gla:"):
+                return self.config.model
+            else:
+                return f"google-gla:{self.config.model}"
+        elif self.config.provider == "openai":
+            return f"openai:{self.config.model}"
+        else:
+            # For other providers, return as-is and let PydanticAI handle it
+            return self.config.model
 
     async def generate(
         self, 
