@@ -626,7 +626,7 @@ class Neo4jStorage(BaseStorage):
         
         query = """
         MATCH (e)-[:MENTIONED_IN]->(c:DocumentChunk {id: $chunk_id})
-        WHERE e.type IS NOT NULL
+        WHERE e.name IS NOT NULL
         RETURN e
         """
         
@@ -650,7 +650,7 @@ class Neo4jStorage(BaseStorage):
         """
         query = """
         MATCH (c:DocumentChunk)-[:MENTIONS]->(e {id: $entity_id})
-        WHERE e.type IS NOT NULL
+        WHERE e.name IS NOT NULL
         RETURN c.id as chunk_id
         ORDER BY c.chunk_index
         """
@@ -828,7 +828,7 @@ class Neo4jStorage(BaseStorage):
         """
         cypher_query = """
         MATCH (e)
-        WHERE e.type IS NOT NULL AND toLower(e.name) CONTAINS toLower($query)
+        WHERE e.name IS NOT NULL AND toLower(e.name) CONTAINS toLower($query)
         """
         
         parameters = {"query": query, "limit": limit}
@@ -1073,7 +1073,7 @@ class Neo4jStorage(BaseStorage):
         
         query = f"""
         MATCH (e {{id: $entity_id}})
-        WHERE e.type IS NOT NULL
+        WHERE e.name IS NOT NULL
         MATCH {pattern}
         """
         
@@ -1190,9 +1190,9 @@ class Neo4jStorage(BaseStorage):
         
         query = f"""
         MATCH (e {{id: $entity_id}})
-        WHERE e.type IS NOT NULL
+        WHERE e.name IS NOT NULL
         MATCH (e)-[{relation_filter}*1..{max_depth}]-(neighbor)
-        WHERE neighbor.id <> e.id AND neighbor.type IS NOT NULL
+        WHERE neighbor.id <> e.id AND neighbor.name IS NOT NULL
         RETURN DISTINCT neighbor
         """
         
@@ -1228,7 +1228,7 @@ class Neo4jStorage(BaseStorage):
         MATCH path = (source {{id: $source_id}})
         -[*1..{max_depth}]-
         (target {{id: $target_id}})
-        WHERE source.type IS NOT NULL AND target.type IS NOT NULL
+        WHERE source.name IS NOT NULL AND target.name IS NOT NULL
         RETURN [node in nodes(path) | node.id] as path_ids
         LIMIT 10
         """
@@ -1337,12 +1337,12 @@ class Neo4jStorage(BaseStorage):
                 RETURN type(r) as type, count(r) as count 
                 ORDER BY count DESC
             """,
-            "entity_count": "MATCH (e) WHERE e.type IS NOT NULL RETURN count(e) as count",
+            "entity_count": "MATCH (e) WHERE e.name IS NOT NULL RETURN count(e) as count",
             "document_count": "MATCH (d:Document) RETURN count(d) as count",
             "chunk_count": "MATCH (c:DocumentChunk) RETURN count(c) as count",
             "entity_types": """
                 MATCH (e)
-                WHERE e.type IS NOT NULL
+                WHERE e.type IS NOT NULL AND e.name IS NOT NULL
                 RETURN e.type as type, count(e) as count
                 ORDER BY count DESC
             """
@@ -1524,11 +1524,11 @@ class Neo4jStorage(BaseStorage):
         """
         query = """
         MATCH (d:Document {id: $document_id})-[:CONTAINS]->(c:DocumentChunk)-[:MENTIONS]->(e)
-        WHERE e.type IS NOT NULL
+        WHERE e.name IS NOT NULL
         RETURN DISTINCT e
         UNION
         MATCH (e {source_doc_id: $document_id})
-        WHERE e.type IS NOT NULL
+        WHERE e.name IS NOT NULL
         RETURN e
         """
         

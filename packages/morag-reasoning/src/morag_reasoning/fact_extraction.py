@@ -132,10 +132,23 @@ Return only the most relevant and well-supported facts."""
             chunk_metadata = []
             
             for i, chunk in enumerate(chunks):
-                chunk_text = chunk.get('content', chunk.get('text', ''))
+                # Handle both string chunks and dict chunks
+                if isinstance(chunk, str):
+                    chunk_text = chunk
+                    # Create minimal metadata for string chunks
+                    chunk_dict = {
+                        'text': chunk,
+                        'content': chunk,
+                        'chunk_id': f'chunk_{i}',
+                        'document_name': f'Document {i+1}'
+                    }
+                else:
+                    chunk_text = chunk.get('text', chunk.get('content', ''))
+                    chunk_dict = chunk
+
                 if chunk_text:
                     chunk_texts.append(f"[Chunk {i+1}] {chunk_text}")
-                    chunk_metadata.append(chunk)
+                    chunk_metadata.append(chunk_dict)
             
             if not chunk_texts:
                 self.logger.warning("No valid chunk texts found")
@@ -267,7 +280,7 @@ Return mappings with high confidence only for clear, direct support."""
             ])
 
             chunks_text = "\n".join([
-                f"Chunk {i}: {chunk.get('content', chunk.get('text', ''))[:500]}..."
+                f"Chunk {i}: {chunk.get('text', chunk.get('content', ''))[:500]}..."
                 for i, chunk in enumerate(chunk_metadata)
             ])
 
@@ -298,7 +311,7 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
                                 document_id=chunk.get('document_id', f"doc_{chunk_idx}"),
                                 chunk_id=chunk.get('chunk_id', chunk.get('id', f"chunk_{chunk_idx}")),
                                 document_name=chunk.get('document_name', chunk.get('source', f"Document {chunk_idx+1}")),
-                                chunk_text=chunk.get('content', chunk.get('text', '')),
+                                chunk_text=chunk.get('text', chunk.get('content', '')),
                                 relevance_score=chunk.get('score', chunk.get('relevance_score', 0.5)),
                                 page_number=chunk.get('page_number'),
                                 section=chunk.get('section'),

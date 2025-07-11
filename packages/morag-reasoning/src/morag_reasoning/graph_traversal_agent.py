@@ -139,13 +139,15 @@ Remember: Use entity names in fact descriptions to make them user-friendly and m
             List of related entity names
         """
         try:
+            # Don't filter by static types - let LLM decide which paths to follow
+            # Find all entities connected to our target entities through any relationship
             query = """
             MATCH (e1)-[r]-(e2)
-            WHERE e1.type IS NOT NULL AND e2.type IS NOT NULL
-            AND e1.name IN $entity_names
+            WHERE e1.name IN $entity_names
             AND NOT e2.name IN $entity_names
-            RETURN DISTINCT e2.name as related_entity_name
-            LIMIT 50
+            AND e2.name IS NOT NULL
+            RETURN DISTINCT e2.name as related_entity_name, type(r) as relation_type
+            LIMIT 100
             """
 
             result = await self.neo4j_storage._execute_query(query, {"entity_names": entity_names})
