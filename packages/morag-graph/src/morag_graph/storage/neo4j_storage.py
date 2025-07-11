@@ -658,6 +658,60 @@ class Neo4jStorage(BaseStorage):
         result = await self._execute_query(query, {"entity_id": entity_id})
 
         return [record['chunk_id'] for record in result]
+
+    async def get_document_chunks_by_entity_names(self, entity_names: List[str]) -> List[Dict[str, Any]]:
+        """Get all DocumentChunk nodes related to specific entity names with full metadata.
+
+        Since the current graph doesn't have direct entity-chunk relationships,
+        we'll search for chunks that contain the entity names in their text.
+
+        Args:
+            entity_names: List of entity names to search for
+
+        Returns:
+            List of dictionaries containing chunk data with full metadata
+        """
+        if not entity_names:
+            return []
+
+        # Since there are no MENTIONED_IN relationships, search by text content
+        query = """
+        MATCH (c:DocumentChunk)
+        OPTIONAL MATCH (d:Document)-[:CONTAINS]->(c)
+        WHERE ANY(entity_name IN $entity_names WHERE toLower(c.text) CONTAINS toLower(entity_name))
+        WITH c, d, [entity_name IN $entity_names WHERE toLower(c.text) CONTAINS toLower(entity_name)] as matching_entities
+        RETURN DISTINCT c.id as chunk_id,
+               c.text as text,
+               c.chunk_index as chunk_index,
+               c.document_id as document_id,
+               c.metadata as chunk_metadata,
+               d.file_name as document_name,
+               d.source_file as source_file,
+               d.metadata as document_metadata,
+               matching_entities as related_entity_names,
+               [] as related_entity_types
+        ORDER BY d.file_name, c.chunk_index
+        """
+
+        result = await self._execute_query(query, {"entity_names": entity_names})
+
+        chunks = []
+        for record in result:
+            chunk_data = {
+                "chunk_id": record["chunk_id"],
+                "text": record["text"],
+                "chunk_index": record["chunk_index"],
+                "document_id": record["document_id"],
+                "document_name": record["document_name"],
+                "source_file": record["source_file"],
+                "chunk_metadata": record["chunk_metadata"] or {},
+                "document_metadata": record["document_metadata"] or {},
+                "related_entity_names": record["related_entity_names"],
+                "related_entity_types": record["related_entity_types"]
+            }
+            chunks.append(chunk_data)
+
+        return chunks
     
     async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
         """Update entity's chunk references by replacing all existing relationships.

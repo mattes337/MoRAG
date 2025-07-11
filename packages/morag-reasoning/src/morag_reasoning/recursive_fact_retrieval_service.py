@@ -97,20 +97,10 @@ class RecursiveFactRetrievalService:
                     "Could not identify key entities in your query to start graph traversal."
                 )
             
-            # Step 2: Map entities to graph nodes
-            self.logger.info("Step 2: Mapping entities to graph nodes")
-            initial_node_ids = await self._map_entities_to_nodes(initial_entities)
-            
-            if not initial_node_ids:
-                return self._create_error_response(
-                    query_id, request, start_time,
-                    "No relevant starting nodes found in the knowledge graph for your query."
-                )
-            
-            # Step 3: Perform graph traversal and fact extraction
-            self.logger.info("Step 3: Performing graph traversal")
+            # Step 2: Perform graph traversal and fact extraction using entities directly
+            self.logger.info("Step 2: Performing graph traversal with entities")
             all_raw_facts, traversal_steps, max_depth_reached = await self._perform_graph_traversal(
-                request, initial_node_ids
+                request, initial_entities
             )
             gta_llm_calls = len(traversal_steps)  # One LLM call per traversal step
             
@@ -229,68 +219,69 @@ class RecursiveFactRetrievalService:
     async def _perform_graph_traversal(
         self,
         request: RecursiveFactRetrievalRequest,
-        initial_node_ids: List[str]
+        initial_entities: List[str]
     ) -> Tuple[List[RawFact], List[TraversalStep], int]:
-        """Perform the main graph traversal and fact extraction."""
+        """Perform graph traversal and fact extraction using entity-based approach."""
         all_raw_facts = []
         traversal_steps = []
+        visited_entities = set()
         max_depth_reached = 0
-        
-        # Queue for breadth-first traversal: (node_id, current_depth)
-        nodes_to_explore_queue = deque([(node_id, 0) for node_id in initial_node_ids])
-        visited_nodes = set(initial_node_ids)
-        
-        while nodes_to_explore_queue and len(all_raw_facts) < request.max_total_facts:
-            current_node_id, current_depth = nodes_to_explore_queue.popleft()
-            
-            # Stop if max depth reached
-            if current_depth >= request.max_depth:
+
+        # Initialize queue with initial entities at depth 0
+        entities_to_explore_queue = deque([(initial_entities, 0)])
+
+        while entities_to_explore_queue and len(all_raw_facts) < request.max_total_facts:
+            current_entities, current_depth = entities_to_explore_queue.popleft()
+
+            # Skip if depth exceeded
+            if current_depth > request.max_depth:
                 continue
-            
+
+            # Filter out already visited entities
+            new_entities = [e for e in current_entities if e not in visited_entities]
+            if not new_entities:
+                continue
+
+            visited_entities.update(new_entities)
             max_depth_reached = max(max_depth_reached, current_depth)
-            
+
             try:
-                # Perform traversal and extraction for current node
-                gta_response = await self.graph_traversal_agent.traverse_and_extract(
+                # Extract facts from DocumentChunks related to these entities
+                gta_response = await self.graph_traversal_agent.extract_facts_from_entity_chunks(
                     user_query=request.user_query,
-                    current_node_id=current_node_id,
+                    entity_names=new_entities,
                     traversal_depth=current_depth,
-                    max_depth=request.max_depth,
-                    visited_nodes=visited_nodes,
                     language=request.language
                 )
-                
+
                 # Record traversal step
-                node_name = await self._get_node_name(current_node_id)
                 step = TraversalStep(
-                    node_id=current_node_id,
-                    node_name=node_name,
+                    node_id=f"entities_depth_{current_depth}",  # Use a descriptive ID
+                    node_name=f"Entities: {', '.join(new_entities[:3])}{'...' if len(new_entities) > 3 else ''}",
                     depth=current_depth,
                     facts_extracted=len(gta_response.extracted_facts),
                     next_nodes_decision=gta_response.next_nodes_to_explore,
                     reasoning=gta_response.reasoning
                 )
                 traversal_steps.append(step)
-                
+
                 # Collect facts
                 all_raw_facts.extend(gta_response.extracted_facts)
-                
-                # Plan next traversal
+
+                # Plan next traversal - parse entity names from response
                 if gta_response.next_nodes_to_explore not in ["STOP_TRAVERSAL", "NONE"]:
-                    next_nodes = self._parse_next_nodes(gta_response.next_nodes_to_explore)
-                    for next_node_id in next_nodes:
-                        if next_node_id not in visited_nodes:
-                            nodes_to_explore_queue.append((next_node_id, current_depth + 1))
-                            visited_nodes.add(next_node_id)
-                
+                    next_entity_names = self._parse_entity_names(gta_response.next_nodes_to_explore)
+                    if next_entity_names:
+                        entities_to_explore_queue.append((next_entity_names, current_depth + 1))
+
             except Exception as e:
                 self.logger.warning(
                     "Error in traversal step",
-                    node_id=current_node_id,
+                    entities=new_entities,
                     depth=current_depth,
                     error=str(e)
                 )
-        
+
         return all_raw_facts, traversal_steps, max_depth_reached
     
     async def _get_node_name(self, node_id: str) -> str:
@@ -302,7 +293,16 @@ class RecursiveFactRetrievalService:
         except Exception:
             pass
         return node_id
-    
+
+    def _parse_entity_names(self, entity_names_str: str) -> List[str]:
+        """Parse entity names from LLM response."""
+        if not entity_names_str or entity_names_str in ["STOP_TRAVERSAL", "NONE"]:
+            return []
+
+        # Split by comma and clean up
+        entities = [entity.strip() for entity in entity_names_str.split(",")]
+        return [entity for entity in entities if entity and entity not in ["STOP_TRAVERSAL", "NONE"]]
+
     def _parse_next_nodes(self, next_nodes_str: str) -> List[str]:
         """Parse next nodes string into list of node IDs."""
         try:

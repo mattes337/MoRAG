@@ -107,255 +107,210 @@ Remember: Use entity names in fact descriptions to make them user-friendly and m
         except Exception:
             return "Unknown Entity"
     
-    async def _get_node_context(self, node_id: str) -> NodeContext:
-        """Get comprehensive context for a node.
-        
+    async def _get_document_chunks_for_entities(self, entity_names: List[str]) -> List[Dict[str, Any]]:
+        """Get DocumentChunk nodes for specific entity names.
+
         Args:
-            node_id: Node ID to get context for
-            
+            entity_names: List of entity names to get chunks for
+
         Returns:
-            NodeContext with all relevant information
+            List of chunk data with full metadata
         """
         try:
-            # Get node properties from Neo4j
-            node_properties = {}
-            try:
-                entity = await self.neo4j_storage.get_entity(node_id)
-                if entity:
-                    node_properties = {
-                        "id": entity.id,
-                        "name": entity.name,
-                        "type": entity.type,
-                        "confidence": getattr(entity, 'confidence', 1.0),
-                        "properties": getattr(entity, 'properties', {})
-                    }
-            except Exception as e:
-                self.logger.warning("Failed to get node properties", node_id=node_id, error=str(e))
-            
-            # Get associated Qdrant content
-            qdrant_content = []
-            try:
-                # Try to find chunks associated with this entity
-                chunks = await self.qdrant_storage.get_chunks_by_entity_id(node_id)
-                for chunk in chunks:
-                    metadata = chunk.get("metadata", {})
-                    qdrant_content.append({
-                        "chunk_id": chunk["chunk_id"],
-                        "content": metadata.get("text", ""),
-                        "document_name": metadata.get("document_name", ""),
-                        "chunk_index": metadata.get("chunk_index"),
-                        "page_number": metadata.get("page_number"),
-                        "section": metadata.get("section"),
-                        "timestamp": metadata.get("timestamp"),
-                        "additional_metadata": {k: v for k, v in metadata.items()
-                                              if k not in ["text", "document_name", "chunk_index", "page_number", "section", "timestamp"]},
-                        "score": 1.0  # No similarity score for entity-based retrieval
-                    })
-            except Exception as e:
-                self.logger.warning("Failed to get Qdrant content", node_id=node_id, error=str(e))
-            
-            # Get neighbors and relationships
-            neighbors_and_relations = []
-            try:
-                neighbors = await self.neo4j_storage.get_neighbors(node_id, max_depth=1)
-                for neighbor in neighbors[:20]:  # Limit to 20 neighbors
-                    neighbors_and_relations.append({
-                        "neighbor_id": neighbor.id,
-                        "neighbor_name": neighbor.name,
-                        "neighbor_type": neighbor.type,
-                        "relationship_type": "RELATED_TO",  # Simplified - could get actual relationship types
-                        "relationship_properties": {}
-                    })
-            except Exception as e:
-                self.logger.warning("Failed to get neighbors", node_id=node_id, error=str(e))
-            
-            return NodeContext(
-                node_id=node_id,
-                node_properties=node_properties,
-                qdrant_content=qdrant_content,
-                neighbors_and_relations=neighbors_and_relations
-            )
-            
+            chunks = await self.neo4j_storage.get_document_chunks_by_entity_names(entity_names)
+            self.logger.debug(f"Found {len(chunks)} chunks for entities: {entity_names}")
+            return chunks
         except Exception as e:
-            self.logger.error("Failed to get node context", node_id=node_id, error=str(e))
-            # Return minimal context to avoid breaking the flow
-            return NodeContext(
-                node_id=node_id,
-                node_properties={"id": node_id},
-                qdrant_content=[],
-                neighbors_and_relations=[]
-            )
+            self.logger.error("Failed to get document chunks for entities",
+                            entity_names=entity_names, error=str(e))
+            return []
+
+    async def _get_related_entity_names(self, entity_names: List[str]) -> List[str]:
+        """Get names of entities related to the given entities through graph relationships.
+
+        Args:
+            entity_names: List of entity names to find related entities for
+
+        Returns:
+            List of related entity names
+        """
+        try:
+            query = """
+            MATCH (e1)-[r]-(e2)
+            WHERE e1.type IS NOT NULL AND e2.type IS NOT NULL
+            AND e1.name IN $entity_names
+            AND NOT e2.name IN $entity_names
+            RETURN DISTINCT e2.name as related_entity_name
+            LIMIT 50
+            """
+
+            result = await self.neo4j_storage._execute_query(query, {"entity_names": entity_names})
+            related_names = [record["related_entity_name"] for record in result]
+
+            self.logger.debug(f"Found {len(related_names)} related entities for: {entity_names}")
+            return related_names
+
+        except Exception as e:
+            self.logger.error("Failed to get related entity names",
+                            entity_names=entity_names, error=str(e))
+            return []
     
-    async def traverse_and_extract(
+    async def extract_facts_from_entity_chunks(
         self,
         user_query: str,
-        current_node_id: str,
+        entity_names: List[str],
         traversal_depth: int,
-        max_depth: int,
-        visited_nodes: Set[str],
-        graph_schema: Optional[str] = None,
         language: Optional[str] = None
     ) -> GTAResponse:
-        """Perform graph traversal and fact extraction for a single node.
+        """Extract facts from DocumentChunk nodes related to specific entities.
 
         Args:
             user_query: Original user query
-            current_node_id: Current node being explored
+            entity_names: List of entity names to extract facts for
             traversal_depth: Current traversal depth
-            max_depth: Maximum allowed depth
-            visited_nodes: Set of already visited node IDs
-            graph_schema: Optional graph schema information
             language: Optional language for fact extraction
 
         Returns:
-            GTAResponse with extracted facts and next node decisions
+            GTAResponse with extracted facts and next entity names to explore
         """
         self.logger.info(
-            "Starting traversal and extraction",
-            node_id=current_node_id,
-            depth=traversal_depth,
-            max_depth=max_depth
+            "Extracting facts from entity chunks",
+            entity_names=entity_names,
+            depth=traversal_depth
         )
-        
+
         try:
-            # Get comprehensive context for the current node
-            context = await self._get_node_context(current_node_id)
-            
-            # Prepare prompt for the LLM
-            prompt = self._create_traversal_prompt(
+            # Get DocumentChunk nodes for these entities
+            chunks = await self._get_document_chunks_for_entities(entity_names)
+
+            if not chunks:
+                self.logger.warning("No chunks found for entities", entity_names=entity_names)
+                return GTAResponse(
+                    extracted_facts=[],
+                    next_nodes_to_explore="NONE",
+                    reasoning=f"No document chunks found for entities: {', '.join(entity_names)}"
+                )
+
+            # Prepare prompt for fact extraction from chunks
+            prompt = self._create_chunk_fact_extraction_prompt(
                 user_query=user_query,
-                context=context,
+                chunks=chunks,
+                entity_names=entity_names,
                 traversal_depth=traversal_depth,
-                max_depth=max_depth,
-                visited_nodes=visited_nodes,
-                graph_schema=graph_schema,
                 language=language
             )
-            
-            # Call LLM for traversal decision and fact extraction
+
+            # Call LLM for fact extraction
             result = await self.agent.run(prompt)
             response = result.data
-            
-            # Validate and enhance the extracted facts
-            enhanced_facts = []
-            entity_name = await self._get_entity_name(current_node_id)
 
+            # Enhance facts with proper metadata from chunks
+            enhanced_facts = []
             for fact in response.extracted_facts:
-                # Ensure depth is set correctly
                 fact.extracted_from_depth = traversal_depth
 
-                # Enhance source metadata if fact comes from Qdrant content
+                # Find the chunk this fact came from and add complete metadata
                 if fact.source_qdrant_chunk_id:
-                    # Find the corresponding chunk in context
-                    for chunk_info in context.qdrant_content:
-                        if chunk_info["chunk_id"] == fact.source_qdrant_chunk_id:
+                    for chunk in chunks:
+                        if chunk["chunk_id"] == fact.source_qdrant_chunk_id:
                             from morag_reasoning.recursive_fact_models import SourceMetadata
-                            # Include entity name in additional metadata for better source descriptions
-                            additional_metadata = chunk_info.get("additional_metadata", {})
-                            additional_metadata["entity_name"] = entity_name
-
                             fact.source_metadata = SourceMetadata(
-                                document_name=chunk_info.get("document_name"),
-                                chunk_index=chunk_info.get("chunk_index"),
-                                page_number=chunk_info.get("page_number"),
-                                section=chunk_info.get("section"),
-                                timestamp=chunk_info.get("timestamp"),
-                                additional_metadata=additional_metadata
+                                document_name=chunk["document_name"],
+                                chunk_index=chunk["chunk_index"],
+                                page_number=chunk["chunk_metadata"].get("page_number"),
+                                section=chunk["chunk_metadata"].get("section"),
+                                timestamp=chunk["chunk_metadata"].get("timestamp"),
+                                additional_metadata={
+                                    "source_file": chunk["source_file"],
+                                    "document_id": chunk["document_id"],
+                                    "related_entities": chunk["related_entity_names"]
+                                }
                             )
                             break
-                else:
-                    # For facts from entity properties, add entity name to metadata
-                    from morag_reasoning.recursive_fact_models import SourceMetadata
-                    fact.source_metadata = SourceMetadata(
-                        additional_metadata={"entity_name": entity_name}
-                    )
 
                 enhanced_facts.append(fact)
-            
-            # Create final response
-            final_response = GTAResponse(
+
+            self.logger.info(
+                "Fact extraction completed",
+                entity_names=entity_names,
+                chunks_processed=len(chunks),
+                facts_extracted=len(enhanced_facts)
+            )
+
+            return GTAResponse(
                 extracted_facts=enhanced_facts,
                 next_nodes_to_explore=response.next_nodes_to_explore,
                 reasoning=response.reasoning
             )
-            
-            self.logger.info(
-                "Traversal and extraction completed",
-                node_id=current_node_id,
-                facts_extracted=len(enhanced_facts),
-                next_decision=response.next_nodes_to_explore
-            )
-            
-            return final_response
-            
+
         except Exception as e:
             self.logger.error(
-                "Error in traversal and extraction",
-                node_id=current_node_id,
+                "Error in fact extraction from chunks",
+                entity_names=entity_names,
+                depth=traversal_depth,
                 error=str(e)
             )
-            # Return empty response to avoid breaking the flow
+
+            # Return empty response on error
             return GTAResponse(
                 extracted_facts=[],
                 next_nodes_to_explore="NONE",
-                reasoning=f"Error occurred during traversal: {str(e)}"
+                reasoning=f"Error occurred during fact extraction: {str(e)}"
             )
     
-    def _create_traversal_prompt(
+    def _create_chunk_fact_extraction_prompt(
         self,
         user_query: str,
-        context: NodeContext,
+        chunks: List[Dict[str, Any]],
+        entity_names: List[str],
         traversal_depth: int,
-        max_depth: int,
-        visited_nodes: Set[str],
-        graph_schema: Optional[str] = None,
         language: Optional[str] = None
     ) -> str:
-        """Create the prompt for the traversal LLM."""
+        """Create the prompt for chunk-based fact extraction."""
 
-        # Format context information - focus on entity names, not IDs
-        entity_name = context.node_properties.get('name', 'Unknown Entity')
-        entity_type = context.node_properties.get('type', 'Unknown Type')
+        # Format chunk information
+        chunks_info = f"Document Chunks Related to Entities: {', '.join(entity_names)}\n\n"
 
-        node_info = f"Current Entity: {entity_name} (Type: {entity_type})\n"
+        for i, chunk in enumerate(chunks[:10]):  # Limit to first 10 chunks for prompt size
+            chunks_info += f"Chunk {i+1}:\n"
+            chunks_info += f"  Document: {chunk['document_name']}\n"
+            chunks_info += f"  Chunk Index: {chunk['chunk_index']}\n"
+            chunks_info += f"  Related Entities: {', '.join(chunk['related_entity_names'])}\n"
+            chunks_info += f"  Content: {chunk['text'][:500]}{'...' if len(chunk['text']) > 500 else ''}\n\n"
 
-        # Add properties but exclude technical IDs
-        filtered_properties = {k: v for k, v in context.node_properties.items()
-                             if k not in ['id'] and not k.endswith('_id')}
-        if filtered_properties:
-            node_info += f"Properties: {json.dumps(filtered_properties, indent=2)}\n"
+        # Get related entity names for next traversal
+        all_related_entities = set()
+        for chunk in chunks:
+            all_related_entities.update(chunk['related_entity_names'])
+        # Remove current entities
+        for entity_name in entity_names:
+            all_related_entities.discard(entity_name)
 
-        if context.qdrant_content:
-            node_info += f"\nAssociated Content ({len(context.qdrant_content)} chunks):\n"
-            for i, content in enumerate(context.qdrant_content[:5]):  # Limit to first 5 chunks
-                node_info += f"  Chunk {i+1}: {content['content'][:200]}...\n"
+        related_entities_info = f"Related Entities Found: {', '.join(list(all_related_entities)[:20])}\n"
 
-        if context.neighbors_and_relations:
-            node_info += f"\nConnected Entities ({len(context.neighbors_and_relations)} total):\n"
-            for neighbor in context.neighbors_and_relations[:10]:  # Limit to first 10 neighbors
-                node_info += f"  - {neighbor['neighbor_name']} (Type: {neighbor['neighbor_type']})\n"
-        
-        visited_list = list(visited_nodes)
-        
-        prompt = f"""GRAPH TRAVERSAL AND FACT EXTRACTION TASK
+        prompt = f"""DOCUMENT CHUNK FACT EXTRACTION TASK
 
 User Query: "{user_query}"
 
-Current Context:
-{node_info}
+{chunks_info}
+
+{related_entities_info}
 
 Traversal Information:
 - Current Depth: {traversal_depth}
-- Maximum Depth: {max_depth}
-- Visited Nodes: {visited_list}
-
-{f"Graph Schema: {graph_schema}" if graph_schema else ""}
+- Current Entities: {', '.join(entity_names)}
 
 Your task:
-1. Extract relevant facts from the current node's context
-2. Decide which neighbors (if any) to explore next
+1. Extract relevant facts from the document chunks that help answer the user query
+2. For each fact, specify which chunk it came from (use the chunk_id as source_qdrant_chunk_id)
+3. Decide which related entities to explore next for deeper traversal
 
-Focus on information that helps answer the user query. Be strategic about which paths to follow."""
+IMPORTANT GUIDELINES:
+- Extract facts from the actual chunk content, not just entity relationships
+- Each fact should be substantial and directly relevant to the user query
+- Include specific details, numbers, dates, and context from the chunks
+- For next_nodes_to_explore, return entity names (not IDs) separated by commas, or "STOP_TRAVERSAL" if sufficient information is gathered
+- Focus on factual content that provides concrete answers or supporting evidence"""
 
         # Add language instruction if specified
         if language:
