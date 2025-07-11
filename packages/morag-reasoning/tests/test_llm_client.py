@@ -17,7 +17,7 @@ class TestLLMConfig:
         assert config.model == "gemini-1.5-flash"
         assert config.temperature == 0.1
         assert config.max_tokens == 2000
-        assert config.max_retries == 5
+        assert config.max_retries == 8
     
     def test_custom_config(self):
         """Test custom configuration values."""
@@ -48,7 +48,7 @@ class TestLLMClient:
         """Test initialization without config (uses environment)."""
         with patch.dict('os.environ', {
             'MORAG_LLM_PROVIDER': 'openai',
-            'MORAG_LLM_MODEL': 'gpt-3.5-turbo',
+            'MORAG_GEMINI_MODEL': 'gpt-3.5-turbo',
             'GEMINI_API_KEY': 'test-key'
         }):
             client = LLMClient()

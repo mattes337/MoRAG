@@ -337,7 +337,7 @@ Please synthesize these facts into a coherent, well-structured answer. Focus on 
         
         try:
             # Use the stronger LLM for final synthesis
-            response = await self.stronger_llm_client.generate_text(prompt)
+            response = await self.stronger_llm_client.generate(prompt)
             
             # Calculate confidence based on fact scores and coverage
             avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(final_facts)

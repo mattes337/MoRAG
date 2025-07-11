@@ -114,18 +114,14 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
             # Get associated Qdrant content
             qdrant_content = []
             try:
-                # Try to find chunks associated with this node
-                # Note: This is a simplified approach - in practice you'd want to link entities to chunks
-                chunks = await self.qdrant_storage.search_by_metadata(
-                    filters={"entity_ids": node_id},  # Assuming chunks have entity_ids field
-                    limit=10
-                )
+                # Try to find chunks associated with this entity
+                chunks = await self.qdrant_storage.get_chunks_by_entity_id(node_id)
                 for chunk in chunks:
                     qdrant_content.append({
-                        "chunk_id": chunk["id"],
-                        "content": chunk.get("text", ""),
+                        "chunk_id": chunk["chunk_id"],
+                        "content": chunk.get("metadata", {}).get("text", ""),
                         "document_name": chunk.get("metadata", {}).get("document_name", ""),
-                        "score": chunk.get("score", 1.0)
+                        "score": 1.0  # No similarity score for entity-based retrieval
                     })
             except Exception as e:
                 self.logger.warning("Failed to get Qdrant content", node_id=node_id, error=str(e))

@@ -125,7 +125,7 @@ class TestGraphTraversalAgent:
         
         mock_neo4j_storage.get_entity.return_value = mock_entity
         mock_neo4j_storage.get_neighbors.return_value = []
-        mock_qdrant_storage.search_by_metadata.return_value = []
+        mock_qdrant_storage.get_chunks_by_entity_id.return_value = []
         
         context = await graph_traversal_agent._get_node_context("test_node")
         
@@ -140,7 +140,7 @@ class TestGraphTraversalAgent:
         """Test getting node context when errors occur."""
         # Mock errors
         mock_neo4j_storage.get_entity.side_effect = Exception("Neo4j error")
-        mock_qdrant_storage.search_by_metadata.side_effect = Exception("Qdrant error")
+        mock_qdrant_storage.get_chunks_by_entity_id.side_effect = Exception("Qdrant error")
         
         context = await graph_traversal_agent._get_node_context("test_node")
         
