@@ -189,13 +189,25 @@ class Entity(BaseModel):
         """Create entity from Neo4J node properties."""
         # Make a copy to avoid modifying the original
         node = node.copy()
-        
+
         # Deserialize attributes from JSON string
         if 'attributes' in node and isinstance(node['attributes'], str):
-            node['attributes'] = json.loads(node['attributes'])
-        
+            try:
+                node['attributes'] = json.loads(node['attributes'])
+            except (json.JSONDecodeError, TypeError):
+                node['attributes'] = {}
+
         # Remove Neo4J specific properties
         if '_labels' in node:
             node.pop('_labels')
-            
+
+        # Check if the entity ID is invalid and regenerate if needed
+        entity_id = node.get('id', '')
+        if entity_id and not IDValidator.is_unified_format(entity_id):
+            # Regenerate ID using the unified generator
+            name = node.get('name', '')
+            entity_type = str(node.get('type', 'CUSTOM'))
+            source_doc_id = node.get('source_doc_id', '')
+            node['id'] = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
+
         return cls(**node)

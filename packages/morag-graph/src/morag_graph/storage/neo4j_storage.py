@@ -851,7 +851,16 @@ class Neo4jStorage(BaseStorage):
                 entity = Entity.from_neo4j_node(record["e"])
                 entities.append(entity)
             except Exception as e:
-                logger.warning(f"Failed to parse entity from search: {e}")
+                # Log more details about the problematic entity
+                entity_data = record.get("e", {})
+                entity_id = entity_data.get("id", "unknown")
+                entity_name = entity_data.get("name", "unknown")
+                logger.warning(
+                    f"Failed to parse entity from search",
+                    entity_id=entity_id,
+                    entity_name=entity_name,
+                    error=str(e)
+                )
         
         return entities
     

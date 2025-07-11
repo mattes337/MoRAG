@@ -233,18 +233,30 @@ Remember: Use entity names in fact descriptions to make them user-friendly and m
                 # Find the chunk this fact came from and add complete metadata
                 if fact.source_qdrant_chunk_id:
                     for chunk in chunks:
-                        if chunk["chunk_id"] == fact.source_qdrant_chunk_id:
+                        # Handle both string and dict chunks defensively
+                        if isinstance(chunk, str):
+                            continue
+
+                        chunk_id = chunk.get("chunk_id", "")
+                        if chunk_id == fact.source_qdrant_chunk_id:
                             from morag_reasoning.recursive_fact_models import SourceMetadata
+
+                            # Safely extract metadata with defaults
+                            chunk_metadata = chunk.get("chunk_metadata") or {}
+                            related_entities = chunk.get("related_entity_names", [])
+                            if not isinstance(related_entities, list):
+                                related_entities = []
+
                             fact.source_metadata = SourceMetadata(
-                                document_name=chunk["document_name"],
-                                chunk_index=chunk["chunk_index"],
-                                page_number=chunk["chunk_metadata"].get("page_number"),
-                                section=chunk["chunk_metadata"].get("section"),
-                                timestamp=chunk["chunk_metadata"].get("timestamp"),
+                                document_name=chunk.get("document_name", "Unknown Document"),
+                                chunk_index=chunk.get("chunk_index", 0),
+                                page_number=chunk_metadata.get("page_number") if isinstance(chunk_metadata, dict) else None,
+                                section=chunk_metadata.get("section") if isinstance(chunk_metadata, dict) else None,
+                                timestamp=chunk_metadata.get("timestamp") if isinstance(chunk_metadata, dict) else None,
                                 additional_metadata={
-                                    "source_file": chunk["source_file"],
-                                    "document_id": chunk["document_id"],
-                                    "related_entities": chunk["related_entity_names"]
+                                    "source_file": chunk.get("source_file", ""),
+                                    "document_id": chunk.get("document_id", ""),
+                                    "related_entities": related_entities
                                 }
                             )
                             break
@@ -295,11 +307,27 @@ Remember: Use entity names in fact descriptions to make them user-friendly and m
 
         # Show up to 20 chunks with shorter content to fit more information
         for i, chunk in enumerate(chunks[:20]):
-            chunks_info += f"Chunk {i+1} (ID: {chunk['chunk_id']}):\n"
-            chunks_info += f"  Document: {chunk['document_name']}\n"
-            chunks_info += f"  Chunk Index: {chunk['chunk_index']}\n"
-            chunks_info += f"  Related Entities: {', '.join(chunk['related_entity_names'])}\n"
-            chunks_info += f"  Content: {chunk['text'][:300]}{'...' if len(chunk['text']) > 300 else ''}\n\n"
+            # Handle both dict and string chunks defensively
+            if isinstance(chunk, str):
+                chunks_info += f"Chunk {i+1} (Text): {chunk[:300]}{'...' if len(chunk) > 300 else ''}\n\n"
+                continue
+
+            # Handle dict chunks with defensive access
+            chunk_id = chunk.get('chunk_id', f'chunk_{i}')
+            document_name = chunk.get('document_name', 'Unknown Document')
+            chunk_index = chunk.get('chunk_index', i)
+            related_entities = chunk.get('related_entity_names', [])
+            text = chunk.get('text', chunk.get('content', ''))
+
+            # Ensure related_entities is a list
+            if not isinstance(related_entities, list):
+                related_entities = []
+
+            chunks_info += f"Chunk {i+1} (ID: {chunk_id}):\n"
+            chunks_info += f"  Document: {document_name}\n"
+            chunks_info += f"  Chunk Index: {chunk_index}\n"
+            chunks_info += f"  Related Entities: {', '.join(related_entities)}\n"
+            chunks_info += f"  Content: {text[:300]}{'...' if len(text) > 300 else ''}\n\n"
 
         # Get related entity names for next traversal from chunks and graph
         all_related_entities = set()

@@ -28,22 +28,36 @@ class UnifiedIDGenerator:
     @staticmethod
     def generate_document_id(source_file: str, checksum: str = None) -> str:
         """Generate deterministic document ID.
-        
+
         Args:
             source_file: Source file path or name
             checksum: Optional file checksum for deterministic ID
-            
+
         Returns:
             Deterministic document ID
         """
+        import os
+        import re
+
+        # Extract just the filename from the path to avoid invalid characters
+        filename = os.path.basename(source_file)
+
+        # Clean the filename to remove invalid characters for IDs
+        # Replace spaces and special characters with underscores
+        clean_filename = re.sub(r'[^\w\-.]', '_', filename)
+        # Remove multiple consecutive underscores
+        clean_filename = re.sub(r'_+', '_', clean_filename)
+        # Remove leading/trailing underscores
+        clean_filename = clean_filename.strip('_')
+
         if checksum:
             # Use checksum for deterministic ID
-            return f"doc_{source_file}_{checksum}"
+            return f"doc_{clean_filename}_{checksum}"
         else:
             # Use timestamp for uniqueness
             import time
             timestamp = str(int(time.time()))
-            return f"doc_{source_file}_{timestamp}"
+            return f"doc_{clean_filename}_{timestamp}"
     
     @staticmethod
     def generate_chunk_id(document_id: str, chunk_index: int) -> str:
