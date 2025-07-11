@@ -51,11 +51,8 @@ class RecursiveFactRetrievalService:
             max_entities=20
         )
         
-        self.graph_traversal_agent = GraphTraversalAgent(
-            llm_client=llm_client,
-            neo4j_storage=neo4j_storage,
-            qdrant_storage=qdrant_storage
-        )
+        # Note: GraphTraversalAgent will be created per request with proper max_facts_per_node
+        self.graph_traversal_agent = None
         
         self.fact_critic_agent = FactCriticAgent(llm_client=llm_client)
     
@@ -87,10 +84,18 @@ class RecursiveFactRetrievalService:
         )
         
         try:
+            # Initialize GraphTraversalAgent with request-specific parameters
+            self.graph_traversal_agent = GraphTraversalAgent(
+                llm_client=self.llm_client,
+                neo4j_storage=self.neo4j_storage,
+                qdrant_storage=self.qdrant_storage,
+                max_facts_per_node=request.max_facts_per_node
+            )
+
             # Step 1: Extract initial entities from user query
             self.logger.info("Step 1: Extracting initial entities")
             initial_entities = await self._extract_initial_entities(request.user_query)
-            
+
             if not initial_entities:
                 return self._create_error_response(
                     query_id, request, start_time,

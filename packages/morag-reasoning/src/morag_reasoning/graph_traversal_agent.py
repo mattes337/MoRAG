@@ -61,14 +61,18 @@ Your role is to:
 3. Decide on the next nodes to explore based on the user query
 
 FACT EXTRACTION GUIDELINES:
-- Extract up to {self.max_facts_per_node} comprehensive, detailed factual statements
+- Extract MANY comprehensive, detailed factual statements (aim for {self.max_facts_per_node} facts)
+- Be AGGRESSIVE in fact extraction - extract multiple facts from each relevant chunk
 - Focus on information that could be relevant to answering the user query
 - Each fact should be a complete, standalone statement with full context and relevant details
 - Include facts from entity properties, associated content, and relationship information
 - Be specific and include all relevant context, numbers, dates, and supporting details
 - Make facts extensive and self-contained so they can be used independently for synthesis
-- IMPORTANT: Reference entities by their names (e.g., "ADHS", "Ernährung") rather than technical IDs
+- IMPORTANT: Reference entities by their names rather than technical IDs
 - Focus on meaningful entity relationships and content, not database metadata
+- Extract specific items, recommendations, studies, and quantitative information when available
+- Extract both positive recommendations (what to do) and negative ones (what to avoid)
+- Include concrete actionable advice, scientific findings, and practical guidance
 
 NEXT NODE DECISION GUIDELINES:
 - Return "STOP_TRAVERSAL" if you believe sufficient information has been gathered
@@ -191,18 +195,33 @@ Remember: Use entity names in fact descriptions to make them user-friendly and m
                     reasoning=f"No document chunks found for entities: {', '.join(entity_names)}"
                 )
 
+            # Get related entities from graph relationships for next traversal
+            related_entities_from_graph = []
+            try:
+                related_entities_from_graph = await self._get_related_entity_names(entity_names)
+            except Exception as e:
+                self.logger.warning("Failed to get graph-related entities", error=str(e))
+
             # Prepare prompt for fact extraction from chunks
             prompt = self._create_chunk_fact_extraction_prompt(
                 user_query=user_query,
                 chunks=chunks,
                 entity_names=entity_names,
                 traversal_depth=traversal_depth,
-                language=language
+                language=language,
+                related_entities_from_graph=related_entities_from_graph
             )
 
             # Call LLM for fact extraction
             result = await self.agent.run(prompt)
             response = result.data
+
+            self.logger.debug(
+                "LLM fact extraction response",
+                facts_count=len(response.extracted_facts),
+                next_nodes=response.next_nodes_to_explore,
+                reasoning=response.reasoning[:200] + "..." if len(response.reasoning) > 200 else response.reasoning
+            )
 
             # Enhance facts with proper metadata from chunks
             enhanced_facts = []
@@ -264,29 +283,39 @@ Remember: Use entity names in fact descriptions to make them user-friendly and m
         chunks: List[Dict[str, Any]],
         entity_names: List[str],
         traversal_depth: int,
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        related_entities_from_graph: Optional[List[str]] = None
     ) -> str:
         """Create the prompt for chunk-based fact extraction."""
 
-        # Format chunk information
-        chunks_info = f"Document Chunks Related to Entities: {', '.join(entity_names)}\n\n"
+        # Format chunk information - show more chunks but with shorter content
+        chunks_info = f"Document Chunks Related to Entities: {', '.join(entity_names)} (Total: {len(chunks)} chunks)\n\n"
 
-        for i, chunk in enumerate(chunks[:10]):  # Limit to first 10 chunks for prompt size
-            chunks_info += f"Chunk {i+1}:\n"
+        # Show up to 20 chunks with shorter content to fit more information
+        for i, chunk in enumerate(chunks[:20]):
+            chunks_info += f"Chunk {i+1} (ID: {chunk['chunk_id']}):\n"
             chunks_info += f"  Document: {chunk['document_name']}\n"
             chunks_info += f"  Chunk Index: {chunk['chunk_index']}\n"
             chunks_info += f"  Related Entities: {', '.join(chunk['related_entity_names'])}\n"
-            chunks_info += f"  Content: {chunk['text'][:500]}{'...' if len(chunk['text']) > 500 else ''}\n\n"
+            chunks_info += f"  Content: {chunk['text'][:300]}{'...' if len(chunk['text']) > 300 else ''}\n\n"
 
-        # Get related entity names for next traversal
+        # Get related entity names for next traversal from chunks and graph
         all_related_entities = set()
+
+        # Get entities mentioned in chunks
         for chunk in chunks:
             all_related_entities.update(chunk['related_entity_names'])
+
+        # Add entities from graph relationships
+        if related_entities_from_graph:
+            all_related_entities.update(related_entities_from_graph)
+
         # Remove current entities
         for entity_name in entity_names:
             all_related_entities.discard(entity_name)
 
-        related_entities_info = f"Related Entities Found: {', '.join(list(all_related_entities)[:20])}\n"
+        related_entities_list = list(all_related_entities)[:20]
+        related_entities_info = f"Related Entities Found: {', '.join(related_entities_list)}\n"
 
         prompt = f"""DOCUMENT CHUNK FACT EXTRACTION TASK
 
@@ -301,16 +330,37 @@ Traversal Information:
 - Current Entities: {', '.join(entity_names)}
 
 Your task:
-1. Extract relevant facts from the document chunks that help answer the user query
+1. Extract MULTIPLE relevant facts from the document chunks that help answer the user query
 2. For each fact, specify which chunk it came from (use the chunk_id as source_qdrant_chunk_id)
 3. Decide which related entities to explore next for deeper traversal
 
-IMPORTANT GUIDELINES:
+CRITICAL REQUIREMENTS:
+- Extract AT LEAST 5-10 facts from the provided chunks
 - Extract facts from the actual chunk content, not just entity relationships
 - Each fact should be substantial and directly relevant to the user query
-- Include specific details, numbers, dates, and context from the chunks
+- Include specific details, numbers, dates, recommendations, and context from the chunks
+- Look for concrete information like specific items, substances, recommendations, studies, etc.
+- Extract specific recommendations, advice, and scientific findings relevant to the query
 - For next_nodes_to_explore, return entity names (not IDs) separated by commas, or "STOP_TRAVERSAL" if sufficient information is gathered
-- Focus on factual content that provides concrete answers or supporting evidence"""
+- Focus on factual content that provides concrete answers or supporting evidence
+
+EXTRACTION STRATEGY:
+- Scan through ALL provided chunks for relevant information
+- Extract multiple facts per chunk if they contain rich information
+- Look for actionable advice, specific recommendations, research findings
+- Include both positive recommendations (what to do) and negative ones (what to avoid)
+- Extract specific items, substances, patterns, timing, and quantities when mentioned
+- Look for scientific studies, expert opinions, practical implementation advice
+- Extract information about mechanisms and causal relationships
+
+FACT EXTRACTION EXAMPLES:
+- Extract specific substances, compounds, or items mentioned with their effects and dosages
+- Extract recommendations about what to avoid and what to prefer with supporting evidence
+- Extract timing, frequency, and quantity information when provided
+- Extract scientific findings, study results, and expert recommendations
+
+NEXT ENTITY EXPLORATION:
+Consider exploring related entities that appear in the content or are mentioned in relationships"""
 
         # Add language instruction if specified
         if language:

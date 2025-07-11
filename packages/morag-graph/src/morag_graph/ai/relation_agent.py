@@ -63,8 +63,8 @@ CRITICAL ENTITY NAME MATCHING:
 - If you see "Belastungen" in text, use "Belastung" (the normalized form from known entities)
 - Only extract relations between entities that are explicitly listed in the "Known entities" section
 - AVOID creating relations with conjugated or inflected entity names
-- Example: Use "ADHS" not "ADHS-Symptomatik" or "ADHS-Kind"
-- Example: Use "Ernährung" not "Ernährungsweise" or "Ernährungsverhalten"
+- Example: Use base entity names, not compound or modified forms
+- Example: Use normalized singular forms rather than variations or compound terms
 
 RELATION TYPE RULES (ALWAYS IN ENGLISH):
 - Relation types should be VERBS (not nouns or adjectives)
@@ -78,7 +78,7 @@ RELATION TYPE RULES (ALWAYS IN ENGLISH):
 - ALL relation types MUST be in English regardless of source text language
 - Use THIRD PERSON SINGULAR forms: "AFFECTS" not "AFFECT", "CAUSES" not "CAUSE", "TREATS" not "TREAT"
 - System will automatically normalize to uppercase singular forms, but prefer correct forms in output
-- Use VERB forms, not nouns: "TREATS" not "treatment", "CONTAINS" not "containment"
+- Use VERB forms, not nouns: use action verbs rather than noun forms
 - Use present tense, THIRD PERSON SINGULAR form: "AFFECTS" not "AFFECT", "CAUSES" not "CAUSE"
 - Relation types are VERBS describing what the source entity DOES to the target entity
 - AVOID conjugated German verbs: use "CONTAINS" not "enthalten", "enthält", "enthaltet"
