@@ -48,10 +48,12 @@ SCORING GUIDELINES:
 
 SOURCE DESCRIPTION GUIDELINES:
 - Create a clear, user-friendly description of where the fact came from
+- Reference entities by their meaningful names (e.g., "ADHS", "Ernährung") rather than technical IDs
 - Include specific document details: document name, chunk/page number, section if available
 - For audio/video: include timestamp information
-- Examples: "From document 'Research_Paper.pdf', page 5, section 'Methodology'", "From video 'Training_Session.mp4' at 15:30", "From 'Company_Report.docx', chunk 3"
+- Examples: "From document 'Research_Paper.pdf', page 5, section 'Methodology'", "From video 'Training_Session.mp4' at 15:30", "From entity 'ADHS' in document 'Treatment_Guide.pdf'"
 - Be specific and include location details that help users find the source
+- Focus on meaningful entity names and content sources, not database metadata
 
 RESPONSE FORMAT:
 Return the original raw fact enhanced with:
@@ -115,21 +117,27 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
                 source_qdrant_chunk_id=raw_fact.source_qdrant_chunk_id,
                 extracted_from_depth=raw_fact.extracted_from_depth,
                 score=0.1,  # Low score for error cases
-                source_description=f"Error evaluating fact from node {raw_fact.source_node_id}"
+                source_description="Error evaluating fact from knowledge graph entity"
             )
     
     def _create_evaluation_prompt(self, user_query: str, raw_fact: RawFact, language: Optional[str] = None) -> str:
         """Create the prompt for fact evaluation."""
 
-        # Build comprehensive source context
+        # Build comprehensive source context focusing on meaningful information
         source_info = []
         if raw_fact.source_property:
             source_info.append(f"Property: {raw_fact.source_property}")
         if raw_fact.source_qdrant_chunk_id:
-            source_info.append(f"Content Chunk: {raw_fact.source_qdrant_chunk_id}")
+            source_info.append(f"Content Chunk")
 
         # Add detailed source metadata
         metadata_info = []
+        entity_name = None
+
+        # Extract entity name from metadata if available
+        if raw_fact.source_metadata.additional_metadata:
+            entity_name = raw_fact.source_metadata.additional_metadata.get("entity_name")
+
         if raw_fact.source_metadata.document_name:
             metadata_info.append(f"Document: {raw_fact.source_metadata.document_name}")
         if raw_fact.source_metadata.chunk_index is not None:
@@ -141,7 +149,12 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
         if raw_fact.source_metadata.timestamp:
             metadata_info.append(f"Timestamp: {raw_fact.source_metadata.timestamp}")
 
-        source_context = f"Node ID: {raw_fact.source_node_id}"
+        # Create user-friendly source context using entity name when available
+        if entity_name:
+            source_context = f"Entity '{entity_name}'"
+        else:
+            source_context = "Knowledge graph entity"
+
         if source_info:
             source_context += f" ({', '.join(source_info)})"
         if metadata_info:
@@ -166,6 +179,11 @@ Consider:
 - Does it provide important context or supporting information?
 - How specific is it to the user's question?
 - Is it factual and verifiable?
+
+IMPORTANT for source description:
+- Use meaningful entity names (e.g., "ADHS", "Ernährung") rather than technical IDs
+- Focus on document names, sections, and entity relationships
+- Make it clear and helpful for users to understand where the information comes from
 
 Return the fact with an assigned score and source description."""
 
@@ -242,7 +260,7 @@ Return the fact with an assigned score and source description."""
                         source_qdrant_chunk_id=fact.source_qdrant_chunk_id,
                         extracted_from_depth=fact.extracted_from_depth,
                         score=0.1,
-                        source_description=f"Batch evaluation error for node {fact.source_node_id}"
+                        source_description="Batch evaluation error for knowledge graph entity"
                     ))
             
             scored_facts.extend(batch_results)
@@ -258,7 +276,7 @@ Return the fact with an assigned score and source description."""
         self,
         scored_facts: list[ScoredFact],
         decay_rate: float = 0.2
-    ) -> list[ScoredFact]:
+    ) -> list["FinalFact"]:
         """Apply depth-based relevance decay to scored facts.
         
         Args:

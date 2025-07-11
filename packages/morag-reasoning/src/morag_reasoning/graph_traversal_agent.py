@@ -64,9 +64,11 @@ FACT EXTRACTION GUIDELINES:
 - Extract up to {self.max_facts_per_node} comprehensive, detailed factual statements
 - Focus on information that could be relevant to answering the user query
 - Each fact should be a complete, standalone statement with full context and relevant details
-- Include facts from node properties, Qdrant content, and relationship information
+- Include facts from entity properties, associated content, and relationship information
 - Be specific and include all relevant context, numbers, dates, and supporting details
 - Make facts extensive and self-contained so they can be used independently for synthesis
+- IMPORTANT: Reference entities by their names (e.g., "ADHS", "Ernährung") rather than technical IDs
+- Focus on meaningful entity relationships and content, not database metadata
 
 NEXT NODE DECISION GUIDELINES:
 - Return "STOP_TRAVERSAL" if you believe sufficient information has been gathered
@@ -77,15 +79,33 @@ NEXT NODE DECISION GUIDELINES:
 - Avoid cycles by checking visited nodes
 
 RESPONSE FORMAT:
-- extracted_facts: Array of RawFact objects with fact_text, source_node_id, source_property (if from property), source_qdrant_chunk_id (if from content), source_metadata (with document details), and extracted_from_depth
+- extracted_facts: Array of RawFact objects with fact_text (using entity names, not IDs), source_node_id, source_property (if from property), source_qdrant_chunk_id (if from content), source_metadata (with document details), and extracted_from_depth
 - next_nodes_to_explore: String decision as described above
 - reasoning: Brief explanation of your decision-making process
 
-Be strategic and focused - aim for comprehensive but efficient exploration."""
+Be strategic and focused - aim for comprehensive but efficient exploration.
+Remember: Use entity names in fact descriptions to make them user-friendly and meaningful."""
 
     def _chunk_id_to_point_id(self, chunk_id: str) -> int:
         """Convert chunk ID to Qdrant point ID."""
         return abs(hash(chunk_id)) % (2**31)
+
+    async def _get_entity_name(self, node_id: str) -> str:
+        """Get the entity name for a node ID.
+
+        Args:
+            node_id: Node ID to get name for
+
+        Returns:
+            Entity name or fallback description
+        """
+        try:
+            entity = await self.neo4j_storage.get_entity(node_id)
+            if entity and entity.name:
+                return entity.name
+            return "Unknown Entity"
+        except Exception:
+            return "Unknown Entity"
     
     async def _get_node_context(self, node_id: str) -> NodeContext:
         """Get comprehensive context for a node.
@@ -218,6 +238,8 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
             
             # Validate and enhance the extracted facts
             enhanced_facts = []
+            entity_name = await self._get_entity_name(current_node_id)
+
             for fact in response.extracted_facts:
                 # Ensure depth is set correctly
                 fact.extracted_from_depth = traversal_depth
@@ -228,15 +250,25 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                     for chunk_info in context.qdrant_content:
                         if chunk_info["chunk_id"] == fact.source_qdrant_chunk_id:
                             from morag_reasoning.recursive_fact_models import SourceMetadata
+                            # Include entity name in additional metadata for better source descriptions
+                            additional_metadata = chunk_info.get("additional_metadata", {})
+                            additional_metadata["entity_name"] = entity_name
+
                             fact.source_metadata = SourceMetadata(
                                 document_name=chunk_info.get("document_name"),
                                 chunk_index=chunk_info.get("chunk_index"),
                                 page_number=chunk_info.get("page_number"),
                                 section=chunk_info.get("section"),
                                 timestamp=chunk_info.get("timestamp"),
-                                additional_metadata=chunk_info.get("additional_metadata", {})
+                                additional_metadata=additional_metadata
                             )
                             break
+                else:
+                    # For facts from entity properties, add entity name to metadata
+                    from morag_reasoning.recursive_fact_models import SourceMetadata
+                    fact.source_metadata = SourceMetadata(
+                        additional_metadata={"entity_name": entity_name}
+                    )
 
                 enhanced_facts.append(fact)
             
@@ -280,20 +312,28 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
         language: Optional[str] = None
     ) -> str:
         """Create the prompt for the traversal LLM."""
-        
-        # Format context information
-        node_info = f"Node ID: {context.node_id}\n"
-        node_info += f"Properties: {json.dumps(context.node_properties, indent=2)}\n"
-        
+
+        # Format context information - focus on entity names, not IDs
+        entity_name = context.node_properties.get('name', 'Unknown Entity')
+        entity_type = context.node_properties.get('type', 'Unknown Type')
+
+        node_info = f"Current Entity: {entity_name} (Type: {entity_type})\n"
+
+        # Add properties but exclude technical IDs
+        filtered_properties = {k: v for k, v in context.node_properties.items()
+                             if k not in ['id'] and not k.endswith('_id')}
+        if filtered_properties:
+            node_info += f"Properties: {json.dumps(filtered_properties, indent=2)}\n"
+
         if context.qdrant_content:
             node_info += f"\nAssociated Content ({len(context.qdrant_content)} chunks):\n"
             for i, content in enumerate(context.qdrant_content[:5]):  # Limit to first 5 chunks
                 node_info += f"  Chunk {i+1}: {content['content'][:200]}...\n"
-        
+
         if context.neighbors_and_relations:
-            node_info += f"\nNeighbors ({len(context.neighbors_and_relations)} total):\n"
+            node_info += f"\nConnected Entities ({len(context.neighbors_and_relations)} total):\n"
             for neighbor in context.neighbors_and_relations[:10]:  # Limit to first 10 neighbors
-                node_info += f"  - {neighbor['neighbor_name']} (ID: {neighbor['neighbor_id']}, Type: {neighbor['neighbor_type']})\n"
+                node_info += f"  - {neighbor['neighbor_name']} (Type: {neighbor['neighbor_type']})\n"
         
         visited_list = list(visited_nodes)
         
