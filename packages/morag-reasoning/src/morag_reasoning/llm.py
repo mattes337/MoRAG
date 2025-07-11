@@ -24,9 +24,9 @@ class LLMConfig(BaseModel):
     timeout: int = 30
     
     # Retry configuration
-    max_retries: int = 5
-    base_delay: float = 1.0
-    max_delay: float = 60.0
+    max_retries: int = 8  # Increased for better handling of overload
+    base_delay: float = 2.0  # Increased base delay
+    max_delay: float = 120.0  # Increased max delay
     exponential_base: float = 2.0
     jitter: bool = True
 
@@ -51,7 +51,9 @@ class LLMClient:
                 api_key=os.getenv("GEMINI_API_KEY"),
                 temperature=float(os.getenv("MORAG_LLM_TEMPERATURE", "0.1")),
                 max_tokens=int(os.getenv("MORAG_LLM_MAX_TOKENS", "2000")),
-                max_retries=int(os.getenv("MORAG_LLM_MAX_RETRIES", "5")),
+                max_retries=int(os.getenv("MORAG_LLM_MAX_RETRIES", "8")),
+                base_delay=float(os.getenv("MORAG_LLM_BASE_DELAY", "2.0")),
+                max_delay=float(os.getenv("MORAG_LLM_MAX_DELAY", "120.0")),
             )
         
         self.config = config
@@ -172,13 +174,32 @@ class LLMClient:
                 
             except Exception as e:
                 last_error = e
-                if attempt < self.config.max_retries:
+                error_str = str(e).lower()
+
+                # Check if this is a retryable error
+                is_retryable = (
+                    "503" in error_str or
+                    "overload" in error_str or
+                    "rate limit" in error_str or
+                    "quota" in error_str or
+                    "too many requests" in error_str or
+                    "service unavailable" in error_str or
+                    "temporarily unavailable" in error_str or
+                    "server error" in error_str or
+                    (hasattr(e, 'response') and hasattr(e.response, 'status_code') and
+                     e.response.status_code in [503, 429, 500, 502, 504])
+                )
+
+                if attempt < self.config.max_retries and is_retryable:
                     delay = self._calculate_delay(attempt)
                     self.logger.warning(
-                        f"OpenAI API call failed (attempt {attempt}/{self.config.max_retries}), "
+                        f"OpenAI API call failed with retryable error (attempt {attempt}/{self.config.max_retries}), "
                         f"retrying in {delay:.2f}s: {str(e)}"
                     )
                     await asyncio.sleep(delay)
+                elif not is_retryable:
+                    self.logger.error(f"OpenAI API call failed with non-retryable error: {str(e)}")
+                    break
                 else:
                     break
         
@@ -240,13 +261,32 @@ class LLMClient:
                 
             except Exception as e:
                 last_error = e
-                if attempt < self.config.max_retries:
+                error_str = str(e).lower()
+
+                # Check if this is a retryable error
+                is_retryable = (
+                    "503" in error_str or
+                    "overload" in error_str or
+                    "rate limit" in error_str or
+                    "quota" in error_str or
+                    "too many requests" in error_str or
+                    "service unavailable" in error_str or
+                    "temporarily unavailable" in error_str or
+                    "server error" in error_str or
+                    (hasattr(e, 'response') and hasattr(e.response, 'status_code') and
+                     e.response.status_code in [503, 429, 500, 502, 504])
+                )
+
+                if attempt < self.config.max_retries and is_retryable:
                     delay = self._calculate_delay(attempt)
                     self.logger.warning(
-                        f"Gemini API call failed (attempt {attempt}/{self.config.max_retries}), "
+                        f"Gemini API call failed with retryable error (attempt {attempt}/{self.config.max_retries}), "
                         f"retrying in {delay:.2f}s: {str(e)}"
                     )
                     await asyncio.sleep(delay)
+                elif not is_retryable:
+                    self.logger.error(f"Gemini API call failed with non-retryable error: {str(e)}")
+                    break
                 else:
                     break
         

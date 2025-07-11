@@ -3,6 +3,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 import structlog
+import asyncio
+import random
+import httpx
 
 from morag_reasoning import (
     IntelligentRetrievalRequest, IntelligentRetrievalResponse,
@@ -18,6 +21,88 @@ from morag_graph import DatabaseType
 
 router = APIRouter(prefix="/api/v2", tags=["intelligent-retrieval"])
 logger = structlog.get_logger(__name__)
+
+
+async def retry_on_overload(
+    func,
+    max_retries: int = 8,
+    base_delay: float = 2.0,
+    max_delay: float = 120.0,
+    exponential_base: float = 2.0,
+    jitter: bool = True
+):
+    """Retry function with exponential backoff for model overload errors.
+
+    Args:
+        func: Async function to retry
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay in seconds
+        max_delay: Maximum delay in seconds
+        exponential_base: Base for exponential backoff
+        jitter: Whether to add random jitter to delays
+
+    Returns:
+        Result of the function call
+
+    Raises:
+        The last exception if all retries fail
+    """
+    last_error = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            return await func()
+
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+
+            # Check if this is a retryable error (503, overload, rate limit, etc.)
+            is_retryable = (
+                "503" in error_str or
+                "overload" in error_str or
+                "rate limit" in error_str or
+                "quota" in error_str or
+                "too many requests" in error_str or
+                "service unavailable" in error_str or
+                "temporarily unavailable" in error_str or
+                "server error" in error_str or
+                isinstance(e, httpx.HTTPStatusError) and e.response.status_code in [503, 429, 500, 502, 504]
+            )
+
+            if not is_retryable or attempt >= max_retries:
+                logger.error(
+                    "Function failed with non-retryable error or max retries exceeded",
+                    attempt=attempt,
+                    max_retries=max_retries,
+                    error=str(e),
+                    is_retryable=is_retryable
+                )
+                break
+
+            # Calculate delay with exponential backoff
+            delay = min(
+                base_delay * (exponential_base ** (attempt - 1)),
+                max_delay
+            )
+
+            # Add jitter to prevent thundering herd
+            if jitter:
+                delay *= (0.5 + random.random() * 0.5)  # Add 0-50% jitter
+
+            logger.warning(
+                "Function failed with retryable error, retrying with exponential backoff",
+                attempt=attempt,
+                max_retries=max_retries,
+                delay=delay,
+                error=str(e)
+            )
+
+            await asyncio.sleep(delay)
+
+    # If we get here, all retries failed
+    logger.error(f"Function failed after {max_retries} attempts")
+    raise last_error
 
 
 async def get_intelligent_retrieval_service(
@@ -131,9 +216,18 @@ async def intelligent_retrieval(
         
         # Get service with specified databases
         service = await get_intelligent_retrieval_service(request)
-        
-        # Perform intelligent retrieval
-        response = await service.retrieve_intelligently(request)
+
+        # Perform intelligent retrieval with retry logic for model overload
+        async def perform_retrieval():
+            return await service.retrieve_intelligently(request)
+
+        response = await retry_on_overload(
+            perform_retrieval,
+            max_retries=request.max_retries,
+            base_delay=request.retry_base_delay,
+            max_delay=request.retry_max_delay,
+            jitter=request.retry_jitter
+        )
         
         logger.info(
             "Intelligent retrieval completed",
@@ -217,7 +311,11 @@ async def get_endpoint_info():
             "qdrant_collection": "Qdrant collection name (optional)",
             "language": "Language for processing (optional)",
             "neo4j_server": "Custom Neo4j server configuration (optional)",
-            "qdrant_server": "Custom Qdrant server configuration (optional)"
+            "qdrant_server": "Custom Qdrant server configuration (optional)",
+            "max_retries": "Maximum retry attempts for overload errors (default: 8)",
+            "retry_base_delay": "Base delay for exponential backoff in seconds (default: 2.0)",
+            "retry_max_delay": "Maximum delay between retries in seconds (default: 120.0)",
+            "retry_jitter": "Add random jitter to retry delays (default: true)"
         },
         "response_format": {
             "query_id": "Unique query identifier",

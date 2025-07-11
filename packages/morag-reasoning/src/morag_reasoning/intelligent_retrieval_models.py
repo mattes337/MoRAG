@@ -79,6 +79,12 @@ class IntelligentRetrievalRequest(BaseModel):
     neo4j_server: Optional[DatabaseServerConfig] = Field(None, description="Custom Neo4j server configuration")
     qdrant_server: Optional[DatabaseServerConfig] = Field(None, description="Custom Qdrant server configuration")
 
+    # Retry configuration for handling model overload (503 errors)
+    max_retries: int = Field(default=8, ge=1, le=20, description="Maximum retry attempts for overload errors")
+    retry_base_delay: float = Field(default=2.0, ge=0.1, le=10.0, description="Base delay for exponential backoff (seconds)")
+    retry_max_delay: float = Field(default=120.0, ge=1.0, le=300.0, description="Maximum delay between retries (seconds)")
+    retry_jitter: bool = Field(default=True, description="Add random jitter to retry delays")
+
 
 class IntelligentRetrievalResponse(BaseModel):
     """Response from intelligent entity-based retrieval."""
