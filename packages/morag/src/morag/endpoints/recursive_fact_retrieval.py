@@ -209,6 +209,7 @@ async def get_recursive_fact_retrieval_info():
             "max_facts_per_node": "Maximum facts to extract per node (default: 5, range: 1-20)",
             "min_fact_score": "Minimum score threshold for facts (default: 0.1, range: 0.0-1.0)",
             "max_total_facts": "Maximum total facts to collect (default: 50, range: 1-200)",
+            "facts_only": "Return only facts without final answer synthesis (default: false)",
             "neo4j_database": "Neo4j database name (optional)",
             "qdrant_collection": "Qdrant collection name (optional)",
             "language": "Language for processing (optional)",
@@ -228,7 +229,7 @@ async def get_recursive_fact_retrieval_info():
             "gta_llm_calls": "Number of GraphTraversalAgent LLM calls",
             "fca_llm_calls": "Number of FactCriticAgent LLM calls", 
             "final_llm_calls": "Number of final synthesis LLM calls",
-            "final_answer": "Final synthesized answer",
+            "final_answer": "Final synthesized answer (null if facts_only=true)",
             "confidence_score": "Overall confidence in the answer"
         },
         "algorithm": {

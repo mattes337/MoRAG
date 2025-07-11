@@ -48,9 +48,10 @@ SCORING GUIDELINES:
 
 SOURCE DESCRIPTION GUIDELINES:
 - Create a clear, user-friendly description of where the fact came from
-- Include document name, node type, or content source as appropriate
-- Examples: "From the Wikipedia page for Neo4j", "From a research paper on graph algorithms", "From company profile data"
-- Be specific but concise
+- Include specific document details: document name, chunk/page number, section if available
+- For audio/video: include timestamp information
+- Examples: "From document 'Research_Paper.pdf', page 5, section 'Methodology'", "From video 'Training_Session.mp4' at 15:30", "From 'Company_Report.docx', chunk 3"
+- Be specific and include location details that help users find the source
 
 RESPONSE FORMAT:
 Return the original raw fact enhanced with:
@@ -62,7 +63,8 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
     async def evaluate_fact(
         self,
         user_query: str,
-        raw_fact: RawFact
+        raw_fact: RawFact,
+        language: Optional[str] = None
     ) -> ScoredFact:
         """Evaluate a raw fact and assign a relevance score.
         
@@ -81,7 +83,7 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
         
         try:
             # Create evaluation prompt
-            prompt = self._create_evaluation_prompt(user_query, raw_fact)
+            prompt = self._create_evaluation_prompt(user_query, raw_fact, language)
             
             # Call LLM for fact evaluation
             result = await self.agent.run(prompt)
@@ -116,19 +118,34 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
                 source_description=f"Error evaluating fact from node {raw_fact.source_node_id}"
             )
     
-    def _create_evaluation_prompt(self, user_query: str, raw_fact: RawFact) -> str:
+    def _create_evaluation_prompt(self, user_query: str, raw_fact: RawFact, language: Optional[str] = None) -> str:
         """Create the prompt for fact evaluation."""
-        
-        # Determine source type for better description
+
+        # Build comprehensive source context
         source_info = []
         if raw_fact.source_property:
             source_info.append(f"Property: {raw_fact.source_property}")
         if raw_fact.source_qdrant_chunk_id:
             source_info.append(f"Content Chunk: {raw_fact.source_qdrant_chunk_id}")
-        
+
+        # Add detailed source metadata
+        metadata_info = []
+        if raw_fact.source_metadata.document_name:
+            metadata_info.append(f"Document: {raw_fact.source_metadata.document_name}")
+        if raw_fact.source_metadata.chunk_index is not None:
+            metadata_info.append(f"Chunk: {raw_fact.source_metadata.chunk_index}")
+        if raw_fact.source_metadata.page_number:
+            metadata_info.append(f"Page: {raw_fact.source_metadata.page_number}")
+        if raw_fact.source_metadata.section:
+            metadata_info.append(f"Section: {raw_fact.source_metadata.section}")
+        if raw_fact.source_metadata.timestamp:
+            metadata_info.append(f"Timestamp: {raw_fact.source_metadata.timestamp}")
+
         source_context = f"Node ID: {raw_fact.source_node_id}"
         if source_info:
             source_context += f" ({', '.join(source_info)})"
+        if metadata_info:
+            source_context += f" - {', '.join(metadata_info)}"
         
         prompt = f"""FACT EVALUATION TASK
 
@@ -152,13 +169,32 @@ Consider:
 
 Return the fact with an assigned score and source description."""
 
+        # Add language instruction if specified
+        if language:
+            language_names = {
+                'en': 'English',
+                'de': 'German',
+                'fr': 'French',
+                'es': 'Spanish',
+                'it': 'Italian',
+                'pt': 'Portuguese',
+                'nl': 'Dutch',
+                'ru': 'Russian',
+                'zh': 'Chinese',
+                'ja': 'Japanese',
+                'ko': 'Korean'
+            }
+            language_name = language_names.get(language, language)
+            prompt += f"\n\nIMPORTANT: Provide source description in {language_name} ({language})."
+
         return prompt
     
     async def batch_evaluate_facts(
         self,
         user_query: str,
         raw_facts: list[RawFact],
-        batch_size: int = 10
+        batch_size: int = 10,
+        language: Optional[str] = None
     ) -> list[ScoredFact]:
         """Evaluate multiple facts in batches for efficiency.
         
@@ -190,7 +226,7 @@ Return the fact with an assigned score and source description."""
             batch_results = []
             for fact in batch:
                 try:
-                    scored_fact = await self.evaluate_fact(user_query, fact)
+                    scored_fact = await self.evaluate_fact(user_query, fact, language)
                     batch_results.append(scored_fact)
                 except Exception as e:
                     self.logger.warning(
@@ -254,6 +290,7 @@ Return the fact with an assigned score and source description."""
                 source_node_id=fact.source_node_id,
                 source_property=fact.source_property,
                 source_qdrant_chunk_id=fact.source_qdrant_chunk_id,
+                source_metadata=fact.source_metadata,
                 extracted_from_depth=fact.extracted_from_depth,
                 score=fact.score,
                 source_description=fact.source_description,

@@ -5,21 +5,33 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 
+class SourceMetadata(BaseModel):
+    """Detailed source metadata for facts."""
+    document_name: Optional[str] = Field(None, description="Name of the source document")
+    chunk_index: Optional[int] = Field(None, description="Index of the chunk within the document")
+    page_number: Optional[int] = Field(None, description="Page number if applicable")
+    section: Optional[str] = Field(None, description="Document section")
+    timestamp: Optional[str] = Field(None, description="Timestamp for audio/video content")
+    additional_metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional source metadata")
+
+
 class RawFact(BaseModel):
     """A raw fact extracted by the GraphTraversalAgent."""
-    fact_text: str = Field(..., description="A concise, extracted piece of information")
+    fact_text: str = Field(..., description="A comprehensive, detailed piece of information with full context")
     source_node_id: str = Field(..., description="ID of the node where this fact was found")
     source_property: Optional[str] = Field(None, description="Optional property name if fact from property")
     source_qdrant_chunk_id: Optional[str] = Field(None, description="Optional ID of Qdrant chunk if fact from chunk content")
+    source_metadata: SourceMetadata = Field(default_factory=SourceMetadata, description="Detailed source metadata")
     extracted_from_depth: int = Field(..., description="Integer representing the traversal depth when this fact was extracted (0 for initial entities)")
 
 
 class ScoredFact(BaseModel):
     """A fact that has been scored by the FactCriticAgent."""
-    fact_text: str = Field(..., description="A concise, extracted piece of information")
+    fact_text: str = Field(..., description="A comprehensive, detailed piece of information with full context")
     source_node_id: str = Field(..., description="ID of the node where this fact was found")
     source_property: Optional[str] = Field(None, description="Optional property name if fact from property")
     source_qdrant_chunk_id: Optional[str] = Field(None, description="Optional ID of Qdrant chunk if fact from chunk content")
+    source_metadata: SourceMetadata = Field(default_factory=SourceMetadata, description="Detailed source metadata")
     extracted_from_depth: int = Field(..., description="Integer representing the traversal depth when this fact was extracted")
     score: float = Field(..., ge=0.0, le=1.0, description="Relevance score assigned by FCA")
     source_description: str = Field(..., description="A user-friendly description of the source")
@@ -27,10 +39,11 @@ class ScoredFact(BaseModel):
 
 class FinalFact(BaseModel):
     """A fact with final decayed score after relevance decay."""
-    fact_text: str = Field(..., description="A concise, extracted piece of information")
+    fact_text: str = Field(..., description="A comprehensive, detailed piece of information with full context")
     source_node_id: str = Field(..., description="ID of the node where this fact was found")
     source_property: Optional[str] = Field(None, description="Optional property name if fact from property")
     source_qdrant_chunk_id: Optional[str] = Field(None, description="Optional ID of Qdrant chunk if fact from chunk content")
+    source_metadata: SourceMetadata = Field(default_factory=SourceMetadata, description="Detailed source metadata")
     extracted_from_depth: int = Field(..., description="Integer representing the traversal depth when this fact was extracted")
     score: float = Field(..., ge=0.0, le=1.0, description="Original relevance score assigned by FCA")
     source_description: str = Field(..., description="A user-friendly description of the source")
@@ -45,12 +58,13 @@ class RecursiveFactRetrievalRequest(BaseModel):
     max_facts_per_node: int = Field(default=5, ge=1, le=20, description="Maximum facts to extract per node")
     min_fact_score: float = Field(default=0.1, ge=0.0, le=1.0, description="Minimum score threshold for facts")
     max_total_facts: int = Field(default=50, ge=1, le=200, description="Maximum total facts to collect")
-    
+    facts_only: bool = Field(default=False, description="If true, return only facts without final answer synthesis")
+
     # Database configuration
     neo4j_database: Optional[str] = Field(None, description="Neo4j database name (optional)")
     qdrant_collection: Optional[str] = Field(None, description="Qdrant collection name (optional)")
     language: Optional[str] = Field(None, description="Language for processing (optional)")
-    
+
     # Database server configuration
     database_servers: Optional[List[Dict[str, Any]]] = Field(
         default=None,
@@ -91,7 +105,7 @@ class RecursiveFactRetrievalResponse(BaseModel):
     final_llm_calls: int = Field(..., description="Number of final synthesis LLM calls")
     
     # Final answer
-    final_answer: str = Field(..., description="Final synthesized answer from the stronger LLM")
+    final_answer: Optional[str] = Field(None, description="Final synthesized answer from the stronger LLM (null if facts_only=true)")
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Overall confidence in the answer")
     
     # Debug information

@@ -61,11 +61,12 @@ Your role is to:
 3. Decide on the next nodes to explore based on the user query
 
 FACT EXTRACTION GUIDELINES:
-- Extract up to {self.max_facts_per_node} concise, factual statements
+- Extract up to {self.max_facts_per_node} comprehensive, detailed factual statements
 - Focus on information that could be relevant to answering the user query
-- Each fact should be a complete, standalone statement
+- Each fact should be a complete, standalone statement with full context and relevant details
 - Include facts from node properties, Qdrant content, and relationship information
-- Be specific and avoid vague statements
+- Be specific and include all relevant context, numbers, dates, and supporting details
+- Make facts extensive and self-contained so they can be used independently for synthesis
 
 NEXT NODE DECISION GUIDELINES:
 - Return "STOP_TRAVERSAL" if you believe sufficient information has been gathered
@@ -76,7 +77,7 @@ NEXT NODE DECISION GUIDELINES:
 - Avoid cycles by checking visited nodes
 
 RESPONSE FORMAT:
-- extracted_facts: Array of RawFact objects with fact_text, source_node_id, source_property (if from property), source_qdrant_chunk_id (if from content), and extracted_from_depth
+- extracted_facts: Array of RawFact objects with fact_text, source_node_id, source_property (if from property), source_qdrant_chunk_id (if from content), source_metadata (with document details), and extracted_from_depth
 - next_nodes_to_explore: String decision as described above
 - reasoning: Brief explanation of your decision-making process
 
@@ -117,10 +118,17 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                 # Try to find chunks associated with this entity
                 chunks = await self.qdrant_storage.get_chunks_by_entity_id(node_id)
                 for chunk in chunks:
+                    metadata = chunk.get("metadata", {})
                     qdrant_content.append({
                         "chunk_id": chunk["chunk_id"],
-                        "content": chunk.get("metadata", {}).get("text", ""),
-                        "document_name": chunk.get("metadata", {}).get("document_name", ""),
+                        "content": metadata.get("text", ""),
+                        "document_name": metadata.get("document_name", ""),
+                        "chunk_index": metadata.get("chunk_index"),
+                        "page_number": metadata.get("page_number"),
+                        "section": metadata.get("section"),
+                        "timestamp": metadata.get("timestamp"),
+                        "additional_metadata": {k: v for k, v in metadata.items()
+                                              if k not in ["text", "document_name", "chunk_index", "page_number", "section", "timestamp"]},
                         "score": 1.0  # No similarity score for entity-based retrieval
                     })
             except Exception as e:
@@ -165,10 +173,11 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
         traversal_depth: int,
         max_depth: int,
         visited_nodes: Set[str],
-        graph_schema: Optional[str] = None
+        graph_schema: Optional[str] = None,
+        language: Optional[str] = None
     ) -> GTAResponse:
         """Perform graph traversal and fact extraction for a single node.
-        
+
         Args:
             user_query: Original user query
             current_node_id: Current node being explored
@@ -176,7 +185,8 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
             max_depth: Maximum allowed depth
             visited_nodes: Set of already visited node IDs
             graph_schema: Optional graph schema information
-            
+            language: Optional language for fact extraction
+
         Returns:
             GTAResponse with extracted facts and next node decisions
         """
@@ -198,7 +208,8 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
                 traversal_depth=traversal_depth,
                 max_depth=max_depth,
                 visited_nodes=visited_nodes,
-                graph_schema=graph_schema
+                graph_schema=graph_schema,
+                language=language
             )
             
             # Call LLM for traversal decision and fact extraction
@@ -210,6 +221,23 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
             for fact in response.extracted_facts:
                 # Ensure depth is set correctly
                 fact.extracted_from_depth = traversal_depth
+
+                # Enhance source metadata if fact comes from Qdrant content
+                if fact.source_qdrant_chunk_id:
+                    # Find the corresponding chunk in context
+                    for chunk_info in context.qdrant_content:
+                        if chunk_info["chunk_id"] == fact.source_qdrant_chunk_id:
+                            from morag_reasoning.recursive_fact_models import SourceMetadata
+                            fact.source_metadata = SourceMetadata(
+                                document_name=chunk_info.get("document_name"),
+                                chunk_index=chunk_info.get("chunk_index"),
+                                page_number=chunk_info.get("page_number"),
+                                section=chunk_info.get("section"),
+                                timestamp=chunk_info.get("timestamp"),
+                                additional_metadata=chunk_info.get("additional_metadata", {})
+                            )
+                            break
+
                 enhanced_facts.append(fact)
             
             # Create final response
@@ -248,7 +276,8 @@ Be strategic and focused - aim for comprehensive but efficient exploration."""
         traversal_depth: int,
         max_depth: int,
         visited_nodes: Set[str],
-        graph_schema: Optional[str] = None
+        graph_schema: Optional[str] = None,
+        language: Optional[str] = None
     ) -> str:
         """Create the prompt for the traversal LLM."""
         
@@ -287,5 +316,23 @@ Your task:
 2. Decide which neighbors (if any) to explore next
 
 Focus on information that helps answer the user query. Be strategic about which paths to follow."""
+
+        # Add language instruction if specified
+        if language:
+            language_names = {
+                'en': 'English',
+                'de': 'German',
+                'fr': 'French',
+                'es': 'Spanish',
+                'it': 'Italian',
+                'pt': 'Portuguese',
+                'nl': 'Dutch',
+                'ru': 'Russian',
+                'zh': 'Chinese',
+                'ja': 'Japanese',
+                'ko': 'Korean'
+            }
+            language_name = language_names.get(language, language)
+            prompt += f"\n\nIMPORTANT: Extract facts in {language_name} ({language}). All fact text must be in {language_name}."
 
         return prompt

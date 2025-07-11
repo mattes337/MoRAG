@@ -123,7 +123,7 @@ class RecursiveFactRetrievalService:
             # Step 4: Evaluate and score facts
             self.logger.info("Step 4: Evaluating and scoring facts")
             scored_facts = await self.fact_critic_agent.batch_evaluate_facts(
-                request.user_query, all_raw_facts
+                request.user_query, all_raw_facts, language=request.language
             )
             fca_llm_calls = len(all_raw_facts)  # One LLM call per fact
             
@@ -142,12 +142,22 @@ class RecursiveFactRetrievalService:
             # Limit total facts
             final_facts = final_facts[:request.max_total_facts]
             
-            # Step 6: Generate final answer
-            self.logger.info("Step 6: Generating final answer")
-            final_answer, confidence_score = await self._generate_final_answer(
-                request.user_query, final_facts
-            )
-            final_llm_calls = 1
+            # Step 6: Generate final answer (unless facts_only is requested)
+            final_answer = None
+            confidence_score = 0.0
+            if not request.facts_only:
+                self.logger.info("Step 6: Generating final answer")
+                final_answer, confidence_score = await self._generate_final_answer(
+                    request.user_query, final_facts, request.language
+                )
+                final_llm_calls = 1
+            else:
+                self.logger.info("Step 6: Skipping final answer generation (facts_only=True)")
+                # Calculate confidence based on fact scores
+                if final_facts:
+                    avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(final_facts)
+                    confidence_score = min(1.0, avg_score * (len(final_facts) / 10))
+                final_llm_calls = 0
             
             # Calculate processing time
             end_time = datetime.now()
@@ -246,7 +256,8 @@ class RecursiveFactRetrievalService:
                     current_node_id=current_node_id,
                     traversal_depth=current_depth,
                     max_depth=request.max_depth,
-                    visited_nodes=visited_nodes
+                    visited_nodes=visited_nodes,
+                    language=request.language
                 )
                 
                 # Record traversal step
@@ -311,7 +322,8 @@ class RecursiveFactRetrievalService:
     async def _generate_final_answer(
         self,
         user_query: str,
-        final_facts: List[FinalFact]
+        final_facts: List[FinalFact],
+        language: Optional[str] = None
     ) -> Tuple[str, float]:
         """Generate the final answer using the stronger LLM."""
         if not final_facts:
@@ -320,12 +332,45 @@ class RecursiveFactRetrievalService:
         # Prepare context for final LLM
         formatted_facts = []
         for fact in final_facts:
+            # Create detailed source information
+            source_details = fact.source_description
+            if fact.source_metadata.document_name:
+                source_parts = [fact.source_metadata.document_name]
+                if fact.source_metadata.chunk_index is not None:
+                    source_parts.append(f"chunk {fact.source_metadata.chunk_index}")
+                if fact.source_metadata.page_number:
+                    source_parts.append(f"page {fact.source_metadata.page_number}")
+                if fact.source_metadata.section:
+                    source_parts.append(f"section '{fact.source_metadata.section}'")
+                if fact.source_metadata.timestamp:
+                    source_parts.append(f"at {fact.source_metadata.timestamp}")
+                source_details = ", ".join(source_parts)
+
             formatted_facts.append(
-                f"Fact (Score: {fact.final_decayed_score:.2f}, Source: {fact.source_description}): {fact.fact_text}"
+                f"Fact (Score: {fact.final_decayed_score:.2f}, Source: {source_details}): {fact.fact_text}"
             )
-        
+
         context = "\n\n".join(formatted_facts)
-        
+
+        # Add language specification if provided
+        language_instruction = ""
+        if language:
+            language_names = {
+                'en': 'English',
+                'de': 'German',
+                'fr': 'French',
+                'es': 'Spanish',
+                'it': 'Italian',
+                'pt': 'Portuguese',
+                'nl': 'Dutch',
+                'ru': 'Russian',
+                'zh': 'Chinese',
+                'ja': 'Japanese',
+                'ko': 'Korean'
+            }
+            language_name = language_names.get(language, language)
+            language_instruction = f"\n\nIMPORTANT: Please respond in {language_name} ({language}). The entire response must be in {language_name}."
+
         prompt = f"""Based on the following facts extracted from a knowledge graph, please provide a comprehensive answer to the user's question.
 
 User Question: "{user_query}"
@@ -333,7 +378,7 @@ User Question: "{user_query}"
 Relevant Facts:
 {context}
 
-Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from the facts. If the facts don't fully answer the question, acknowledge what information is available and what might be missing."""
+Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from the facts. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}"""
         
         try:
             # Use the stronger LLM for final synthesis

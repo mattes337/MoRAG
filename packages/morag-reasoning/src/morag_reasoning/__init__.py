@@ -27,7 +27,7 @@ from .fact_extraction import FactExtractionService
 
 # Recursive fact retrieval components
 from .recursive_fact_models import (
-    RawFact, ScoredFact, FinalFact,
+    SourceMetadata, RawFact, ScoredFact, FinalFact,
     RecursiveFactRetrievalRequest, RecursiveFactRetrievalResponse,
     TraversalStep, GTAResponse, FCAResponse
 )
@@ -59,6 +59,7 @@ __all__ = [
     "RecursivePathFollower",
     "FactExtractionService",
     # Recursive fact retrieval
+    "SourceMetadata",
     "RawFact",
     "ScoredFact",
     "FinalFact",

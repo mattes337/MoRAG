@@ -233,7 +233,8 @@ class RecursiveFactRetrievalTester:
         max_facts_per_node: int = 5,
         min_fact_score: float = 0.1,
         max_total_facts: int = 50,
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        facts_only: bool = False
     ) -> Dict[str, Any]:
         """Test the recursive fact retrieval service.
 
@@ -245,6 +246,7 @@ class RecursiveFactRetrievalTester:
             min_fact_score: Minimum score threshold for facts
             max_total_facts: Maximum total facts to collect
             language: Language for processing
+            facts_only: If true, return only facts without final answer synthesis
 
         Returns:
             Response from the service
@@ -266,7 +268,8 @@ class RecursiveFactRetrievalTester:
                 max_total_facts=max_total_facts,
                 neo4j_database=self.neo4j_database,
                 qdrant_collection=self.qdrant_collection,
-                language=language
+                language=language,
+                facts_only=facts_only
             )
 
             # Run recursive fact retrieval
@@ -416,6 +419,7 @@ async def main():
     parser.add_argument("--min-fact-score", type=float, default=0.1, help="Minimum score threshold for facts")
     parser.add_argument("--max-total-facts", type=int, default=50, help="Maximum total facts to collect")
     parser.add_argument("--language", help="Language for processing")
+    parser.add_argument("--facts-only", action="store_true", help="Return only facts without final answer synthesis")
 
     # Output options
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
@@ -481,6 +485,8 @@ async def main():
         print(f"   Max total facts: {args.max_total_facts}")
         if args.language:
             print(f"   Language: {args.language}")
+        if args.facts_only:
+            print(f"   Facts only: {args.facts_only}")
         print()
 
         results = await tester.test_recursive_fact_retrieval(
@@ -490,7 +496,8 @@ async def main():
             max_facts_per_node=args.max_facts_per_node,
             min_fact_score=args.min_fact_score,
             max_total_facts=args.max_total_facts,
-            language=args.language
+            language=args.language,
+            facts_only=args.facts_only
         )
 
         # Print results
