@@ -56,39 +56,53 @@ class GraphTraversalAgent:
         return f"""You are a GraphTraversalAgent (GTA) responsible for intelligent graph traversal and fact extraction.
 
 Your role is to:
-1. Analyze the current node's context (properties, content, neighbors)
-2. Extract potentially relevant facts from the provided context
-3. Decide on the next nodes to explore based on the user query
+1. Analyze document chunks and extract actionable facts from their content
+2. Extract concrete, substantive information that directly answers user queries
+3. Decide on the next entities to explore based on the user query
 
 FACT EXTRACTION GUIDELINES:
-- Extract MANY comprehensive, detailed factual statements (aim for {self.max_facts_per_node} facts)
-- Be AGGRESSIVE in fact extraction - extract multiple facts from each relevant chunk
-- Focus on information that could be relevant to answering the user query
-- Each fact should be a complete, standalone statement with full context and relevant details
-- Include facts from entity properties, associated content, and relationship information
-- Be specific and include all relevant context, numbers, dates, and supporting details
-- Make facts extensive and self-contained so they can be used independently for synthesis
-- IMPORTANT: Reference entities by their names rather than technical IDs
-- Focus on meaningful entity relationships and content, not database metadata
-- Extract specific items, recommendations, studies, and quantitative information when available
-- Extract both positive recommendations (what to do) and negative ones (what to avoid)
-- Include concrete actionable advice, scientific findings, and practical guidance
+- Extract DIRECT FACTS from document content, not meta-descriptions about the content
+- NEVER say "the document mentions" or "the video talks about" - extract the actual facts
+- Extract {self.max_facts_per_node} concrete, actionable facts per chunk
+- Each fact must be INFORMATION COMPLETE and standalone
+- Focus on specific recommendations, treatments, substances, quantities, and scientific findings
+- Include exact dosages, timing, mechanisms, and research results when available
+- Extract both positive recommendations (what works) and negative ones (what to avoid)
+- Include specific items, compounds, procedures, and their effects
+- Extract causal relationships and mechanisms of action
+- Favor research findings, scientific studies, and expert recommendations
+- Make each fact actionable and specific, not general or descriptive
+
+WHAT TO EXTRACT:
+- Specific treatments and their effectiveness
+- Exact dosages, timing, and administration methods
+- Scientific study results and statistical findings
+- Specific substances and their effects
+- Contraindications and things to avoid
+- Mechanisms of action and biological processes
+- Practical implementation advice
+- Quantitative data and measurements
+
+WHAT NOT TO EXTRACT:
+- Meta-commentary about what documents contain
+- General descriptions of topics
+- References to "the video" or "the document"
+- Vague statements without specific details
+- Database or chunk metadata
 
 NEXT NODE DECISION GUIDELINES:
 - Return "STOP_TRAVERSAL" if you believe sufficient information has been gathered
 - Return "NONE" if no promising neighbors exist for exploration
-- Return comma-separated (node_id, relationship_type) tuples for nodes to explore next
+- Return comma-separated entity names for entities to explore next
 - Consider semantic relevance to the query, potential for new information discovery
-- Prioritize nodes that are likely to contain relevant information
-- Avoid cycles by checking visited nodes
+- Prioritize entities that are likely to contain relevant information
 
 RESPONSE FORMAT:
-- extracted_facts: Array of RawFact objects with fact_text (using entity names, not IDs), source_node_id, source_property (if from property), source_qdrant_chunk_id (if from content), source_metadata (with document details), and extracted_from_depth
+- extracted_facts: Array of RawFact objects with fact_text containing direct, actionable facts
 - next_nodes_to_explore: String decision as described above
 - reasoning: Brief explanation of your decision-making process
 
-Be strategic and focused - aim for comprehensive but efficient exploration.
-Remember: Use entity names in fact descriptions to make them user-friendly and meaningful."""
+Remember: Extract the actual facts, not descriptions of what documents contain."""
 
     def _chunk_id_to_point_id(self, chunk_id: str) -> int:
         """Convert chunk ID to Qdrant point ID."""
@@ -347,7 +361,7 @@ Remember: Use entity names in fact descriptions to make them user-friendly and m
         related_entities_list = list(all_related_entities)[:20]
         related_entities_info = f"Related Entities Found: {', '.join(related_entities_list)}\n"
 
-        prompt = f"""DOCUMENT CHUNK FACT EXTRACTION TASK
+        prompt = f"""DIRECT FACT EXTRACTION FROM DOCUMENT CHUNKS
 
 User Query: "{user_query}"
 
@@ -359,38 +373,42 @@ Traversal Information:
 - Current Depth: {traversal_depth}
 - Current Entities: {', '.join(entity_names)}
 
-Your task:
-1. Extract MULTIPLE relevant facts from the document chunks that help answer the user query
-2. For each fact, specify which chunk it came from (use the chunk_id as source_qdrant_chunk_id)
-3. Decide which related entities to explore next for deeper traversal
+CRITICAL INSTRUCTIONS:
+You are extracting DIRECT FACTS from document content to answer the user query.
 
-CRITICAL REQUIREMENTS:
-- Extract AT LEAST 5-10 facts from the provided chunks
-- Extract facts from the actual chunk content, not just entity relationships
-- Each fact should be substantial and directly relevant to the user query
-- Include specific details, numbers, dates, recommendations, and context from the chunks
-- Look for concrete information like specific items, substances, recommendations, studies, etc.
-- Extract specific recommendations, advice, and scientific findings relevant to the query
-- For next_nodes_to_explore, return entity names (not IDs) separated by commas, or "STOP_TRAVERSAL" if sufficient information is gathered
-- Focus on factual content that provides concrete answers or supporting evidence
+WHAT TO DO:
+- Extract the actual factual content from the chunks
+- Make each fact INFORMATION COMPLETE and standalone
+- Extract specific treatments, dosages, mechanisms, and research findings
+- Include exact quantities, timing, and scientific data
+- Extract both positive recommendations and contraindications
+- Focus on actionable, concrete information
 
-EXTRACTION STRATEGY:
-- Scan through ALL provided chunks for relevant information
-- Extract multiple facts per chunk if they contain rich information
-- Look for actionable advice, specific recommendations, research findings
-- Include both positive recommendations (what to do) and negative ones (what to avoid)
-- Extract specific items, substances, patterns, timing, and quantities when mentioned
-- Look for scientific studies, expert opinions, practical implementation advice
-- Extract information about mechanisms and causal relationships
+WHAT NOT TO DO:
+- NEVER write "the document mentions" or "the video discusses"
+- NEVER reference chunks, documents, or sources in the fact text
+- NEVER write meta-descriptions about content
+- NEVER use vague or general statements
 
-FACT EXTRACTION EXAMPLES:
-- Extract specific substances, compounds, or items mentioned with their effects and dosages
-- Extract recommendations about what to avoid and what to prefer with supporting evidence
-- Extract timing, frequency, and quantity information when provided
-- Extract scientific findings, study results, and expert recommendations
+EXTRACTION EXAMPLES:
+GOOD: "Omega-3 fatty acids at 1000mg daily reduce ADHD symptoms by 25% according to randomized controlled trials"
+BAD: "The document mentions that omega-3 fatty acids can help with ADHD"
 
-NEXT ENTITY EXPLORATION:
-Consider exploring related entities that appear in the content or are mentioned in relationships"""
+GOOD: "Meditation for 20 minutes daily improves attention span and reduces hyperactivity in children with ADHD"
+BAD: "The video talks about meditation being beneficial for ADHD"
+
+GOOD: "Avoid artificial food dyes (Red 40, Yellow 6) as they increase hyperactivity in 73% of ADHD children"
+BAD: "The study discusses how certain food additives affect ADHD symptoms"
+
+EXTRACTION REQUIREMENTS:
+- Extract {self.max_facts_per_node} direct, actionable facts from the chunks
+- Each fact must be complete and usable independently
+- Include specific dosages, timing, percentages, and research data
+- Extract mechanisms of action and biological processes
+- Include contraindications and safety information
+- For next_nodes_to_explore, return entity names separated by commas, or "STOP_TRAVERSAL"
+
+Focus on extracting the actual substantive information that directly answers the user's query."""
 
         # Add language instruction if specified
         if language:
