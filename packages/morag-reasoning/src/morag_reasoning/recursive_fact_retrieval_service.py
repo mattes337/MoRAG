@@ -118,6 +118,7 @@ class RecursiveFactRetrievalService:
                 )
             
             # Step 4: Evaluate and score facts (unless skip_fact_evaluation is true)
+            scored_facts = []  # Initialize scored_facts for both code paths
             if request.skip_fact_evaluation:
                 self.logger.info("Step 4: Skipping fact evaluation (skip_fact_evaluation=True)")
                 # Convert raw facts directly to final facts without scoring
