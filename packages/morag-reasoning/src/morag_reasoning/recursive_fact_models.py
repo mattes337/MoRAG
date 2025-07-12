@@ -59,6 +59,7 @@ class RecursiveFactRetrievalRequest(BaseModel):
     min_fact_score: float = Field(default=0.1, ge=0.0, le=1.0, description="Minimum score threshold for facts")
     max_total_facts: int = Field(default=50, ge=1, le=200, description="Maximum total facts to collect")
     facts_only: bool = Field(default=False, description="If true, return only facts without final answer synthesis")
+    skip_fact_evaluation: bool = Field(default=False, description="If true, skip fact evaluation and return all raw facts without scoring")
 
     # Database configuration
     neo4j_database: Optional[str] = Field(None, description="Neo4j database name (optional)")

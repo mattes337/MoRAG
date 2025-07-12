@@ -115,27 +115,49 @@ class RecursiveFactRetrievalService:
                     "No relevant facts could be extracted from the knowledge graph."
                 )
             
-            # Step 4: Evaluate and score facts
-            self.logger.info("Step 4: Evaluating and scoring facts")
-            scored_facts = await self.fact_critic_agent.batch_evaluate_facts(
-                request.user_query, all_raw_facts, language=request.language
-            )
-            fca_llm_calls = len(all_raw_facts)  # One LLM call per fact
-            
-            # Step 5: Apply relevance decay
-            self.logger.info("Step 5: Applying relevance decay")
-            final_facts = self.fact_critic_agent.apply_relevance_decay(
-                scored_facts, request.decay_rate
-            )
-            
-            # Filter facts by minimum score
-            final_facts = [
-                fact for fact in final_facts 
-                if fact.final_decayed_score >= request.min_fact_score
-            ]
-            
-            # Limit total facts
-            final_facts = final_facts[:request.max_total_facts]
+            # Step 4: Evaluate and score facts (unless skip_fact_evaluation is true)
+            if request.skip_fact_evaluation:
+                self.logger.info("Step 4: Skipping fact evaluation (skip_fact_evaluation=True)")
+                # Convert raw facts directly to final facts without scoring
+                final_facts = []
+                for raw_fact in all_raw_facts:
+                    final_fact = FinalFact(
+                        fact_text=raw_fact.fact_text,
+                        source_node_id=raw_fact.source_node_id,
+                        source_property=raw_fact.source_property,
+                        source_qdrant_chunk_id=raw_fact.source_qdrant_chunk_id,
+                        source_metadata=raw_fact.source_metadata,
+                        extracted_from_depth=raw_fact.extracted_from_depth,
+                        score=1.0,  # Default score since evaluation is skipped
+                        source_description=f"Node: {raw_fact.source_node_id}",  # Basic source description
+                        final_decayed_score=1.0  # No decay applied
+                    )
+                    final_facts.append(final_fact)
+
+                # Limit total facts (no score filtering since evaluation is skipped)
+                final_facts = final_facts[:request.max_total_facts]
+                fca_llm_calls = 0  # No LLM calls for fact evaluation
+            else:
+                self.logger.info("Step 4: Evaluating and scoring facts")
+                scored_facts = await self.fact_critic_agent.batch_evaluate_facts(
+                    request.user_query, all_raw_facts, language=request.language
+                )
+                fca_llm_calls = len(all_raw_facts)  # One LLM call per fact
+
+                # Step 5: Apply relevance decay
+                self.logger.info("Step 5: Applying relevance decay")
+                final_facts = self.fact_critic_agent.apply_relevance_decay(
+                    scored_facts, request.decay_rate
+                )
+
+                # Filter facts by minimum score
+                final_facts = [
+                    fact for fact in final_facts
+                    if fact.final_decayed_score >= request.min_fact_score
+                ]
+
+                # Limit total facts
+                final_facts = final_facts[:request.max_total_facts]
             
             # Step 6: Generate final answer (unless facts_only is requested)
             final_answer = None

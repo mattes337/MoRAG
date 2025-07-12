@@ -210,6 +210,7 @@ async def get_recursive_fact_retrieval_info():
             "min_fact_score": "Minimum score threshold for facts (default: 0.1, range: 0.0-1.0)",
             "max_total_facts": "Maximum total facts to collect (default: 50, range: 1-200)",
             "facts_only": "Return only facts without final answer synthesis (default: false)",
+            "skip_fact_evaluation": "Skip fact evaluation and return all raw facts without scoring (default: false)",
             "neo4j_database": "Neo4j database name (optional)",
             "qdrant_collection": "Qdrant collection name (optional)",
             "language": "Language for processing (optional)",
@@ -237,10 +238,10 @@ async def get_recursive_fact_retrieval_info():
             "step_2": "Map entities to graph nodes in Neo4j",
             "step_3": "Perform breadth-first graph traversal using GraphTraversalAgent",
             "step_4": "Extract facts from each node (properties, content, relationships)",
-            "step_5": "Evaluate fact relevance using FactCriticAgent",
-            "step_6": "Apply depth-based relevance decay",
+            "step_5": "Evaluate fact relevance using FactCriticAgent (skipped if skip_fact_evaluation=true)",
+            "step_6": "Apply depth-based relevance decay (skipped if skip_fact_evaluation=true)",
             "step_7": "Filter facts by minimum score and limit total count",
-            "step_8": "Synthesize final answer using stronger LLM"
+            "step_8": "Synthesize final answer using stronger LLM (skipped if facts_only=true)"
         }
     }
 

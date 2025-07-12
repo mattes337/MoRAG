@@ -102,6 +102,17 @@ curl "http://localhost:8000/api/v2/recursive-fact-retrieval/info"
 curl "http://localhost:8000/api/v2/recursive-fact-retrieval/health"
 ```
 
+### Skip Fact Evaluation (Return All Raw Facts)
+```bash
+curl -X POST "http://localhost:8000/api/v2/recursive-fact-retrieval" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_query": "What are the main symptoms of ADHD?",
+    "skip_fact_evaluation": true,
+    "max_total_facts": 100
+  }'
+```
+
 ## Configuration Parameters
 
 | Parameter | Default | Range | Description |
@@ -111,6 +122,8 @@ curl "http://localhost:8000/api/v2/recursive-fact-retrieval/health"
 | `max_facts_per_node` | 5 | 1-20 | Maximum facts extracted per node |
 | `min_fact_score` | 0.1 | 0.0-1.0 | Minimum score threshold for facts |
 | `max_total_facts` | 50 | 1-200 | Maximum total facts to collect |
+| `facts_only` | false | boolean | Return only facts without final answer synthesis |
+| `skip_fact_evaluation` | false | boolean | Skip fact evaluation and return all raw facts without scoring |
 
 ## Understanding the Output
 
