@@ -53,56 +53,36 @@ class GraphTraversalAgent:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for the GraphTraversalAgent."""
-        return f"""You are a GraphTraversalAgent (GTA) responsible for intelligent graph traversal and fact extraction.
+        return f"""You are a helpful GraphTraversalAgent that extracts useful information from document chunks.
 
-Your role is to:
-1. Analyze document chunks and extract actionable facts from their content
-2. Extract concrete, substantive information that directly answers user queries
-3. Decide on the next entities to explore based on the user query
+Your job is to:
+1. Look through document chunks for information related to the user's query
+2. Extract any useful facts, recommendations, or advice you find
+3. Suggest related topics to explore next
 
-FACT EXTRACTION GUIDELINES:
-- Extract DIRECT FACTS from document content, not meta-descriptions about the content
-- NEVER say "the document mentions" or "the video talks about" - extract the actual facts
-- Extract {self.max_facts_per_node} concrete, actionable facts per chunk
-- Each fact must be INFORMATION COMPLETE and standalone
-- Focus on specific recommendations, treatments, substances, quantities, and scientific findings
-- Include exact dosages, timing, mechanisms, and research results when available
-- Extract both positive recommendations (what works) and negative ones (what to avoid)
-- Include specific items, compounds, procedures, and their effects
-- Extract causal relationships and mechanisms of action
-- Favor research findings, scientific studies, and expert recommendations
-- Make each fact actionable and specific, not general or descriptive
+EXTRACTION APPROACH:
+- Be VERY AGGRESSIVE in extracting information - extract MANY facts
+- Look for recommendations, treatments, foods, supplements, advice
+- Include both what helps and what to avoid
+- Extract specific details when available (dosages, amounts, etc.)
+- Extract from EVERY chunk that contains relevant information
+- Extract MULTIPLE facts per chunk when possible
+- Extract up to {self.max_facts_per_node} useful pieces of information (aim for the maximum!)
 
-WHAT TO EXTRACT:
-- Specific treatments and their effectiveness
-- Exact dosages, timing, and administration methods
-- Scientific study results and statistical findings
-- Specific substances and their effects
-- Contraindications and things to avoid
-- Mechanisms of action and biological processes
-- Practical implementation advice
-- Quantitative data and measurements
-
-WHAT NOT TO EXTRACT:
-- Meta-commentary about what documents contain
-- General descriptions of topics
-- References to "the video" or "the document"
-- Vague statements without specific details
-- Database or chunk metadata
-
-NEXT NODE DECISION GUIDELINES:
-- Return "STOP_TRAVERSAL" if you believe sufficient information has been gathered
-- Return "NONE" if no promising neighbors exist for exploration
-- Return comma-separated entity names for entities to explore next
-- Consider semantic relevance to the query, potential for new information discovery
-- Prioritize entities that are likely to contain relevant information
+WHAT TO LOOK FOR:
+- Treatments, therapies, or interventions
+- Foods, supplements, or substances mentioned
+- Things to do or avoid
+- Effects, benefits, or problems
+- Research findings or expert advice
+- Practical tips or strategies
 
 RESPONSE FORMAT:
-- extracted_facts: Array of RawFact objects with fact_text containing direct, actionable facts
-- next_nodes_to_explore: String decision as described above
-- reasoning: Brief explanation of your decision-making process
+- extracted_facts: List of useful information found in the chunks
+- next_nodes_to_explore: Related entity names to explore next, or "STOP_TRAVERSAL"
+- reasoning: Brief explanation of what you found
 
-Remember: Extract the actual facts, not descriptions of what documents contain."""
+Be generous in extracting information - anything related to the user's query is valuable."""
 
     def _chunk_id_to_point_id(self, chunk_id: str) -> int:
         """Convert chunk ID to Qdrant point ID."""
@@ -228,6 +208,15 @@ Remember: Extract the actual facts, not descriptions of what documents contain."
                 related_entities_from_graph=related_entities_from_graph
             )
 
+            # Debug: Log prompt length and sample content
+            self.logger.debug(
+                "Sending prompt to LLM for fact extraction",
+                prompt_length=len(prompt),
+                chunks_count=len(chunks),
+                entity_names=entity_names,
+                sample_prompt=prompt[:500] + "..." if len(prompt) > 500 else prompt
+            )
+
             # Call LLM for fact extraction
             result = await self.agent.run(prompt)
             response = result.data
@@ -316,15 +305,14 @@ Remember: Extract the actual facts, not descriptions of what documents contain."
     ) -> str:
         """Create the prompt for chunk-based fact extraction."""
 
-        # Format chunk information - show more chunks with more content
+        # Format chunk information - show ALL chunks with substantial content
         chunks_info = f"Document Chunks Related to Entities: {', '.join(entity_names)} (Total: {len(chunks)} chunks)\n\n"
 
-        # Show up to 50 chunks with more content to provide better context
-        max_chunks_to_show = min(50, len(chunks))
-        for i, chunk in enumerate(chunks[:max_chunks_to_show]):
+        # Show ALL chunks with substantial content to maximize fact extraction
+        for i, chunk in enumerate(chunks):
             # Handle both dict and string chunks defensively
             if isinstance(chunk, str):
-                chunks_info += f"Chunk {i+1} (Text): {chunk[:800]}{'...' if len(chunk) > 800 else ''}\n\n"
+                chunks_info += f"Chunk {i+1} (Text): {chunk[:1200]}{'...' if len(chunk) > 1200 else ''}\n\n"
                 continue
 
             # Handle dict chunks with defensive access
@@ -342,10 +330,7 @@ Remember: Extract the actual facts, not descriptions of what documents contain."
             chunks_info += f"  Document: {document_name}\n"
             chunks_info += f"  Chunk Index: {chunk_index}\n"
             chunks_info += f"  Related Entities: {', '.join(related_entities)}\n"
-            chunks_info += f"  Content: {text[:800]}{'...' if len(text) > 800 else ''}\n\n"
-
-        if len(chunks) > max_chunks_to_show:
-            chunks_info += f"... and {len(chunks) - max_chunks_to_show} more chunks available.\n\n"
+            chunks_info += f"  Content: {text[:1200]}{'...' if len(text) > 1200 else ''}\n\n"
 
         # Get related entity names for next traversal from chunks and graph
         all_related_entities = set()
@@ -365,7 +350,7 @@ Remember: Extract the actual facts, not descriptions of what documents contain."
         related_entities_list = list(all_related_entities)[:20]
         related_entities_info = f"Related Entities Found: {', '.join(related_entities_list)}\n"
 
-        prompt = f"""EXTRACT ACTIONABLE FACTS FROM DOCUMENT CHUNKS
+        prompt = f"""FIND USEFUL INFORMATION FROM DOCUMENT CHUNKS
 
 User Query: "{user_query}"
 
@@ -373,46 +358,50 @@ User Query: "{user_query}"
 
 {related_entities_info}
 
-Traversal Information:
-- Current Depth: {traversal_depth}
-- Current Entities: {', '.join(entity_names)}
-
 YOUR TASK:
-Extract DIRECT, ACTIONABLE FACTS from the document chunks that help answer the user's query.
+AGGRESSIVELY extract MANY useful facts from the document chunks that relate to the user's query.
 
-EXTRACTION GUIDELINES:
-- Look through ALL the provided chunks for relevant information
-- Extract the actual factual content, not descriptions of what documents contain
-- Make each fact COMPLETE and STANDALONE
-- Include specific details: dosages, timing, percentages, mechanisms
-- Extract both positive recommendations (what works) and negative ones (what to avoid)
-- Focus on concrete, implementable information
-
-FACT FORMAT EXAMPLES:
-✅ GOOD: "Omega-3 fatty acids at 1000mg daily reduce ADHD symptoms by 25%"
-✅ GOOD: "Meditation for 20 minutes daily improves attention span in ADHD children"
-✅ GOOD: "Avoid artificial food dyes (Red 40, Yellow 6) as they increase hyperactivity"
-✅ GOOD: "Magnesium deficiency is found in 95% of ADHD children"
-
-❌ BAD: "The document mentions omega-3 helps with ADHD"
-❌ BAD: "The video discusses meditation benefits"
-❌ BAD: "Studies show food dyes affect behavior"
+WHAT TO EXTRACT (be very thorough):
+- Any specific recommendations, treatments, or advice
+- Foods, supplements, or substances mentioned
+- Effects, benefits, or problems described
+- Dosages, amounts, or quantities mentioned
+- Things to do or avoid
+- Research findings or expert opinions
+- Practical tips or strategies
+- Mechanisms of action
+- Study results and statistics
+- Personal experiences and case studies
+- Contraindications and warnings
 
 EXTRACTION STRATEGY:
-1. Scan through the chunk content for specific information
-2. Look for treatments, supplements, foods, behaviors, and their effects
-3. Extract quantitative data (dosages, percentages, timeframes)
-4. Include mechanisms of action when mentioned
-5. Extract both what helps and what harms
-6. Make facts actionable and specific
+- Go through EVERY chunk systematically
+- Extract MULTIPLE facts from each relevant chunk
+- Be VERY GENEROUS - extract anything remotely useful
+- Include both detailed and general information
+- Extract both positive and negative information
+- Look for any connection to the user's query topic
+- Don't skip chunks - scan them all for useful information
+
+EXAMPLES OF WHAT TO EXTRACT:
+- "Omega-3 helps with ADHD symptoms"
+- "Avoid sugar and processed foods"
+- "Exercise improves focus"
+- "Sleep is important for attention"
+- "Certain food additives cause hyperactivity"
+- "Magnesium supplements may help"
+- "Studies show 25% improvement with treatment X"
+- "Doctor recommends avoiding substance Y"
+- "Patient reported better focus after change Z"
 
 REQUIREMENTS:
-- Extract UP TO {self.max_facts_per_node} facts from the available chunks
-- Each fact should be information-complete and usable independently
-- Focus on content that directly relates to the user's query
-- For next exploration, suggest entity names separated by commas, or "STOP_TRAVERSAL"
+- Extract AS MANY facts as possible, up to {self.max_facts_per_node} pieces of information
+- Aim for the MAXIMUM number of facts - don't stop early
+- Make each fact clear and understandable
+- Include any specific details when available
+- For next exploration, suggest related entity names or "STOP_TRAVERSAL"
 
-Remember: Extract the actual facts and recommendations, not meta-commentary about documents."""
+Remember: Extract EVERYTHING useful - the more facts the better!"""
 
         # Add language instruction if specified
         if language:
