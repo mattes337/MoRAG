@@ -857,8 +857,8 @@ class Neo4jStorage(BaseStorage):
                 entity_name = entity_data.get("name", "unknown")
                 logger.warning(
                     "Failed to parse entity from search",
-                    entity_id_value=entity_id,
-                    entity_name_value=entity_name,
+                    entity_id=entity_id,
+                    entity_name=entity_name,
                     error=str(e)
                 )
         

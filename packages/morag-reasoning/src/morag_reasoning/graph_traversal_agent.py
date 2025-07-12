@@ -316,14 +316,15 @@ Remember: Extract the actual facts, not descriptions of what documents contain."
     ) -> str:
         """Create the prompt for chunk-based fact extraction."""
 
-        # Format chunk information - show more chunks but with shorter content
+        # Format chunk information - show more chunks with more content
         chunks_info = f"Document Chunks Related to Entities: {', '.join(entity_names)} (Total: {len(chunks)} chunks)\n\n"
 
-        # Show up to 20 chunks with shorter content to fit more information
-        for i, chunk in enumerate(chunks[:20]):
+        # Show up to 50 chunks with more content to provide better context
+        max_chunks_to_show = min(50, len(chunks))
+        for i, chunk in enumerate(chunks[:max_chunks_to_show]):
             # Handle both dict and string chunks defensively
             if isinstance(chunk, str):
-                chunks_info += f"Chunk {i+1} (Text): {chunk[:300]}{'...' if len(chunk) > 300 else ''}\n\n"
+                chunks_info += f"Chunk {i+1} (Text): {chunk[:800]}{'...' if len(chunk) > 800 else ''}\n\n"
                 continue
 
             # Handle dict chunks with defensive access
@@ -341,7 +342,10 @@ Remember: Extract the actual facts, not descriptions of what documents contain."
             chunks_info += f"  Document: {document_name}\n"
             chunks_info += f"  Chunk Index: {chunk_index}\n"
             chunks_info += f"  Related Entities: {', '.join(related_entities)}\n"
-            chunks_info += f"  Content: {text[:300]}{'...' if len(text) > 300 else ''}\n\n"
+            chunks_info += f"  Content: {text[:800]}{'...' if len(text) > 800 else ''}\n\n"
+
+        if len(chunks) > max_chunks_to_show:
+            chunks_info += f"... and {len(chunks) - max_chunks_to_show} more chunks available.\n\n"
 
         # Get related entity names for next traversal from chunks and graph
         all_related_entities = set()
@@ -361,7 +365,7 @@ Remember: Extract the actual facts, not descriptions of what documents contain."
         related_entities_list = list(all_related_entities)[:20]
         related_entities_info = f"Related Entities Found: {', '.join(related_entities_list)}\n"
 
-        prompt = f"""DIRECT FACT EXTRACTION FROM DOCUMENT CHUNKS
+        prompt = f"""EXTRACT ACTIONABLE FACTS FROM DOCUMENT CHUNKS
 
 User Query: "{user_query}"
 
@@ -373,42 +377,42 @@ Traversal Information:
 - Current Depth: {traversal_depth}
 - Current Entities: {', '.join(entity_names)}
 
-CRITICAL INSTRUCTIONS:
-You are extracting DIRECT FACTS from document content to answer the user query.
+YOUR TASK:
+Extract DIRECT, ACTIONABLE FACTS from the document chunks that help answer the user's query.
 
-WHAT TO DO:
-- Extract the actual factual content from the chunks
-- Make each fact INFORMATION COMPLETE and standalone
-- Extract specific treatments, dosages, mechanisms, and research findings
-- Include exact quantities, timing, and scientific data
-- Extract both positive recommendations and contraindications
-- Focus on actionable, concrete information
+EXTRACTION GUIDELINES:
+- Look through ALL the provided chunks for relevant information
+- Extract the actual factual content, not descriptions of what documents contain
+- Make each fact COMPLETE and STANDALONE
+- Include specific details: dosages, timing, percentages, mechanisms
+- Extract both positive recommendations (what works) and negative ones (what to avoid)
+- Focus on concrete, implementable information
 
-WHAT NOT TO DO:
-- NEVER write "the document mentions" or "the video discusses"
-- NEVER reference chunks, documents, or sources in the fact text
-- NEVER write meta-descriptions about content
-- NEVER use vague or general statements
+FACT FORMAT EXAMPLES:
+✅ GOOD: "Omega-3 fatty acids at 1000mg daily reduce ADHD symptoms by 25%"
+✅ GOOD: "Meditation for 20 minutes daily improves attention span in ADHD children"
+✅ GOOD: "Avoid artificial food dyes (Red 40, Yellow 6) as they increase hyperactivity"
+✅ GOOD: "Magnesium deficiency is found in 95% of ADHD children"
 
-EXTRACTION EXAMPLES:
-GOOD: "Omega-3 fatty acids at 1000mg daily reduce ADHD symptoms by 25% according to randomized controlled trials"
-BAD: "The document mentions that omega-3 fatty acids can help with ADHD"
+❌ BAD: "The document mentions omega-3 helps with ADHD"
+❌ BAD: "The video discusses meditation benefits"
+❌ BAD: "Studies show food dyes affect behavior"
 
-GOOD: "Meditation for 20 minutes daily improves attention span and reduces hyperactivity in children with ADHD"
-BAD: "The video talks about meditation being beneficial for ADHD"
+EXTRACTION STRATEGY:
+1. Scan through the chunk content for specific information
+2. Look for treatments, supplements, foods, behaviors, and their effects
+3. Extract quantitative data (dosages, percentages, timeframes)
+4. Include mechanisms of action when mentioned
+5. Extract both what helps and what harms
+6. Make facts actionable and specific
 
-GOOD: "Avoid artificial food dyes (Red 40, Yellow 6) as they increase hyperactivity in 73% of ADHD children"
-BAD: "The study discusses how certain food additives affect ADHD symptoms"
+REQUIREMENTS:
+- Extract UP TO {self.max_facts_per_node} facts from the available chunks
+- Each fact should be information-complete and usable independently
+- Focus on content that directly relates to the user's query
+- For next exploration, suggest entity names separated by commas, or "STOP_TRAVERSAL"
 
-EXTRACTION REQUIREMENTS:
-- Extract {self.max_facts_per_node} direct, actionable facts from the chunks
-- Each fact must be complete and usable independently
-- Include specific dosages, timing, percentages, and research data
-- Extract mechanisms of action and biological processes
-- Include contraindications and safety information
-- For next_nodes_to_explore, return entity names separated by commas, or "STOP_TRAVERSAL"
-
-Focus on extracting the actual substantive information that directly answers the user's query."""
+Remember: Extract the actual facts and recommendations, not meta-commentary about documents."""
 
         # Add language instruction if specified
         if language:

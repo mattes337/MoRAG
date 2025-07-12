@@ -207,8 +207,8 @@ async def entity_query(
             graph_engine = create_dynamic_graph_engine(request.database_servers)
 
         logger.info("Processing entity query",
-                   entity_id=request.entity_id,
-                   entity_name=request.entity_name)
+                   entity_id_param=request.entity_id,
+                   entity_name_param=request.entity_name)
         
         # Find entity
         entity = None
