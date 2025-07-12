@@ -43,17 +43,11 @@ class RecursiveFactRetrievalService:
         self.stronger_llm_client = stronger_llm_client or llm_client
         self.logger = structlog.get_logger(__name__)
         
-        # Initialize sub-components
-        self.entity_service = EntityIdentificationService(
-            llm_client=llm_client,
-            graph_storage=neo4j_storage,
-            min_confidence=0.2,
-            max_entities=20
-        )
-        
-        # Note: GraphTraversalAgent will be created per request with proper max_facts_per_node
+        # Note: EntityIdentificationService and GraphTraversalAgent will be created per request
+        # with proper language and max_facts_per_node parameters
+        self.entity_service = None
         self.graph_traversal_agent = None
-        
+
         self.fact_critic_agent = FactCriticAgent(llm_client=llm_client)
     
     async def retrieve_facts_recursively(
@@ -84,7 +78,15 @@ class RecursiveFactRetrievalService:
         )
         
         try:
-            # Initialize GraphTraversalAgent with request-specific parameters
+            # Initialize request-specific services with language parameter
+            self.entity_service = EntityIdentificationService(
+                llm_client=self.llm_client,
+                graph_storage=self.neo4j_storage,
+                min_confidence=0.2,
+                max_entities=20,
+                language=request.language
+            )
+
             self.graph_traversal_agent = GraphTraversalAgent(
                 llm_client=self.llm_client,
                 neo4j_storage=self.neo4j_storage,
@@ -93,7 +95,7 @@ class RecursiveFactRetrievalService:
             )
 
             # Step 1: Extract initial entities from user query
-            self.logger.info("Step 1: Extracting initial entities")
+            self.logger.info("Step 1: Extracting initial entities", language=request.language)
             initial_entities = await self._extract_initial_entities(request.user_query)
 
             if not initial_entities:

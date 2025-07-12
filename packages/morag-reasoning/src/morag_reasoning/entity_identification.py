@@ -85,26 +85,45 @@ Return only the most relevant entities that would help retrieve information to a
     
     async def identify_entities(self, query: str) -> List[IdentifiedEntity]:
         """Identify entities from a user query.
-        
+
         Args:
             query: User query text
-            
+
         Returns:
             List of identified entities
         """
         if not query or not query.strip():
             return []
-        
-        self.logger.info("Starting entity identification", query=query)
-        
+
+        self.logger.info("Starting entity identification", query=query, language=self.language)
+
         try:
+            # Build language-specific instruction
+            language_instruction = ""
+            if self.language:
+                language_names = {
+                    'en': 'English',
+                    'de': 'German',
+                    'fr': 'French',
+                    'es': 'Spanish',
+                    'it': 'Italian',
+                    'pt': 'Portuguese',
+                    'nl': 'Dutch',
+                    'ru': 'Russian',
+                    'zh': 'Chinese',
+                    'ja': 'Japanese',
+                    'ko': 'Korean'
+                }
+                language_name = language_names.get(self.language, self.language)
+                language_instruction = f"\n\nIMPORTANT: Extract entity names in {language_name} ({self.language}) to match how they appear in the knowledge graph. Entity names must be in {language_name} for accurate graph matching."
+
             # Use PydanticAI agent to identify entities
             prompt = f"""Identify the key entities from this user query that would be useful for graph-based information retrieval:
 
 Query: "{query}"
 
-Focus on entities that are likely to exist in a knowledge graph and are essential for answering the user's question."""
-            
+Focus on entities that are likely to exist in a knowledge graph and are essential for answering the user's question.{language_instruction}"""
+
             result = await self.agent.run(prompt)
             entities = result.data.entities
             
