@@ -198,6 +198,15 @@ class Settings(BaseSettings):
                 return [v] if v else ["*"]
         return v or ["*"]
 
+    # Graphiti Integration Settings
+    graphiti_enabled: bool = Field(default=False, alias="GRAPHITI_ENABLED")
+    graphiti_neo4j_uri: str = Field(default="bolt://localhost:7687", alias="GRAPHITI_NEO4J_URI")
+    graphiti_neo4j_username: str = Field(default="neo4j", alias="GRAPHITI_NEO4J_USERNAME")
+    graphiti_neo4j_password: str = Field(default="password", alias="GRAPHITI_NEO4J_PASSWORD")
+    graphiti_neo4j_database: str = Field(default="morag_graphiti", alias="GRAPHITI_NEO4J_DATABASE")
+    graphiti_backend_preference: str = Field(default="graphiti", alias="GRAPHITI_BACKEND_PREFERENCE")
+    graphiti_enable_fallback: bool = Field(default=True, alias="GRAPHITI_ENABLE_FALLBACK")
+
     @field_validator('qdrant_collection_name')
     @classmethod
     def validate_collection_name(cls, v):

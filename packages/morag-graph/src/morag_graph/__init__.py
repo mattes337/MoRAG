@@ -23,6 +23,33 @@ from .builders import GraphBuilder, GraphBuildResult, GraphBuildError
 # Database configuration models
 from .models.database_config import DatabaseType, DatabaseConfig, DatabaseServerConfig, DatabaseServerArray, DatabaseResult
 
+# Graphiti integration (optional)
+try:
+    from .graphiti import (
+        GraphitiConfig, create_graphiti_instance, GraphitiConnectionService,
+        DocumentEpisodeMapper, create_episode_mapper,
+        GraphitiSearchService, SearchResult, SearchMetrics, SearchResultAdapter, create_search_service,
+        SearchInterface, GraphitiSearchAdapter, HybridSearchService, create_search_adapter, create_hybrid_search_service
+    )
+    GRAPHITI_AVAILABLE = True
+except ImportError:
+    GRAPHITI_AVAILABLE = False
+    GraphitiConfig = None
+    create_graphiti_instance = None
+    GraphitiConnectionService = None
+    DocumentEpisodeMapper = None
+    create_episode_mapper = None
+    GraphitiSearchService = None
+    SearchResult = None
+    SearchMetrics = None
+    SearchResultAdapter = None
+    create_search_service = None
+    SearchInterface = None
+    GraphitiSearchAdapter = None
+    HybridSearchService = None
+    create_search_adapter = None
+    create_hybrid_search_service = None
+
 # Query processing
 from .query import QueryEntityExtractor, QueryEntity, QueryAnalysis, QueryIntentAnalyzer
 
@@ -68,4 +95,21 @@ __all__ = [
     "ResultFusionEngine",
     "WeightedCombinationFusion",
     "ReciprocalRankFusion",
+    # Graphiti integration (conditional)
+    "GRAPHITI_AVAILABLE",
+    "GraphitiConfig",
+    "create_graphiti_instance",
+    "GraphitiConnectionService",
+    "DocumentEpisodeMapper",
+    "create_episode_mapper",
+    "GraphitiSearchService",
+    "SearchResult",
+    "SearchMetrics",
+    "SearchResultAdapter",
+    "create_search_service",
+    "SearchInterface",
+    "GraphitiSearchAdapter",
+    "HybridSearchService",
+    "create_search_adapter",
+    "create_hybrid_search_service",
 ]
