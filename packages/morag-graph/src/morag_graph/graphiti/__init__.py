@@ -10,6 +10,13 @@ from .connection import GraphitiConnectionService
 from .episode_mapper import DocumentEpisodeMapper, create_episode_mapper
 from .search_service import GraphitiSearchService, SearchResult, SearchMetrics, SearchResultAdapter, create_search_service
 from .search_integration import SearchInterface, GraphitiSearchAdapter, HybridSearchService, create_search_adapter, create_hybrid_search_service
+from .temporal_service import GraphitiTemporalService, TemporalSnapshot, TemporalChange, TemporalQueryType, create_temporal_service
+from .custom_schema import (
+    MoragEntityType, MoragRelationType, BaseEntitySchema, BaseRelationSchema,
+    PersonEntity, OrganizationEntity, TechnologyEntity, ConceptEntity, DocumentEntity,
+    SemanticRelation, TemporalRelation, DocumentRelation, SchemaRegistry, schema_registry
+)
+from .schema_storage import SchemaAwareEntityStorage, SchemaAwareSearchService, create_schema_aware_storage, create_schema_aware_search
 
 # Import adapter components
 try:
@@ -115,6 +122,35 @@ __all__ = [
     "HybridSearchService",
     "create_search_adapter",
     "create_hybrid_search_service",
+
+    # Temporal queries
+    "GraphitiTemporalService",
+    "TemporalSnapshot",
+    "TemporalChange",
+    "TemporalQueryType",
+    "create_temporal_service",
+
+    # Custom schema
+    "MoragEntityType",
+    "MoragRelationType",
+    "BaseEntitySchema",
+    "BaseRelationSchema",
+    "PersonEntity",
+    "OrganizationEntity",
+    "TechnologyEntity",
+    "ConceptEntity",
+    "DocumentEntity",
+    "SemanticRelation",
+    "TemporalRelation",
+    "DocumentRelation",
+    "SchemaRegistry",
+    "schema_registry",
+
+    # Schema-aware storage and search
+    "SchemaAwareEntityStorage",
+    "SchemaAwareSearchService",
+    "create_schema_aware_storage",
+    "create_schema_aware_search",
 
     # Adapter layer
     "BaseAdapter",
