@@ -8,8 +8,7 @@ __version__ = "0.1.0"
 # Core models
 from .models import Entity, Relation, Graph
 
-# Extraction components
-from .extraction import EntityExtractor, RelationExtractor
+# Traditional extraction components removed - use Graphiti instead
 
 # Storage backends
 from .storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
@@ -92,8 +91,7 @@ __all__ = [
     "Entity",
     "Relation",
     "Graph",
-    "EntityExtractor",
-    "RelationExtractor",
+    # Traditional extractors removed - use Graphiti instead
     "Neo4jStorage",
     "QdrantStorage",
     "Neo4jConfig",

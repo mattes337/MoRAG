@@ -49,13 +49,130 @@ try:
     from morag_audio import AudioProcessor, AudioConfig
     from morag_core.models import ProcessingConfig
     from morag_services import QdrantVectorStorage, GeminiEmbeddingService
+    from graph_extraction import extract_and_ingest_with_graphiti
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-audio")
     print("  pip install -e packages/morag-services")
+    print("  pip install -e packages/morag-graph")
     sys.exit(1)
+
+
+async def test_audio_with_graphiti(
+    audio_file: Path,
+    metadata: Optional[Dict[str, Any]] = None,
+    model_size: str = "base",
+    enable_diarization: bool = False,
+    enable_topics: bool = False
+) -> bool:
+    """Test audio processing using Graphiti for knowledge graph ingestion."""
+    print_header("MoRAG Audio Processing with Graphiti")
+
+    if not audio_file.exists():
+        print(f"❌ Error: Audio file not found: {audio_file}")
+        return False
+
+    print_result("Input File", str(audio_file))
+    print_result("File Size", f"{audio_file.stat().st_size / 1024 / 1024:.2f} MB")
+    print_result("Model Size", model_size)
+    print_result("Speaker Diarization", "✅ Enabled" if enable_diarization else "❌ Disabled")
+    print_result("Topic Segmentation", "✅ Enabled" if enable_topics else "❌ Disabled")
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+
+    try:
+        print_section("Audio Processing")
+        print("🔄 Starting audio transcription...")
+
+        # Initialize audio processor
+        audio_config = AudioConfig(
+            model_size=model_size,
+            enable_diarization=enable_diarization,
+            enable_topics=enable_topics
+        )
+        processor = AudioProcessor(audio_config)
+
+        # Process the audio file
+        result = await processor.process_file(audio_file)
+
+        if not result.success:
+            print(f"❌ Audio processing failed: {result.error}")
+            return False
+
+        print(f"✅ Audio processed successfully")
+        print_result("Duration", f"{result.audio_metadata.get('duration', 'Unknown')} seconds")
+        print_result("Transcription Length", f"{len(result.transcription)} characters")
+
+        if result.speakers:
+            print_result("Speakers Detected", str(len(result.speakers)))
+        if result.topics:
+            print_result("Topics Detected", str(len(result.topics)))
+
+        # Prepare content for Graphiti
+        doc_id = f"audio_{audio_file.stem}_{hash(str(audio_file))}"
+        title = f"Audio: {audio_file.stem}"
+
+        # Combine transcription with speaker and topic information
+        content_parts = [result.transcription]
+
+        if result.speakers:
+            content_parts.append("\n\nSpeaker Information:")
+            for speaker in result.speakers:
+                content_parts.append(f"- {speaker}")
+
+        if result.topics:
+            content_parts.append("\n\nTopics Discussed:")
+            for topic in result.topics:
+                content_parts.append(f"- {topic}")
+
+        full_content = "\n".join(content_parts)
+
+        # Prepare metadata for Graphiti
+        graphiti_metadata = {
+            'source_file': str(audio_file),
+            'file_type': 'audio',
+            'duration_seconds': result.audio_metadata.get('duration'),
+            'model_size': model_size,
+            'speaker_count': len(result.speakers) if result.speakers else 0,
+            'topic_count': len(result.topics) if result.topics else 0,
+            'transcription_length': len(result.transcription)
+        }
+        if metadata:
+            graphiti_metadata.update(metadata)
+
+        print_section("Graphiti Knowledge Graph Ingestion")
+
+        # Use Graphiti for ingestion
+        graphiti_result = await extract_and_ingest_with_graphiti(
+            text_content=full_content,
+            doc_id=doc_id,
+            title=title,
+            context=f"Audio transcription: {audio_file.name}",
+            metadata=graphiti_metadata
+        )
+
+        # Report results
+        if graphiti_result['graphiti']['success']:
+            print_section("✅ Graphiti Ingestion Results")
+            print_result("Episode Name", graphiti_result['graphiti']['episode_name'])
+            print_result("Content Length", f"{graphiti_result['graphiti']['content_length']} characters")
+            print_result("Audio ID", doc_id)
+        else:
+            print(f"❌ Graphiti ingestion failed: {graphiti_result['graphiti'].get('error', 'Unknown error')}")
+            return False
+
+        print_section("✅ Processing Complete")
+        print("🎉 Audio successfully processed and ingested into Graphiti knowledge graph!")
+        print("💡 The transcription is now available for semantic search and knowledge graph queries.")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Error during audio processing: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def print_header(title: str):
@@ -553,7 +670,12 @@ Examples:
     python test-audio.py recording.wav --model-size large --enable-diarization
     python test-audio.py video.mp4 --enable-topics
 
-  Ingestion Mode (background processing + storage):
+  Graphiti Knowledge Graph Mode (recommended):
+    python test-audio.py my-audio.mp3 --graphiti
+    python test-audio.py recording.wav --graphiti --enable-diarization --metadata '{"category": "meeting"}'
+    python test-audio.py audio.mp3 --graphiti --model-size large --enable-topics
+
+  Traditional Ingestion Mode (legacy):
     python test-audio.py my-audio.mp3 --ingest
     python test-audio.py recording.wav --ingest --webhook-url https://my-app.com/webhook
     python test-audio.py audio.mp3 --ingest --metadata '{"category": "meeting"}'
@@ -567,8 +689,10 @@ Examples:
     )
 
     parser.add_argument('audio_file', help='Path to audio file')
+    parser.add_argument('--graphiti', action='store_true',
+                       help='Use Graphiti for knowledge graph ingestion (recommended)')
     parser.add_argument('--ingest', action='store_true',
-                       help='Enable ingestion mode (background processing + storage)')
+                       help='Enable traditional ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_audio)')
@@ -609,8 +733,24 @@ Examples:
     handle_resume_arguments(args, str(audio_file), 'audio', metadata)
 
     try:
-        if args.ingest:
-            # Ingestion mode
+        if args.graphiti:
+            # Graphiti knowledge graph mode (recommended)
+            success = asyncio.run(test_audio_with_graphiti(
+                audio_file,
+                metadata=metadata,
+                model_size=args.model_size,
+                enable_diarization=args.enable_diarization,
+                enable_topics=args.enable_topics
+            ))
+            if success:
+                print("\n🎉 Audio processing with Graphiti completed successfully!")
+                print("💡 The transcription is now available in the knowledge graph for semantic search.")
+                sys.exit(0)
+            else:
+                print("\n💥 Audio processing with Graphiti failed!")
+                sys.exit(1)
+        elif args.ingest:
+            # Traditional ingestion mode
             success = asyncio.run(test_audio_ingestion(
                 audio_file,
                 webhook_url=args.webhook_url,

@@ -1,24 +1,33 @@
 # MoRAG CLI Documentation
 
-This document provides comprehensive documentation for all MoRAG CLI commands and scripts, covering both **ingestion** and **processing** operations.
+This document provides comprehensive documentation for all MoRAG CLI commands and scripts, covering both **processing** and **knowledge graph ingestion** operations.
 
 ## 🔄 Operation Modes
 
-MoRAG supports two distinct operation modes:
+MoRAG supports three distinct operation modes:
 
 ### **Processing Mode** (Immediate Results)
 - **Purpose**: Get immediate processing results without storage
 - **Use Case**: One-time analysis, testing, development
 - **Output**: Direct results returned immediately
-- **Storage**: No vector database storage
+- **Storage**: No database storage
 - **Searchable**: No
 
-### **Ingestion Mode** (Background Processing + Storage)
+### **Graphiti Knowledge Graph Mode** (Recommended)
+- **Purpose**: Process content and build knowledge graphs using Graphiti episodes
+- **Use Case**: Building searchable knowledge bases with entity relationships
+- **Output**: Episodes created in Neo4j with automatic entity extraction
+- **Storage**: Knowledge graph stored in Neo4j via Graphiti
+- **Searchable**: Yes, via hybrid semantic and keyword search
+- **Features**: Automatic deduplication, temporal queries, relationship extraction
+
+### **Legacy Vector Storage Mode** (Deprecated)
 - **Purpose**: Process content and store in vector database for later retrieval
-- **Use Case**: Building searchable knowledge base
+- **Use Case**: Simple vector-based search without knowledge graphs
 - **Output**: Task ID for monitoring progress
 - **Storage**: Results stored in Qdrant vector database
 - **Searchable**: Yes, via `/search` endpoint
+- **Note**: ⚠️ **DEPRECATED** - Use Graphiti mode instead
 
 ### **Remote Processing Mode** (Offload to Remote Workers)
 - **Purpose**: Offload computationally intensive tasks to remote workers with GPU support
@@ -29,7 +38,57 @@ MoRAG supports two distinct operation modes:
 
 ## 📁 Available CLI Scripts
 
-All CLI scripts are located in `cli/` and support both operation modes with enhanced graph extraction capabilities.
+All CLI scripts are located in `cli/` and support multiple operation modes with Graphiti knowledge graph capabilities.
+
+## 🚀 Migration to Graphiti
+
+**Important**: Traditional entity/relation extraction has been **completely removed** in favor of Graphiti's superior episode-based knowledge representation.
+
+### What Changed
+- ❌ **Removed**: `EntityExtractor`, `RelationExtractor`, `HybridEntityExtractor`
+- ❌ **Removed**: Traditional graph extraction scripts and workflows
+- ❌ **Removed**: Manual entity/relation extraction processes
+- ✅ **Added**: Graphiti-based knowledge graph ingestion with automatic entity extraction
+- ✅ **Added**: Episode-based knowledge representation with temporal context
+- ✅ **Added**: Built-in deduplication and hybrid search capabilities
+
+### Migration Guide
+**Old Approach** (removed):
+```bash
+# This no longer works
+python cli/test-document.py document.pdf --ingest --neo4j
+```
+
+**New Approach** (recommended):
+```bash
+# Use Graphiti for knowledge graphs
+python cli/test-document.py document.pdf --graphiti
+python cli/test-graphiti.py ingest document.pdf
+```
+
+### Benefits of Graphiti
+- **Automatic Entity Extraction**: No manual configuration needed
+- **Temporal Knowledge Graphs**: Episodes with time-based context
+- **Built-in Deduplication**: Prevents knowledge graph bloat
+- **Hybrid Search**: Combines semantic and keyword search
+- **Simplified Workflow**: Single command for complete ingestion
+
+### Knowledge Graph Scripts
+
+#### `test-graphiti.py` (Recommended)
+**Purpose**: Direct access to Graphiti knowledge graph functionality
+```bash
+# Ingest documents into knowledge graph
+python cli/test-graphiti.py ingest my-document.pdf
+python cli/test-graphiti.py ingest research.docx --metadata '{"category": "research"}'
+
+# Search the knowledge graph
+python cli/test-graphiti.py search "artificial intelligence"
+python cli/test-graphiti.py search "machine learning" --limit 5 --search-type hybrid
+
+# Check system status
+python cli/test-graphiti.py status
+```
 
 ### Database Setup Scripts
 
@@ -39,10 +98,10 @@ All CLI scripts are located in `cli/` and support both operation modes with enha
 # Create both database and collection
 python cli/create-databases.py --neo4j-database smartcard --qdrant-collection smartcard_docs
 
-# Create only Neo4j database
+# Create only Neo4j database (for Graphiti)
 python cli/create-databases.py --neo4j-database my_database
 
-# Create only Qdrant collection
+# Create only Qdrant collection (for traditional mode)
 python cli/create-databases.py --qdrant-collection my_collection
 
 # List existing databases and collections
@@ -116,16 +175,18 @@ python cli/test-document.py spreadsheet.xlsx
 python cli/test-document.py document.docx
 ```
 
-**Ingestion Mode** (background processing + storage):
+**Graphiti Knowledge Graph Mode** (recommended):
 ```bash
-python cli/test-document.py my-document.pdf --ingest --qdrant
-python cli/test-document.py document.docx --ingest --qdrant --metadata '{"category": "research", "priority": 1}'
+python cli/test-document.py my-document.pdf --graphiti
+python cli/test-document.py document.docx --graphiti --metadata '{"category": "research", "priority": 1}'
+python cli/test-document.py presentation.pptx --graphiti --chunking-strategy chapter
 ```
 
-**Graph Extraction Mode** (entities/relations + dual database storage):
+**Legacy Vector Storage Mode** (deprecated):
 ```bash
-python cli/test-document.py my-document.pdf --ingest --qdrant --neo4j
-python cli/test-document.py document.docx --ingest --neo4j --metadata '{"category": "research", "priority": 1}'
+# ⚠️ DEPRECATED - Use --graphiti instead
+python cli/test-document.py my-document.pdf --ingest --qdrant
+python cli/test-document.py document.docx --ingest --qdrant --metadata '{"category": "research", "priority": 1}'
 ```
 
 **Features**:

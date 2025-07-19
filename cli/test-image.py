@@ -63,11 +63,109 @@ try:
         IntermediateJSON, MarkdownGenerator, Entity, Relation,
         ContentType, ProcessingMode, create_processing_metadata, get_output_paths
     )
-    from graph_extraction import extract_and_ingest
+    from graph_extraction import extract_and_ingest_with_graphiti
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure the common schema and graph extraction modules are available.")
     sys.exit(1)
+
+
+async def test_image_with_graphiti(
+    image_file: Path,
+    metadata: Optional[Dict[str, Any]] = None
+) -> bool:
+    """Test image processing using Graphiti for knowledge graph ingestion."""
+    print_header("MoRAG Image Processing with Graphiti")
+
+    if not image_file.exists():
+        print(f"❌ Error: Image file not found: {image_file}")
+        return False
+
+    print_result("Input File", str(image_file))
+    print_result("File Size", f"{image_file.stat().st_size / 1024:.2f} KB")
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+
+    try:
+        print_section("Image Processing")
+        print("🔄 Starting image analysis...")
+
+        # Initialize image processor
+        config = ImageConfig()
+        processor = ImageProcessor(config)
+
+        # Process the image file
+        result = await processor.process_file(image_file)
+
+        if not result.success:
+            print(f"❌ Image processing failed: {result.error}")
+            return False
+
+        print(f"✅ Image processed successfully")
+        print_result("Caption", result.caption[:100] + "..." if len(result.caption) > 100 else result.caption)
+        print_result("Extracted Text Length", f"{len(result.extracted_text)} characters")
+        print_result("Image Dimensions", f"{result.image_metadata.width}x{result.image_metadata.height}")
+
+        # Prepare content for Graphiti
+        doc_id = f"image_{image_file.stem}_{hash(str(image_file))}"
+        title = f"Image: {image_file.stem}"
+
+        # Combine caption and extracted text
+        content_parts = []
+        if result.caption:
+            content_parts.append(f"Image Description: {result.caption}")
+        if result.extracted_text:
+            content_parts.append(f"Extracted Text: {result.extracted_text}")
+
+        full_content = "\n\n".join(content_parts) if content_parts else "Image processed without text content"
+
+        # Prepare metadata for Graphiti
+        graphiti_metadata = {
+            'source_file': str(image_file),
+            'file_type': 'image',
+            'image_format': result.image_metadata.format,
+            'width': result.image_metadata.width,
+            'height': result.image_metadata.height,
+            'file_size_kb': round(image_file.stat().st_size / 1024, 2),
+            'has_caption': bool(result.caption),
+            'has_extracted_text': bool(result.extracted_text),
+            'caption_length': len(result.caption) if result.caption else 0,
+            'extracted_text_length': len(result.extracted_text) if result.extracted_text else 0
+        }
+        if metadata:
+            graphiti_metadata.update(metadata)
+
+        print_section("Graphiti Knowledge Graph Ingestion")
+
+        # Use Graphiti for ingestion
+        graphiti_result = await extract_and_ingest_with_graphiti(
+            text_content=full_content,
+            doc_id=doc_id,
+            title=title,
+            context=f"Image analysis: {image_file.name}",
+            metadata=graphiti_metadata
+        )
+
+        # Report results
+        if graphiti_result['graphiti']['success']:
+            print_section("✅ Graphiti Ingestion Results")
+            print_result("Episode Name", graphiti_result['graphiti']['episode_name'])
+            print_result("Content Length", f"{graphiti_result['graphiti']['content_length']} characters")
+            print_result("Image ID", doc_id)
+        else:
+            print(f"❌ Graphiti ingestion failed: {graphiti_result['graphiti'].get('error', 'Unknown error')}")
+            return False
+
+        print_section("✅ Processing Complete")
+        print("🎉 Image successfully processed and ingested into Graphiti knowledge graph!")
+        print("💡 The image analysis is now available for semantic search and knowledge graph queries.")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Error during image processing: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def print_header(title: str):
@@ -612,7 +710,12 @@ Examples:
     python test-image.py screenshot.png
     python test-image.py diagram.gif
 
-  Ingestion Mode (background processing + storage):
+  Graphiti Knowledge Graph Mode (recommended):
+    python test-image.py my-image.jpg --graphiti
+    python test-image.py screenshot.png --graphiti --metadata '{"type": "screenshot"}'
+    python test-image.py diagram.png --graphiti --metadata '{"category": "technical"}'
+
+  Traditional Ingestion Mode (legacy):
     python test-image.py my-image.jpg --ingest
     python test-image.py screenshot.png --ingest --metadata '{"type": "screenshot"}'
     python test-image.py diagram.png --ingest --webhook-url https://my-app.com/webhook
@@ -626,8 +729,10 @@ Examples:
     )
 
     parser.add_argument('image_file', help='Path to image file')
+    parser.add_argument('--graphiti', action='store_true',
+                       help='Use Graphiti for knowledge graph ingestion (recommended)')
     parser.add_argument('--ingest', action='store_true',
-                       help='Enable ingestion mode (background processing + storage)')
+                       help='Enable traditional ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_images)')
@@ -658,12 +763,25 @@ Examples:
     handle_resume_arguments(args, str(image_file), 'image', metadata)
 
     try:
-        if args.ingest:
+        if args.graphiti:
+            # Graphiti knowledge graph mode (recommended)
+            success = asyncio.run(test_image_with_graphiti(
+                image_file,
+                metadata=metadata
+            ))
+            if success:
+                print("\n🎉 Image processing with Graphiti completed successfully!")
+                print("💡 The image analysis is now available in the knowledge graph for semantic search.")
+                sys.exit(0)
+            else:
+                print("\n💥 Image processing with Graphiti failed!")
+                sys.exit(1)
+        elif args.ingest:
             # Default to Qdrant if no database flags specified
             use_qdrant = args.qdrant or (not args.qdrant and not args.neo4j)
             use_neo4j = args.neo4j
-            
-            # Ingestion mode
+
+            # Traditional ingestion mode
             success = asyncio.run(test_image_ingestion(
                 image_file,
                 webhook_url=args.webhook_url,

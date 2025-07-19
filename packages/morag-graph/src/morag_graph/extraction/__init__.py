@@ -1,17 +1,14 @@
-"""LLM-based entity and relation extraction with pattern matching."""
+"""Traditional extraction modules removed - use Graphiti instead.
 
-from .entity_extractor import EntityExtractor
-from .relation_extractor import RelationExtractor
-from .base import BaseExtractor
-from .pattern_matcher import EntityPatternMatcher, EntityPattern, PatternType
-from .hybrid_extractor import HybridEntityExtractor
+For knowledge graph extraction and ingestion, use the Graphiti-based approach:
+- morag_graph.graphiti.GraphitiConnectionService
+- morag_graph.graphiti.DocumentEpisodeMapper
+- morag_graph.graphiti.GraphitiSearchService
 
-__all__ = [
-    "EntityExtractor",
-    "RelationExtractor",
-    "BaseExtractor",
-    "EntityPatternMatcher",
-    "EntityPattern",
-    "PatternType",
-    "HybridEntityExtractor",
-]
+See the graphiti module for modern episode-based knowledge representation.
+"""
+
+# Traditional extraction components removed
+# Use Graphiti for entity extraction and knowledge graph building
+
+__all__ = []

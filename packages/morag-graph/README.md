@@ -2,6 +2,17 @@
 
 Graph-augmented RAG components for MoRAG (Multimodal RAG Ingestion Pipeline).
 
+## 🚨 Important Migration Notice
+
+**Traditional entity/relation extraction has been completely removed** in favor of Graphiti's superior episode-based knowledge representation.
+
+- ❌ **Removed**: `EntityExtractor`, `RelationExtractor`, `HybridEntityExtractor`
+- ❌ **Removed**: Manual entity/relation extraction workflows
+- ✅ **New**: Graphiti-based automatic knowledge graph building
+- ✅ **New**: Episode-based knowledge representation with temporal context
+
+**Migration**: Replace all traditional extraction code with Graphiti-based ingestion (see examples below).
+
 ## Overview
 
 The `morag-graph` package provides graph database integration and LLM-based entity and relation extraction capabilities for the MoRAG system. It enables knowledge graph construction from documents and graph-guided retrieval to enhance RAG performance.
@@ -37,19 +48,29 @@ pip install morag-graph
 
 ## Usage
 
-### Basic Entity and Relation Extraction
+### Graphiti Knowledge Graph Ingestion (Recommended)
 
 ```python
-from morag_graph.models import Entity, Relation, Graph
-from morag_graph.extraction import EntityExtractor, RelationExtractor, HybridEntityExtractor
-from morag_graph.storage import Neo4jStorage
+from morag_graph.graphiti import GraphitiConnectionService, GraphitiConfig
+from morag_graph.models import Document
 
-# Standard AI-based extraction
-entity_extractor = EntityExtractor()
-relation_extractor = RelationExtractor()
+# Modern Graphiti-based approach
+config = GraphitiConfig(
+    neo4j_uri="bolt://localhost:7687",
+    neo4j_username="neo4j",
+    neo4j_password="password",
+    openai_api_key="your-api-key"
+)
 
-entities = await entity_extractor.extract("Your text content here")
-relations = await relation_extractor.extract("Your text content here", entities)
+connection_service = GraphitiConnectionService(config)
+await connection_service.connect()
+
+# Create episode with automatic entity extraction
+await connection_service.create_episode(
+    name="Document Title",
+    content="Your text content here",
+    source_description="Document ingestion"
+)
 
 # Enhanced hybrid extraction (AI + Pattern Matching)
 hybrid_extractor = HybridEntityExtractor(
@@ -140,42 +161,47 @@ The system uses LLM-based dynamic relation type detection to automatically gener
 
 All relation types are determined dynamically by the LLM based on the content being processed.
 
-### Intention-Based Extraction
+### Graphiti Episode-Based Knowledge Representation
 
-The new intention-based extraction system reduces type fragmentation by:
+Graphiti provides a modern approach to knowledge graph construction using episodes:
 
-1. **Document Intention Analysis**: Automatically generates a concise intention summary that captures the document's primary purpose and domain
-2. **Guided Type Abstraction**: Uses the intention to guide the LLM toward more abstract, domain-appropriate entity and relation types
-3. **Reduced Fragmentation**: Prevents overly specific types like "IS_CEO", "IS_CTO", "IS_CFO" in favor of unified types like "IS_MEMBER"
+1. **Episode-Based Storage**: Content is stored as episodes with temporal context
+2. **Automatic Entity Extraction**: Built-in LLM-based entity and relation extraction
+3. **Deduplication**: Automatic detection and merging of similar content
+4. **Hybrid Search**: Combines semantic and keyword search capabilities
 
 **Example Usage:**
 
 ```python
-from morag_graph.extraction import EntityExtractor, RelationExtractor
-from morag_graph.extraction.base import LLMConfig
+from morag_graph.graphiti import GraphitiConnectionService, GraphitiConfig
 
-# Configure LLM
-config = LLMConfig(provider="gemini", api_key="your-api-key")
+# Configure Graphiti
+config = GraphitiConfig(
+    neo4j_uri="bolt://localhost:7687",
+    neo4j_username="neo4j",
+    neo4j_password="password",
+    openai_api_key="your-api-key"
+)
 
-# Create extractors
-entity_extractor = EntityExtractor(config=config)
-relation_extractor = RelationExtractor(config=config)
+# Create connection service
+connection_service = GraphitiConnectionService(config)
+await connection_service.connect()
 
-# Extract with intention context
-text = "John Smith is the CEO of TechCorp..."
-intention = "Document explaining the structure of the organization/company"
-
-entities = await entity_extractor.extract(text, intention=intention)
-relations = await relation_extractor.extract(text, entities=entities, intention=intention)
+# Create episode with automatic entity extraction
+await connection_service.create_episode(
+    name="Company Structure Document",
+    content="John Smith is the CEO of TechCorp...",
+    source_description="Organizational chart document"
+)
 ```
 
 **Benefits:**
-- Fewer, more meaningful entity and relation types
-- Better graph connectivity through type abstraction
-- Domain-aware extraction that respects document context
-- Maintained LLM flexibility with better guidance
+- Automatic entity and relation extraction
+- Temporal knowledge representation
+- Built-in deduplication and consistency
+- Simplified workflow with single API calls
 
-See `examples/intention_based_extraction.py` for a complete demonstration.
+See the CLI scripts for complete examples of Graphiti usage.
 
 ## License
 
