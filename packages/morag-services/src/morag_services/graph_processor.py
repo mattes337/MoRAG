@@ -15,17 +15,15 @@ logger = structlog.get_logger(__name__)
 
 try:
     from morag_graph import (
-        EntityExtractor, RelationExtractor, Neo4jStorage, QdrantStorage,
+        Neo4jStorage, QdrantStorage,
         Neo4jConfig, QdrantConfig, DatabaseType, DatabaseConfig, DatabaseResult,
         Entity, Relation
     )
-    from morag_graph.extraction.base import LLMConfig
+    # Traditional extraction removed - use Graphiti instead
     GRAPH_AVAILABLE = True
 except ImportError as e:
     logger.warning("morag-graph package not available - graph processing disabled", error=str(e))
     GRAPH_AVAILABLE = False
-    EntityExtractor = None
-    RelationExtractor = None
     Neo4jStorage = None
     QdrantStorage = None
     Neo4jConfig = None
@@ -35,7 +33,6 @@ except ImportError as e:
     DatabaseResult = None
     Entity = None
     Relation = None
-    LLMConfig = None
 
 logger = structlog.get_logger(__name__)
 

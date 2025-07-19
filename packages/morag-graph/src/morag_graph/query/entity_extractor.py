@@ -1,10 +1,13 @@
-"""Query entity extraction and linking for graph-guided retrieval."""
+"""Query entity extraction and linking for graph-guided retrieval.
+
+Note: Traditional entity extraction has been removed. This module is deprecated.
+Use Graphiti for modern knowledge graph operations.
+"""
 
 import logging
 import difflib
 from typing import List, Optional, Dict, Any
 
-from ..extraction import EntityExtractor
 from ..storage.base import BaseStorage
 from ..models import Entity
 from .models import QueryEntity, QueryAnalysis, QueryProcessingError
@@ -13,25 +16,30 @@ logger = logging.getLogger(__name__)
 
 
 class QueryEntityExtractor:
-    """Extract and link entities from user queries to the knowledge graph."""
-    
+    """Extract and link entities from user queries to the knowledge graph.
+
+    DEPRECATED: Use Graphiti for knowledge graph operations instead.
+    """
+
     def __init__(
-        self, 
-        entity_extractor: EntityExtractor,
+        self,
         graph_storage: BaseStorage,
         similarity_threshold: float = 0.8
     ):
         """Initialize the query entity extractor.
-        
+
         Args:
-            entity_extractor: Entity extractor for NLP processing
             graph_storage: Graph storage backend
             similarity_threshold: Minimum similarity score for entity linking
         """
-        self.entity_extractor = entity_extractor
         self.graph_storage = graph_storage
         self.similarity_threshold = similarity_threshold
         self.logger = logging.getLogger(__name__)
+
+        # Log deprecation warning
+        self.logger.warning(
+            "QueryEntityExtractor is deprecated. Use Graphiti for knowledge graph operations."
+        )
     
     async def extract_and_link_entities(self, query: str) -> QueryAnalysis:
         """Extract entities from query and link to knowledge graph.
@@ -47,9 +55,13 @@ class QueryEntityExtractor:
         """
         try:
             self.logger.info(f"Processing query: {query}")
-            
-            # Extract entities using NLP pipeline
-            extracted_entities = await self.entity_extractor.extract(query)
+
+            # Traditional entity extraction removed - return empty results
+            self.logger.warning(
+                "QueryEntityExtractor is deprecated. No entities extracted. "
+                "Use Graphiti for knowledge graph operations."
+            )
+            extracted_entities = []
             
             # Convert to QueryEntity objects and link to graph
             query_entities = []

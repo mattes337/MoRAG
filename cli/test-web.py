@@ -45,11 +45,13 @@ load_dotenv(env_path)
 
 try:
     from morag_web import WebProcessor, WebScrapingConfig
+    from graph_extraction import extract_and_ingest_with_graphiti
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-web")
+    print("  pip install -e packages/morag-graph")
     sys.exit(1)
 
 

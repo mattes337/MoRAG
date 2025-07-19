@@ -1,4 +1,8 @@
-"""Graph builder for constructing knowledge graphs from documents."""
+"""Graph builder for constructing knowledge graphs from documents.
+
+DEPRECATED: Traditional graph building has been replaced by Graphiti.
+Use morag_graph.graphiti for modern knowledge graph operations.
+"""
 
 import asyncio
 import logging
@@ -6,9 +10,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from ..extraction.entity_extractor import EntityExtractor
-from ..extraction.relation_extractor import RelationExtractor
-from ..extraction.base import LLMConfig
+# Traditional extraction imports removed - use Graphiti instead
 from ..storage.base import BaseStorage
 from ..models.entity import Entity
 from ..models.relation import Relation
@@ -41,39 +43,33 @@ class GraphBuildResult:
 
 class GraphBuilder:
     """Builder for constructing knowledge graphs from documents.
-    
-    This class orchestrates the process of extracting entities and relations
+
+    DEPRECATED: This class is deprecated. Use Graphiti for modern knowledge graph operations.
+
+    This class previously orchestrated the process of extracting entities and relations
     from documents and storing them in a graph database.
     """
-    
+
     def __init__(
         self,
         storage: BaseStorage,
-        llm_config: Optional[LLMConfig] = None,
-        entity_types: Optional[Dict[str, str]] = None,
-        relation_types: Optional[Dict[str, str]] = None
+        **kwargs  # Accept any kwargs for backward compatibility
     ):
         """Initialize the graph builder.
-        
+
         Args:
             storage: Graph storage backend
-            llm_config: Configuration for LLM-based extraction
-            entity_types: Custom entity types for extraction
-            relation_types: Custom relation types for extraction
+            **kwargs: Ignored for backward compatibility
         """
         self.storage = storage
         self.logger = logging.getLogger(__name__)
-        
-        # Initialize extractors
-        self.entity_extractor = EntityExtractor(
-            config=llm_config,
-            entity_types=entity_types
+
+        # Log deprecation warning
+        self.logger.warning(
+            "GraphBuilder is deprecated. Use Graphiti for knowledge graph operations."
         )
-        
-        self.relation_extractor = RelationExtractor(
-            config=llm_config,
-            relation_types=relation_types
-        )
+
+        # Traditional extractors removed - functionality disabled
         
         # Initialize checksum and cleanup managers
         self.checksum_manager = DocumentChecksumManager(storage)
@@ -130,17 +126,13 @@ class GraphBuilder:
             # Document changed, cleanup existing data first
             cleanup_result = await self.cleanup_manager.cleanup_document_data(document_id)
             
-            # Extract entities from content
-            entities = await self.entity_extractor.extract(
-                content,
-                source_doc_id=document_id
+            # Traditional extraction removed - return empty results
+            self.logger.warning(
+                f"GraphBuilder is deprecated. No entities or relations extracted for document {document_id}. "
+                "Use Graphiti for knowledge graph operations."
             )
-            
-            # Extract relations from content and entities
-            relations = await self.relation_extractor.extract(
-                content,
-                entities=entities
-            )
+            entities = []
+            relations = []
             
             # Store entities and relations
             result = await self._store_entities_and_relations(
@@ -211,17 +203,13 @@ class GraphBuilder:
             # Process each chunk
             for i, chunk in enumerate(chunks):
                 try:
-                    # Extract entities from chunk
-                    entities = await self.entity_extractor.extract(
-                        chunk.text,
-                        source_doc_id=document_id
+                    # Traditional extraction removed - skip chunk processing
+                    self.logger.warning(
+                        f"GraphBuilder is deprecated. Skipping chunk {i} for document {document_id}. "
+                        "Use Graphiti for knowledge graph operations."
                     )
-                    
-                    # Extract relations from chunk
-                    relations = await self.relation_extractor.extract(
-                        chunk.text,
-                        entities=entities
-                    )
+                    entities = []
+                    relations = []
                     
                     # Add chunk metadata
                     chunk_metadata = {

@@ -13,17 +13,14 @@ logger = structlog.get_logger(__name__)
 
 # Try to import graph components, but handle gracefully if not available
 try:
-    from morag_graph import HybridRetrievalCoordinator, ContextExpansionEngine, QueryEntityExtractor
     from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
     from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
+    # Traditional extraction components removed - use Graphiti instead
     GRAPH_AVAILABLE = True
 except ImportError as e:
     logger.warning("Graph components not available", error=str(e))
     GRAPH_AVAILABLE = False
     # Create dummy classes for type hints
-    HybridRetrievalCoordinator = None
-    ContextExpansionEngine = None
-    QueryEntityExtractor = None
     Neo4jStorage = None
     QdrantStorage = None
     Neo4jConfig = None
@@ -183,26 +180,9 @@ def get_graph_analytics() -> Optional[GraphAnalytics]:
         return None
 
 
-@lru_cache()
-def get_query_entity_extractor() -> Optional[QueryEntityExtractor]:
-    """Get query entity extractor instance."""
-    try:
-        storage = get_neo4j_storage()
-        return QueryEntityExtractor(graph_storage=storage)
-    except Exception as e:
-        logger.warning("Query entity extractor not available", error=str(e))
-        return None
-
-
-@lru_cache()
-def get_context_expansion_engine() -> Optional[ContextExpansionEngine]:
-    """Get context expansion engine instance."""
-    try:
-        storage = get_neo4j_storage()
-        return ContextExpansionEngine(storage)
-    except Exception as e:
-        logger.warning("Context expansion engine not available", error=str(e))
-        return None
+# Traditional extraction components removed - use Graphiti instead
+# Query entity extractor and context expansion engine are no longer available
+# Use Graphiti for knowledge graph operations
 
 
 @lru_cache()

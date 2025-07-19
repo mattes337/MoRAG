@@ -45,14 +45,9 @@ from dotenv import load_dotenv
 env_path = project_root / '.env'
 load_dotenv(env_path, override=True)
 
-try:
-    from morag_video import VideoProcessor, VideoConfig
-except ImportError as e:
-    print(f"❌ Import error: {e}")
-    print("Make sure you have installed the MoRAG packages:")
-    print("  pip install -e packages/morag-core")
-    print("  pip install -e packages/morag-video")
-    sys.exit(1)
+# Import required modules
+from morag_video import VideoProcessor, VideoConfig
+from graph_extraction import extract_and_ingest_with_graphiti
 
 
 def print_header(title: str):
@@ -73,6 +68,139 @@ def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
     print(f"{spaces}📋 {key}: {value}")
+
+
+async def test_video_with_graphiti(
+    video_file: Path,
+    metadata: Optional[Dict[str, Any]] = None,
+    generate_thumbnails: bool = False,
+    thumbnail_count: int = 3,
+    enable_ocr: bool = False,
+    language: Optional[str] = None
+) -> bool:
+    """Test video processing using Graphiti for knowledge graph ingestion."""
+    print_header("MoRAG Video Processing with Graphiti")
+
+    if not video_file.exists():
+        print(f"❌ Error: Video file not found: {video_file}")
+        return False
+
+    print_result("Input File", str(video_file))
+    print_result("File Size", f"{video_file.stat().st_size / 1024 / 1024:.2f} MB")
+    print_result("Generate Thumbnails", "✅ Enabled" if generate_thumbnails else "❌ Disabled")
+    print_result("OCR Enabled", "✅ Enabled" if enable_ocr else "❌ Disabled")
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+
+    try:
+        print_section("Video Processing")
+        print("🔄 Starting video processing...")
+
+        # Initialize video configuration
+        config = VideoConfig(
+            extract_audio=True,
+            generate_thumbnails=generate_thumbnails,
+            thumbnail_count=thumbnail_count,
+            extract_keyframes=False,
+            enable_enhanced_audio=True,
+            enable_speaker_diarization=True,
+            enable_topic_segmentation=True,
+            audio_model_size="base",
+            enable_ocr=enable_ocr,
+            language=language
+        )
+
+        # Initialize video processor
+        processor = VideoProcessor(config)
+
+        # Process the video file
+        result = await processor.process_video(video_file)
+
+        if not result.success:
+            print(f"❌ Video processing failed: {result.error}")
+            return False
+
+        print(f"✅ Video processed successfully")
+        print_result("Duration", f"{result.video_metadata.get('duration', 'Unknown')} seconds")
+        print_result("Transcription Length", f"{len(result.transcription)} characters")
+
+        if result.thumbnails:
+            print_result("Thumbnails Generated", str(len(result.thumbnails)))
+        if result.speakers:
+            print_result("Speakers Detected", str(len(result.speakers)))
+        if result.topics:
+            print_result("Topics Detected", str(len(result.topics)))
+
+        # Prepare content for Graphiti
+        doc_id = f"video_{video_file.stem}_{hash(str(video_file))}"
+        title = f"Video: {video_file.stem}"
+
+        # Combine transcription with additional information
+        content_parts = [result.transcription]
+
+        if result.speakers:
+            content_parts.append("\n\nSpeaker Information:")
+            for speaker in result.speakers:
+                content_parts.append(f"- {speaker}")
+
+        if result.topics:
+            content_parts.append("\n\nTopics Discussed:")
+            for topic in result.topics:
+                content_parts.append(f"- {topic}")
+
+        if result.ocr_text:
+            content_parts.append(f"\n\nText from Video (OCR):\n{result.ocr_text}")
+
+        full_content = "\n".join(content_parts)
+
+        # Prepare metadata for Graphiti
+        graphiti_metadata = {
+            'source_file': str(video_file),
+            'file_type': 'video',
+            'duration_seconds': result.video_metadata.get('duration'),
+            'video_format': result.video_metadata.get('format'),
+            'resolution': result.video_metadata.get('resolution'),
+            'speaker_count': len(result.speakers) if result.speakers else 0,
+            'topic_count': len(result.topics) if result.topics else 0,
+            'thumbnail_count': len(result.thumbnails) if result.thumbnails else 0,
+            'transcription_length': len(result.transcription),
+            'has_ocr_text': bool(result.ocr_text),
+            'ocr_text_length': len(result.ocr_text) if result.ocr_text else 0
+        }
+        if metadata:
+            graphiti_metadata.update(metadata)
+
+        print_section("Graphiti Knowledge Graph Ingestion")
+
+        # Use Graphiti for ingestion
+        graphiti_result = await extract_and_ingest_with_graphiti(
+            text_content=full_content,
+            doc_id=doc_id,
+            title=title,
+            context=f"Video analysis: {video_file.name}",
+            metadata=graphiti_metadata
+        )
+
+        # Report results
+        if graphiti_result['graphiti']['success']:
+            print_section("✅ Graphiti Ingestion Results")
+            print_result("Episode Name", graphiti_result['graphiti']['episode_name'])
+            print_result("Content Length", f"{graphiti_result['graphiti']['content_length']} characters")
+            print_result("Video ID", doc_id)
+        else:
+            print(f"❌ Graphiti ingestion failed: {graphiti_result['graphiti'].get('error', 'Unknown error')}")
+            return False
+
+        print_section("✅ Processing Complete")
+        print("🎉 Video successfully processed and ingested into Graphiti knowledge graph!")
+        print("💡 The video content is now available for semantic search and knowledge graph queries.")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Error during video processing: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 async def test_video_processing(video_file: Path, generate_thumbnails: bool = False,
@@ -408,7 +536,12 @@ Examples:
     python test-video.py recording.avi --thumbnails --thumbnail-count 5
     python test-video.py presentation.mov --enable-ocr
 
-  Ingestion Mode (background processing + storage):
+  Graphiti Knowledge Graph Mode (recommended):
+    python test-video.py my-video.mp4 --graphiti
+    python test-video.py recording.avi --graphiti --thumbnails --metadata '{"type": "meeting"}'
+    python test-video.py presentation.mov --graphiti --enable-ocr --metadata '{"category": "education"}'
+
+  Traditional Ingestion Mode (legacy):
     python test-video.py my-video.mp4 --ingest
     python test-video.py recording.avi --ingest --metadata '{"type": "meeting"}'
     python test-video.py presentation.mov --ingest --webhook-url https://my-app.com/webhook
@@ -427,8 +560,10 @@ Note: Video processing may take several minutes for large files.
     )
 
     parser.add_argument('video_file', help='Path to video file')
+    parser.add_argument('--graphiti', action='store_true',
+                       help='Use Graphiti for knowledge graph ingestion (recommended)')
     parser.add_argument('--ingest', action='store_true',
-                       help='Enable ingestion mode (background processing + storage)')
+                       help='Enable traditional ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_videos)')
@@ -562,8 +697,25 @@ Note: Video processing may take several minutes for large files.
     handle_resume_arguments(args, str(video_file), 'video', metadata)
 
     try:
-        if args.ingest:
-            # Ingestion mode
+        if args.graphiti:
+            # Graphiti knowledge graph mode (recommended)
+            success = asyncio.run(test_video_with_graphiti(
+                video_file,
+                metadata=metadata,
+                generate_thumbnails=args.thumbnails,
+                thumbnail_count=args.thumbnail_count,
+                enable_ocr=args.enable_ocr,
+                language=args.language
+            ))
+            if success:
+                print("\n🎉 Video processing with Graphiti completed successfully!")
+                print("💡 The video content is now available in the knowledge graph for semantic search.")
+                sys.exit(0)
+            else:
+                print("\n💥 Video processing with Graphiti failed!")
+                sys.exit(1)
+        elif args.ingest:
+            # Traditional ingestion mode
             success = asyncio.run(test_video_ingestion(
                 video_file,
                 webhook_url=args.webhook_url,

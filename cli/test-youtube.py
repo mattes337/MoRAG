@@ -44,11 +44,13 @@ load_dotenv(env_path)
 
 try:
     from morag_youtube import YouTubeProcessor, YouTubeConfig
+    from graph_extraction import extract_and_ingest_with_graphiti
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-youtube")
+    print("  pip install -e packages/morag-graph")
     sys.exit(1)
 
 
@@ -84,6 +86,139 @@ def validate_youtube_url(url: str) -> bool:
         if re.match(pattern, url):
             return True
     return False
+
+
+async def test_youtube_with_graphiti(
+    url: str,
+    metadata: Optional[Dict[str, Any]] = None
+) -> bool:
+    """Test YouTube processing using Graphiti for knowledge graph ingestion."""
+    print_header("MoRAG YouTube Processing with Graphiti")
+
+    if not validate_youtube_url(url):
+        print(f"❌ Error: Invalid YouTube URL format: {url}")
+        print("Please provide a valid YouTube URL like:")
+        print("  https://www.youtube.com/watch?v=VIDEO_ID")
+        print("  https://youtu.be/VIDEO_ID")
+        return False
+
+    print_result("YouTube URL", url)
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+
+    try:
+        print_section("YouTube Processing")
+        print("🔄 Starting YouTube video processing...")
+
+        # Initialize YouTube processor
+        processor = YouTubeProcessor()
+
+        # Create YouTube configuration for full processing
+        config = YouTubeConfig(
+            quality="best",
+            extract_audio=True,
+            download_subtitles=True,
+            download_thumbnails=True,
+            extract_metadata_only=False  # Full processing for Graphiti
+        )
+
+        # Process the YouTube video
+        result = await processor.process_url(url, config)
+
+        if not result.success:
+            print(f"❌ YouTube processing failed: {result.error}")
+            return False
+
+        print(f"✅ YouTube video processed successfully")
+        print_result("Title", result.metadata.get('title', 'Unknown'))
+        print_result("Duration", f"{result.metadata.get('duration', 'Unknown')} seconds")
+        print_result("Channel", result.metadata.get('uploader', 'Unknown'))
+        print_result("View Count", str(result.metadata.get('view_count', 'Unknown')))
+        print_result("Upload Date", result.metadata.get('upload_date', 'Unknown'))
+
+        if result.transcription:
+            print_result("Transcription Length", f"{len(result.transcription)} characters")
+        if result.subtitles:
+            print_result("Subtitles Available", "✅ Yes")
+        if result.thumbnails:
+            print_result("Thumbnails Downloaded", str(len(result.thumbnails)))
+
+        # Prepare content for Graphiti
+        video_id = result.metadata.get('id', 'unknown')
+        doc_id = f"youtube_{video_id}_{hash(url)}"
+        title = f"YouTube: {result.metadata.get('title', 'Unknown Video')}"
+
+        # Combine transcription with video information
+        content_parts = []
+
+        # Add video metadata as context
+        content_parts.append(f"Video Title: {result.metadata.get('title', 'Unknown')}")
+        content_parts.append(f"Channel: {result.metadata.get('uploader', 'Unknown')}")
+        content_parts.append(f"Duration: {result.metadata.get('duration', 'Unknown')} seconds")
+        content_parts.append(f"Upload Date: {result.metadata.get('upload_date', 'Unknown')}")
+        if result.metadata.get('description'):
+            content_parts.append(f"Description: {result.metadata['description']}")
+
+        # Add transcription
+        if result.transcription:
+            content_parts.append(f"\n\nTranscription:\n{result.transcription}")
+
+        # Add subtitles if different from transcription
+        if result.subtitles and result.subtitles != result.transcription:
+            content_parts.append(f"\n\nSubtitles:\n{result.subtitles}")
+
+        full_content = "\n".join(content_parts)
+
+        # Prepare metadata for Graphiti
+        graphiti_metadata = {
+            'source_url': url,
+            'video_id': video_id,
+            'file_type': 'youtube_video',
+            'title': result.metadata.get('title'),
+            'channel': result.metadata.get('uploader'),
+            'duration_seconds': result.metadata.get('duration'),
+            'view_count': result.metadata.get('view_count'),
+            'upload_date': result.metadata.get('upload_date'),
+            'thumbnail_count': len(result.thumbnails) if result.thumbnails else 0,
+            'has_transcription': bool(result.transcription),
+            'has_subtitles': bool(result.subtitles),
+            'transcription_length': len(result.transcription) if result.transcription else 0,
+            'content_length': len(full_content)
+        }
+        if metadata:
+            graphiti_metadata.update(metadata)
+
+        print_section("Graphiti Knowledge Graph Ingestion")
+
+        # Use Graphiti for ingestion
+        graphiti_result = await extract_and_ingest_with_graphiti(
+            text_content=full_content,
+            doc_id=doc_id,
+            title=title,
+            context=f"YouTube video analysis: {result.metadata.get('title', 'Unknown')}",
+            metadata=graphiti_metadata
+        )
+
+        # Report results
+        if graphiti_result['graphiti']['success']:
+            print_section("✅ Graphiti Ingestion Results")
+            print_result("Episode Name", graphiti_result['graphiti']['episode_name'])
+            print_result("Content Length", f"{graphiti_result['graphiti']['content_length']} characters")
+            print_result("Video ID", doc_id)
+        else:
+            print(f"❌ Graphiti ingestion failed: {graphiti_result['graphiti'].get('error', 'Unknown error')}")
+            return False
+
+        print_section("✅ Processing Complete")
+        print("🎉 YouTube video successfully processed and ingested into Graphiti knowledge graph!")
+        print("💡 The video content is now available for semantic search and knowledge graph queries.")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Error during YouTube processing: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 async def test_youtube_processing(url: str) -> bool:
@@ -335,8 +470,10 @@ Make sure you have a stable internet connection.
     )
 
     parser.add_argument('youtube_url', help='YouTube URL to process')
+    parser.add_argument('--graphiti', action='store_true',
+                       help='Use Graphiti for knowledge graph ingestion (recommended)')
     parser.add_argument('--ingest', action='store_true',
-                       help='Enable ingestion mode (background processing + storage)')
+                       help='Enable traditional ingestion mode (background processing + storage)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_youtube)')
@@ -365,8 +502,21 @@ Make sure you have a stable internet connection.
     handle_resume_arguments(args, args.youtube_url, 'youtube', metadata)
 
     try:
-        if args.ingest:
-            # Ingestion mode
+        if args.graphiti:
+            # Graphiti knowledge graph mode (recommended)
+            success = asyncio.run(test_youtube_with_graphiti(
+                args.youtube_url,
+                metadata=metadata
+            ))
+            if success:
+                print("\n🎉 YouTube processing with Graphiti completed successfully!")
+                print("💡 The video content is now available in the knowledge graph for semantic search.")
+                sys.exit(0)
+            else:
+                print("\n💥 YouTube processing with Graphiti failed!")
+                sys.exit(1)
+        elif args.ingest:
+            # Traditional ingestion mode
             success = asyncio.run(test_youtube_ingestion(
                 args.youtube_url,
                 webhook_url=args.webhook_url,
