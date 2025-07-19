@@ -164,65 +164,21 @@ print(chunk.extract_document_id())  # Returns parent document ID
 print(chunk.extract_chunk_index())  # Returns chunk index
 ```
 
-## Migration
+## Fresh Data Ingestion
 
-### Migration Service
-The `IDMigrationService` handles converting existing legacy IDs to the unified format.
+For new data ingestion, the unified ID system automatically generates appropriate IDs for all entities. No migration is needed for fresh data - simply use the standard ingestion pipeline and all IDs will be generated in the unified format.
 
 ```python
-from morag_graph.utils import IDMigrationService
+from morag_graph.utils import UnifiedIDGenerator
 
-# Initialize migration service
-migration_service = IDMigrationService(
-    neo4j_storage=neo4j_storage,
-    qdrant_storage=qdrant_storage  # Optional
-)
+# ID generation is automatic during ingestion
+# All new entities will use the unified format
+generator = UnifiedIDGenerator()
 
-# Migrate all ID types
-result = await migration_service.migrate_all(batch_size=100)
-
-# Migrate specific types
-doc_result = await migration_service.migrate_document_ids()
-chunk_result = await migration_service.migrate_chunk_ids()
-entity_result = await migration_service.migrate_entity_ids()
-relation_result = await migration_service.migrate_relation_ids()
-
-# Generate migration report
-report = migration_service.get_migration_report()
-```
-
-### CLI Migration Tool
-A command-line tool is provided for easy migration:
-
-```bash
-# Migrate all IDs
-python scripts/migrate_ids.py \
-  --neo4j-uri bolt://localhost:7687 \
-  --neo4j-user neo4j \
-  --neo4j-password password \
-  migrate-all
-
-# Dry run to preview changes
-python scripts/migrate_ids.py \
-  --neo4j-uri bolt://localhost:7687 \
-  --neo4j-user neo4j \
-  --neo4j-password password \
-  --dry-run \
-  migrate-all
-
-# Migrate specific entity types
-python scripts/migrate_ids.py \
-  --neo4j-uri bolt://localhost:7687 \
-  --neo4j-user neo4j \
-  --neo4j-password password \
-  migrate-documents
-
-# Validate unified ID format
-python scripts/migrate_ids.py \
-  --neo4j-uri bolt://localhost:7687 \
-  --neo4j-user neo4j \
-  --neo4j-password password \
-  validate
+# Generate IDs for new entities
+document_id = generator.generate_document_id("example.pdf")
+chunk_id = generator.generate_chunk_id(document_id, 0)
+entity_id = generator.generate_entity_id("John Doe", "PERSON")
 ```
 
 ## Benefits

@@ -9,10 +9,6 @@ from morag_graph.graphiti.entity_storage import (
     GraphitiEntityStorage, EntityStorageResult, RelationStorageResult,
     create_entity_storage
 )
-from morag_graph.graphiti.migration_utils import (
-    Neo4jToGraphitiMigrator, MigrationStats, MigrationResult,
-    create_migrator
-)
 from morag_graph.graphiti import GraphitiConfig
 
 
@@ -261,90 +257,7 @@ class TestGraphitiEntityStorage:
         assert "relation_adapter_stats" in stats
 
 
-class TestMigrationStats:
-    """Test MigrationStats functionality."""
-    
-    def test_init(self):
-        """Test stats initialization."""
-        stats = MigrationStats()
-        
-        assert stats.entities_processed == 0
-        assert stats.entities_migrated == 0
-        assert stats.relations_processed == 0
-        assert stats.relations_migrated == 0
-        assert stats.start_time is None
-        assert stats.end_time is None
-    
-    def test_duration_calculation(self):
-        """Test duration calculation."""
-        stats = MigrationStats()
-        stats.start_time = datetime(2024, 1, 1, 12, 0, 0)
-        stats.end_time = datetime(2024, 1, 1, 12, 0, 30)
-        
-        assert stats.duration_seconds == 30.0
-    
-    def test_success_rates(self):
-        """Test success rate calculations."""
-        stats = MigrationStats()
-        stats.entities_processed = 10
-        stats.entities_migrated = 8
-        stats.relations_processed = 5
-        stats.relations_migrated = 4
-        
-        assert stats.entity_success_rate == 0.8
-        assert stats.relation_success_rate == 0.8
-    
-    def test_success_rates_zero_division(self):
-        """Test success rates with zero processed items."""
-        stats = MigrationStats()
-        
-        assert stats.entity_success_rate == 0.0
-        assert stats.relation_success_rate == 0.0
 
-
-class TestNeo4jToGraphitiMigrator:
-    """Test Neo4jToGraphitiMigrator functionality."""
-    
-    def test_init(self):
-        """Test migrator initialization."""
-        mock_neo4j = MagicMock()
-        migrator = Neo4jToGraphitiMigrator(mock_neo4j)
-        
-        assert migrator.neo4j_storage == mock_neo4j
-        assert migrator.graphiti_storage is not None
-        assert migrator.batch_size == 100
-        assert isinstance(migrator.stats, MigrationStats)
-    
-    def test_init_with_config(self):
-        """Test migrator initialization with config."""
-        mock_neo4j = MagicMock()
-        config = GraphitiConfig(openai_api_key="test-key")
-        migrator = Neo4jToGraphitiMigrator(mock_neo4j, config, batch_size=50)
-        
-        assert migrator.batch_size == 50
-        assert migrator.graphiti_storage.config == config
-    
-    def test_get_migration_summary(self):
-        """Test migration summary generation."""
-        mock_neo4j = MagicMock()
-        migrator = Neo4jToGraphitiMigrator(mock_neo4j)
-        
-        # Set some test stats
-        migrator.stats.entities_processed = 10
-        migrator.stats.entities_migrated = 8
-        migrator.errors = ["Error 1", "Error 2"]
-        migrator.warnings = ["Warning 1"]
-        
-        summary = migrator.get_migration_summary()
-        
-        assert "stats" in summary
-        assert "errors" in summary
-        assert "warnings" in summary
-        assert "graphiti_storage_stats" in summary
-        assert summary["stats"]["entities"]["processed"] == 10
-        assert summary["stats"]["entities"]["migrated"] == 8
-        assert len(summary["errors"]) == 2
-        assert len(summary["warnings"]) == 1
 
 
 class TestCreateFunctions:
@@ -365,20 +278,4 @@ class TestCreateFunctions:
         assert isinstance(storage, GraphitiEntityStorage)
         assert storage.config == config
     
-    def test_create_migrator(self):
-        """Test migrator creation function."""
-        mock_neo4j = MagicMock()
-        migrator = create_migrator(mock_neo4j)
-        
-        assert isinstance(migrator, Neo4jToGraphitiMigrator)
-        assert migrator.neo4j_storage == mock_neo4j
-        assert migrator.batch_size == 100
-    
-    def test_create_migrator_with_config(self):
-        """Test migrator creation with config."""
-        mock_neo4j = MagicMock()
-        config = GraphitiConfig(openai_api_key="test-key")
-        migrator = create_migrator(mock_neo4j, config, batch_size=50)
-        
-        assert isinstance(migrator, Neo4jToGraphitiMigrator)
-        assert migrator.batch_size == 50
+

@@ -49,10 +49,6 @@ try:
         GraphitiEntityStorage, EntityStorageResult, RelationStorageResult,
         create_entity_storage
     )
-    from .migration_utils import (
-        Neo4jToGraphitiMigrator, MigrationStats, MigrationResult,
-        create_migrator
-    )
     ENTITY_STORAGE_AVAILABLE = True
 except ImportError:
     # Graceful degradation if dependencies are missing
@@ -60,10 +56,6 @@ except ImportError:
     EntityStorageResult = None
     RelationStorageResult = None
     create_entity_storage = None
-    Neo4jToGraphitiMigrator = None
-    MigrationStats = None
-    MigrationResult = None
-    create_migrator = None
     ENTITY_STORAGE_AVAILABLE = False
 
 # Import integration components
@@ -173,10 +165,6 @@ __all__ = [
     "EntityStorageResult",
     "RelationStorageResult",
     "create_entity_storage",
-    "Neo4jToGraphitiMigrator",
-    "MigrationStats",
-    "MigrationResult",
-    "create_migrator",
     "ENTITY_STORAGE_AVAILABLE",
 
     # Integration services
