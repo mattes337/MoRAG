@@ -73,18 +73,15 @@ def create_graphiti_instance(config: Optional[GraphitiConfig] = None):
     # Create Neo4j driver
     driver = Neo4jDriver(
         uri=config.neo4j_uri,
-        username=config.neo4j_username,
+        user=config.neo4j_username,  # Use 'user' instead of 'username'
         password=config.neo4j_password,
         database=config.neo4j_database
     )
 
-    # Create Graphiti instance
+    # Create Graphiti instance with minimal parameters
+    # Let Graphiti use default LLM configuration from environment
     graphiti = Graphiti(
-        driver=driver,
-        llm_model=config.openai_model,
-        embedding_model=config.openai_embedding_model,
-        enable_telemetry=config.enable_telemetry,
-        parallel_runtime=config.parallel_runtime
+        graph_driver=driver
     )
 
     logger.info(

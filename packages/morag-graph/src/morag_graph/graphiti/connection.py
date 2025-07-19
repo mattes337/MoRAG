@@ -70,11 +70,12 @@ class GraphitiConnectionService:
             test_episode_name = f"connection_test_{datetime.now().isoformat()}"
             test_content = "This is a connection test episode."
             
-            # Add episode to Graphiti
+            # Add episode to Graphiti with correct parameters
             await self._graphiti.add_episode(
                 name=test_episode_name,
-                content=test_content,
-                source_description="MoRAG connection test"
+                episode_body=test_content,
+                source_description="MoRAG connection test",
+                reference_time=datetime.now()
             )
             
             logger.debug("Connection validation successful", episode_name=test_episode_name)
@@ -89,7 +90,8 @@ class GraphitiConnectionService:
         name: str,
         content: str,
         source_description: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        reference_time: Optional[datetime] = None
     ) -> bool:
         """Create a new episode in Graphiti.
         
@@ -107,16 +109,19 @@ class GraphitiConnectionService:
             return False
             
         try:
+            if reference_time is None:
+                reference_time = datetime.now()
+
             await self._graphiti.add_episode(
                 name=name,
-                content=content,
+                episode_body=content,  # Use episode_body instead of content
                 source_description=source_description or "MoRAG episode",
-                metadata=metadata or {}
+                reference_time=reference_time
             )
-            
+
             logger.info("Episode created successfully", episode_name=name)
             return True
-            
+
         except Exception as e:
             logger.error("Failed to create episode", episode_name=name, error=str(e))
             return False

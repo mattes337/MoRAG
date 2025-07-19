@@ -51,12 +51,14 @@ try:
     from morag_core.interfaces.processor import ProcessingConfig
     from morag_services import QdrantVectorStorage, GeminiEmbeddingService
     from morag_core.models import Document, DocumentChunk
+    from graph_extraction import extract_and_ingest, extract_and_ingest_with_graphiti
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-document")
     print("  pip install -e packages/morag-services")
+    print("  pip install -e packages/morag-graph")
     sys.exit(1)
 
 
@@ -302,6 +304,118 @@ async def store_content_in_vector_db(
         raise
 
 
+async def test_document_with_graphiti(
+    document_file: Path,
+    metadata: Optional[Dict[str, Any]] = None,
+    chunking_strategy: str = "paragraph",
+    chunk_size: int = 1000,
+    chunk_overlap: int = 200,
+    use_traditional_extraction: bool = False
+) -> bool:
+    """Test document processing using Graphiti for knowledge graph ingestion.
+
+    This is the new recommended approach that uses Graphiti's episode-based
+    knowledge representation with built-in entity extraction.
+    """
+    print_header("MoRAG Document Processing with Graphiti")
+
+    if not document_file.exists():
+        print(f"❌ Error: Document file not found: {document_file}")
+        return False
+
+    print_result("Input File", str(document_file))
+    print_result("File Size", f"{document_file.stat().st_size / 1024 / 1024:.2f} MB")
+    print_result("File Extension", document_file.suffix.lower())
+    print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
+    print_result("Chunking Strategy", chunking_strategy)
+    print_result("Chunk Size", f"{chunk_size} characters")
+    print_result("Chunk Overlap", f"{chunk_overlap} characters")
+    print_result("Use Traditional Extraction", "✅ Yes" if use_traditional_extraction else "❌ No")
+
+    try:
+        print_section("Processing Document")
+        print("🔄 Starting document processing...")
+
+        # Initialize document processor
+        processor = DocumentProcessor()
+
+        # Process the document file
+        result = await processor.process_file(
+            document_file,
+            extract_metadata=True,
+            chunking_strategy=chunking_strategy,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
+        )
+
+        if not result.success:
+            print(f"❌ Document processing failed: {result.error}")
+            return False
+
+        print(f"✅ Document processed successfully")
+        print_result("Title", result.document.metadata.get('title', 'Unknown'))
+        print_result("Pages", str(result.document.metadata.get('page_count', 'Unknown')))
+        print_result("Chunks", str(len(result.chunks)))
+
+        # Combine all chunk content for Graphiti ingestion
+        full_content = "\n\n".join([chunk.content for chunk in result.chunks])
+        doc_id = f"doc_{document_file.stem}_{hash(str(document_file))}"
+        title = result.document.metadata.get('title') or document_file.stem
+
+        # Prepare metadata for Graphiti
+        graphiti_metadata = {
+            'source_file': str(document_file),
+            'file_type': document_file.suffix.lower(),
+            'chunk_count': len(result.chunks),
+            'processing_strategy': chunking_strategy,
+            'file_size_mb': round(document_file.stat().st_size / 1024 / 1024, 2)
+        }
+        if metadata:
+            graphiti_metadata.update(metadata)
+
+        print_section("Graphiti Knowledge Graph Ingestion")
+
+        # Use Graphiti for ingestion
+        graphiti_result = await extract_and_ingest_with_graphiti(
+            text_content=full_content,
+            doc_id=doc_id,
+            title=title,
+            context=f"Document: {document_file.name}",
+            metadata=graphiti_metadata,
+            use_traditional_extraction=use_traditional_extraction
+        )
+
+        # Report results
+        if graphiti_result['graphiti']['success']:
+            print_section("✅ Graphiti Ingestion Results")
+            print_result("Episode Name", graphiti_result['graphiti']['episode_name'])
+            print_result("Content Length", f"{graphiti_result['graphiti']['content_length']} characters")
+            print_result("Document ID", doc_id)
+
+            if use_traditional_extraction and graphiti_result['traditional']:
+                if graphiti_result['traditional']['success']:
+                    print_section("📊 Traditional Extraction Comparison")
+                    print_result("Entities", str(len(graphiti_result['traditional']['entities'])))
+                    print_result("Relations", str(len(graphiti_result['traditional']['relations'])))
+                else:
+                    print("⚠️ Traditional extraction failed")
+        else:
+            print(f"❌ Graphiti ingestion failed: {graphiti_result['graphiti'].get('error', 'Unknown error')}")
+            return False
+
+        print_section("✅ Processing Complete")
+        print("🎉 Document successfully processed and ingested into Graphiti knowledge graph!")
+        print("💡 The content is now available for semantic search and knowledge graph queries.")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Error during document processing: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 async def test_document_ingestion(document_file: Path, webhook_url: Optional[str] = None,
                                  metadata: Optional[Dict[str, Any]] = None,
                                  chunking_strategy: str = "paragraph",
@@ -472,7 +586,12 @@ Examples:
     python test-document.py presentation.pptx --chunking-strategy chapter
     python test-document.py document.docx --chunk-size 2000
 
-  Ingestion Mode (background processing + storage):
+  Graphiti Knowledge Graph Mode (recommended):
+    python test-document.py my-document.pdf --graphiti
+    python test-document.py document.docx --graphiti --metadata '{"category": "research"}'
+    python test-document.py presentation.pptx --graphiti --traditional-extraction
+
+  Traditional Ingestion Mode (background processing + storage):
     python test-document.py my-document.pdf --ingest
     python test-document.py document.docx --ingest --metadata '{"category": "research"}'
     python test-document.py presentation.pptx --ingest --webhook-url https://my-app.com/webhook
@@ -488,6 +607,10 @@ Examples:
     parser.add_argument('document_file', help='Path to document file')
     parser.add_argument('--ingest', action='store_true',
                        help='Enable ingestion mode (background processing + storage)')
+    parser.add_argument('--graphiti', action='store_true',
+                       help='Use Graphiti for knowledge graph ingestion (recommended)')
+    parser.add_argument('--traditional-extraction', action='store_true',
+                       help='Also run traditional entity/relation extraction for comparison (with --graphiti)')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_documents)')
@@ -528,8 +651,18 @@ Examples:
     handle_resume_arguments(args, str(document_file), 'document', metadata)
 
     try:
-        if args.ingest:
-            # Ingestion mode
+        if args.graphiti:
+            # Graphiti knowledge graph mode (recommended)
+            success = asyncio.run(test_document_with_graphiti(
+                document_file,
+                metadata=metadata,
+                chunking_strategy=args.chunking_strategy,
+                chunk_size=args.chunk_size,
+                chunk_overlap=args.chunk_overlap,
+                use_traditional_extraction=args.traditional_extraction
+            ))
+        elif args.ingest:
+            # Traditional ingestion mode
             success = asyncio.run(test_document_ingestion(
                 document_file,
                 webhook_url=args.webhook_url,
