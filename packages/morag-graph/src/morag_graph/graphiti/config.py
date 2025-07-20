@@ -58,12 +58,35 @@ def create_graphiti_instance(config: Optional[GraphitiConfig] = None):
         ) from e
 
     if config is None:
+        # Determine which API key is available
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+
+        # Choose appropriate models based on available API keys
+        if gemini_key:
+            # Use Gemini models if Gemini API key is available
+            model = os.getenv("GRAPHITI_MODEL", "gemini-1.5-flash")
+            embedding_model = os.getenv("GRAPHITI_EMBEDDING_MODEL", "text-embedding-004")
+            api_key = gemini_key
+        elif openai_key:
+            # Use OpenAI models if only OpenAI API key is available
+            model = os.getenv("GRAPHITI_MODEL", "gpt-4")
+            embedding_model = os.getenv("GRAPHITI_EMBEDDING_MODEL", "text-embedding-3-small")
+            api_key = openai_key
+        else:
+            # Default to Gemini models but will fail without API key
+            model = "gemini-1.5-flash"
+            embedding_model = "text-embedding-004"
+            api_key = None
+
         config = GraphitiConfig(
             neo4j_uri=os.getenv("GRAPHITI_NEO4J_URI", "bolt://localhost:7687"),
             neo4j_username=os.getenv("GRAPHITI_NEO4J_USERNAME", "neo4j"),
             neo4j_password=os.getenv("GRAPHITI_NEO4J_PASSWORD", "password"),
             neo4j_database=os.getenv("GRAPHITI_NEO4J_DATABASE", "morag_graphiti"),
-            openai_api_key=os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY"),
+            openai_api_key=api_key,
+            openai_model=model,
+            openai_embedding_model=embedding_model,
             enable_telemetry=os.getenv("GRAPHITI_TELEMETRY_ENABLED", "false").lower() == "true",
             parallel_runtime=os.getenv("USE_PARALLEL_RUNTIME", "false").lower() == "true"
         )

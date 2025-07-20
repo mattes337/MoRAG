@@ -693,6 +693,20 @@ Examples:
                        help='Use Graphiti for knowledge graph ingestion (recommended)')
     parser.add_argument('--ingest', action='store_true',
                        help='Enable traditional ingestion mode (background processing + storage)')
+
+    # Hybrid Episode Strategy Options (for --graphiti mode)
+    parser.add_argument('--episode-strategy',
+                       choices=['document_only', 'chunk_only', 'contextual_chunks', 'hybrid'],
+                       default='contextual_chunks',
+                       help='Episode creation strategy for Graphiti mode (default: contextual_chunks for audio)')
+    parser.add_argument('--context-level',
+                       choices=['minimal', 'standard', 'rich', 'comprehensive'],
+                       default='rich',
+                       help='Context enrichment level for Graphiti mode (default: rich)')
+    parser.add_argument('--disable-ai-summarization', action='store_true',
+                       help='Disable AI-powered contextual summaries in Graphiti mode')
+    parser.add_argument('--episode-prefix',
+                       help='Custom prefix for episode names in Graphiti mode')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_audio)')

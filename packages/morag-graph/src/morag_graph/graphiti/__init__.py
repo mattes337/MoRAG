@@ -7,7 +7,10 @@ and hybrid search capabilities.
 
 from .config import GraphitiConfig, create_graphiti_instance
 from .connection import GraphitiConnectionService
-from .episode_mapper import DocumentEpisodeMapper, create_episode_mapper
+from .episode_mapper import (
+    DocumentEpisodeMapper, EpisodeStrategy, ContextLevel,
+    create_episode_mapper, create_hybrid_episode_mapper, create_contextual_chunk_mapper
+)
 from .search_service import GraphitiSearchService, SearchResult, SearchMetrics, SearchResultAdapter, create_search_service
 from .search_integration import SearchInterface, GraphitiSearchAdapter, HybridSearchService, create_search_adapter, create_hybrid_search_service
 from .temporal_service import GraphitiTemporalService, TemporalSnapshot, TemporalChange, TemporalQueryType, create_temporal_service
@@ -99,7 +102,11 @@ __all__ = [
 
     # Document mapping
     "DocumentEpisodeMapper",
+    "EpisodeStrategy",
+    "ContextLevel",
     "create_episode_mapper",
+    "create_hybrid_episode_mapper",
+    "create_contextual_chunk_mapper",
 
     # Search services
     "GraphitiSearchService",

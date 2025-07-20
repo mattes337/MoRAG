@@ -89,7 +89,9 @@ async def example_connection():
 
 ### 2. Document Episode Mapper
 
-Converts MoRAG documents into Graphiti episodes:
+Converts MoRAG documents into Graphiti episodes with multiple strategies:
+
+#### Basic Usage
 
 ```python
 from morag_graph.graphiti import DocumentEpisodeMapper
@@ -97,13 +99,92 @@ from morag_core.models import Document
 
 async def map_document():
     mapper = DocumentEpisodeMapper(config)
-    
+
     # Map entire document to episode
     result = await mapper.map_document_to_episode(document)
-    
+
     # Map individual chunks to episodes
     chunk_results = await mapper.map_document_chunks_to_episodes(document)
 ```
+
+#### Hybrid Strategy (Recommended)
+
+The hybrid approach provides both granular chunk-level episodes and contextual processing:
+
+```python
+from morag_graph.graphiti import (
+    create_hybrid_episode_mapper,
+    EpisodeStrategy,
+    ContextLevel
+)
+
+async def hybrid_mapping():
+    # Create hybrid mapper with rich context
+    mapper = create_hybrid_episode_mapper(
+        config=config,
+        context_level=ContextLevel.RICH
+    )
+
+    # Map document with both document and contextual chunk episodes
+    result = await mapper.map_document_hybrid(
+        document=document,
+        episode_name_prefix="my_document",
+        source_description="Important document with contextual analysis"
+    )
+
+    print(f"Created {result['total_episodes']} episodes:")
+    print(f"  - Document episode: {result['document_episode']['success']}")
+    print(f"  - Chunk episodes: {len(result['chunk_episodes'])}")
+```
+
+#### Episode Strategies
+
+Choose the strategy that best fits your use case:
+
+```python
+# 1. Document Only - One episode per document
+mapper = DocumentEpisodeMapper(
+    config=config,
+    strategy=EpisodeStrategy.DOCUMENT_ONLY,
+    context_level=ContextLevel.MINIMAL
+)
+
+# 2. Chunks Only - One episode per chunk
+mapper = DocumentEpisodeMapper(
+    config=config,
+    strategy=EpisodeStrategy.CHUNK_ONLY,
+    context_level=ContextLevel.STANDARD
+)
+
+# 3. Contextual Chunks - Chunks with rich context summaries
+mapper = create_contextual_chunk_mapper(
+    config=config,
+    context_level=ContextLevel.COMPREHENSIVE
+)
+
+# 4. Hybrid - Both document and contextual chunks (RECOMMENDED)
+mapper = create_hybrid_episode_mapper(
+    config=config,
+    context_level=ContextLevel.RICH
+)
+```
+
+#### Context Levels
+
+Control the amount of contextual information included:
+
+- **MINIMAL**: Basic metadata only
+- **STANDARD**: Document summary + chunk relationships
+- **RICH**: Full context with surrounding chunks and semantic analysis
+- **COMPREHENSIVE**: All available context including cross-document relationships
+
+#### Benefits of Hybrid Approach
+
+✅ **Granular Retrieval**: Chunk-level episodes enable precise information retrieval
+✅ **Contextual Understanding**: Rich summaries preserve document-level meaning
+✅ **Flexible Querying**: Query at both document and chunk levels
+✅ **AI-Enhanced**: Automatic contextual summaries using LLM capabilities
+✅ **Configurable**: Adjust context level based on your needs
 
 ### 3. Search Service
 

@@ -13,6 +13,12 @@ Processing Mode (immediate results):
     python test-document.py spreadsheet.xlsx
     python test-document.py document.docx
 
+Graphiti Mode (recommended - knowledge graph with hybrid episodes):
+    python test-document.py my-document.pdf --graphiti
+    python test-document.py document.docx --graphiti --episode-strategy hybrid --context-level rich
+    python test-document.py report.pdf --graphiti --episode-strategy contextual_chunks --context-level comprehensive
+    python test-document.py manual.pdf --graphiti --episode-strategy document_only --context-level minimal
+
 Ingestion Mode (background processing + storage):
     python test-document.py my-document.pdf --ingest
     python test-document.py document.docx --ingest --metadata '{"category": "research", "priority": 1}'
@@ -310,14 +316,18 @@ async def test_document_with_graphiti(
     chunking_strategy: str = "paragraph",
     chunk_size: int = 1000,
     chunk_overlap: int = 200,
-    use_traditional_extraction: bool = False
+    use_traditional_extraction: bool = False,
+    episode_strategy: str = "hybrid",
+    context_level: str = "rich",
+    enable_ai_summarization: bool = True,
+    episode_prefix: Optional[str] = None
 ) -> bool:
-    """Test document processing using Graphiti for knowledge graph ingestion.
+    """Test document processing using Graphiti with hybrid episode strategy.
 
-    This is the new recommended approach that uses Graphiti's episode-based
-    knowledge representation with built-in entity extraction.
+    This approach uses Graphiti's episode-based knowledge representation with
+    configurable episode strategies and contextual processing.
     """
-    print_header("MoRAG Document Processing with Graphiti")
+    print_header("MoRAG Document Processing with Graphiti Hybrid Episodes")
 
     if not document_file.exists():
         print(f"❌ Error: Document file not found: {document_file}")
@@ -330,6 +340,10 @@ async def test_document_with_graphiti(
     print_result("Chunking Strategy", chunking_strategy)
     print_result("Chunk Size", f"{chunk_size} characters")
     print_result("Chunk Overlap", f"{chunk_overlap} characters")
+    print_result("Episode Strategy", episode_strategy)
+    print_result("Context Level", context_level)
+    print_result("AI Summarization", "✅ Enabled" if enable_ai_summarization else "❌ Disabled")
+    print_result("Episode Prefix", episode_prefix or "Auto-generated")
     print_result("Use Traditional Extraction", "✅ Yes" if use_traditional_extraction else "❌ No")
 
     try:
@@ -373,33 +387,189 @@ async def test_document_with_graphiti(
         if metadata:
             graphiti_metadata.update(metadata)
 
-        print_section("Graphiti Knowledge Graph Ingestion")
+        print_section("Graphiti Hybrid Episode Mapping")
 
-        # Use Graphiti for ingestion
-        graphiti_result = await extract_and_ingest_with_graphiti(
-            text_content=full_content,
-            doc_id=doc_id,
-            title=title,
-            context=f"Document: {document_file.name}",
-            metadata=graphiti_metadata
+        # Import hybrid episode mapper
+        from morag_graph.graphiti import (
+            DocumentEpisodeMapper, EpisodeStrategy, ContextLevel,
+            GraphitiConfig, create_hybrid_episode_mapper
         )
 
+        # Convert string values to enums
+        strategy_map = {
+            'document_only': EpisodeStrategy.DOCUMENT_ONLY,
+            'chunk_only': EpisodeStrategy.CHUNK_ONLY,
+            'contextual_chunks': EpisodeStrategy.CONTEXTUAL_CHUNKS,
+            'hybrid': EpisodeStrategy.HYBRID
+        }
+
+        context_map = {
+            'minimal': ContextLevel.MINIMAL,
+            'standard': ContextLevel.STANDARD,
+            'rich': ContextLevel.RICH,
+            'comprehensive': ContextLevel.COMPREHENSIVE
+        }
+
+        strategy_enum = strategy_map[episode_strategy]
+        context_enum = context_map[context_level]
+
+        # Create Graphiti config with automatic API key detection
+        # Determine which API key is available
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+
+        # Choose appropriate models based on available API keys
+        if gemini_key:
+            # Use Gemini models if Gemini API key is available
+            model = os.getenv("GRAPHITI_MODEL", "gemini-1.5-flash")
+            embedding_model = os.getenv("GRAPHITI_EMBEDDING_MODEL", "text-embedding-004")
+            api_key = gemini_key
+        elif openai_key:
+            # Use OpenAI models if only OpenAI API key is available
+            model = os.getenv("GRAPHITI_MODEL", "gpt-4")
+            embedding_model = os.getenv("GRAPHITI_EMBEDDING_MODEL", "text-embedding-3-small")
+            api_key = openai_key
+        else:
+            # Default to Gemini models but will fail without API key
+            model = "gemini-1.5-flash"
+            embedding_model = "text-embedding-004"
+            api_key = None
+
+        config = GraphitiConfig(
+            neo4j_uri=os.getenv("GRAPHITI_NEO4J_URI", "bolt://localhost:7687"),
+            neo4j_username=os.getenv("GRAPHITI_NEO4J_USERNAME", "neo4j"),
+            neo4j_password=os.getenv("GRAPHITI_NEO4J_PASSWORD", "password"),
+            neo4j_database=os.getenv("GRAPHITI_NEO4J_DATABASE", "morag_graphiti"),
+            openai_api_key=api_key,
+            openai_model=model,
+            openai_embedding_model=embedding_model,
+            enable_telemetry=os.getenv("GRAPHITI_TELEMETRY_ENABLED", "false").lower() == "true",
+            parallel_runtime=os.getenv("USE_PARALLEL_RUNTIME", "false").lower() == "true"
+        )
+
+        # Create episode mapper with specified strategy
+        if episode_strategy == 'hybrid':
+            mapper = create_hybrid_episode_mapper(
+                config=config,
+                context_level=context_enum
+            )
+        else:
+            mapper = DocumentEpisodeMapper(
+                config=config,
+                strategy=strategy_enum,
+                context_level=context_enum,
+                enable_ai_summarization=enable_ai_summarization
+            )
+
+        # Convert processed result to Document model
+        from morag_core.models import Document, DocumentMetadata
+
+        doc_metadata = DocumentMetadata(
+            title=title,
+            source_name=document_file.name,
+            source_type="document",
+            mime_type=f"application/{document_file.suffix[1:]}" if document_file.suffix else "text/plain"
+        )
+
+        document = Document(metadata=doc_metadata)
+        document.chunks = result.document.chunks
+        document.raw_text = full_content
+
+        # Determine episode prefix
+        prefix = episode_prefix or f"{document_file.stem}"
+
+        # Map document using selected strategy
+        if episode_strategy == 'hybrid':
+            mapping_result = await mapper.map_document_hybrid(
+                document=document,
+                episode_name_prefix=prefix,
+                source_description=f"Document processing: {document_file.name}"
+            )
+        elif episode_strategy == 'document_only':
+            mapping_result = await mapper.map_document_to_episode(
+                document=document,
+                episode_name=f"{prefix}_document",
+                source_description=f"Document processing: {document_file.name}"
+            )
+        elif episode_strategy in ['chunk_only', 'contextual_chunks']:
+            if episode_strategy == 'contextual_chunks':
+                chunk_results = await mapper.map_document_chunks_to_contextual_episodes(
+                    document=document,
+                    chunk_episode_prefix=prefix
+                )
+            else:
+                chunk_results = await mapper.map_document_chunks_to_episodes(
+                    document=document,
+                    chunk_episode_prefix=prefix
+                )
+
+            # Create summary result
+            successful_chunks = [r for r in chunk_results if r.get('success')]
+            mapping_result = {
+                'success': len(successful_chunks) > 0,
+                'strategy': episode_strategy,
+                'chunk_episodes': chunk_results,
+                'total_episodes': len(successful_chunks)
+            }
+
         # Report results
-        if graphiti_result['graphiti']['success']:
-            print_section("✅ Graphiti Ingestion Results")
-            print_result("Episode Name", graphiti_result['graphiti']['episode_name'])
-            print_result("Content Length", f"{graphiti_result['graphiti']['content_length']} characters")
+        if mapping_result.get('success'):
+            print_section("✅ Hybrid Episode Mapping Results")
+
+            if episode_strategy == 'hybrid':
+                print_result("Strategy", "Hybrid (Document + Contextual Chunks)")
+                print_result("Total Episodes", str(mapping_result['total_episodes']))
+
+                doc_ep = mapping_result.get('document_episode', {})
+                if doc_ep.get('success'):
+                    print_result("Document Episode", doc_ep['episode_name'])
+
+                chunk_eps = mapping_result.get('chunk_episodes', [])
+                successful_chunks = [ep for ep in chunk_eps if ep.get('success')]
+                print_result("Chunk Episodes", f"{len(successful_chunks)}/{len(chunk_eps)} successful")
+
+                # Show sample chunk episodes
+                for i, ep in enumerate(successful_chunks[:3]):
+                    if ep.get('contextual_summary'):
+                        print_result(f"  Chunk {i+1}", f"{ep['episode_name']} (context: {len(ep['contextual_summary'])} chars)")
+                    else:
+                        print_result(f"  Chunk {i+1}", ep['episode_name'])
+
+                if len(successful_chunks) > 3:
+                    print_result("  ...", f"and {len(successful_chunks) - 3} more chunks")
+
+            elif episode_strategy == 'document_only':
+                print_result("Strategy", "Document Only")
+                print_result("Episode Name", mapping_result['episode_name'])
+                print_result("Content Length", f"{mapping_result['content_length']} characters")
+
+            else:  # chunk_only or contextual_chunks
+                print_result("Strategy", f"{'Contextual ' if episode_strategy == 'contextual_chunks' else ''}Chunks Only")
+                print_result("Total Episodes", str(mapping_result['total_episodes']))
+
+                chunk_eps = mapping_result.get('chunk_episodes', [])
+                for i, ep in enumerate(chunk_eps[:3]):  # Show first 3
+                    if ep.get('success'):
+                        if episode_strategy == 'contextual_chunks' and ep.get('contextual_summary'):
+                            print_result(f"Chunk {i+1}", f"{ep['episode_name']} (context: {len(ep['contextual_summary'])} chars)")
+                        else:
+                            print_result(f"Chunk {i+1}", ep['episode_name'])
+
+                if len(chunk_eps) > 3:
+                    print_result("...", f"and {len(chunk_eps) - 3} more chunks")
+
+            print_result("Context Level", context_level.title())
+            print_result("AI Summarization", "✅ Used" if enable_ai_summarization else "❌ Basic only")
             print_result("Document ID", doc_id)
 
-            if use_traditional_extraction and graphiti_result['traditional']:
-                if graphiti_result['traditional']['success']:
-                    print_section("📊 Traditional Extraction Comparison")
-                    print_result("Entities", str(len(graphiti_result['traditional']['entities'])))
-                    print_result("Relations", str(len(graphiti_result['traditional']['relations'])))
-                else:
-                    print("⚠️ Traditional extraction failed")
+            # Traditional extraction comparison (if enabled)
+            if use_traditional_extraction:
+                print_section("📊 Traditional Extraction Comparison")
+                print("⚠️ Traditional extraction comparison not yet implemented with hybrid episodes")
+                print("   The hybrid episode strategy provides automatic entity extraction through Graphiti")
         else:
-            print(f"❌ Graphiti ingestion failed: {graphiti_result['graphiti'].get('error', 'Unknown error')}")
+            error_msg = mapping_result.get('error', 'Unknown error')
+            print(f"❌ Episode mapping failed: {error_msg}")
             return False
 
         print_section("✅ Processing Complete")
@@ -610,6 +780,20 @@ Examples:
                        help='Use Graphiti for knowledge graph ingestion (recommended)')
     parser.add_argument('--traditional-extraction', action='store_true',
                        help='Also run traditional entity/relation extraction for comparison (with --graphiti)')
+
+    # Hybrid Episode Strategy Options (for --graphiti mode)
+    parser.add_argument('--episode-strategy',
+                       choices=['document_only', 'chunk_only', 'contextual_chunks', 'hybrid'],
+                       default='hybrid',
+                       help='Episode creation strategy for Graphiti mode (default: hybrid)')
+    parser.add_argument('--context-level',
+                       choices=['minimal', 'standard', 'rich', 'comprehensive'],
+                       default='rich',
+                       help='Context enrichment level for Graphiti mode (default: rich)')
+    parser.add_argument('--disable-ai-summarization', action='store_true',
+                       help='Disable AI-powered contextual summaries in Graphiti mode')
+    parser.add_argument('--episode-prefix',
+                       help='Custom prefix for episode names in Graphiti mode')
     parser.add_argument('--qdrant', action='store_true',
                        help='Store in Qdrant vector database (ingestion mode only)')
     parser.add_argument('--qdrant-collection', help='Qdrant collection name (default: from environment or morag_documents)')
@@ -658,7 +842,11 @@ Examples:
                 chunking_strategy=args.chunking_strategy,
                 chunk_size=args.chunk_size,
                 chunk_overlap=args.chunk_overlap,
-                use_traditional_extraction=args.traditional_extraction
+                use_traditional_extraction=args.traditional_extraction,
+                episode_strategy=args.episode_strategy,
+                context_level=args.context_level,
+                enable_ai_summarization=not args.disable_ai_summarization,
+                episode_prefix=args.episode_prefix
             ))
         elif args.ingest:
             # Traditional ingestion mode

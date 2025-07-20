@@ -87,7 +87,7 @@ class ProductionConfigManager:
         return GraphitiConfig(
             neo4j_uri=os.getenv("GRAPHITI_NEO4J_URI", "bolt://localhost:7687"),
             neo4j_username=os.getenv("GRAPHITI_NEO4J_USERNAME", "neo4j"),
-            neo4j_password=os.getenv("GRAPHITI_NEO4J_PASSWORD", "default_password"),
+            neo4j_password=os.getenv("GRAPHITI_NEO4J_PASSWORD", "password"),
             neo4j_database=os.getenv("GRAPHITI_NEO4J_DATABASE", "morag_graphiti"),
             openai_api_key=os.getenv("OPENAI_API_KEY", "default_key"),
             enable_telemetry=os.getenv("GRAPHITI_TELEMETRY_ENABLED", "false").lower() == "true"
