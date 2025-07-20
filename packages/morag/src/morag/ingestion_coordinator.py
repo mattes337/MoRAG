@@ -30,6 +30,7 @@ from morag_graph.models.document_chunk import DocumentChunk
 from morag_graph.models.database_config import DatabaseConfig, DatabaseType
 from .graph_extractor_wrapper import GraphExtractor
 from morag_graph.utils.id_generation import UnifiedIDGenerator
+from .ingestion.atomic_ingestion_service import AtomicIngestionService, ValidationError
 
 import structlog
 
@@ -44,6 +45,7 @@ class IngestionCoordinator:
         self.embedding_service = None
         self.vector_storage = None
         self.graph_extractor = None
+        self.atomic_ingestion_service = AtomicIngestionService()
         
     async def initialize(self):
         """Initialize all services."""
@@ -95,7 +97,150 @@ class IngestionCoordinator:
 
         # Initialize graph extractor
         self.graph_extractor = GraphExtractor()
-        
+
+    async def ingest_content_atomic(
+        self,
+        content: str,
+        source_path: str,
+        content_type: str,
+        metadata: Dict[str, Any],
+        processing_result: ProcessingResult,
+        databases: Optional[List[DatabaseConfig]] = None,
+        chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None,
+        document_id: Optional[str] = None,
+        replace_existing: bool = False,
+        language: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Perform atomic content ingestion with pre-validation and transaction management.
+
+        This method ensures that either all chunks are successfully ingested or none are,
+        preventing inconsistent database states.
+
+        Args:
+            content: Text content to ingest
+            source_path: Source file path or URL
+            content_type: Type of content (document, audio, video, etc.)
+            metadata: Content metadata
+            processing_result: Processing result from document/media processing
+            databases: List of database configurations to use
+            chunk_size: Size of text chunks (default: 1000)
+            chunk_overlap: Overlap between chunks (default: 200)
+            document_id: Document identifier (auto-generated if not provided)
+            replace_existing: Whether to replace existing document
+            language: Language code for processing
+
+        Returns:
+            Dictionary containing ingestion results
+
+        Raises:
+            ValidationError: If pre-validation fails
+            Exception: If ingestion fails after validation
+        """
+        start_time = datetime.now(timezone.utc)
+
+        # Set defaults
+        chunk_size = chunk_size or 1000
+        chunk_overlap = chunk_overlap or 200
+        document_id = document_id or str(uuid.uuid4())
+
+        # Detect databases if not provided
+        if databases is None:
+            databases = self._detect_databases()
+
+        logger.info(
+            "Starting atomic content ingestion",
+            source_path=source_path,
+            content_type=content_type,
+            document_id=document_id,
+            content_length=len(content),
+            databases_count=len(databases),
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
+        )
+
+        try:
+            # Use atomic ingestion service
+            result = await self.atomic_ingestion_service.ingest_with_validation(
+                content=content,
+                source_path=source_path,
+                document_id=document_id,
+                database_configs=databases,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                replace_existing=replace_existing,
+                metadata={
+                    **metadata,
+                    "content_type": content_type,
+                    "language": language,
+                    "processing_result": processing_result.to_dict() if hasattr(processing_result, 'to_dict') else {}
+                }
+            )
+
+            # Write result files
+            result_file_path = self._write_ingest_result_file(source_path, result)
+            result['result_file'] = result_file_path
+
+            logger.info(
+                "Atomic ingestion completed successfully",
+                document_id=document_id,
+                transaction_id=result.get("transaction_id"),
+                processing_time=result.get("processing_time"),
+                chunks_processed=result.get("chunks_processed"),
+                entities_extracted=result.get("entities_extracted"),
+                relations_extracted=result.get("relations_extracted")
+            )
+
+            return result
+
+        except ValidationError as e:
+            logger.error(
+                "Atomic ingestion failed during validation",
+                document_id=document_id,
+                source_path=source_path,
+                error=str(e)
+            )
+
+            # Write failure result
+            failure_result = {
+                "success": False,
+                "document_id": document_id,
+                "source_path": source_path,
+                "error": str(e),
+                "error_type": "ValidationError",
+                "processing_time": (datetime.now(timezone.utc) - start_time).total_seconds()
+            }
+
+            result_file_path = self._write_ingest_result_file(source_path, failure_result)
+            failure_result['result_file'] = result_file_path
+
+            return failure_result
+
+        except Exception as e:
+            logger.error(
+                "Atomic ingestion failed",
+                document_id=document_id,
+                source_path=source_path,
+                error=str(e),
+                error_type=type(e).__name__
+            )
+
+            # Write failure result
+            failure_result = {
+                "success": False,
+                "document_id": document_id,
+                "source_path": source_path,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "processing_time": (datetime.now(timezone.utc) - start_time).total_seconds()
+            }
+
+            result_file_path = self._write_ingest_result_file(source_path, failure_result)
+            failure_result['result_file'] = result_file_path
+
+            return failure_result
+
     async def ingest_content(
         self,
         content: str,
