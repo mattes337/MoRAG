@@ -237,10 +237,24 @@ class GraphTraversal:
                 self.logger.warning(f"Failed to parse path entity: {e}")
         
         relations = []
-        for rel in record["relations"]:
+        for i, rel in enumerate(record["relations"]):
             try:
-                relation = Relation.from_neo4j_relationship(rel)
-                relations.append(relation)
+                # Extract relationship type from Neo4j relationship object
+                rel_type = str(rel.type) if hasattr(rel, 'type') else None
+
+                # Get source and target entity IDs from the path
+                # In a path, relationships connect consecutive entities
+                source_entity_id = entities[i].id if i < len(entities) else None
+                target_entity_id = entities[i + 1].id if i + 1 < len(entities) else None
+
+                if source_entity_id and target_entity_id:
+                    relation = Relation.from_neo4j_relationship(
+                        rel,
+                        source_entity_id,
+                        target_entity_id,
+                        rel_type
+                    )
+                    relations.append(relation)
             except Exception as e:
                 self.logger.warning(f"Failed to parse path relation: {e}")
         

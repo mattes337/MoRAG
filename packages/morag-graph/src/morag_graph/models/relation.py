@@ -122,19 +122,16 @@ class Relation(BaseModel):
     def to_neo4j_relationship(self) -> Dict[str, Any]:
         """Convert relation to Neo4J relationship properties.
 
+        The relation type is used as the Neo4j relationship type (label), not as a property.
+
         Excludes unnecessary fields to reduce memory consumption:
+        - type: Used as Neo4j relationship type, not as property
         - context: Full chunk text (entities already refer to chunks)
         - source_doc_id: Document reference (entities already have chunk references)
         - description: Redundant with relation type
         """
-        # Get the type value as string
-        type_value = str(self.type)
-
         # Use model_dump for properties
         properties = self.model_dump()
-
-        # Ensure type is clean string value
-        properties['type'] = type_value
 
         # Serialize attributes to JSON string for Neo4J storage
         if 'attributes' in properties:
@@ -143,6 +140,9 @@ class Relation(BaseModel):
         # Remove entity IDs as they are handled by Neo4J relationship structure
         properties.pop('source_entity_id', None)
         properties.pop('target_entity_id', None)
+
+        # Remove type - it's used as the Neo4j relationship type, not as a property
+        properties.pop('type', None)
 
         # Remove unnecessary fields to reduce memory consumption
         properties.pop('context', None)  # Full chunk text - entities already refer to chunks
@@ -153,12 +153,20 @@ class Relation(BaseModel):
     
     @classmethod
     def from_neo4j_relationship(
-        cls, 
-        relationship: Any, 
-        source_entity_id: EntityId, 
-        target_entity_id: EntityId
+        cls,
+        relationship: Any,
+        source_entity_id: EntityId,
+        target_entity_id: EntityId,
+        relationship_type: Optional[str] = None
     ) -> 'Relation':
-        """Create relation from Neo4J relationship properties."""
+        """Create relation from Neo4J relationship properties.
+
+        Args:
+            relationship: Neo4j relationship object or dict of properties
+            source_entity_id: ID of source entity
+            target_entity_id: ID of target entity
+            relationship_type: Neo4j relationship type (e.g., 'CURES', 'TREATS')
+        """
         # Convert Neo4j relationship object to dictionary
         try:
             if hasattr(relationship, 'items'):
@@ -173,16 +181,24 @@ class Relation(BaseModel):
         except (TypeError, ValueError) as e:
             # If conversion fails, create minimal relationship dict
             relationship_dict = {}
-            
+
+        # Get relationship type from Neo4j relationship type or parameter
+        if relationship_type:
+            relation_type = relationship_type
+        elif hasattr(relationship, 'type'):
+            # Neo4j relationship object has a type attribute
+            relation_type = str(relationship.type)
+        else:
+            # Fallback to default
+            relation_type = 'RELATED_TO'
+
         # Ensure we have required fields with defaults
         if 'id' not in relationship_dict:
             relationship_dict['id'] = f"{source_entity_id}_{target_entity_id}_{hash(str(relationship))}"
-        if 'type' not in relationship_dict:
-            relationship_dict['type'] = 'RELATED_TO'
         if 'confidence' not in relationship_dict:
             relationship_dict['confidence'] = 1.0
-        if 'source_text' not in relationship_dict:
-            relationship_dict['source_text'] = ''
+        if 'context' not in relationship_dict:
+            relationship_dict['context'] = ''
         
         # Deserialize attributes from JSON string
         if 'attributes' in relationship_dict and isinstance(relationship_dict['attributes'], str):
@@ -193,10 +209,11 @@ class Relation(BaseModel):
         elif 'attributes' not in relationship_dict:
             relationship_dict['attributes'] = {}
         
-        # Add entity IDs back
+        # Add entity IDs and relation type
         relationship_dict['source_entity_id'] = source_entity_id
         relationship_dict['target_entity_id'] = target_entity_id
-        
+        relationship_dict['type'] = relation_type
+
         return cls(**relationship_dict)
     
     def get_neo4j_type(self) -> str:

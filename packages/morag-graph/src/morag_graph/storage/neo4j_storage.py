@@ -1005,17 +1005,18 @@ class Neo4jStorage(BaseStorage):
         """
         query = """
         MATCH (source)-[r {id: $relation_id}]->(target)
-        RETURN r, source.id as source_id, target.id as target_id
+        RETURN r, source.id as source_id, target.id as target_id, type(r) as relation_type
         """
-        
+
         result = await self._execute_query(query, {"relation_id": relation_id})
-        
+
         if result:
             record = result[0]
             return Relation.from_neo4j_relationship(
-                record["r"], 
-                record["source_id"], 
-                record["target_id"]
+                record["r"],
+                record["source_id"],
+                record["target_id"],
+                record["relation_type"]
             )
         
         return None
@@ -1035,18 +1036,19 @@ class Neo4jStorage(BaseStorage):
         query = """
         MATCH (source)-[r]->(target)
         WHERE r.id IN $relation_ids
-        RETURN r, source.id as source_id, target.id as target_id
+        RETURN r, source.id as source_id, target.id as target_id, type(r) as relation_type
         """
-        
+
         result = await self._execute_query(query, {"relation_ids": relation_ids})
-        
+
         relations = []
         for record in result:
             try:
                 relation = Relation.from_neo4j_relationship(
-                    record["r"], 
-                    record["source_id"], 
-                    record["target_id"]
+                    record["r"],
+                    record["source_id"],
+                    record["target_id"],
+                    record["relation_type"]
                 )
                 relations.append(relation)
             except Exception as e:
@@ -1072,13 +1074,13 @@ class Neo4jStorage(BaseStorage):
         """
         if direction == "out":
             pattern = "(e)-[r]->(target)"
-            return_clause = "r, e.id as source_id, target.id as target_id"
+            return_clause = "r, e.id as source_id, target.id as target_id, type(r) as relation_type"
         elif direction == "in":
             pattern = "(source)-[r]->(e)"
-            return_clause = "r, source.id as source_id, e.id as target_id"
+            return_clause = "r, source.id as source_id, e.id as target_id, type(r) as relation_type"
         else:  # both
             pattern = "(n1)-[r]-(e)-[r2]-(n2)"
-            return_clause = "r, n1.id as source_id, e.id as target_id"
+            return_clause = "r, n1.id as source_id, e.id as target_id, type(r) as relation_type"
         
         query = f"""
         MATCH (e {{id: $entity_id}})
@@ -1099,9 +1101,10 @@ class Neo4jStorage(BaseStorage):
         for record in result:
             try:
                 relation = Relation.from_neo4j_relationship(
-                    record["r"], 
-                    record["source_id"], 
-                    record["target_id"]
+                    record["r"],
+                    record["source_id"],
+                    record["target_id"],
+                    record["relation_type"]
                 )
                 relations.append(relation)
             except Exception as e:
@@ -1118,18 +1121,19 @@ class Neo4jStorage(BaseStorage):
         query = """
         MATCH (source)-[r]->(target)
         WHERE source.type IS NOT NULL AND target.type IS NOT NULL
-        RETURN r, source.id as source_id, target.id as target_id
+        RETURN r, source.id as source_id, target.id as target_id, type(r) as relation_type
         """
-        
+
         result = await self._execute_query(query)
-        
+
         relations = []
         for record in result:
             try:
                 relation = Relation.from_neo4j_relationship(
-                    record["r"], 
-                    record["source_id"], 
-                    record["target_id"]
+                    record["r"],
+                    record["source_id"],
+                    record["target_id"],
+                    record["relation_type"]
                 )
                 relations.append(relation)
             except Exception as e:
@@ -1303,17 +1307,18 @@ class Neo4jStorage(BaseStorage):
             MATCH (source)-[r]->(target)
             WHERE source.type IS NOT NULL AND target.type IS NOT NULL
             AND source.id IN $entity_ids AND target.id IN $entity_ids
-            RETURN r, source.id as source_id, target.id as target_id
+            RETURN r, source.id as source_id, target.id as target_id, type(r) as relation_type
             """
-            
+
             result = await self._execute_query(query, {"entity_ids": entity_id_list})
-            
+
             for record in result:
                 try:
                     relation = Relation.from_neo4j_relationship(
-                        record["r"], 
-                        record["source_id"], 
-                        record["target_id"]
+                        record["r"],
+                        record["source_id"],
+                        record["target_id"],
+                        record["relation_type"]
                     )
                     graph.add_relation(relation)
                 except Exception as e:

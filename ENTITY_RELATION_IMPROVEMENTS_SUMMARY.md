@@ -94,6 +94,22 @@ This document summarizes the comprehensive improvements made to entity normaliza
 - **Better deduplication**: Uses normalized forms for consistent entity identification
 - **Enhanced prompts**: Updated to emphasize canonical form extraction
 
+### 5. Proper Relation Type Storage
+
+**Fixed in**: `packages/morag-graph/src/morag_graph/models/relation.py` and `packages/morag-graph/src/morag_graph/storage/neo4j_storage.py`
+
+#### Critical Fix:
+- **Relation types as Neo4j labels**: Relation types (e.g., "TREATS", "CURES", "DIAGNOSES") are now properly stored as Neo4j relationship types (labels), not as properties
+- **Clean property storage**: Relation properties no longer include the redundant `type` field
+- **Proper query updates**: All Neo4j queries updated to use `type(r)` to extract relationship types
+- **Enhanced relationship creation**: Neo4j relationships created with proper syntax: `(source)-[r:TREATS]->(target)`
+
+#### Benefits:
+- **Performance**: Neo4j can efficiently filter and traverse by relationship type
+- **Query optimization**: Relationship type filtering is much faster
+- **Graph visualization**: Relationship types appear correctly in graph visualization tools
+- **Semantic clarity**: Clear separation between relationship identity (type) and properties (metadata)
+
 ## Technical Implementation Details
 
 ### LLM-Based Entity Normalization Pipeline
@@ -133,6 +149,24 @@ The LLM receives detailed instructions for normalization across languages:
 
 - **Entities**: Group by normalized name (case-insensitive), merge attributes
 - **Relations**: Group by (source_id, target_id, type), preserve different types, merge duplicates
+
+### Relation Type Storage Fix
+
+**Before**: Relation types stored as properties
+```cypher
+CREATE (source)-[r:RELATIONSHIP {type: "TREATS", confidence: 0.8}]->(target)
+```
+
+**After**: Relation types used as Neo4j relationship types
+```cypher
+CREATE (source)-[r:TREATS {confidence: 0.8}]->(target)
+```
+
+**Query Updates**: All queries now use `type(r)` to extract relationship type
+```cypher
+MATCH (source)-[r]->(target)
+RETURN r, source.id as source_id, target.id as target_id, type(r) as relation_type
+```
 
 ## Testing
 
