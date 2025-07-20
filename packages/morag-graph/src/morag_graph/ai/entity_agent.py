@@ -6,6 +6,7 @@ import structlog
 
 from morag_core.ai import MoRAGBaseAgent, EntityExtractionResult, Entity, ConfidenceLevel
 from ..models import Entity as GraphEntity
+from ..utils.entity_normalizer import EntityNormalizer
 
 logger = structlog.get_logger(__name__)
 
@@ -29,6 +30,7 @@ class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):
         self.entity_types = entity_types or {}
         self.language = language
         self.logger = logger.bind(agent="entity_extraction")
+        self.entity_normalizer = EntityNormalizer()
 
     def get_result_type(self) -> Type[EntityExtractionResult]:
         return EntityExtractionResult
@@ -65,17 +67,31 @@ For each entity, provide:
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
 
-CRITICAL ENTITY NAME NORMALIZATION RULES:
-- ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
-- ALWAYS use MASCULINE form when applicable: "Zahnmediziner" not "Zahnmedizinerin"
-- ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
-- RESOLVE abbreviations to their canonical form
+CRITICAL ENTITY NAME NORMALIZATION RULES (YOU MUST DO THIS WORK):
+- ALWAYS use SINGULAR form in ANY language:
+  * German: "Schwermetalle" → "Schwermetall", "Hunde" → "Hund"
+  * English: "children" → "child", "mice" → "mouse"
+  * Spanish: "médicos" → "médico", "niños" → "niño"
+  * French: "médecins" → "médecin", "enfants" → "enfant"
+- ALWAYS use MASCULINE/NEUTRAL form when applicable:
+  * German: "Pilotinnen" → "Pilot", "Ärztin" → "Arzt"
+  * Spanish: "médicas" → "médico", "profesoras" → "profesor"
+  * French: "médecines" → "médecin", "professeures" → "professeur"
+- ALWAYS use UNCONJUGATED base form:
+  * German: "Belastungen" → "Belastung"
+  * English: "running" → "run", "studied" → "study"
+  * Spanish: "corriendo" → "correr", "estudiado" → "estudiar"
+- REMOVE contextual/positional information:
+  * "protein in cells" → "protein"
+  * "Protein bei Patienten" → "Protein"
+  * "proteína en células" → "proteína"
+- RESOLVE abbreviations to canonical form when appropriate:
+  * "WHO", "Weltgesundheitsorganisation", "Organización Mundial de la Salud" → "WHO"
+  * "DNA", "Desoxyribonukleinsäure", "ácido desoxirribonucleico" → "DNA"
 - Use the most CANONICAL form of the entity name
-- Normalize case appropriately: proper nouns capitalized, common nouns lowercase
-- PRESERVE original language for entity names but ensure canonical form
+- Normalize case: proper nouns capitalized, common nouns lowercase
+- PRESERVE original language but ensure canonical form
 - AVOID creating multiple entities for the same concept with different forms
-- Example: "ADHS", "Aufmerksamkeitsdefizit-Hyperaktivitätsstörung" should both become "ADHS"
-- Example: "Ernährung", "Ernährungsweise", "Ernährungsverhalten" should all become "Ernährung"
 
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY (ALWAYS IN ENGLISH):
 - Entity types should be NOUNS (not verbs or adjectives)
@@ -143,14 +159,29 @@ For each entity, provide:
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
 
-CRITICAL ENTITY NAME NORMALIZATION RULES:
-- ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
-- ALWAYS use MASCULINE form: "Zahnmediziner" not "Zahnmedizinerin"
-- ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
-- RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
-- If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
+CRITICAL ENTITY NAME NORMALIZATION RULES (YOU MUST DO THIS WORK):
+- ALWAYS use SINGULAR form in ANY language:
+  * German: "Schwermetalle" → "Schwermetall", "Hunde" → "Hund"
+  * English: "children" → "child", "mice" → "mouse"
+  * Spanish: "médicos" → "médico", "niños" → "niño"
+  * French: "médecins" → "médecin", "enfants" → "enfant"
+- ALWAYS use MASCULINE/NEUTRAL form when applicable:
+  * German: "Pilotinnen" → "Pilot", "Ärztin" → "Arzt"
+  * Spanish: "médicas" → "médico", "profesoras" → "profesor"
+  * French: "médecines" → "médecin", "professeures" → "professeur"
+- ALWAYS use UNCONJUGATED base form:
+  * German: "Belastungen" → "Belastung"
+  * English: "running" → "run", "studied" → "study"
+  * Spanish: "corriendo" → "correr", "estudiado" → "estudiar"
+- REMOVE contextual/positional information:
+  * "protein in cells" → "protein"
+  * "Protein bei Patienten" → "Protein"
+  * "proteína en células" → "proteína"
+- RESOLVE abbreviations to canonical form when appropriate:
+  * "WHO", "Weltgesundheitsorganisation", "Organización Mundial de la Salud" → "WHO"
+  * "DNA", "Desoxyribonukleinsäure", "ácido desoxirribonucleico" → "DNA"
 - Use the most CANONICAL form of the entity name
-- Normalize case appropriately: proper nouns capitalized, common nouns lowercase
+- Normalize case: proper nouns capitalized, common nouns lowercase
 
 Focus on entities that are:
 - Clearly identifiable and significant
@@ -174,14 +205,29 @@ For each entity, provide:
 3. confidence: Your confidence in the extraction (0.0 to 1.0)
 4. description: Generic, context-independent description of what this entity is (not its role in this specific document)
 
-CRITICAL ENTITY NAME NORMALIZATION RULES:
-- ALWAYS use SINGULAR form: "Schwermetall" not "Schwermetalle" or "Schwermetallen"
-- ALWAYS use MASCULINE form: "Zahnmediziner" not "Zahnmedizinerin"
-- ALWAYS use UNCONJUGATED base form: "Belastung" not "Belastungen"
-- RESOLVE abbreviations where possible: "WHO" not "Weltgesundheitsorganisation" or "World Health Organization"
-- If abbreviation is more commonly known, use the abbreviation: "DNA" not "Desoxyribonukleinsäure"
+CRITICAL ENTITY NAME NORMALIZATION RULES (YOU MUST DO THIS WORK):
+- ALWAYS use SINGULAR form in ANY language:
+  * German: "Schwermetalle" → "Schwermetall", "Hunde" → "Hund"
+  * English: "children" → "child", "mice" → "mouse"
+  * Spanish: "médicos" → "médico", "niños" → "niño"
+  * French: "médecins" → "médecin", "enfants" → "enfant"
+- ALWAYS use MASCULINE/NEUTRAL form when applicable:
+  * German: "Pilotinnen" → "Pilot", "Ärztin" → "Arzt"
+  * Spanish: "médicas" → "médico", "profesoras" → "profesor"
+  * French: "médecines" → "médecin", "professeures" → "professeur"
+- ALWAYS use UNCONJUGATED base form:
+  * German: "Belastungen" → "Belastung"
+  * English: "running" → "run", "studied" → "study"
+  * Spanish: "corriendo" → "correr", "estudiado" → "estudiar"
+- REMOVE contextual/positional information:
+  * "protein in cells" → "protein"
+  * "Protein bei Patienten" → "Protein"
+  * "proteína en células" → "proteína"
+- RESOLVE abbreviations to canonical form when appropriate:
+  * "WHO", "Weltgesundheitsorganisation", "Organización Mundial de la Salud" → "WHO"
+  * "DNA", "Desoxyribonukleinsäure", "ácido desoxirribonucleico" → "DNA"
 - Use the most CANONICAL form of the entity name
-- Normalize case appropriately: proper nouns capitalized, common nouns lowercase
+- Normalize case: proper nouns capitalized, common nouns lowercase
 
 ENTITY TYPE CREATION RULES - FOLLOW STRICTLY:
 - Use BROAD categories that can apply to many similar entities
@@ -400,7 +446,11 @@ REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type 
 
         # Simplify the entity type to use only the first part
         graph_type = self._simplify_entity_type(graph_type)
-        
+
+        # Normalize entity name to canonical form (using sync version for now)
+        # The LLM should already provide normalized names, this is just cleanup
+        normalized_name = self.entity_normalizer.normalize_entity_name_sync(entity.name, self.language)
+
         # Create attributes from metadata and context
         attributes = entity.metadata.copy() if entity.metadata else {}
         if entity.context:
@@ -409,12 +459,16 @@ REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type 
             attributes['start_pos'] = entity.start_pos
         if entity.end_pos is not None:
             attributes['end_pos'] = entity.end_pos
-        
+
+        # Store original name if it was changed during normalization
+        if normalized_name != entity.name:
+            attributes['original_name'] = entity.name
+
         # Ensure confidence is a float
         confidence = float(entity.confidence) if isinstance(entity.confidence, (int, float)) else 0.5
 
         return GraphEntity(
-            name=entity.name,
+            name=normalized_name,
             type=graph_type,
             confidence=confidence,
             source_doc_id=source_doc_id,
@@ -422,12 +476,14 @@ REMEMBER: The goal is REUSABILITY. Multiple entities should share the same type 
         )
     
     def _deduplicate_entities(self, entities: List[GraphEntity]) -> List[GraphEntity]:
-        """Remove duplicate entities based on name only, merging different types."""
-        # Group entities by normalized name (case-insensitive)
+        """Remove duplicate entities based on normalized name, merging different types."""
+        # Group entities by normalized name using the entity normalizer
         entity_groups = {}
 
         for entity in entities:
-            # Use only the normalized name as the key, ignoring type
+            # Use the entity normalizer to get the canonical form
+            # Since entity.name should already be normalized from _convert_to_graph_entity,
+            # we just need to ensure consistent grouping
             normalized_name = entity.name.lower().strip()
 
             if normalized_name not in entity_groups:

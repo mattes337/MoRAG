@@ -7,6 +7,7 @@ import structlog
 from morag_core.ai import MoRAGBaseAgent, RelationExtractionResult, Relation, ConfidenceLevel
 from ..models import Entity as GraphEntity, Relation as GraphRelation
 from .multi_pass_extractor import MultiPassRelationExtractor
+from ..utils.semantic_relation_enhancer import SemanticRelationEnhancer
 
 logger = structlog.get_logger(__name__)
 
@@ -43,6 +44,9 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
         self.use_enhanced_extraction = use_enhanced_extraction
         self.enable_multi_pass = enable_multi_pass
         self.logger = logger.bind(agent="relation_extraction")
+
+        # Initialize semantic relation enhancer
+        self.semantic_enhancer = SemanticRelationEnhancer()
 
         # Initialize enhanced extractor if enabled
         if self.use_enhanced_extraction:
@@ -118,12 +122,20 @@ Focus on relations that are:
 - Significant to understanding the content
 - Between entities that actually exist in the known entities list
 
+MULTIPLE RELATIONS BETWEEN ENTITY PAIRS:
+- The same pair of entities can have MULTIPLE different relation types
+- Extract ALL meaningful relationships between entities, not just one
+- Example: "Doctor" and "Patient" might have relations like "treats", "diagnoses", "monitors"
+- Example: "Software" and "Database" might have relations like "connects_to", "queries", "updates"
+- Each relation should capture a distinct aspect of the relationship
+- Contextual information should be stored in the relation, not the entity
+
 Avoid extracting:
 - Relations with entities not in the known entities list
 - Vague or uncertain relationships
 - Relations based on speculation
 - Relations with very low confidence (<0.5)
-- Duplicate or redundant relations
+- Exact duplicate relations (same source, target, and type)
 - Relations involving technical metadata or file properties"""
 
         elif self.relation_types:
@@ -522,6 +534,19 @@ Avoid extracting:
         # Simplify the relation type to use only the first part
         graph_type = self._simplify_relation_type(graph_type)
 
+        # Enhance relation type with semantic information
+        context = relation.context if hasattr(relation, 'context') and relation.context else ""
+        enhanced_type = self.semantic_enhancer.enhance_relation_type(
+            relation.source_entity,
+            relation.target_entity,
+            context,
+            graph_type
+        )
+
+        # Use enhanced type if it's valid, otherwise fall back to original
+        if self.semantic_enhancer.validate_relation_type(enhanced_type):
+            graph_type = enhanced_type
+
         # Normalize the relation type (uppercase, singular form)
         graph_type = self._normalize_relation_type(graph_type)
         
@@ -544,23 +569,73 @@ Avoid extracting:
         )
     
     def _deduplicate_relations(self, relations: List[GraphRelation]) -> List[GraphRelation]:
-        """Remove duplicate relations based on source, target, and type."""
-        seen = set()
-        deduplicated = []
-        
+        """
+        Remove duplicate relations while preserving multiple relation types between entity pairs.
+
+        This method allows multiple different relation types between the same entity pair,
+        but removes exact duplicates (same source, target, and type).
+        """
+        # Group relations by (source, target, type) tuple
+        relation_groups = {}
+
         for relation in relations:
             # Create a key based on source, target, and type
             key = (relation.source_entity_id, relation.target_entity_id, relation.type)
-            
-            if key not in seen:
-                seen.add(key)
-                deduplicated.append(relation)
+
+            if key not in relation_groups:
+                relation_groups[key] = []
+            relation_groups[key].append(relation)
+
+        # For each group, merge or select the best relation
+        deduplicated = []
+        for key, group_relations in relation_groups.items():
+            if len(group_relations) == 1:
+                # Single relation, keep as is
+                deduplicated.append(group_relations[0])
             else:
-                # If we've seen this relation before, keep the one with higher confidence
-                for i, existing in enumerate(deduplicated):
-                    if (existing.source_entity_id, existing.target_entity_id, existing.type) == key:
-                        if relation.confidence > existing.confidence:
-                            deduplicated[i] = relation
-                        break
-        
+                # Multiple relations with same source, target, and type
+                # Merge them by keeping the highest confidence and combining contexts
+                merged_relation = self._merge_duplicate_relations(group_relations)
+                deduplicated.append(merged_relation)
+
         return deduplicated
+
+    def _merge_duplicate_relations(self, relations: List[GraphRelation]) -> GraphRelation:
+        """Merge multiple relations with the same source, target, and type."""
+        if not relations:
+            raise ValueError("Cannot merge empty relation list")
+
+        if len(relations) == 1:
+            return relations[0]
+
+        # Find the relation with the highest confidence
+        best_relation = max(relations, key=lambda r: r.confidence)
+
+        # Merge attributes and contexts from all relations
+        merged_attributes = {}
+        contexts = []
+
+        for relation in relations:
+            if relation.attributes:
+                merged_attributes.update(relation.attributes)
+
+            # Collect contexts
+            if hasattr(relation, 'context') and relation.context:
+                contexts.append(relation.context)
+            elif 'context' in relation.attributes:
+                contexts.append(relation.attributes['context'])
+
+        # Combine unique contexts
+        unique_contexts = list(set(contexts))
+        if unique_contexts:
+            merged_attributes['context'] = ' | '.join(unique_contexts)
+
+        # Create merged relation using the best relation as base
+        return GraphRelation(
+            source_entity_id=best_relation.source_entity_id,
+            target_entity_id=best_relation.target_entity_id,
+            type=best_relation.type,
+            confidence=best_relation.confidence,
+            source_doc_id=best_relation.source_doc_id,
+            attributes=merged_attributes
+        )
