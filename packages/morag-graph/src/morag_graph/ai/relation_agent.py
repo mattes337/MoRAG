@@ -1,4 +1,4 @@
-"""PydanticAI agent for relation extraction."""
+"""PydanticAI agent for relation extraction with enhanced capabilities."""
 
 import asyncio
 from typing import Type, List, Optional, Dict, Any, Tuple
@@ -6,6 +6,7 @@ import structlog
 
 from morag_core.ai import MoRAGBaseAgent, RelationExtractionResult, Relation, ConfidenceLevel
 from ..models import Entity as GraphEntity, Relation as GraphRelation
+from .multi_pass_extractor import MultiPassRelationExtractor
 
 logger = structlog.get_logger(__name__)
 
@@ -13,7 +14,16 @@ logger = structlog.get_logger(__name__)
 class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
     """PydanticAI agent for extracting relations between entities."""
 
-    def __init__(self, min_confidence: float = 0.6, dynamic_types: bool = True, relation_types: Optional[Dict[str, str]] = None, language: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        min_confidence: float = 0.6,
+        dynamic_types: bool = True,
+        relation_types: Optional[Dict[str, str]] = None,
+        language: Optional[str] = None,
+        use_enhanced_extraction: bool = True,
+        enable_multi_pass: bool = True,
+        **kwargs
+    ):
         """Initialize the relation extraction agent.
 
         Args:
@@ -21,6 +31,8 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
             dynamic_types: Whether to use dynamic relation types (LLM-determined)
             relation_types: Custom relation types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
             language: Language code for processing (e.g., 'en', 'de', 'fr')
+            use_enhanced_extraction: Whether to use enhanced extraction capabilities
+            enable_multi_pass: Whether to enable multi-pass extraction
             **kwargs: Additional arguments passed to base agent
         """
         super().__init__(**kwargs)
@@ -28,7 +40,19 @@ class RelationExtractionAgent(MoRAGBaseAgent[RelationExtractionResult]):
         self.dynamic_types = dynamic_types
         self.relation_types = relation_types or {}
         self.language = language
+        self.use_enhanced_extraction = use_enhanced_extraction
+        self.enable_multi_pass = enable_multi_pass
         self.logger = logger.bind(agent="relation_extraction")
+
+        # Initialize enhanced extractor if enabled
+        if self.use_enhanced_extraction:
+            self.multi_pass_extractor = MultiPassRelationExtractor(
+                min_confidence=min_confidence,
+                language=language,
+                enable_semantic_analysis=True,
+                enable_domain_extraction=True,
+                enable_contextual_enhancement=True
+            )
 
     def get_result_type(self) -> Type[RelationExtractionResult]:
         return RelationExtractionResult
@@ -52,7 +76,7 @@ Extract relations that represent clear, factual connections between entities. De
 For each relation, provide:
 1. source_entity: NORMALIZED name of the source entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
 2. target_entity: NORMALIZED name of the target entity (use SINGULAR, UNCONJUGATED, MASCULINE form that matches the known entities)
-3. relation_type: A SIMPLE, descriptive English VERB (e.g., CONTAINS, CAUSES, TREATS, INFLUENCES, USES, etc.)
+3. relation_type: A descriptive relation type that precisely captures the relationship based on context
 4. confidence: Your confidence in the relation (0.0 to 1.0)
 5. context: Brief English explanation of the relationship
 
@@ -66,26 +90,27 @@ CRITICAL ENTITY NAME MATCHING:
 - Example: Use base entity names, not compound or modified forms
 - Example: Use normalized singular forms rather than variations or compound terms
 
-RELATION TYPE RULES (ALWAYS IN ENGLISH):
-- Relation types should be VERBS (not nouns or adjectives)
-- Use SIMPLE, clear English VERBS that capture the core action/relationship
-- Prefer GENERAL verbs over overly specific ones
-- Use SINGLE English VERB WORDS when possible: CONTAINS, CAUSES, TREATS, INFLUENCES, USES, AFFECTS, PRODUCES
-- If compound types needed, keep them SHORT and use VERB forms: BELONGS_TO, LOCATED_IN, ASSOCIATED_WITH
-- Avoid complex types like "COLLABORATES_WITH_ON_PROJECT" - use "COLLABORATES"
-- Be consistent within the same document/domain
-- Consider the direction of the relationship (source -> target)
+DYNAMIC RELATION TYPE CREATION (ALWAYS IN ENGLISH):
+- Create relation types that precisely describe the relationship based on context
+- Be specific about the nature of the relationship (e.g., "therapeutically_treats" vs "surgically_treats")
+- Use descriptive language that captures the semantic meaning
+- Consider the direction and strength of the relationship
+- Use verbs that accurately represent the action or connection
 - ALL relation types MUST be in English regardless of source text language
-- Use THIRD PERSON SINGULAR forms: "AFFECTS" not "AFFECT", "CAUSES" not "CAUSE", "TREATS" not "TREAT"
-- System will automatically normalize to uppercase singular forms, but prefer correct forms in output
-- Use VERB forms, not nouns: use action verbs rather than noun forms
-- Use present tense, THIRD PERSON SINGULAR form: "AFFECTS" not "AFFECT", "CAUSES" not "CAUSE"
-- Relation types are VERBS describing what the source entity DOES to the target entity
-- AVOID conjugated German verbs: use "CONTAINS" not "enthalten", "enthält", "enthaltet"
-- AVOID German verb forms: use "CAUSES" not "verursacht", "TREATS" not "behandelt"
-- STANDARDIZE similar concepts: "empfehlt" and "empfehlung" should both become "RECOMMENDS"
-- Example good verbs: CONTAINS, CAUSES, TREATS, INFLUENCES, AFFECTS, PRODUCES, REQUIRES, PREVENTS
-- System automatically normalizes to uppercase singular, but use correct forms: AFFECTS, CAUSES, TREATS, USES
+- Be creative but precise in relation type naming
+- Look for the WHY and HOW behind connections
+- Consider the domain context (medical, technical, business, academic)
+- Avoid generic types like "MENTIONS" or "RELATED_TO" unless no deeper relationship exists
+
+RELATIONSHIP CATEGORIES TO CONSIDER:
+- CAUSAL: What causes what? What prevents what? What enables what?
+- FUNCTIONAL: How do things work together? What operates what?
+- HIERARCHICAL: What manages/owns/contains what?
+- TEMPORAL: What happens before/after what?
+- SPATIAL: Where are things located? What connects to what?
+- COLLABORATIVE: What works with what? What competes with what?
+- KNOWLEDGE: What teaches/explains what?
+- CREATION: What creates/produces what?
 
 Focus on relations that are:
 - Explicitly stated or clearly implied in the text
@@ -184,39 +209,120 @@ Avoid extracting:
         text: str,
         entities: Optional[List[GraphEntity]] = None,
         chunk_size: int = 3000,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
+        domain_hint: Optional[str] = None
     ) -> List[GraphRelation]:
         """Extract relations from text with known entities.
-        
+
         Args:
             text: Text to extract relations from
             entities: List of known entities to consider
             chunk_size: Maximum characters per chunk for large texts
             source_doc_id: Optional source document ID
-            
+            domain_hint: Optional hint about the domain for specialized extraction
+
         Returns:
             List of GraphRelation objects
         """
         if not text or not text.strip():
             return []
-        
-        entity_names = [entity.name for entity in entities] if entities else []
-        
+
+        # Use enhanced extraction if available and enabled
+        if self.use_enhanced_extraction and hasattr(self, 'multi_pass_extractor'):
+            return await self._extract_relations_enhanced(
+                text, entities, source_doc_id, domain_hint
+            )
+
+        # Fallback to original extraction method
+        return await self._extract_relations_original(
+            text, entities, chunk_size, source_doc_id
+        )
+
+    async def _extract_relations_enhanced(
+        self,
+        text: str,
+        entities: Optional[List[GraphEntity]],
+        source_doc_id: Optional[str],
+        domain_hint: Optional[str]
+    ) -> List[GraphRelation]:
+        """Extract relations using enhanced multi-pass approach."""
         self.logger.info(
-            "Starting relation extraction",
+            "Starting enhanced relation extraction",
+            text_length=len(text),
+            num_entities=len(entities) if entities else 0,
+            domain_hint=domain_hint,
+            multi_pass=self.enable_multi_pass
+        )
+
+        try:
+            if self.enable_multi_pass:
+                # Use full multi-pass extraction
+                result = await self.multi_pass_extractor.extract_relations_multi_pass(
+                    text=text,
+                    entities=entities,
+                    source_doc_id=source_doc_id,
+                    domain_hint=domain_hint
+                )
+
+                self.logger.info(
+                    "Enhanced multi-pass extraction completed",
+                    total_relations=len(result.final_relations),
+                    domain=result.domain,
+                    passes=result.statistics['total_passes']
+                )
+
+                return result.final_relations
+            else:
+                # Use enhanced single-pass extraction
+                enhanced_agent = self.multi_pass_extractor.enhanced_agent
+                graph_relations = await enhanced_agent.extract_enhanced_relations(
+                    text=text,
+                    entities=entities,
+                    source_doc_id=source_doc_id,
+                    domain_hint=domain_hint
+                )
+
+                self.logger.info(
+                    "Enhanced single-pass extraction completed",
+                    total_relations=len(graph_relations)
+                )
+
+                return graph_relations
+
+        except Exception as e:
+            self.logger.error(
+                "Enhanced relation extraction failed, falling back to original method",
+                error=str(e),
+                error_type=type(e).__name__
+            )
+            # Fallback to original method
+            return await self._extract_relations_original(text, entities, 3000, source_doc_id)
+
+    async def _extract_relations_original(
+        self,
+        text: str,
+        entities: Optional[List[GraphEntity]],
+        chunk_size: int,
+        source_doc_id: Optional[str]
+    ) -> List[GraphRelation]:
+        """Original relation extraction method."""
+        entity_names = [entity.name for entity in entities] if entities else []
+
+        self.logger.info(
+            "Starting original relation extraction",
             text_length=len(text),
             num_entities=len(entity_names),
             chunk_size=chunk_size,
             source_doc_id=source_doc_id
         )
-        
+
         try:
             # Check if text needs chunking
             if len(text) <= chunk_size:
                 relations = await self._extract_single_chunk(text, entity_names)
             else:
                 relations = await self._extract_chunked(text, entity_names, chunk_size)
-            
+
             # Convert to GraphRelation objects and filter by confidence
             graph_relations = []
             for relation in relations:
@@ -226,20 +332,20 @@ Avoid extracting:
                     )
                     if graph_relation:  # Only add if entity resolution succeeded
                         graph_relations.append(graph_relation)
-            
+
             # Deduplicate relations
             graph_relations = self._deduplicate_relations(graph_relations)
-            
+
             self.logger.info(
-                "Relation extraction completed",
+                "Original relation extraction completed",
                 total_relations=len(graph_relations),
                 min_confidence=self.min_confidence
             )
-            
+
             return graph_relations
-            
+
         except Exception as e:
-            self.logger.error("Relation extraction failed", error=str(e), error_type=type(e).__name__)
+            self.logger.error("Original relation extraction failed", error=str(e), error_type=type(e).__name__)
             raise
     
     async def _extract_single_chunk(self, text: str, entity_names: List[str]) -> List[Relation]:
