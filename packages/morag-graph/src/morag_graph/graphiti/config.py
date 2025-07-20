@@ -5,6 +5,8 @@ from typing import Optional
 from pydantic import BaseModel, Field
 import structlog
 
+from .vector_patch import apply_vector_similarity_patch
+
 logger = structlog.get_logger(__name__)
 
 
@@ -46,10 +48,13 @@ def create_graphiti_instance(config: Optional[GraphitiConfig] = None):
     try:
         from graphiti_core import Graphiti
         from graphiti_core.driver.neo4j_driver import Neo4jDriver
+        from graphiti_core.llm_client.gemini_client import GeminiClient, LLMConfig
+        from graphiti_core.embedder.gemini import GeminiEmbedder, GeminiEmbedderConfig
+        from graphiti_core.cross_encoder.gemini_reranker_client import GeminiRerankerClient
     except ImportError as e:
         logger.error("Graphiti core not available", error=str(e))
         raise ImportError(
-            "graphiti-core is not installed. Install with: pip install graphiti-core"
+            "graphiti-core is not installed. Install with: pip install 'graphiti-core[google-genai]'"
         ) from e
 
     if config is None:
@@ -58,17 +63,44 @@ def create_graphiti_instance(config: Optional[GraphitiConfig] = None):
             neo4j_username=os.getenv("GRAPHITI_NEO4J_USERNAME", "neo4j"),
             neo4j_password=os.getenv("GRAPHITI_NEO4J_PASSWORD", "password"),
             neo4j_database=os.getenv("GRAPHITI_NEO4J_DATABASE", "morag_graphiti"),
-            openai_api_key=os.getenv("OPENAI_API_KEY"),
+            openai_api_key=os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY"),
             enable_telemetry=os.getenv("GRAPHITI_TELEMETRY_ENABLED", "false").lower() == "true",
             parallel_runtime=os.getenv("USE_PARALLEL_RUNTIME", "false").lower() == "true"
         )
 
     # Validate required settings
     if not config.openai_api_key:
-        raise ValueError("OpenAI API key is required for Graphiti integration")
+        raise ValueError("GEMINI_API_KEY or OPENAI_API_KEY is required for Graphiti integration")
 
-    # Set OpenAI API key in environment for Graphiti
-    os.environ["OPENAI_API_KEY"] = config.openai_api_key
+    # Apply vector similarity patches for Neo4j Community Edition compatibility
+    apply_vector_similarity_patch()
+
+    # Additional aggressive patching for bulk queries
+    try:
+        import graphiti_core.utils.bulk_utils as bulk_utils
+        from morag_graph.graphiti.vector_patch import GraphitiVectorPatch
+
+        # Store original functions
+        original_get_entity_node_save_bulk_query = bulk_utils.get_entity_node_save_bulk_query
+        original_get_entity_edge_save_bulk_query = bulk_utils.get_entity_edge_save_bulk_query
+
+        # Create patched versions
+        def patched_entity_node_query(nodes, provider=None):
+            query = original_get_entity_node_save_bulk_query(nodes, provider)
+            return GraphitiVectorPatch.patch_query(query)
+
+        def patched_entity_edge_query(db_type='neo4j'):
+            query = original_get_entity_edge_save_bulk_query(db_type)
+            return GraphitiVectorPatch.patch_query(query)
+
+        # Apply patches
+        bulk_utils.get_entity_node_save_bulk_query = patched_entity_node_query
+        bulk_utils.get_entity_edge_save_bulk_query = patched_entity_edge_query
+
+        logger.info("✅ Applied aggressive bulk query patches")
+
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to apply aggressive bulk query patches: {e}")
 
     # Create Neo4j driver
     driver = Neo4jDriver(
@@ -78,11 +110,57 @@ def create_graphiti_instance(config: Optional[GraphitiConfig] = None):
         database=config.neo4j_database
     )
 
-    # Create Graphiti instance with minimal parameters
-    # Let Graphiti use default LLM configuration from environment
-    graphiti = Graphiti(
-        graph_driver=driver
-    )
+    # Check if using Gemini models
+    if config.openai_model and "gemini" in config.openai_model.lower():
+        # Configure Gemini clients
+        api_key = config.openai_api_key
+
+        # Create Gemini LLM client
+        llm_client = GeminiClient(
+            config=LLMConfig(
+                api_key=api_key,
+                model=config.openai_model
+            )
+        )
+
+        # Create Gemini embedder
+        embedder = GeminiEmbedder(
+            config=GeminiEmbedderConfig(
+                api_key=api_key,
+                embedding_model=config.openai_embedding_model or "text-embedding-004"
+            )
+        )
+
+        # Create Gemini reranker
+        cross_encoder = GeminiRerankerClient(
+            config=LLMConfig(
+                api_key=api_key,
+                model="gemini-2.0-flash"  # Use recommended model for reranking
+            )
+        )
+
+        # Create Graphiti instance with Gemini clients
+        graphiti = Graphiti(
+            graph_driver=driver,
+            llm_client=llm_client,
+            embedder=embedder,
+            cross_encoder=cross_encoder
+        )
+
+        logger.info("Configured Graphiti with Gemini clients",
+                   model=config.openai_model,
+                   embedding_model=config.openai_embedding_model or "text-embedding-004")
+    else:
+        # Use standard OpenAI configuration
+        os.environ["OPENAI_API_KEY"] = config.openai_api_key
+
+        # Create Graphiti instance with default OpenAI clients
+        graphiti = Graphiti(
+            graph_driver=driver
+        )
+
+        logger.info("Configured Graphiti with OpenAI clients",
+                   model=config.openai_model)
 
     logger.info(
         "Graphiti instance created",
@@ -97,7 +175,7 @@ def create_graphiti_instance(config: Optional[GraphitiConfig] = None):
 
 def load_config_from_env() -> GraphitiConfig:
     """Load Graphiti configuration from environment variables.
-    
+
     Returns:
         GraphitiConfig instance with values from environment
     """
@@ -106,9 +184,9 @@ def load_config_from_env() -> GraphitiConfig:
         neo4j_username=os.getenv("GRAPHITI_NEO4J_USERNAME", "neo4j"),
         neo4j_password=os.getenv("GRAPHITI_NEO4J_PASSWORD", "password"),
         neo4j_database=os.getenv("GRAPHITI_NEO4J_DATABASE", "morag_graphiti"),
-        openai_api_key=os.getenv("OPENAI_API_KEY"),
-        openai_model=os.getenv("GRAPHITI_OPENAI_MODEL", "gpt-4"),
-        openai_embedding_model=os.getenv("GRAPHITI_OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
+        openai_api_key=os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        openai_model=os.getenv("GRAPHITI_MODEL", "gemini-1.5-flash"),
+        openai_embedding_model=os.getenv("GRAPHITI_EMBEDDING_MODEL", "text-embedding-004"),
         enable_telemetry=os.getenv("GRAPHITI_TELEMETRY_ENABLED", "false").lower() == "true",
         parallel_runtime=os.getenv("USE_PARALLEL_RUNTIME", "false").lower() == "true"
     )

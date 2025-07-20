@@ -44,19 +44,20 @@ class GraphitiExtractionService:
     def _get_graphiti_config(self) -> GraphitiConfig:
         """Get or create Graphiti configuration."""
         if self._graphiti_config is None:
-            # Get API key from environment (try Gemini first, then OpenAI)
-            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("No API key found. Set GEMINI_API_KEY or OPENAI_API_KEY environment variable.")
+            # Get Gemini API key from environment
+            gemini_api_key = os.getenv("GEMINI_API_KEY")
+            if not gemini_api_key:
+                raise ValueError("No Gemini API key found. Set GEMINI_API_KEY environment variable.")
 
+            # Force local Neo4j configuration with Gemini
             self._graphiti_config = GraphitiConfig(
-                neo4j_uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
-                neo4j_username=os.getenv("NEO4J_USERNAME", "neo4j"),
-                neo4j_password=os.getenv("NEO4J_PASSWORD", "password"),
-                neo4j_database=os.getenv("NEO4J_DATABASE", "neo4j"),
-                openai_api_key=api_key,  # Use available API key
-                openai_model=os.getenv("GRAPHITI_MODEL", "gpt-4"),
-                openai_embedding_model=os.getenv("GRAPHITI_EMBEDDING_MODEL", "text-embedding-3-small")
+                neo4j_uri="bolt://localhost:7687",
+                neo4j_username="neo4j",
+                neo4j_password="password",
+                neo4j_database="neo4j",
+                openai_api_key=gemini_api_key,
+                openai_model="gemini-1.5-flash",
+                openai_embedding_model="text-embedding-004"
             )
         return self._graphiti_config
 

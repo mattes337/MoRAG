@@ -44,14 +44,14 @@ sys.path.insert(0, str(project_root))
 # Load environment variables from the project root
 from dotenv import load_dotenv
 env_path = project_root / '.env'
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 try:
     from morag_document import DocumentProcessor
     from morag_core.interfaces.processor import ProcessingConfig
     from morag_services import QdrantVectorStorage, GeminiEmbeddingService
     from morag_core.models import Document, DocumentChunk
-    from graph_extraction import extract_and_ingest, extract_and_ingest_with_graphiti
+    from graph_extraction import extract_and_ingest_with_graphiti
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
@@ -353,20 +353,20 @@ async def test_document_with_graphiti(
             return False
 
         print(f"✅ Document processed successfully")
-        print_result("Title", result.document.metadata.get('title', 'Unknown'))
-        print_result("Pages", str(result.document.metadata.get('page_count', 'Unknown')))
-        print_result("Chunks", str(len(result.chunks)))
+        print_result("Title", result.document.metadata.title or 'Unknown')
+        print_result("Pages", str(result.document.metadata.page_count or 'Unknown'))
+        print_result("Chunks", str(len(result.document.chunks)))
 
         # Combine all chunk content for Graphiti ingestion
-        full_content = "\n\n".join([chunk.content for chunk in result.chunks])
+        full_content = "\n\n".join([chunk.content for chunk in result.document.chunks])
         doc_id = f"doc_{document_file.stem}_{hash(str(document_file))}"
-        title = result.document.metadata.get('title') or document_file.stem
+        title = result.document.metadata.title or document_file.stem
 
         # Prepare metadata for Graphiti
         graphiti_metadata = {
             'source_file': str(document_file),
             'file_type': document_file.suffix.lower(),
-            'chunk_count': len(result.chunks),
+            'chunk_count': len(result.document.chunks),
             'processing_strategy': chunking_strategy,
             'file_size_mb': round(document_file.stat().st_size / 1024 / 1024, 2)
         }
@@ -381,8 +381,7 @@ async def test_document_with_graphiti(
             doc_id=doc_id,
             title=title,
             context=f"Document: {document_file.name}",
-            metadata=graphiti_metadata,
-            use_traditional_extraction=use_traditional_extraction
+            metadata=graphiti_metadata
         )
 
         # Report results
