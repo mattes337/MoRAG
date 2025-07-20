@@ -198,7 +198,13 @@ Format your response as JSON:
 
             self.logger.debug(f"Cleaned response: {response_clean}")
 
-            data = json.loads(response_clean)
+            # Parse JSON with enhanced error handling
+            from morag_core.utils.json_parser import parse_llm_response_with_retry
+            data = parse_llm_response_with_retry(
+                response_clean,
+                fallback_value={"selected_paths": []},
+                context="path_selection"
+            )
             selected_paths = []
 
             for selection in data.get("selected_paths", []):

@@ -21,14 +21,14 @@ class EnhancedJSONParser:
     
     def parse_json_response(self, response: str, fallback_value: Any = None) -> Any:
         """Parse JSON response with multi-level error handling.
-        
+
         Args:
             response: Raw response string from LLM
             fallback_value: Value to return if all parsing attempts fail
-            
+
         Returns:
             Parsed JSON data or fallback_value
-            
+
         Raises:
             JSONParsingError: If parsing fails and no fallback provided
         """
@@ -36,52 +36,67 @@ class EnhancedJSONParser:
             if fallback_value is not None:
                 return fallback_value
             raise JSONParsingError("Empty response")
-        
+
         # Log the raw response for debugging
         self.logger.debug("Parsing JSON response", response_length=len(response))
-        
+
         # Step 1: Try direct JSON parsing
         try:
             return json.loads(response.strip())
         except json.JSONDecodeError as e:
-            self.logger.debug("Direct JSON parsing failed", error=str(e))
-        
+            self.logger.debug("Direct JSON parsing failed", error=str(e), error_position=getattr(e, 'pos', None))
+
         # Step 2: Extract JSON from markdown or wrapped text
         try:
             cleaned_response = self._extract_json_from_text(response)
             return json.loads(cleaned_response)
         except json.JSONDecodeError as e:
-            self.logger.debug("Cleaned JSON parsing failed", error=str(e))
-        
+            self.logger.debug("Cleaned JSON parsing failed", error=str(e), error_position=getattr(e, 'pos', None))
+
         # Step 3: Fix common JSON issues
         try:
             fixed_response = self._fix_common_json_issues(response)
             return json.loads(fixed_response)
         except json.JSONDecodeError as e:
-            self.logger.debug("Fixed JSON parsing failed", error=str(e))
-        
-        # Step 4: Extract partial JSON
+            self.logger.debug("Fixed JSON parsing failed", error=str(e), error_position=getattr(e, 'pos', None))
+
+        # Step 4: Try aggressive string fixing for unterminated strings
+        try:
+            aggressively_fixed = self._aggressive_string_fix(response)
+            return json.loads(aggressively_fixed)
+        except json.JSONDecodeError as e:
+            self.logger.debug("Aggressive string fix failed", error=str(e), error_position=getattr(e, 'pos', None))
+
+        # Step 5: Extract partial JSON
         try:
             partial_json = self._extract_partial_json(response)
             if partial_json is not None:
                 return partial_json
         except Exception as e:
             self.logger.debug("Partial JSON extraction failed", error=str(e))
-        
-        # Step 5: Try to extract array elements
+
+        # Step 6: Try to extract array elements
         try:
             array_elements = self._extract_array_elements(response)
             if array_elements:
                 return array_elements
         except Exception as e:
             self.logger.debug("Array element extraction failed", error=str(e))
-        
+
+        # Step 7: Last resort - try to extract any valid JSON fragments
+        try:
+            fragments = self._extract_json_fragments(response)
+            if fragments:
+                return fragments
+        except Exception as e:
+            self.logger.debug("JSON fragment extraction failed", error=str(e))
+
         # All parsing attempts failed
         self.logger.error("All JSON parsing attempts failed", response=response[:500])
-        
+
         if fallback_value is not None:
             return fallback_value
-        
+
         raise JSONParsingError(f"Failed to parse JSON response: {response[:200]}...")
     
     def _extract_json_from_text(self, text: str) -> str:
@@ -160,22 +175,141 @@ class EnhancedJSONParser:
         return text
     
     def _fix_unterminated_strings(self, text: str) -> str:
-        """Fix unterminated strings in JSON."""
-        # This is a complex operation, so we'll use a simple heuristic
-        # Look for patterns like: "key": "value without closing quote
-        
-        # Pattern: "key": "value followed by newline or next key
-        pattern = r'"([^"]*)":\s*"([^"]*?)(?=\s*[,}\]\n]|$|"[^"]*":)'
-        
-        def fix_match(match):
+        """Fix unterminated strings in JSON with enhanced detection."""
+        # Enhanced approach to handle various unterminated string patterns
+
+        # First, handle simple cases where quotes are missing at the end
+        # Pattern: "key": "value without closing quote followed by comma, brace, bracket, or end
+        pattern1 = r'"([^"]*)":\s*"([^"]*?)(?=\s*[,}\]\n]|$|"[^"]*":)'
+
+        def fix_simple_match(match):
             key = match.group(1)
             value = match.group(2)
             # If value doesn't end with quote, add it
             if not value.endswith('"'):
                 return f'"{key}": "{value}"'
             return match.group(0)
-        
-        return re.sub(pattern, fix_match, text)
+
+        text = re.sub(pattern1, fix_simple_match, text)
+
+        # Handle more complex cases with escaped characters
+        # Look for strings that start with quote but don't have proper closing
+        lines = text.split('\n')
+        fixed_lines = []
+
+        for line in lines:
+            # Check if line has an unterminated string
+            if self._has_unterminated_string(line):
+                line = self._fix_line_unterminated_string(line)
+            fixed_lines.append(line)
+
+        return '\n'.join(fixed_lines)
+
+    def _has_unterminated_string(self, line: str) -> bool:
+        """Check if a line has an unterminated string."""
+        # Count quotes, accounting for escaped quotes
+        quote_count = 0
+        i = 0
+        while i < len(line):
+            if line[i] == '"' and (i == 0 or line[i-1] != '\\'):
+                quote_count += 1
+            elif line[i] == '\\' and i + 1 < len(line):
+                i += 1  # Skip escaped character
+            i += 1
+
+        # If odd number of quotes, we likely have an unterminated string
+        return quote_count % 2 == 1
+
+    def _fix_line_unterminated_string(self, line: str) -> str:
+        """Fix unterminated string in a single line."""
+        # Find the last unmatched quote and add closing quote before special characters
+        quote_positions = []
+        i = 0
+        while i < len(line):
+            if line[i] == '"' and (i == 0 or line[i-1] != '\\'):
+                quote_positions.append(i)
+            elif line[i] == '\\' and i + 1 < len(line):
+                i += 1  # Skip escaped character
+            i += 1
+
+        if len(quote_positions) % 2 == 1:
+            # Find where to insert the closing quote
+            last_quote_pos = quote_positions[-1]
+            # Look for next comma, brace, bracket, or end of line
+            insert_pos = len(line)
+            for pos in range(last_quote_pos + 1, len(line)):
+                if line[pos] in ',}]\n':
+                    insert_pos = pos
+                    break
+
+            # Insert closing quote
+            line = line[:insert_pos] + '"' + line[insert_pos:]
+
+        return line
+
+    def _aggressive_string_fix(self, text: str) -> str:
+        """Aggressively fix JSON strings by handling various edge cases."""
+        text = self._extract_json_from_text(text)
+
+        # First apply standard fixes
+        text = self._fix_common_json_issues(text)
+
+        # Handle specific unterminated string patterns
+        # Pattern: "key": "value that ends abruptly at line end
+        text = re.sub(r'"([^"]*)":\s*"([^"]*?)$', r'"\1": "\2"', text, flags=re.MULTILINE)
+
+        # Pattern: "key": "value that ends abruptly before next key
+        text = re.sub(r'"([^"]*)":\s*"([^"]*?)\s*"([^"]*)":', r'"\1": "\2", "\3":', text)
+
+        # Handle cases where quotes are missing entirely
+        # Pattern: key: value (no quotes)
+        text = re.sub(r'(\w+):\s*([^",}\]\n]+)', r'"\1": "\2"', text)
+
+        # Fix newlines within strings
+        text = re.sub(r'"([^"]*)\n([^"]*)"', r'"\1 \2"', text)
+
+        # Ensure proper comma placement
+        text = re.sub(r'"\s*\n\s*"', r'",\n"', text)
+
+        return text
+
+    def _extract_json_fragments(self, text: str) -> Optional[Dict[str, Any]]:
+        """Extract any valid JSON fragments from malformed text."""
+        result = {}
+
+        # Try to extract key-value pairs using regex
+        # Pattern: "key": "value" or "key": value
+        kv_pattern = r'"([^"]+)":\s*(?:"([^"]*)"|([^,}\]\n]+))'
+        matches = re.findall(kv_pattern, text)
+
+        for match in matches:
+            key = match[0]
+            value = match[1] if match[1] else match[2]
+
+            # Try to parse value as JSON if possible
+            try:
+                if value.strip().startswith(('{', '[')):
+                    result[key] = json.loads(value.strip())
+                elif value.strip().lower() in ('true', 'false'):
+                    result[key] = value.strip().lower() == 'true'
+                elif value.strip().isdigit():
+                    result[key] = int(value.strip())
+                elif self._is_float(value.strip()):
+                    result[key] = float(value.strip())
+                else:
+                    result[key] = value.strip()
+            except:
+                result[key] = value.strip()
+
+        return result if result else None
+
+    def _is_float(self, value: str) -> bool:
+        """Check if a string represents a float."""
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
     
     def _extract_partial_json(self, text: str) -> Optional[Any]:
         """Extract valid JSON objects from partially malformed text."""
@@ -370,12 +504,83 @@ _parser = EnhancedJSONParser()
 
 def parse_json_response(response: str, fallback_value: Any = None) -> Any:
     """Parse JSON response with enhanced error recovery.
-    
+
     Args:
         response: Raw response string from LLM
         fallback_value: Value to return if parsing fails
-        
+
     Returns:
         Parsed JSON data or fallback_value
     """
     return _parser.parse_json_response(response, fallback_value)
+
+
+def parse_llm_response_with_retry(
+    response: str,
+    fallback_value: Any = None,
+    max_attempts: int = 3,
+    context: str = "LLM response"
+) -> Any:
+    """Parse LLM response with multiple attempts and enhanced error recovery.
+
+    This function provides additional retry logic specifically for LLM responses
+    that may have transient formatting issues.
+
+    Args:
+        response: Raw response string from LLM
+        fallback_value: Value to return if all parsing attempts fail
+        max_attempts: Maximum number of parsing attempts
+        context: Context description for logging
+
+    Returns:
+        Parsed JSON data or fallback_value
+
+    Raises:
+        JSONParsingError: If parsing fails and no fallback provided
+    """
+    last_error = None
+
+    for attempt in range(max_attempts):
+        try:
+            return _parser.parse_json_response(response, fallback_value)
+        except JSONParsingError as e:
+            last_error = e
+            logger.debug(
+                f"JSON parsing attempt {attempt + 1} failed",
+                context=context,
+                error=str(e),
+                attempt=attempt + 1,
+                max_attempts=max_attempts
+            )
+
+            if attempt < max_attempts - 1:
+                # Try preprocessing the response differently for next attempt
+                response = _preprocess_for_retry(response, attempt)
+
+    # All attempts failed
+    logger.error(
+        f"All {max_attempts} JSON parsing attempts failed",
+        context=context,
+        error=str(last_error),
+        response_preview=response[:200] if response else "None"
+    )
+
+    if fallback_value is not None:
+        return fallback_value
+
+    raise last_error
+
+
+def _preprocess_for_retry(response: str, attempt: int) -> str:
+    """Preprocess response differently for each retry attempt."""
+    if attempt == 0:
+        # First retry: try removing extra whitespace and normalizing quotes
+        response = re.sub(r'\s+', ' ', response.strip())
+        response = response.replace('"', '"').replace('"', '"')  # Normalize smart quotes
+        response = response.replace(''', "'").replace(''', "'")  # Normalize smart apostrophes
+    elif attempt == 1:
+        # Second retry: try more aggressive cleaning
+        response = re.sub(r'[^\x20-\x7E\n\r\t]', '', response)  # Remove non-printable chars
+        response = re.sub(r'\n+', '\n', response)  # Normalize newlines
+
+    return response

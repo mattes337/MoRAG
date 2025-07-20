@@ -252,7 +252,19 @@ Format as JSON:
 
             self.logger.debug(f"Cleaned response: {response_clean}")
 
-            data = json.loads(response_clean)
+            # Use enhanced JSON parser with better error handling
+            from morag_core.utils.json_parser import parse_llm_response_with_retry
+            data = parse_llm_response_with_retry(
+                response_clean,
+                fallback_value={
+                    "is_sufficient": False,
+                    "confidence": 3,
+                    "gaps": [],
+                    "reasoning": "Failed to parse LLM analysis - using fallback",
+                    "suggested_queries": []
+                },
+                context="context_analysis"
+            )
 
             gaps = []
             for gap_data in data.get("gaps", []):
