@@ -15,6 +15,8 @@ logger = structlog.get_logger(__name__)
 try:
     from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
     from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
+    from morag_graph.retrieval import HybridRetrievalCoordinator, ContextExpansionEngine
+    from morag_graph.query import QueryEntityExtractor
     # Traditional extraction components removed - use Graphiti instead
     GRAPH_AVAILABLE = True
 except ImportError as e:
@@ -28,6 +30,9 @@ except ImportError as e:
     GraphCRUD = None
     GraphTraversal = None
     GraphAnalytics = None
+    HybridRetrievalCoordinator = None
+    ContextExpansionEngine = None
+    QueryEntityExtractor = None
 
 # Try to import reasoning components, but handle gracefully if not available
 try:

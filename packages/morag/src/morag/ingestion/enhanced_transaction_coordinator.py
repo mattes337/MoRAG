@@ -7,7 +7,7 @@ import structlog
 from morag_core.config import DatabaseConfig, DatabaseType
 from morag_core.utils.json_parser import parse_json_response
 from morag_graph.storage.neo4j_storage import Neo4jStorage
-from morag_graph.storage.qdrant_storage import QdrantVectorStorage
+from morag_graph.storage.qdrant_storage import QdrantStorage
 from morag_graph.models import Entity, Relation
 
 from .transaction_coordinator import (
@@ -185,7 +185,7 @@ class EnhancedTransactionCoordinator(TransactionCoordinator):
         
         return True
     
-    async def _store_qdrant_vectors(self, storage: QdrantVectorStorage, operation: TransactionOperation) -> bool:
+    async def _store_qdrant_vectors(self, storage: QdrantStorage, operation: TransactionOperation) -> bool:
         """Store vectors in Qdrant."""
         chunks_data = operation.data.get("chunks", [])
         document_id = operation.data.get("document_id")
@@ -313,17 +313,17 @@ class EnhancedTransactionCoordinator(TransactionCoordinator):
         
         return self._storage_cache[config_key]
     
-    async def _get_qdrant_storage(self, db_config_dict: Dict[str, Any]) -> QdrantVectorStorage:
+    async def _get_qdrant_storage(self, db_config_dict: Dict[str, Any]) -> QdrantStorage:
         """Get or create Qdrant storage instance."""
         config_key = f"qdrant_{hash(str(sorted(db_config_dict.items())))}"
-        
+
         if config_key not in self._storage_cache:
             # Reconstruct DatabaseConfig from dict
             db_config = DatabaseConfig(**db_config_dict)
-            storage = QdrantVectorStorage(db_config)
+            storage = QdrantStorage(db_config)
             await storage.connect()
             self._storage_cache[config_key] = storage
-        
+
         return self._storage_cache[config_key]
     
     async def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:

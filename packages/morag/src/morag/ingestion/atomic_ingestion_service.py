@@ -10,7 +10,7 @@ from morag_core.config import DatabaseConfig, DatabaseType
 from morag_core.utils.json_parser import parse_json_response, JSONParsingError
 from morag_graph.models import Entity, Relation
 from morag_graph.storage.neo4j_storage import Neo4jStorage
-from morag_graph.storage.qdrant_storage import QdrantVectorStorage
+from morag_graph.storage.qdrant_storage import QdrantStorage
 
 from .transaction_coordinator import (
     TransactionCoordinator,

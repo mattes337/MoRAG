@@ -9,6 +9,28 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+# Import database configuration from morag_graph for backward compatibility
+try:
+    from morag_graph.models.database_config import DatabaseConfig, DatabaseType, DatabaseServerConfig
+except ImportError:
+    # Create stub classes if morag_graph is not available
+    from enum import Enum
+    from pydantic import BaseModel
+
+    class DatabaseType(str, Enum):
+        NEO4J = "neo4j"
+        QDRANT = "qdrant"
+
+    class DatabaseConfig(BaseModel):
+        type: DatabaseType
+        hostname: Optional[str] = None
+        port: Optional[int] = None
+        username: Optional[str] = None
+        password: Optional[str] = None
+        database_name: Optional[str] = None
+
+    DatabaseServerConfig = DatabaseConfig
+
 def detect_device() -> str:
     """Detect the best available device (CPU/GPU) with fallback to CPU."""
     try:

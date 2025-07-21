@@ -28,6 +28,8 @@ from .config import (
     EmbeddingConfig,
     ProcessingResult,
 )
+# Import database config from parent config module for backward compatibility
+from ..config import DatabaseConfig, DatabaseType, DatabaseServerConfig
 from .remote_job import RemoteJob
 
 __all__ = [
@@ -55,6 +57,10 @@ __all__ = [
     "WebProcessingConfig",
     "EmbeddingConfig",
     "ProcessingResult",
+    # Database configuration models (backward compatibility)
+    "DatabaseConfig",
+    "DatabaseType",
+    "DatabaseServerConfig",
     # Remote job models
     "RemoteJob",
 ]
