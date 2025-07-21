@@ -123,8 +123,77 @@ class GraphitiConnectionService:
             return True
 
         except Exception as e:
-            logger.error("Failed to create episode", episode_name=name, error=str(e))
+            error_msg = str(e)
+
+            # Check for specific JSON parsing errors that might be recoverable
+            if "Unterminated string" in error_msg or "Failed to parse structured response" in error_msg:
+                logger.warning(
+                    "Episode creation failed due to LLM response parsing error",
+                    episode_name=name,
+                    error=error_msg,
+                    content_preview=content[:200] if content else "None"
+                )
+
+                # Try to create episode with simplified content to avoid LLM processing issues
+                try:
+                    # Create a simplified version of the content that's less likely to cause parsing issues
+                    simplified_content = self._simplify_content_for_retry(content)
+
+                    await self._graphiti.add_episode(
+                        name=f"{name}_simplified",
+                        episode_body=simplified_content,
+                        source_description=f"Simplified version - {source_description or 'MoRAG episode'}",
+                        reference_time=reference_time
+                    )
+
+                    logger.info("Episode created successfully with simplified content", episode_name=f"{name}_simplified")
+                    return True
+
+                except Exception as retry_error:
+                    logger.error(
+                        "Failed to create episode even with simplified content",
+                        episode_name=name,
+                        original_error=error_msg,
+                        retry_error=str(retry_error)
+                    )
+            else:
+                logger.error("Failed to create episode", episode_name=name, error=error_msg)
+
             return False
+
+    def _simplify_content_for_retry(self, content: str) -> str:
+        """Simplify content to reduce the likelihood of LLM parsing errors.
+
+        Args:
+            content: Original content that may be causing parsing issues
+
+        Returns:
+            Simplified content that's less likely to cause LLM errors
+        """
+        if not content:
+            return content
+
+        # Remove or escape characters that commonly cause JSON parsing issues
+        simplified = content
+
+        # Replace problematic characters
+        simplified = simplified.replace('"', "'")  # Replace double quotes with single quotes
+        simplified = simplified.replace('\n', ' ')  # Replace newlines with spaces
+        simplified = simplified.replace('\r', ' ')  # Replace carriage returns
+        simplified = simplified.replace('\t', ' ')  # Replace tabs with spaces
+
+        # Remove excessive whitespace
+        import re
+        simplified = re.sub(r'\s+', ' ', simplified)
+
+        # Truncate if too long (very long content can cause LLM issues)
+        if len(simplified) > 2000:
+            simplified = simplified[:2000] + "... [content truncated for processing]"
+
+        # Remove any remaining problematic characters
+        simplified = re.sub(r'[^\x20-\x7E ]', '', simplified)  # Keep only printable ASCII + space
+
+        return simplified.strip()
 
     async def search_episodes(
         self,

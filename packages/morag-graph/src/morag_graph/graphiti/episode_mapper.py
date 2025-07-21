@@ -261,14 +261,42 @@ class DocumentEpisodeMapper:
                         )
 
                         # Create episode with rich metadata
-                        success = await conn.create_episode(
-                            name=episode_name,
-                            content=enhanced_content,
-                            source_description=f"Contextual chunk {i+1} from document: {document.metadata.title or document.id}",
-                            metadata=self._generate_contextual_chunk_metadata(
-                                document, chunk, i, contextual_summary, document_summary
+                        try:
+                            success = await conn.create_episode(
+                                name=episode_name,
+                                content=enhanced_content,
+                                source_description=f"Contextual chunk {i+1} from document: {document.metadata.title or document.id}",
+                                metadata=self._generate_contextual_chunk_metadata(
+                                    document, chunk, i, contextual_summary, document_summary
+                                )
                             )
-                        )
+                        except Exception as episode_error:
+                            # If episode creation fails due to content issues, try with simplified content
+                            logger.warning(
+                                "Episode creation failed, trying with simplified content",
+                                episode_name=episode_name,
+                                error=str(episode_error)
+                            )
+
+                            # Create simplified content
+                            simplified_content = self._create_simplified_chunk_content(chunk, i)
+
+                            try:
+                                success = await conn.create_episode(
+                                    name=f"{episode_name}_simplified",
+                                    content=simplified_content,
+                                    source_description=f"Simplified chunk {i+1} from document: {document.metadata.title or document.id}",
+                                    metadata=self._generate_basic_chunk_metadata(document, chunk, i)
+                                )
+                                episode_name = f"{episode_name}_simplified"  # Update name for result
+                            except Exception as retry_error:
+                                logger.error(
+                                    "Failed to create episode even with simplified content",
+                                    episode_name=episode_name,
+                                    original_error=str(episode_error),
+                                    retry_error=str(retry_error)
+                                )
+                                success = False
 
                         result = {
                             "success": success,
@@ -878,6 +906,83 @@ Chunk Content:
 
         if hasattr(document.metadata, 'mime_type') and document.metadata.mime_type:
             metadata["document_mime_type"] = document.metadata.mime_type
+
+        return metadata
+
+    def _create_simplified_chunk_content(self, chunk: DocumentChunk, chunk_index: int) -> str:
+        """Create simplified content for chunk episode when normal processing fails.
+
+        Args:
+            chunk: Original chunk
+            chunk_index: Index of the chunk
+
+        Returns:
+            Simplified content that's less likely to cause LLM parsing errors
+        """
+        # Create very basic content without complex formatting
+        content_parts = []
+
+        # Add basic header
+        content_parts.append(f"=== CHUNK {chunk_index + 1} ===")
+
+        # Add simplified content (remove problematic characters)
+        simplified_text = chunk.content
+        simplified_text = simplified_text.replace('"', "'")  # Replace quotes
+        simplified_text = simplified_text.replace('\n', ' ')  # Replace newlines
+        simplified_text = simplified_text.replace('\r', ' ')  # Replace carriage returns
+        simplified_text = simplified_text.replace('\t', ' ')  # Replace tabs
+
+        # Remove excessive whitespace
+        import re
+        simplified_text = re.sub(r'\s+', ' ', simplified_text)
+
+        # Truncate if too long
+        if len(simplified_text) > 1500:
+            simplified_text = simplified_text[:1500] + "... [content truncated]"
+
+        content_parts.append(simplified_text)
+
+        return "\n".join(content_parts)
+
+    def _generate_basic_chunk_metadata(
+        self,
+        document: Document,
+        chunk: DocumentChunk,
+        chunk_index: int
+    ) -> Dict[str, Any]:
+        """Generate basic metadata for chunk episode when complex processing fails.
+
+        Args:
+            document: Parent document
+            chunk: Document chunk
+            chunk_index: Index of the chunk
+
+        Returns:
+            Basic metadata dictionary
+        """
+        metadata = {
+            # Core identifiers
+            "morag_document_id": document.id,
+            "morag_chunk_id": chunk.id,
+            "morag_source": "simplified_chunk_episode_mapper",
+            "created_at": datetime.now().isoformat(),
+
+            # Basic chunk information
+            "chunk_index": chunk_index,
+            "chunk_length": len(chunk.content),
+            "total_chunks": len(document.chunks),
+
+            # Simplified processing flag
+            "simplified_processing": True,
+            "processing_note": "Created with simplified processing due to content complexity"
+        }
+
+        # Add basic document info if available
+        if hasattr(document.metadata, 'title') and document.metadata.title:
+            metadata["document_title"] = document.metadata.title
+
+        if hasattr(document.metadata, 'source_name') and document.metadata.source_name:
+            metadata["document_filename"] = document.metadata.source_name
 
         return metadata
 

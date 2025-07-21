@@ -38,6 +38,7 @@ Examples:
 """
 
 import sys
+import os
 import asyncio
 import json
 import argparse
@@ -128,18 +129,18 @@ async def ingest_document(
             return False
 
         print(f"✅ Document processed successfully")
-        print_result("Title", result.document.metadata.get('title', 'Unknown'))
-        print_result("Chunks", str(len(result.chunks)))
+        print_result("Title", getattr(result.document.metadata, 'title', 'Unknown'))
+        print_result("Chunks", str(len(result.document.chunks)))
 
         # Prepare content for Graphiti
-        full_content = "\n\n".join([chunk.content for chunk in result.chunks])
+        full_content = "\n\n".join([chunk.content for chunk in result.document.chunks])
         doc_id = f"doc_{document_file.stem}_{hash(str(document_file))}"
-        title = result.document.metadata.get('title') or document_file.stem
+        title = getattr(result.document.metadata, 'title', None) or document_file.stem
 
         graphiti_metadata = {
             'source_file': str(document_file),
             'file_type': document_file.suffix.lower(),
-            'chunk_count': len(result.chunks),
+            'chunk_count': len(result.document.chunks),
             'processing_strategy': chunking_strategy
         }
         if metadata:
@@ -230,7 +231,7 @@ async def ingest_document(
         )
 
         document = Document(metadata=doc_metadata)
-        document.chunks = result.chunks
+        document.chunks = result.document.chunks
         document.raw_text = full_content
 
         # Determine episode prefix
@@ -374,8 +375,8 @@ async def check_status():
         
         if connection_service.is_connected:
             print("✅ Graphiti connection: OK")
-            print_result("Neo4j URI", connection_service._graphiti_config.neo4j_uri if connection_service._graphiti_config else "Unknown")
-            print_result("Database", connection_service._graphiti_config.neo4j_database if connection_service._graphiti_config else "Unknown")
+            print_result("Neo4j URI", connection_service.config.neo4j_uri if connection_service.config else "Unknown")
+            print_result("Database", connection_service.config.neo4j_database if connection_service.config else "Unknown")
         else:
             print("❌ Graphiti connection: Failed")
             

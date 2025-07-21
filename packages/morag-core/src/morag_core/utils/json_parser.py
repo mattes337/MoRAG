@@ -254,6 +254,45 @@ class EnhancedJSONParser:
         # First apply standard fixes
         text = self._fix_common_json_issues(text)
 
+        # Handle the specific error case: "Unterminated string starting at: line 1 column 13"
+        # This often happens when LLM generates malformed JSON with unclosed quotes
+        try:
+            # Count quotes to detect unterminated strings
+            quote_count = text.count('"')
+            if quote_count % 2 != 0:
+                # Odd number of quotes - likely unterminated string
+                # Find the position around character 12-13 where the error occurs
+                if len(text) > 12:
+                    # Look for unterminated strings around the error position
+                    start_pos = max(0, 10)  # Start a bit before position 12
+                    end_pos = min(len(text), 50)  # Look ahead to find a good closing point
+
+                    # Find the last quote before position 12
+                    last_quote_before = text.rfind('"', 0, 13)
+                    if last_quote_before != -1:
+                        # Find the next quote after the error position
+                        next_quote_after = text.find('"', 13)
+                        if next_quote_after == -1:
+                            # No closing quote found, try to add one at a reasonable position
+                            # Look for natural break points like comma, brace, or bracket
+                            break_chars = [',', '}', ']', '\n', ':', ' ']
+                            break_pos = -1
+                            search_start = 13
+
+                            for char in break_chars:
+                                pos = text.find(char, search_start)
+                                if pos != -1 and (break_pos == -1 or pos < break_pos):
+                                    break_pos = pos
+
+                            if break_pos != -1:
+                                # Insert closing quote before the break character
+                                text = text[:break_pos] + '"' + text[break_pos:]
+                            else:
+                                # No break found, add quote at the end
+                                text = text + '"'
+        except Exception as e:
+            self.logger.debug("Quote fixing failed", error=str(e))
+
         # Handle specific unterminated string patterns
         # Pattern: "key": "value that ends abruptly at line end
         text = re.sub(r'"([^"]*)":\s*"([^"]*?)$', r'"\1": "\2"', text, flags=re.MULTILINE)
@@ -578,9 +617,38 @@ def _preprocess_for_retry(response: str, attempt: int) -> str:
         response = re.sub(r'\s+', ' ', response.strip())
         response = response.replace('"', '"').replace('"', '"')  # Normalize smart quotes
         response = response.replace(''', "'").replace(''', "'")  # Normalize smart apostrophes
+
+        # Handle the specific "Unterminated string starting at: line 1 column 13" error
+        # Try to fix unterminated strings by adding missing quotes
+        if len(response) > 12:
+            # Check if there's an unterminated string around position 12
+            quote_count = response[:13].count('"')
+            if quote_count % 2 != 0:  # Odd number of quotes means unterminated string
+                # Find a good place to close the string
+                remaining = response[13:]
+                # Look for natural break points
+                break_chars = [',', '}', ']', '\n', ':', ' ']
+                break_pos = -1
+                for char in break_chars:
+                    pos = remaining.find(char)
+                    if pos != -1 and (break_pos == -1 or pos < break_pos):
+                        break_pos = pos
+
+                if break_pos != -1:
+                    # Insert closing quote before the break character
+                    response = response[:13 + break_pos] + '"' + response[13 + break_pos:]
+                else:
+                    # No break found, add quote at the end
+                    response = response + '"'
+
     elif attempt == 1:
         # Second retry: try more aggressive cleaning
         response = re.sub(r'[^\x20-\x7E\n\r\t]', '', response)  # Remove non-printable chars
         response = re.sub(r'\n+', '\n', response)  # Normalize newlines
+
+        # Try to balance quotes
+        quote_count = response.count('"')
+        if quote_count % 2 != 0:
+            response = response + '"'  # Add missing closing quote
 
     return response

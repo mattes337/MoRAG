@@ -1,0 +1,19 @@
+Test Document for Graphiti Integration
+
+This is a test document to verify that our JSON parsing fixes work correctly.
+
+Section 1: Introduction
+This document contains various types of content that might cause issues with LLM response parsing.
+
+Section 2: Content with Special Characters
+Here we have content with quotes: "This is a quoted string"
+And content with German text: Zellen sind die Grundbausteine des Lebens.
+Content with apostrophes: It's important to handle these correctly.
+
+Section 3: Technical Content
+- Entity extraction should work properly
+- Relations should be identified correctly
+- The system should handle unterminated strings gracefully
+
+Section 4: Conclusion
+This test document should be processed successfully with our improved error handling.
