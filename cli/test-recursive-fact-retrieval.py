@@ -36,6 +36,16 @@ from morag_reasoning import (
 from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
 from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
 
+# Import Graphiti services
+try:
+    from morag_graph.graphiti import (
+        GraphitiSearchService, GraphitiConfig, GraphitiConnectionService,
+        HybridSearchService, create_graphiti_instance
+    )
+    GRAPHITI_AVAILABLE = True
+except ImportError:
+    GRAPHITI_AVAILABLE = False
+
 # Configure logging
 structlog.configure(
     processors=[
@@ -225,6 +235,73 @@ class RecursiveFactRetrievalTester:
 
         return health
     
+    async def test_graphiti_search(
+        self,
+        user_query: str,
+        limit: int = 10
+    ) -> Dict[str, Any]:
+        """Test Graphiti search directly.
+
+        Args:
+            user_query: Query to search for
+            limit: Maximum number of results
+
+        Returns:
+            Search results and metadata
+        """
+        if not GRAPHITI_AVAILABLE:
+            return {
+                "success": False,
+                "error": "Graphiti is not available"
+            }
+
+        try:
+            # Create Graphiti configuration
+            config = GraphitiConfig(
+                neo4j_uri=self.neo4j_uri,
+                neo4j_username=self.neo4j_user,
+                neo4j_password=self.neo4j_password,
+                neo4j_database=self.neo4j_database,
+                openai_api_key=self.gemini_api_key,
+                openai_model=self.gemini_model,
+                openai_embedding_model="text-embedding-004"
+            )
+
+            # Create search service
+            search_service = GraphitiSearchService(config)
+
+            # Perform search
+            results, metrics = await search_service.search(user_query, limit)
+
+            return {
+                "success": True,
+                "query": user_query,
+                "results": [
+                    {
+                        "content": result.content,
+                        "score": result.score,
+                        "source_type": result.source_type,
+                        "document_id": result.document_id,
+                        "chunk_id": result.chunk_id,
+                        "metadata": result.metadata
+                    }
+                    for result in results
+                ],
+                "metrics": {
+                    "query_time": metrics.query_time,
+                    "result_count": metrics.result_count,
+                    "total_episodes": metrics.total_episodes,
+                    "search_method": metrics.search_method
+                }
+            }
+
+        except Exception as e:
+            logger.error("Graphiti search test failed", error=str(e))
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     async def test_recursive_fact_retrieval(
         self,
         user_query: str,
@@ -300,7 +377,40 @@ class RecursiveFactRetrievalTester:
                     await self.service.qdrant_storage.close()
             except Exception as e:
                 logger.warning("Error during cleanup", error=str(e))
-    
+
+    def print_graphiti_results(self, results: Dict[str, Any], verbose: bool = False):
+        """Print Graphiti search results in a formatted way."""
+        if not results.get("success"):
+            print(f"❌ Graphiti search failed: {results.get('error', 'Unknown error')}")
+            return
+
+        print("✅ Graphiti search successful!")
+        print(f"   Query: {results['query']}")
+
+        metrics = results.get('metrics', {})
+        print(f"   Query time: {metrics.get('query_time', 0):.3f}s")
+        print(f"   Results found: {metrics.get('result_count', 0)}")
+        print(f"   Total episodes: {metrics.get('total_episodes', 0)}")
+        print(f"   Search method: {metrics.get('search_method', 'unknown')}")
+
+        # Print search results
+        search_results = results.get('results', [])
+        if search_results:
+            print(f"\n🔍 Search Results:")
+            for i, result in enumerate(search_results[:10], 1):  # Show top 10 results
+                print(f"   {i}. Score: {result['score']:.3f}")
+                print(f"      Content: {result['content'][:200]}{'...' if len(result['content']) > 200 else ''}")
+                print(f"      Source: {result['source_type']}")
+                if result.get('document_id'):
+                    print(f"      Document ID: {result['document_id']}")
+                if result.get('chunk_id'):
+                    print(f"      Chunk ID: {result['chunk_id']}")
+                if verbose and result.get('metadata'):
+                    print(f"      Metadata: {result['metadata']}")
+                print()
+        else:
+            print("\n📭 No results found")
+
     def print_results(self, results: Dict[str, Any], verbose: bool = False):
         """Print test results in a formatted way.
         
@@ -428,6 +538,7 @@ async def main():
     # Output options
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--check-health", action="store_true", help="Check service health")
+    parser.add_argument("--test-graphiti", action="store_true", help="Test Graphiti search instead of recursive fact retrieval")
     parser.add_argument("--output-json", help="Save results to JSON file")
     parser.add_argument("--show-config", action="store_true", help="Show current environment configuration and exit")
 
@@ -480,35 +591,47 @@ async def main():
                 print(f"Error: {health['error']}")
             print()
 
-        # Run the test
-        print(f"🧠 Testing recursive fact retrieval with query: '{args.query}'")
-        print(f"   Max depth: {args.max_depth}")
-        print(f"   Decay rate: {args.decay_rate}")
-        print(f"   Max facts per node: {args.max_facts_per_node}")
-        print(f"   Min fact score: {args.min_fact_score}")
-        print(f"   Max total facts: {args.max_total_facts}")
-        if args.language:
-            print(f"   Language: {args.language}")
-        if args.facts_only:
-            print(f"   Facts only: {args.facts_only}")
-        if args.skip_fact_evaluation:
-            print(f"   Skip fact evaluation: {args.skip_fact_evaluation}")
-        print()
+        # Run the appropriate test
+        if args.test_graphiti:
+            print(f"🔍 Testing Graphiti search with query: '{args.query}'")
+            print()
 
-        results = await tester.test_recursive_fact_retrieval(
-            user_query=args.query,
-            max_depth=args.max_depth,
-            decay_rate=args.decay_rate,
-            max_facts_per_node=args.max_facts_per_node,
-            min_fact_score=args.min_fact_score,
-            max_total_facts=args.max_total_facts,
-            language=args.language,
-            facts_only=args.facts_only,
-            skip_fact_evaluation=args.skip_fact_evaluation
-        )
+            results = await tester.test_graphiti_search(
+                user_query=args.query,
+                limit=args.max_total_facts
+            )
+        else:
+            print(f"🧠 Testing recursive fact retrieval with query: '{args.query}'")
+            print(f"   Max depth: {args.max_depth}")
+            print(f"   Decay rate: {args.decay_rate}")
+            print(f"   Max facts per node: {args.max_facts_per_node}")
+            print(f"   Min fact score: {args.min_fact_score}")
+            print(f"   Max total facts: {args.max_total_facts}")
+            if args.language:
+                print(f"   Language: {args.language}")
+            if args.facts_only:
+                print(f"   Facts only: {args.facts_only}")
+            if args.skip_fact_evaluation:
+                print(f"   Skip fact evaluation: {args.skip_fact_evaluation}")
+            print()
+
+            results = await tester.test_recursive_fact_retrieval(
+                user_query=args.query,
+                max_depth=args.max_depth,
+                decay_rate=args.decay_rate,
+                max_facts_per_node=args.max_facts_per_node,
+                min_fact_score=args.min_fact_score,
+                max_total_facts=args.max_total_facts,
+                language=args.language,
+                facts_only=args.facts_only,
+                skip_fact_evaluation=args.skip_fact_evaluation
+            )
 
         # Print results
-        tester.print_results(results, verbose=args.verbose)
+        if args.test_graphiti:
+            tester.print_graphiti_results(results, verbose=args.verbose)
+        else:
+            tester.print_results(results, verbose=args.verbose)
 
         # Save to JSON if requested
         if args.output_json:

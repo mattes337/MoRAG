@@ -214,11 +214,13 @@ class GraphitiConnectionService:
             return []
             
         try:
-            results = await self._graphiti.search(
-                query=query,
-                limit=limit
-            )
-            
+            # Use the correct Graphiti search API
+            results = await self._graphiti.search(query=query)
+
+            # Apply limit manually since Graphiti core doesn't support it directly
+            if limit and len(results) > limit:
+                results = results[:limit]
+
             logger.info("Episode search completed", query=query, result_count=len(results))
             return results
             
