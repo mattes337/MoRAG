@@ -11,8 +11,19 @@ sys.path.insert(0, str(src_path))
 def test_legacy_models():
     """Test legacy models can be imported and work correctly."""
     try:
-        # Import models directly without going through __init__.py
-        from morag.models.legacy import LegacyQueryRequest, LegacyQueryResponse, LegacyResult
+        # Import the specific model files directly to avoid import chain issues
+        import importlib.util
+
+        # Load legacy models module directly
+        legacy_path = src_path / "morag" / "models" / "legacy.py"
+        spec = importlib.util.spec_from_file_location("legacy", legacy_path)
+        legacy_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(legacy_module)
+
+        # Get classes from the module
+        LegacyQueryRequest = legacy_module.LegacyQueryRequest
+        LegacyQueryResponse = legacy_module.LegacyQueryResponse
+        LegacyResult = legacy_module.LegacyResult
         
         # Test LegacyQueryRequest
         request = LegacyQueryRequest(
@@ -65,10 +76,22 @@ def test_legacy_models():
 def test_enhanced_models():
     """Test enhanced query models can be imported and work correctly."""
     try:
-        from morag.models.enhanced_query import (
-            EnhancedQueryRequest, QueryType, ExpansionStrategy, FusionStrategy,
-            EntityQueryRequest, GraphTraversalRequest
-        )
+        # Import the specific model files directly to avoid import chain issues
+        import importlib.util
+
+        # Load enhanced query models module directly
+        enhanced_path = src_path / "morag" / "models" / "enhanced_query.py"
+        spec = importlib.util.spec_from_file_location("enhanced_query", enhanced_path)
+        enhanced_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(enhanced_module)
+
+        # Get classes from the module
+        EnhancedQueryRequest = enhanced_module.EnhancedQueryRequest
+        QueryType = enhanced_module.QueryType
+        ExpansionStrategy = enhanced_module.ExpansionStrategy
+        FusionStrategy = enhanced_module.FusionStrategy
+        EntityQueryRequest = enhanced_module.EntityQueryRequest
+        GraphTraversalRequest = enhanced_module.GraphTraversalRequest
         
         # Test EnhancedQueryRequest
         request = EnhancedQueryRequest(
@@ -115,9 +138,25 @@ def test_enhanced_models():
 def test_model_validation():
     """Test model validation works correctly."""
     try:
-        from morag.models.legacy import LegacyQueryRequest
-        from morag.models.enhanced_query import EnhancedQueryRequest
+        # Import the specific model files directly to avoid import chain issues
+        import importlib.util
         from pydantic import ValidationError
+
+        # Load legacy models module directly
+        legacy_path = src_path / "morag" / "models" / "legacy.py"
+        spec = importlib.util.spec_from_file_location("legacy", legacy_path)
+        legacy_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(legacy_module)
+
+        # Load enhanced query models module directly
+        enhanced_path = src_path / "morag" / "models" / "enhanced_query.py"
+        spec = importlib.util.spec_from_file_location("enhanced_query", enhanced_path)
+        enhanced_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(enhanced_module)
+
+        # Get classes from the modules
+        LegacyQueryRequest = legacy_module.LegacyQueryRequest
+        EnhancedQueryRequest = enhanced_module.EnhancedQueryRequest
         
         # Test validation errors
         try:
