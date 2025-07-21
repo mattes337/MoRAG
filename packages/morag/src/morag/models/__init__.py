@@ -29,12 +29,11 @@ from .enhanced_query import (
 
 
 
-# Legacy models temporarily removed - will be recreated
-# from .legacy import (
-#     LegacyQueryRequest,
-#     LegacyQueryResponse,
-#     LegacyResult,
-# )
+from .legacy import (
+    LegacyQueryRequest,
+    LegacyQueryResponse,
+    LegacyResult,
+)
 
 __all__ = [
     "CreateRemoteJobRequest",
@@ -58,8 +57,7 @@ __all__ = [
     "GraphPath",
     "GraphTraversalResponse",
     "GraphAnalyticsRequest",
-    # Legacy models temporarily removed
-    # "LegacyQueryRequest",
-    # "LegacyQueryResponse",
-    # "LegacyResult",
+    "LegacyQueryRequest",
+    "LegacyQueryResponse",
+    "LegacyResult",
 ]

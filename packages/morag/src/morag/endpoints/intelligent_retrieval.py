@@ -6,6 +6,8 @@ import structlog
 import asyncio
 import random
 import httpx
+import uuid
+from datetime import datetime
 
 from morag_reasoning import (
     IntelligentRetrievalRequest, IntelligentRetrievalResponse,
@@ -199,7 +201,7 @@ async def intelligent_retrieval(
     request: IntelligentRetrievalRequest
 ):
     """Perform intelligent entity-based retrieval with recursive path following.
-    
+
     This endpoint:
     1. Identifies entities from the user prompt
     2. Retrieves entity nodes/chunks from Neo4j/Qdrant
@@ -207,13 +209,17 @@ async def intelligent_retrieval(
     4. Extracts key facts from retrieved chunks with source information
     5. Returns structured JSON with facts and sources
     """
+    query_id = str(uuid.uuid4())
+    start_time = datetime.now()
+
     try:
         logger.info(
             "Starting intelligent retrieval",
+            query_id=query_id,
             query=request.query,
             max_iterations=request.max_iterations
         )
-        
+
         # Get service with specified databases
         service = await get_intelligent_retrieval_service(request)
 
@@ -228,19 +234,30 @@ async def intelligent_retrieval(
             max_delay=request.retry_max_delay,
             jitter=request.retry_jitter
         )
-        
+
+        # Update response with query_id if not already set
+        if not hasattr(response, 'query_id') or not response.query_id:
+            response.query_id = query_id
+
+        processing_time = (datetime.now() - start_time).total_seconds() * 1000
+        if hasattr(response, 'processing_time_ms'):
+            response.processing_time_ms = processing_time
+
         logger.info(
             "Intelligent retrieval completed",
             query_id=response.query_id,
-            key_facts=len(response.key_facts),
-            processing_time_ms=response.processing_time_ms
+            key_facts=len(response.key_facts) if hasattr(response, 'key_facts') else 0,
+            processing_time_ms=processing_time
         )
-        
+
         return response
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             "Intelligent retrieval failed",
+            query_id=query_id,
             error=str(e),
             error_type=type(e).__name__,
             query=request.query

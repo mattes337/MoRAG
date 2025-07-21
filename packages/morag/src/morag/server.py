@@ -459,19 +459,31 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     app = FastAPI(
         title="MoRAG API",
         description="""
-        Modular Retrieval Augmented Generation System
+        Modular Retrieval Augmented Generation System with Graph-Augmented RAG
 
         ## Features
-        - **Processing Endpoints**: Process content and return results immediately
-        - **Ingestion Endpoints**: Process content and store in vector database for retrieval
-        - **Task Management**: Track processing status and manage background tasks
-        - **Search**: Query stored content using vector similarity
+        - **Enhanced Query API (v2)**: Graph-augmented retrieval with multi-hop reasoning
+        - **Legacy API (v1)**: Backward-compatible endpoints (deprecated)
+        - **Intelligent Retrieval**: Entity-based recursive graph traversal
+        - **Multi-hop Reasoning**: Complex query answering with path finding
+        - **Remote Job Processing**: Background processing for audio/video content
 
-        ## Endpoint Categories
-        - `/process/*` - Immediate processing (no storage)
-        - `/api/v1/ingest/*` - Background processing with vector storage
-        - `/api/v1/status/*` - Task status and management
-        - `/search` - Vector similarity search
+        ## API Versions
+
+        ### v2 API (Recommended)
+        - `/api/v2/query` - Enhanced query with graph-augmented retrieval
+        - `/api/v2/query/stream` - Streaming enhanced query
+        - `/api/v2/entity/query` - Entity-specific queries
+        - `/api/v2/graph/traverse` - Graph traversal between entities
+        - `/api/v2/graph/analytics` - Graph analytics and statistics
+        - `/api/v2/intelligent-query` - Intelligent entity-based retrieval
+        - `/api/v2/reasoning/query` - Multi-hop reasoning
+        - `/api/v2/recursive-fact-retrieval` - Recursive fact extraction
+
+        ### v1 API (Deprecated)
+        - `/api/v1/query` - Legacy query endpoint (use v2 instead)
+        - `/api/v1/migration-guide` - Migration guidance
+        - `/api/v1/remote-jobs/*` - Remote job management
         """,
         version="0.1.0",
         docs_url="/docs",
@@ -1212,13 +1224,13 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     except ImportError as e:
         logger.warning("Intelligent retrieval endpoints not available", error=str(e))
 
-    # Legacy router temporarily disabled
-    # try:
-    #     from morag.endpoints import legacy_router
-    #     app.include_router(legacy_router)
-    #     logger.info("Legacy API endpoints loaded")
-    # except ImportError as e:
-    #     logger.warning("Legacy endpoints not available", error=str(e))
+    # Include legacy router (v1 API compatibility)
+    try:
+        from morag.endpoints import legacy_router
+        app.include_router(legacy_router)
+        logger.info("Legacy API endpoints loaded")
+    except ImportError as e:
+        logger.warning("Legacy endpoints not available", error=str(e))
 
     # Include reasoning router (multi-hop reasoning API)
     try:

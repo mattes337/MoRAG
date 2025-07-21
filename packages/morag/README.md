@@ -171,19 +171,38 @@ Create a configuration file (JSON format):
 
 ## API Endpoints
 
-### Enhanced Query API (v2) - Graph-Augmented RAG
+### Enhanced Query API (v2) - Graph-Augmented RAG ✨
 
+**Core Query Endpoints:**
 - `POST /api/v2/query` - Enhanced query with graph-augmented retrieval
 - `POST /api/v2/query/stream` - Streaming enhanced query for real-time results
 - `POST /api/v2/entity/query` - Query specific entities and relationships
 - `POST /api/v2/graph/traverse` - Perform graph traversal between entities
-- `GET /api/v2/graph/analytics` - Get graph analytics and statistics
+- `POST /api/v2/graph/analytics` - Get graph analytics and statistics
 
-### Legacy Query API (v1) - Deprecated
+**Specialized Retrieval:**
+- `POST /api/v2/intelligent-query` - Intelligent entity-based retrieval with recursive graph traversal
+- `POST /api/v2/reasoning/query` - Multi-hop reasoning for complex queries
+- `POST /api/v2/recursive-fact-retrieval` - Recursive fact extraction with graph-based RAG
+
+**Utility Endpoints:**
+- `GET /api/v2/reasoning/strategies` - Available reasoning strategies
+- `GET /api/v2/intelligent-query/health` - Health check for intelligent retrieval
+- `GET /api/v2/intelligent-query/info` - Information about intelligent retrieval features
+
+### Legacy Query API (v1) - Deprecated ⚠️
 
 - `POST /api/v1/query` - Legacy query endpoint (deprecated, use v2)
 - `GET /api/v1/migration-guide` - Migration guidance from v1 to v2
 - `GET /api/v1/health` - Legacy health check with deprecation notice
+- `GET /api/v1/status` - Legacy status with feature comparison
+
+**Remote Job Management:**
+- `POST /api/v1/remote-jobs/` - Create remote processing job
+- `GET /api/v1/remote-jobs/poll` - Poll for available jobs
+- `PUT /api/v1/remote-jobs/{job_id}/result` - Submit job result
+- `GET /api/v1/remote-jobs/{job_id}/status` - Get job status
+- `GET /api/v1/remote-jobs/{job_id}/download` - Download job file
 
 ### Processing (Immediate Results)
 

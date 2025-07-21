@@ -1,6 +1,7 @@
 """Multi-hop reasoning API endpoints."""
 
 import time
+import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -115,19 +116,20 @@ async def multi_hop_reasoning(
     iterative_retriever = Depends(get_iterative_retriever)
 ):
     """Perform multi-hop reasoning to answer a complex query."""
+    query_id = str(uuid.uuid4())
+    start_time = datetime.now()
+
     if not REASONING_AVAILABLE:
         raise HTTPException(
-            status_code=503, 
+            status_code=503,
             detail="Multi-hop reasoning not available. Please check reasoning components."
         )
-    
+
     if path_finder is None or iterative_retriever is None:
         raise HTTPException(
             status_code=503,
             detail="Reasoning components not properly initialized"
         )
-    
-    start_time = time.time()
 
     try:
         # Use dynamic database connections if provided
@@ -138,6 +140,7 @@ async def multi_hop_reasoning(
             # For now, we'll use the default ones but this could be enhanced
 
         logger.info("Starting multi-hop reasoning",
+                   query_id=query_id,
                    query=request.query,
                    strategy=request.strategy,
                    start_entities=request.start_entities)
@@ -168,8 +171,7 @@ async def multi_hop_reasoning(
         )
         
         # Step 4: Prepare response
-        end_time = time.time()
-        reasoning_time_ms = (end_time - start_time) * 1000
+        processing_time = (datetime.now() - start_time).total_seconds() * 1000
         
         # Convert paths to response format
         selected_paths = []
@@ -211,21 +213,26 @@ async def multi_hop_reasoning(
             context_info=context_info,
             iterations_used=iterations_used,
             final_confidence=final_confidence,
-            reasoning_time_ms=reasoning_time_ms,
+            reasoning_time_ms=processing_time,
             context_sufficient=context_sufficient,
             reasoning_summary=reasoning_summary
         )
-        
+
         logger.info("Multi-hop reasoning completed",
+                   query_id=query_id,
                    paths_found=len(reasoning_paths),
                    iterations_used=iterations_used,
                    final_confidence=final_confidence,
-                   reasoning_time_ms=reasoning_time_ms)
+                   processing_time_ms=processing_time)
         
         return result
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Error in multi-hop reasoning", error=str(e))
+        logger.error("Error in multi-hop reasoning",
+                    query_id=query_id,
+                    error=str(e))
         raise HTTPException(status_code=500, detail=f"Reasoning failed: {str(e)}")
 
 

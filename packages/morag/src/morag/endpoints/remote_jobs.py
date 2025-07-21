@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from typing import List
 import structlog
-from datetime import timedelta
+import uuid
+from datetime import timedelta, datetime
 from pathlib import Path
 
 from morag.models.remote_job_api import (
@@ -31,18 +32,34 @@ async def create_remote_job(
     service: RemoteJobService = Depends(get_remote_job_service)
 ):
     """Create a new remote conversion job."""
+    request_id = str(uuid.uuid4())
+    start_time = datetime.now()
+
     try:
+        logger.info("Creating remote job",
+                   request_id=request_id,
+                   content_type=request.content_type)
+
         job = service.create_job(request)
 
+        processing_time = (datetime.now() - start_time).total_seconds() * 1000
 
+        logger.info("Remote job created successfully",
+                   request_id=request_id,
+                   job_id=job.id,
+                   processing_time_ms=processing_time)
 
         return CreateRemoteJobResponse(
             job_id=job.id,
             status=job.status,
             created_at=job.created_at
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Failed to create remote job", error=str(e))
+        logger.error("Failed to create remote job",
+                    request_id=request_id,
+                    error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create remote job: {str(e)}"

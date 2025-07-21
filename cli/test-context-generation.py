@@ -274,23 +274,30 @@ class AgenticContextGenerator:
             return entities
         
         try:
-            # Use LLM to extract entities with reasoning
+            # Use LLM to extract entities with domain-aware reasoning
             extraction_prompt = f"""
             Analyze this query and extract key entities that would be useful for knowledge graph traversal.
-            Focus on concrete nouns, concepts, and named entities that could have relationships in a knowledge base.
-            
+            Identify the domain and context, then extract entities that are most likely to exist in a knowledge base for this domain.
+
             Query: "{prompt}"
-            
+
+            First, identify the domain (medical, technical, scientific, etc.) and the key concepts.
+            Then extract entities that:
+            - Are central to answering the query
+            - Likely have relationships with other entities in this domain
+            - Could be found in a knowledge base regardless of language
+            - Include both specific terms and broader concepts
+
             For each entity, provide:
-            1. Entity name (normalized, singular form)
-            2. Entity type (PERSON, ORGANIZATION, CONCEPT, MEDICAL_CONDITION, SUBSTANCE, etc.)
+            1. Entity name (use the most universal/recognizable form)
+            2. Entity type (PERSON, ORGANIZATION, CONCEPT, MEDICAL_CONDITION, SUBSTANCE, PROCEDURE, etc.)
             3. Confidence score (0.0-1.0)
             4. Why this entity is relevant for answering the query
-            
+
             Return as JSON array with format:
             [{{"name": "entity_name", "type": "ENTITY_TYPE", "confidence": 0.9, "relevance": "explanation"}}]
-            
-            Extract 3-7 most relevant entities. Be selective and focus on quality over quantity.
+
+            Extract 3-7 most relevant entities. Focus on entities that are likely to have rich relationships in the knowledge graph.
             """
             
             response = await self.llm_client.generate(extraction_prompt)
@@ -337,73 +344,78 @@ class AgenticContextGenerator:
         
         return entities
     
-    async def _get_entity_translations(self, entity_name: str) -> List[str]:
-        """Get translations and variants of an entity name for multilingual matching."""
-        variants = [entity_name]
-
+    async def _get_entity_search_variants(self, entity_name: str) -> List[str]:
+        """Get search variants for an entity using LLM to handle any language/domain."""
         if not self.llm_client:
-            # Basic hardcoded translations for common substances
-            translations = {
-                'mercury': ['quecksilber', 'hg'],
-                'quecksilber': ['mercury', 'hg'],
-                'aluminum': ['aluminium'],
-                'aluminium': ['aluminum', 'al'],
-                'iron': ['eisen', 'fe'],
-                'eisen': ['iron', 'fe'],
-                'zinc': ['zink', 'zn'],
-                'zink': ['zinc', 'zn'],
-                'lead': ['blei', 'pb'],
-                'blei': ['lead', 'pb'],
-                'copper': ['kupfer', 'cu'],
-                'kupfer': ['copper', 'cu'],
-                'silver': ['silber', 'ag'],
-                'silber': ['silver', 'ag'],
-                'gold': ['gold', 'au'],
-                'calcium': ['kalzium', 'calcium', 'ca'],
-                'kalzium': ['calcium', 'ca'],
-                'magnesium': ['magnesium', 'mg'],
-                'vitamin': ['vitamin'],
-                'protein': ['protein', 'eiweiß'],
-                'eiweiß': ['protein'],
-            }
-
-            entity_lower = entity_name.lower()
-            if entity_lower in translations:
-                variants.extend(translations[entity_lower])
-
-            return list(set(variants))
+            return [entity_name.lower()]
 
         try:
-            # Use LLM to get translations
-            translation_prompt = f"""
-            Provide translations and common variants for this entity name in German and English:
+            # Use LLM to generate search variants without any language assumptions
+            variant_prompt = f"""
+            Generate search variants for this entity to find it in a knowledge database.
+            The database may contain entities in any language or domain-specific terminology.
 
             Entity: "{entity_name}"
 
-            Return a simple list of variants separated by commas, including:
-            - German translation
-            - English translation
+            Provide variants that would help find this entity, including:
+            - Alternative names or spellings
+            - Scientific/technical terms
             - Common abbreviations
-            - Scientific names if applicable
+            - Synonyms in any language
+            - Related terms that might be used to refer to the same concept
 
-            Example for "Mercury": mercury, quecksilber, hg
-            Example for "Vitamin C": vitamin c, ascorbic acid, ascorbinsäure
-
-            Return only the comma-separated list, nothing else.
+            Return only a comma-separated list of search terms, nothing else.
+            Example: mercury, quecksilber, hg, mercurius
             """
 
-            response = await self.llm_client.generate(translation_prompt)
+            response = await self.llm_client.generate(variant_prompt)
 
-            # Parse the response
+            # Parse the response and include original
+            variants = [entity_name.lower()]
             if response:
                 new_variants = [v.strip().lower() for v in response.split(',') if v.strip()]
                 variants.extend(new_variants)
 
-        except Exception as e:
-            self._log("Warning", f"Could not get translations for {entity_name}: {e}")
+            # Remove duplicates
+            return list(set([v for v in variants if v.strip()]))
 
-        # Remove duplicates and return
-        return list(set([v.lower() for v in variants if v.strip()]))
+        except Exception as e:
+            self._log("Warning", f"Could not get search variants for {entity_name}: {e}")
+            return [entity_name.lower()]
+
+    async def _generate_search_queries(self, prompt: str) -> List[str]:
+        """Generate multiple search queries for vector search using LLM."""
+        if not self.llm_client:
+            return [prompt]
+
+        try:
+            query_prompt = f"""
+            Generate 3-5 different search queries to find relevant documents for this question.
+            Create variations that would capture different aspects and terminology.
+
+            Original question: "{prompt}"
+
+            Generate queries that:
+            - Use different terminology or synonyms
+            - Focus on different aspects of the question
+            - Include technical and common language variants
+            - Cover related concepts that might contain relevant information
+
+            Return only the search queries, one per line, nothing else.
+            """
+
+            response = await self.llm_client.generate(query_prompt)
+
+            queries = [prompt]  # Always include original
+            if response:
+                new_queries = [q.strip() for q in response.split('\n') if q.strip()]
+                queries.extend(new_queries)
+
+            return queries[:5]  # Limit to 5 queries max
+
+        except Exception as e:
+            self._log("Warning", f"Could not generate search queries: {e}")
+            return [prompt]
 
     async def _navigate_graph_agentic(self, entities: List[Dict[str, Any]], prompt: str) -> Dict[str, Any]:
         """Navigate the knowledge graph using agentic approach."""
@@ -421,8 +433,8 @@ class AgenticContextGenerator:
             for entity_info in entities[:5]:  # Limit to first 5 entities
                 entity_name = entity_info.get("normalized_name", entity_info.get("name", ""))
 
-                # Get translations and variants for multilingual matching
-                entity_variants = await self._get_entity_translations(entity_name)
+                # Get search variants using LLM
+                entity_variants = await self._get_entity_search_variants(entity_name)
                 self._log("Debug", f"Searching for entity '{entity_name}' with variants: {entity_variants}")
 
                 # Search for matching entities in the graph using all variants
@@ -477,23 +489,30 @@ class AgenticContextGenerator:
                         }
                         graph_data["relations"].append(graph_relation)
             
-            # Use LLM to analyze reasoning paths
+            # Use LLM to analyze reasoning paths with domain intelligence
             if graph_data["entities"] or graph_data["relations"]:
                 reasoning_prompt = f"""
-                Analyze the following knowledge graph data to identify reasoning paths that help answer this query:
-                
+                Analyze this knowledge graph data to identify the most important reasoning paths for answering the query.
+                Focus on domain-specific relationships and logical connections.
+
                 Query: "{prompt}"
-                
-                Graph Entities:
+
+                Available Entities:
                 {chr(10).join([f"- {e['name']} ({', '.join(e['types'])}): {e['description']}" for e in graph_data['entities'][:10]])}
-                
-                Graph Relations:
+
+                Available Relationships:
                 {chr(10).join([f"- {r['source']} --{r['relation']}--> {r['target']}: {r['description']}" for r in graph_data['relations'][:15]])}
-                
-                Identify 2-3 key reasoning paths that connect the entities and help answer the query.
-                For each path, explain how it contributes to understanding the query.
+
+                Task:
+                1. Identify the domain and what type of reasoning is needed
+                2. Find the most relevant entity chains that connect to the query
+                3. Highlight relationships that provide direct or indirect answers
+                4. Note any missing connections that would be needed for a complete answer
+
+                Provide 2-3 key reasoning paths that best support answering the query.
+                For each path, explain its relevance and what it contributes to the answer.
                 """
-                
+
                 reasoning_analysis = await self.llm_client.generate(reasoning_prompt)
                 graph_data["reasoning_paths"].append(reasoning_analysis)
         
@@ -503,24 +522,41 @@ class AgenticContextGenerator:
         return graph_data
 
     async def _search_vector_documents(self, prompt: str) -> List[Dict[str, Any]]:
-        """Search for relevant documents using vector similarity."""
+        """Search for relevant documents using vector similarity with LLM-enhanced queries."""
         chunks = []
 
         if not self.qdrant_storage:
             return chunks
 
         try:
-            # Search for relevant documents
-            vector_results = await self.qdrant_storage.search_entities(prompt, limit=10)
+            # Generate enhanced search queries using LLM
+            search_queries = await self._generate_search_queries(prompt)
 
-            for result in vector_results:
-                chunk = {
-                    "content": result.get("content", ""),
-                    "metadata": result.get("metadata", {}),
-                    "score": result.get("score", 0.0),
-                    "source": result.get("metadata", {}).get("source", "unknown")
-                }
-                chunks.append(chunk)
+            all_results = []
+            for query in search_queries:
+                try:
+                    vector_results = await self.qdrant_storage.search_entities(query, limit=5)
+                    all_results.extend(vector_results)
+                except Exception as e:
+                    self._log("Warning", f"Vector search failed for query '{query}': {e}")
+
+            # Deduplicate and process results
+            seen_content = set()
+            for result in all_results:
+                content = result.get("content", "")
+                if content and content not in seen_content:
+                    seen_content.add(content)
+                    chunk = {
+                        "content": content,
+                        "metadata": result.get("metadata", {}),
+                        "score": result.get("score", 0.0),
+                        "source": result.get("metadata", {}).get("source", "unknown")
+                    }
+                    chunks.append(chunk)
+
+            # Sort by score and limit
+            chunks.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+            return chunks[:10]
 
         except Exception as e:
             self._log("Warning", f"Vector search failed: {e}")
@@ -537,28 +573,30 @@ class AgenticContextGenerator:
             return (entity_score + graph_score + vector_score) / 3.0
 
         try:
-            # Use LLM to evaluate context quality
+            # Use LLM to evaluate context quality with domain awareness
             scoring_prompt = f"""
             Evaluate the quality and relevance of this context for answering the given query.
+            Consider the domain and what type of information would be needed for a complete answer.
 
             Query: "{prompt}"
 
-            Context Summary:
+            Available Context:
             - Extracted entities: {len(result.extracted_entities)}
-            - Graph entities: {len(result.graph_entities)}
-            - Graph relations: {len(result.graph_relations)}
-            - Vector chunks: {len(result.vector_chunks)}
-            - Reasoning paths: {len(result.reasoning_paths)}
+            - Graph entities found: {len(result.graph_entities)}
+            - Graph relationships: {len(result.graph_relations)}
+            - Document chunks: {len(result.vector_chunks)}
 
-            Sample entities: {[e.get('name', '') for e in result.extracted_entities[:3]]}
-            Sample relations: {[f"{r.get('source', '')} -> {r.get('target', '')}" for r in result.graph_relations[:3]]}
+            Key entities identified: {[e.get('name', '') for e in result.extracted_entities[:5]]}
+            Sample graph connections: {[f"{r.get('source', '')} -> {r.get('target', '')}" for r in result.graph_relations[:5]]}
 
-            Rate the context quality on a scale of 0.0 to 1.0 considering:
-            1. Relevance to the query
-            2. Completeness of information
-            3. Quality of entity extraction
-            4. Usefulness of graph connections
-            5. Document relevance
+            Assess the context quality (0.0 to 1.0) based on:
+            1. Domain relevance - Does the context match the query domain?
+            2. Entity coverage - Are the key entities for this query represented?
+            3. Relationship richness - Are there meaningful connections between entities?
+            4. Information completeness - Is there enough detail to answer the query?
+            5. Source quality - Are the information sources appropriate for this domain?
+
+            Consider what would be needed for a complete answer in this domain and how well the current context supports that.
 
             Return only a single number between 0.0 and 1.0.
             """
@@ -621,22 +659,29 @@ class AgenticContextGenerator:
             if result.reasoning_paths:
                 reasoning_context = "\n\nREASONING ANALYSIS:\n" + "\n".join(result.reasoning_paths)
 
-            # Generate final response
+            # Generate final response with domain awareness
             synthesis_prompt = f"""
-            You are a knowledgeable assistant. Provide a comprehensive, accurate answer to this query using the provided context.
-            Start directly with the main content without preambles or conversational phrases.
+            Analyze the query domain and provide a comprehensive answer using the available context.
+            Adapt your response style and depth to match the domain requirements.
 
             Query: "{prompt}"
-
             Context Quality Score: {result.context_score:.2f}/1.0
+
+            Available Information:
             {entity_context}
             {graph_context}
             {vector_context}
             {reasoning_context}
 
-            Synthesize all available information to provide a detailed, well-reasoned response.
-            If the context is insufficient, clearly state what information is missing.
-            Be direct and factual in your response.
+            Instructions:
+            1. Identify the domain and what type of answer is expected
+            2. Synthesize all available information relevant to the query
+            3. If context is insufficient, specify exactly what additional information would be needed
+            4. For medical/health queries, emphasize the need for professional consultation
+            5. For technical queries, focus on accuracy and cite specific sources when available
+            6. Be direct and factual, avoiding unnecessary preambles
+
+            Provide a response that matches the domain's standards for completeness and accuracy.
             """
 
             final_response = await self.llm_client.generate(synthesis_prompt)

@@ -6,6 +6,8 @@ import structlog
 import asyncio
 import random
 import httpx
+import uuid
+from datetime import datetime
 
 from morag_reasoning import (
     RecursiveFactRetrievalRequest, RecursiveFactRetrievalResponse,
@@ -107,9 +109,13 @@ async def recursive_fact_retrieval(
     - Configurable depth limits and scoring thresholds
     - Support for custom database configurations
     """
+    query_id = str(uuid.uuid4())
+    start_time = datetime.now()
+
     try:
         logger.info(
             "Starting recursive fact retrieval",
+            query_id=query_id,
             query=request.user_query,
             max_depth=request.max_depth,
             decay_rate=request.decay_rate
@@ -128,15 +134,23 @@ async def recursive_fact_retrieval(
         for attempt in range(max_retries):
             try:
                 response = await perform_retrieval()
-                
+
+                # Update response with query_id if not already set
+                if not hasattr(response, 'query_id') or not response.query_id:
+                    response.query_id = query_id
+
+                processing_time = (datetime.now() - start_time).total_seconds() * 1000
+                if hasattr(response, 'processing_time_ms'):
+                    response.processing_time_ms = processing_time
+
                 logger.info(
                     "Recursive fact retrieval completed",
                     query_id=response.query_id,
-                    total_facts=len(response.final_facts),
-                    confidence=response.confidence_score,
-                    processing_time_ms=response.processing_time_ms
+                    total_facts=len(response.final_facts) if hasattr(response, 'final_facts') else 0,
+                    confidence=getattr(response, 'confidence_score', 0.0),
+                    processing_time_ms=processing_time
                 )
-                
+
                 return response
                 
             except httpx.HTTPStatusError as e:
@@ -177,7 +191,9 @@ async def recursive_fact_retrieval(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Recursive fact retrieval failed", error=str(e))
+        logger.error("Recursive fact retrieval failed",
+                    query_id=query_id,
+                    error=str(e))
         raise HTTPException(
             status_code=500,
             detail=f"Recursive fact retrieval failed: {str(e)}"
