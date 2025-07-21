@@ -25,6 +25,7 @@ dependencies = [
     "nltk>=3.7",
     "spacy>=3.4.0",
     "langdetect>=1.0.9",
+    "markitdown>=0.0.1a2",
 
     "structlog>=23.0.0",
 ]

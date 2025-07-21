@@ -164,6 +164,38 @@ class Settings(BaseSettings):
         description="Maximum tokens per chunk for embedding models"
     )
 
+    # Markitdown Configuration
+    markitdown_enabled: bool = Field(
+        default=True,
+        alias="MORAG_MARKITDOWN_ENABLED",
+        description="Enable markitdown for document conversion"
+    )
+    markitdown_use_azure_doc_intel: bool = Field(
+        default=False,
+        alias="MORAG_MARKITDOWN_USE_AZURE_DOC_INTEL",
+        description="Use Azure Document Intelligence with markitdown"
+    )
+    markitdown_azure_endpoint: Optional[str] = Field(
+        default=None,
+        alias="MORAG_MARKITDOWN_AZURE_ENDPOINT",
+        description="Azure Document Intelligence endpoint URL"
+    )
+    markitdown_use_llm_image_description: bool = Field(
+        default=False,
+        alias="MORAG_MARKITDOWN_USE_LLM_IMAGE_DESCRIPTION",
+        description="Use LLM for image descriptions in markitdown"
+    )
+    markitdown_llm_model: str = Field(
+        default="gpt-4o",
+        alias="MORAG_MARKITDOWN_LLM_MODEL",
+        description="LLM model for image descriptions"
+    )
+    markitdown_enable_plugins: bool = Field(
+        default=False,
+        alias="MORAG_MARKITDOWN_ENABLE_PLUGINS",
+        description="Enable markitdown plugins"
+    )
+
     # Page-based chunking configuration
     default_chunking_strategy: str = Field(
         default="page",
