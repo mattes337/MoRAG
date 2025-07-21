@@ -337,6 +337,74 @@ class AgenticContextGenerator:
         
         return entities
     
+    async def _get_entity_translations(self, entity_name: str) -> List[str]:
+        """Get translations and variants of an entity name for multilingual matching."""
+        variants = [entity_name]
+
+        if not self.llm_client:
+            # Basic hardcoded translations for common substances
+            translations = {
+                'mercury': ['quecksilber', 'hg'],
+                'quecksilber': ['mercury', 'hg'],
+                'aluminum': ['aluminium'],
+                'aluminium': ['aluminum', 'al'],
+                'iron': ['eisen', 'fe'],
+                'eisen': ['iron', 'fe'],
+                'zinc': ['zink', 'zn'],
+                'zink': ['zinc', 'zn'],
+                'lead': ['blei', 'pb'],
+                'blei': ['lead', 'pb'],
+                'copper': ['kupfer', 'cu'],
+                'kupfer': ['copper', 'cu'],
+                'silver': ['silber', 'ag'],
+                'silber': ['silver', 'ag'],
+                'gold': ['gold', 'au'],
+                'calcium': ['kalzium', 'calcium', 'ca'],
+                'kalzium': ['calcium', 'ca'],
+                'magnesium': ['magnesium', 'mg'],
+                'vitamin': ['vitamin'],
+                'protein': ['protein', 'eiweiß'],
+                'eiweiß': ['protein'],
+            }
+
+            entity_lower = entity_name.lower()
+            if entity_lower in translations:
+                variants.extend(translations[entity_lower])
+
+            return list(set(variants))
+
+        try:
+            # Use LLM to get translations
+            translation_prompt = f"""
+            Provide translations and common variants for this entity name in German and English:
+
+            Entity: "{entity_name}"
+
+            Return a simple list of variants separated by commas, including:
+            - German translation
+            - English translation
+            - Common abbreviations
+            - Scientific names if applicable
+
+            Example for "Mercury": mercury, quecksilber, hg
+            Example for "Vitamin C": vitamin c, ascorbic acid, ascorbinsäure
+
+            Return only the comma-separated list, nothing else.
+            """
+
+            response = await self.llm_client.generate(translation_prompt)
+
+            # Parse the response
+            if response:
+                new_variants = [v.strip().lower() for v in response.split(',') if v.strip()]
+                variants.extend(new_variants)
+
+        except Exception as e:
+            self._log("Warning", f"Could not get translations for {entity_name}: {e}")
+
+        # Remove duplicates and return
+        return list(set([v.lower() for v in variants if v.strip()]))
+
     async def _navigate_graph_agentic(self, entities: List[Dict[str, Any]], prompt: str) -> Dict[str, Any]:
         """Navigate the knowledge graph using agentic approach."""
         graph_data = {
@@ -352,20 +420,27 @@ class AgenticContextGenerator:
             # For each extracted entity, find related entities and relations
             for entity_info in entities[:5]:  # Limit to first 5 entities
                 entity_name = entity_info.get("normalized_name", entity_info.get("name", ""))
-                
-                # Search for matching entities in the graph
+
+                # Get translations and variants for multilingual matching
+                entity_variants = await self._get_entity_translations(entity_name)
+                self._log("Debug", f"Searching for entity '{entity_name}' with variants: {entity_variants}")
+
+                # Search for matching entities in the graph using all variants
                 entity_query = """
                 MATCH (e)
-                WHERE toLower(e.name) CONTAINS toLower($entity_name)
-                   OR toLower($entity_name) CONTAINS toLower(e.name)
+                WHERE any(variant IN $entity_variants WHERE
+                    toLower(e.name) CONTAINS toLower(variant)
+                    OR toLower(variant) CONTAINS toLower(e.name)
+                    OR toLower(e.name) = toLower(variant)
+                )
                 RETURN e.name as name, labels(e) as types,
                        coalesce(e.description, '') as description,
                        e.name as id
                 LIMIT 10
                 """
-                
+
                 entity_results = await self.neo4j_storage._execute_query(
-                    entity_query, {"entity_name": entity_name}
+                    entity_query, {"entity_variants": entity_variants}
                 )
                 
                 for record in entity_results:
@@ -706,8 +781,12 @@ async def main():
 
             if result.graph_relations:
                 print(f"\n🔗 Graph Relations ({len(result.graph_relations)}):")
-                for relation in result.graph_relations[:5]:
+                # Show more relations when we have good results
+                max_relations = 10 if len(result.graph_relations) > 20 else 5
+                for relation in result.graph_relations[:max_relations]:
                     print(f"  - {relation.get('source', '')} --{relation.get('relation', '')}--> {relation.get('target', '')}")
+                if len(result.graph_relations) > max_relations:
+                    print(f"  ... and {len(result.graph_relations) - max_relations} more relations")
 
         print(f"\n{'='*80}")
         print("🎯 FINAL RESPONSE")
