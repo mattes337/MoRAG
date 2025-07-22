@@ -1,7 +1,6 @@
 """FastAPI server for MoRAG system."""
 
 import asyncio
-import base64
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 import json
@@ -11,11 +10,19 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 import structlog
 
 from morag.api import MoRAGAPI
+from morag.api.models import (
+    ProcessURLRequest, ProcessBatchRequest, SearchRequest, ProcessingResultResponse,
+    IngestFileRequest, IngestURLRequest, IngestBatchRequest, IngestRemoteFileRequest,
+    ProcessRemoteFileRequest, IngestResponse, BatchIngestResponse, TaskStatus
+)
+from morag.api.utils import (
+    download_remote_file, normalize_content_type, normalize_processing_result,
+    encode_thumbnails_to_base64
+)
 from morag_services import ServiceConfig
 from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
 from morag_graph.models.database_config import DatabaseType, DatabaseConfig
@@ -31,10 +38,7 @@ from morag.endpoints import remote_jobs_router
 logger = structlog.get_logger(__name__)
 
 
-
-
-
-async def download_remote_file(file_path: str, temp_dir: Path) -> Path:
+# Note: Utility functions have been moved to morag.api.utils module
     """Download a remote file (HTTP/HTTPS URL or UNC path) to local temp directory.
 
     Args:

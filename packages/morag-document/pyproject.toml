@@ -15,19 +15,14 @@ requires-python = ">=3.8"
 dependencies = [
     "morag-core>=0.1.0",
     "morag-embedding>=0.1.0",
-    "pypdf>=3.0.0",
-    "docling>=2.7.0",
-    "python-docx>=1.1.2",
-    "openpyxl>=3.1.5",
-    "python-pptx>=0.6.21",
-    "beautifulsoup4>=4.11.0",
-    "markdown>=3.4.0",
-    "nltk>=3.7",
-    "spacy>=3.4.0",
-    "langdetect>=1.0.9",
+    # Core document conversion
     "markitdown>=0.0.1a2",
-
-    "structlog>=23.0.0",
+    # Supporting libraries
+    "beautifulsoup4>=4.11.0",  # Used for HTML processing
+    "nltk>=3.7",  # Used for NLP processing
+    "spacy>=3.4.0",  # Used for advanced NLP
+    "langdetect>=1.0.9",  # Used for language detection
+    "structlog>=23.0.0",  # Logging
 ]
 
 [project.optional-dependencies]

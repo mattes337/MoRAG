@@ -28,19 +28,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install document-specific dependencies
+# Note: Most document processing is now handled by markitdown
 RUN pip install \
-    pypdf2 \
-    pymupdf \
-    python-docx \
-    python-pptx \
-    openpyxl \
-    xlrd \
     beautifulsoup4 \
     lxml \
-    markdown \
-    pdfplumber \
-    tabula-py \
-    camelot-py[cv] \
     pytesseract \
     pillow
 
