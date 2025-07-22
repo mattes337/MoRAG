@@ -2,24 +2,24 @@
 
 ## Overview
 
-The MoRAG Document Processing package is a component of the Modular Retrieval Augmented Generation (MoRAG) system. It provides functionality for processing various document types, extracting text, and preparing documents for embedding and retrieval.
+The MoRAG Document Processing package is a component of the Modular Retrieval Augmented Generation (MoRAG) system. It provides functionality for processing various document types, extracting text, and preparing documents for embedding and retrieval using Microsoft's markitdown framework for optimal LLM compatibility.
 
 ## Features
 
-- Support for multiple document formats:
-  - PDF documents
-  - Microsoft Word documents (.docx)
-  - Microsoft Excel spreadsheets (.xlsx)
-  - Microsoft PowerPoint presentations (.pptx)
-  - HTML documents
-  - Markdown files
-  - Plain text files
-  - CSV files
-- Text extraction with metadata preservation
-- Document chunking with configurable strategies
-- Language detection
-- Quality assessment
-- Document summarization
+- **Universal Document Support** (47+ formats) powered by markitdown:
+  - **Document Formats**: PDF, Word (DOC/DOCX), Excel (XLS/XLSX), PowerPoint (PPT/PPTX)
+  - **Text Formats**: HTML, Markdown, Plain text, CSV, JSON, XML
+  - **Image Formats**: JPG, PNG, GIF, BMP, TIFF, WEBP, SVG (with OCR)
+  - **Audio Formats**: MP3, WAV, M4A, FLAC, AAC, OGG (with transcription)
+  - **Video Formats**: MP4, AVI, MOV, MKV, WEBM, FLV, WMV (with transcription)
+  - **Archive Formats**: ZIP, EPUB, TAR, GZ, RAR, 7Z
+- **LLM-Optimized Output**: Markdown format optimized for language models
+- **High-Quality Conversion**: Advanced table extraction, OCR, structure preservation
+- **Async Processing**: Full asynchronous support for scalable processing
+- **Quality Assessment**: Automated quality scoring and validation
+- **Flexible Chunking**: Configurable chunking strategies for optimal retrieval
+- **Language Detection**: Automatic language detection and processing
+- **Metadata Extraction**: Comprehensive metadata preservation
 
 ## Installation
 
@@ -65,21 +65,47 @@ for i, chunk in enumerate(document.chunks):
     print(f"Chunk {i}: {chunk.content[:100]}...")
 ```
 
+## Architecture
+
+### Markitdown Integration
+
+This package uses Microsoft's markitdown framework as the core conversion engine, providing:
+
+- **Universal Format Support**: Single framework handles 47+ file formats
+- **LLM-Optimized Output**: Native Markdown output optimized for language models
+- **High Quality**: Advanced table extraction, OCR, and structure preservation
+- **Token Efficiency**: Markdown conventions are highly token-efficient for LLMs
+- **Reliability**: Production-ready framework from Microsoft
+
+### Converter Architecture
+
+| Format Category | Converter | Supported Formats | Features |
+|----------------|-----------|-------------------|----------|
+| Documents | PDFConverter | PDF | Advanced table extraction, OCR |
+| Documents | WordConverter | DOC, DOCX | Structure preservation, tables |
+| Documents | ExcelConverter | XLS, XLSX | Spreadsheet to markdown conversion |
+| Documents | PresentationConverter | PPT, PPTX | Slide content extraction |
+| Text | TextConverter | TXT, MD, HTML, HTM | Encoding detection, structure preservation |
+| Archives | ArchiveConverter | ZIP, EPUB, TAR, GZ, RAR, 7Z | Content extraction |
+| Images | ImageConverter | JPG, PNG, GIF, BMP, TIFF, WEBP, SVG | OCR, metadata extraction |
+| Audio | AudioConverter | MP3, WAV, M4A, FLAC, AAC, OGG | Transcription, metadata |
+| Video | VideoConverter | MP4, AVI, MOV, MKV, WEBM, FLV, WMV | Audio extraction, transcription |
+
 ## Dependencies
 
-- morag-core: Core components for MoRAG
-- morag-embedding: Embedding service for MoRAG
-- pypdf: PDF processing
-- python-docx: Word document processing
-- openpyxl: Excel spreadsheet processing
-- python-pptx: PowerPoint presentation processing
-- beautifulsoup4: HTML processing
-- markdown: Markdown processing
-- nltk: Natural language processing
-- spacy: Advanced NLP capabilities
-- langdetect: Language detection
-- aiohttp: Asynchronous HTTP client/server
-- structlog: Structured logging
+### Core Dependencies
+- **markitdown**: Universal document conversion framework
+- **morag-core**: Core components and interfaces
+- **morag-image**: Image processing capabilities
+- **morag-audio**: Audio processing and transcription
+- **morag-video**: Video processing and transcription
+
+### Supporting Libraries
+- **structlog**: Structured logging
+- **spacy**: Advanced NLP capabilities
+- **langdetect**: Language detection
+- **beautifulsoup4**: HTML processing (via markitdown)
+- **aiofiles**: Asynchronous file operations
 
 ## License
 
