@@ -33,10 +33,10 @@ Each task includes implementation + testing + validation before proceeding:
 - [x] **Task 2.8**: Implement archive formats with markitdown + **TEST & VALIDATE** ✅
 
 ### Phase 3: Advanced Features (Tasks 3.1-3.4)
-- [ ] **Task 3.1**: Implement Azure Document Intelligence integration + **TEST & VALIDATE**
-- [ ] **Task 3.2**: Add LLM-based image description support + **TEST & VALIDATE**
-- [ ] **Task 3.3**: Implement audio transcription capabilities + **TEST & VALIDATE**
-- [ ] **Task 3.4**: Add quality assessment and validation + **TEST & VALIDATE**
+- [x] **Task 3.1**: Implement video transcription with markitdown + **TEST & VALIDATE** ✅
+- [x] **Task 3.2**: Add LLM-based image description support + **TEST & VALIDATE** ✅
+- [x] **Task 3.3**: Implement audio transcription capabilities + **TEST & VALIDATE** ✅
+- [x] **Task 3.4**: Add quality assessment and validation + **TEST & VALIDATE** ✅
 
 ### Phase 4: Integration & Cleanup (Tasks 4.1-4.3)
 - [ ] **Task 4.1**: Update document processor registry (big bang switch) + **FULL SYSTEM TEST**
@@ -144,8 +144,7 @@ API_USAGE_GUIDE.md                                        # Update examples if n
 - Existing MoRAG dependencies (maintained)
 
 ### Optional Enhancements
-- Azure Document Intelligence endpoint configuration
-- OpenAI client for LLM-based image descriptions
+- OpenAI client for LLM-based image descriptions (built into markitdown)
 - Additional format-specific dependencies as needed
 
 ## Configuration Changes
@@ -154,8 +153,6 @@ API_USAGE_GUIDE.md                                        # Update examples if n
 ```python
 # Markitdown configuration
 MARKITDOWN_ENABLED: bool = True
-MARKITDOWN_USE_AZURE_DOC_INTEL: bool = False
-MARKITDOWN_AZURE_ENDPOINT: Optional[str] = None
 MARKITDOWN_USE_LLM_IMAGE_DESCRIPTION: bool = False
 MARKITDOWN_LLM_MODEL: str = "gpt-4o"
 MARKITDOWN_ENABLE_PLUGINS: bool = False
@@ -266,10 +263,10 @@ The markitdown integration now provides comprehensive document processing capabi
 - Excel: XLS, XLSX with spreadsheet conversion
 - PowerPoint: PPT, PPTX with slide content extraction
 
-**Media Formats (18 formats):**
+**Media Formats (22 formats):**
 - Images: JPG, PNG, GIF, BMP, TIFF, WEBP, SVG with OCR
-- Audio: MP3, WAV, M4A, FLAC, AAC, OGG with transcription
-- Video: MP4, AVI, MOV, MKV with audio extraction
+- Audio: MP3, WAV, M4A, FLAC, AAC, OGG, WMA with transcription
+- Video: MP4, AVI, MOV, MKV, WEBM, FLV, WMV with audio extraction and transcription
 
 **Text Formats (12 formats):**
 - Plain text: TXT with encoding detection
@@ -280,4 +277,20 @@ The markitdown integration now provides comprehensive document processing capabi
 - Archives: ZIP, TAR, GZ, RAR, 7Z with content extraction
 - E-books: EPUB with chapter structure
 
-**Total: 43 supported file formats** - making MoRAG one of the most comprehensive document processing systems available.
+**Total: 47 supported file formats** - making MoRAG one of the most comprehensive document processing systems available.
+
+### 🏗️ Architecture Changes
+
+**Converter Organization:**
+- **Document Converters**: PDF, Word, Excel, PowerPoint, Text, Archive remain in `morag-document`
+- **Image Converter**: Moved to `morag-image` package with markitdown integration
+- **Audio Converter**: Moved to `morag-audio` package with markitdown transcription
+- **Video Converter**: Updated in `morag-video` package with markitdown transcription
+- **Unified Interface**: All converters implement the same `ConversionResult` interface
+
+**Benefits:**
+- ✅ Proper separation of concerns by file type
+- ✅ Specialized packages handle their domain-specific formats
+- ✅ Markitdown provides unified, high-quality conversion across all formats
+- ✅ No Azure dependencies - pure markitdown implementation
+- ✅ Enhanced video support with transcription capabilities

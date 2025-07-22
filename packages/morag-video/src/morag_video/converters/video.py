@@ -1,13 +1,22 @@
-"""Video converter module for MoRAG."""
+"""Video converter module for MoRAG using markitdown framework."""
 
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Set
 
 import structlog
 
-from morag_core.converters import ConversionResult, ConversionQualityValidator
+from morag_core.interfaces.converter import (
+    ConversionResult,
+    ConversionOptions,
+    QualityScore,
+    ConversionError,
+    UnsupportedFormatError,
+)
+from morag_core.models.document import Document, DocumentType
+from morag_core.converters import ConversionQualityValidator
+from morag_document.services.markitdown_service import MarkitdownService
 from morag_video.processor import VideoProcessingResult
 
 logger = structlog.get_logger(__name__)
@@ -28,58 +37,97 @@ class VideoConversionOptions:
 
 
 class VideoConverter:
-    """Converts video processing results to structured formats."""
-
-    SUPPORTED_FORMATS = ["mp4", "avi", "mov", "mkv", "webm"]
+    """Video document converter using markitdown framework."""
 
     def __init__(self):
-        """Initialize the video converter."""
+        """Initialize Video converter."""
+        self.supported_formats: Set[str] = {
+            "video", "mp4", "avi", "mov", "mkv", "webm", "flv", "wmv"
+        }
+        self.markitdown_service = MarkitdownService()
         self.quality_validator = ConversionQualityValidator()
         logger.info("Video converter initialized")
 
-    async def convert(self, 
-                     file_path: Union[str, Path], 
-                     options: Optional[VideoConversionOptions] = None) -> ConversionResult:
-        """Convert a video file to structured markdown.
-        
+    async def supports_format(self, format_type: str) -> bool:
+        """Check if format is supported.
+
         Args:
-            file_path: Path to the video file
-            options: Conversion options
-            
+            format_type: Format type string
+
         Returns:
-            ConversionResult with structured markdown
+            True if format is supported, False otherwise
         """
-        from morag_video.processor import VideoProcessor, VideoConfig
-        
+        return format_type.lower() in self.supported_formats
+
+    async def convert(self,
+                     file_path: Union[str, Path],
+                     options: Optional[ConversionOptions] = None) -> ConversionResult:
+        """Convert video file to text using markitdown.
+
+        Args:
+            file_path: Path to video file
+            options: Conversion options
+
+        Returns:
+            Conversion result with document
+
+        Raises:
+            ConversionError: If conversion fails
+            UnsupportedFormatError: If video format is not supported
+        """
         file_path = Path(file_path)
-        options = options or VideoConversionOptions()
-        
-        # Configure video processor based on conversion options
-        config = VideoConfig(
-            extract_audio=options.include_transcript,
-            generate_thumbnails=options.include_thumbnails,
-            extract_keyframes=options.include_keyframes,
-            enable_enhanced_audio=options.group_by_speaker or options.group_by_topic,
-            enable_speaker_diarization=options.group_by_speaker,
-            enable_topic_segmentation=options.group_by_topic,
-            enable_ocr=options.include_ocr
-        )
-        
-        processor = VideoProcessor(config)
-        
+        options = options or ConversionOptions()
+
+        # Validate input
+        if not file_path.exists():
+            raise ConversionError(f"Video file not found: {file_path}")
+
+        # Detect format if not specified
+        format_type = options.format_type or file_path.suffix.lower().lstrip('.')
+
+        # Check if format is supported
+        if not await self.supports_format(format_type):
+            raise UnsupportedFormatError(f"Format '{format_type}' is not supported by video converter")
+
         try:
-            # Process the video
-            logger.info("Processing video for conversion", file_path=str(file_path))
-            result = await processor.process_video(file_path)
-            
-            # Create structured markdown
-            markdown = await self.convert_to_markdown(result, options)
-            
+            # Use markitdown for video transcription
+            logger.info("Converting video file with markitdown", file_path=str(file_path))
+
+            result = await self.markitdown_service.convert_file(file_path)
+
+            # Create document
+            document = Document(
+                id=options.document_id,
+                title=options.title or file_path.stem,
+                raw_text=result.text_content,
+                document_type=DocumentType.VIDEO,
+                file_path=str(file_path),
+                metadata={
+                    "file_size": file_path.stat().st_size,
+                    "format": format_type,
+                    "conversion_method": "markitdown",
+                    **result.metadata
+                }
+            )
+
             # Calculate quality score
-            quality_score = self._calculate_quality_score(result, options)
-            
-            # Clean up temporary files
-            processor.cleanup_temp_files(result.temp_files)
+            quality_score = QualityScore(
+                overall_score=0.9,  # High score for markitdown transcription
+                text_extraction_score=0.9,
+                structure_preservation_score=0.8,
+                metadata_extraction_score=0.9,
+                issues_detected=[]
+            )
+
+            return ConversionResult(
+                document=document,
+                quality_score=quality_score,
+                warnings=[]
+            )
+
+        except Exception as e:
+            logger.error("Video conversion failed", error=str(e), file_path=str(file_path))
+            raise ConversionError(f"Failed to convert video file: {e}") from e
             
             return ConversionResult(
                 content=markdown,

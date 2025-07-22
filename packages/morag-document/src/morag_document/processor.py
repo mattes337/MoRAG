@@ -28,9 +28,12 @@ from .converters.word import WordConverter
 from .converters.text import TextConverter
 from .converters.excel import ExcelConverter
 from .converters.presentation import PresentationConverter
-from .converters.image import ImageConverter
-from .converters.audio import AudioConverter
 from .converters.archive import ArchiveConverter
+
+# Import converters from specialized packages
+from morag_image.converters.image_converter import ImageConverter
+from morag_audio.converters.audio_converter import AudioConverter
+from morag_video.converters.video import VideoConverter
 
 logger = structlog.get_logger(__name__)
 
@@ -84,6 +87,11 @@ class DocumentProcessor(BaseProcessor):
         archive_converter = ArchiveConverter()
         for format_type in archive_converter.supported_formats:
             self.converters[format_type] = archive_converter
+
+        # Register Video converter (markitdown-based)
+        video_converter = VideoConverter()
+        for format_type in video_converter.supported_formats:
+            self.converters[format_type] = video_converter
 
     async def process(self, config: ProcessingConfig) -> ProcessingResult:
         """Process document.

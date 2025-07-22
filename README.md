@@ -53,7 +53,12 @@ packages/
 - **Multiple Interfaces**: REST API, CLI, and Python API
 
 ### 📊 Processing Capabilities
-- **Universal Document Conversion**: Unified framework for converting any document format to structured markdown
+- **Universal Document Conversion**: Unified framework powered by markitdown for converting 47+ file formats to structured markdown
+- **Specialized Converters**: Domain-specific converters organized by file type:
+  - **Documents**: PDF, Word, Excel, PowerPoint, Text, Archives (in `morag-document`)
+  - **Images**: JPG, PNG, GIF, BMP, TIFF, WEBP, SVG with OCR (in `morag-image`)
+  - **Audio**: MP3, WAV, M4A, FLAC, AAC, OGG with transcription (in `morag-audio`)
+  - **Video**: MP4, AVI, MOV, MKV, WEBM with transcription (in `morag-video`)
 - **Intelligent Chunking**: Multiple strategies (semantic, page, sentence, paragraph) with AI-powered boundary detection
 - **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
 - **Batch Embedding**: Optimized batch processing using Gemini's native batch API for 4x faster embeddings

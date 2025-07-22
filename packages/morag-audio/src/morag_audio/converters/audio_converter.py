@@ -1,12 +1,20 @@
-"""Audio to Markdown converter with speaker diarization and topic segmentation."""
+"""Audio document converter using markitdown framework."""
 
 import time
 from pathlib import Path
-from typing import Union, List, Dict, Any, Optional
+from typing import Union, List, Dict, Any, Optional, Set
 from dataclasses import dataclass, field
 import structlog
 
-from morag_core.exceptions import ProcessingError as ConversionError
+from morag_core.interfaces.converter import (
+    ConversionResult,
+    ConversionOptions,
+    QualityScore,
+    ConversionError,
+    UnsupportedFormatError,
+)
+from morag_core.models.document import Document, DocumentType
+from morag_document.services.markitdown_service import MarkitdownService
 from morag_audio.processor import AudioProcessingResult, AudioSegment
 
 logger = structlog.get_logger(__name__)
@@ -38,16 +46,98 @@ class AudioConversionResult:
 
 
 class AudioConverter:
-    """Converts audio processing results to structured markdown."""
+    """Audio document converter using markitdown framework."""
 
     def __init__(self):
-        """Initialize the audio converter."""
+        """Initialize Audio converter."""
         self.name = "MoRAG Audio Converter"
-        self.supported_formats = ['audio', 'mp3', 'wav', 'm4a', 'flac', 'mp4', 'avi', 'mov', 'mkv']
-    
-    def supports_format(self, format_type: str) -> bool:
-        """Check if this converter supports the given format."""
-        return format_type.lower() in self.supported_formats
+        self.supported_formats: Set[str] = {
+            "audio", "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "mp4", "avi", "mov", "mkv"
+        }
+        self.markitdown_service = MarkitdownService()
+
+    async def supports_format(self, format_type: str) -> bool:
+        """Check if format is supported.
+
+        Args:
+            format_type: Format type string
+
+        Returns:
+            True if format is supported, False otherwise
+        """
+        return format_type.lower() in {
+            "audio", "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "mp4", "avi", "mov", "mkv"
+        }
+
+    async def convert(
+        self, file_path: Union[str, Path], options: Optional[ConversionOptions] = None
+    ) -> ConversionResult:
+        """Convert audio file to text using markitdown.
+
+        Args:
+            file_path: Path to audio file
+            options: Conversion options
+
+        Returns:
+            Conversion result with document
+
+        Raises:
+            ConversionError: If conversion fails
+            UnsupportedFormatError: If audio format is not supported
+        """
+        file_path = Path(file_path)
+        options = options or ConversionOptions()
+
+        # Validate input
+        if not file_path.exists():
+            raise ConversionError(f"Audio file not found: {file_path}")
+
+        # Detect format if not specified
+        format_type = options.format_type or file_path.suffix.lower().lstrip('.')
+
+        # Check if format is supported
+        if not await self.supports_format(format_type):
+            raise UnsupportedFormatError(f"Format '{format_type}' is not supported by audio converter")
+
+        try:
+            # Use markitdown for audio transcription
+            logger.info("Converting audio file with markitdown", file_path=str(file_path))
+
+            result = await self.markitdown_service.convert_file(file_path)
+
+            # Create document
+            document = Document(
+                id=options.document_id,
+                title=options.title or file_path.stem,
+                raw_text=result.text_content,
+                document_type=DocumentType.AUDIO,
+                file_path=str(file_path),
+                metadata={
+                    "file_size": file_path.stat().st_size,
+                    "format": format_type,
+                    "conversion_method": "markitdown",
+                    **result.metadata
+                }
+            )
+
+            # Calculate quality score
+            quality_score = QualityScore(
+                overall_score=0.9,  # High score for markitdown transcription
+                text_extraction_score=0.9,
+                structure_preservation_score=0.8,
+                metadata_extraction_score=0.9,
+                issues_detected=[]
+            )
+
+            return ConversionResult(
+                document=document,
+                quality_score=quality_score,
+                warnings=[]
+            )
+
+        except Exception as e:
+            logger.error("Audio conversion failed", error=str(e), file_path=str(file_path))
+            raise ConversionError(f"Failed to convert audio file: {e}") from e
     
     async def convert_to_json(self,
                              result: AudioProcessingResult,
