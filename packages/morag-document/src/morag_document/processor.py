@@ -32,8 +32,10 @@ from .converters.archive import ArchiveConverter
 
 # Import converters from specialized packages
 from morag_image.converters.image_converter import ImageConverter
-from morag_audio.converters.audio_converter import AudioConverter
-from morag_video.converters.video import VideoConverter
+# AudioConverter import moved to avoid circular dependency
+# from morag_audio.converters.audio_converter import AudioConverter
+# VideoConverter import moved to avoid circular dependency
+# from morag_video.converters.video import VideoConverter
 
 logger = structlog.get_logger(__name__)
 
@@ -78,20 +80,28 @@ class DocumentProcessor(BaseProcessor):
         for format_type in image_converter.supported_formats:
             self.converters[format_type] = image_converter
 
-        # Register Audio converter (markitdown-based)
-        audio_converter = AudioConverter()
-        for format_type in audio_converter.supported_formats:
-            self.converters[format_type] = audio_converter
+        # Register Audio converter (markitdown-based) - optional to avoid circular import
+        try:
+            from morag_audio.converters.audio_converter import AudioConverter
+            audio_converter = AudioConverter()
+            for format_type in audio_converter.supported_formats:
+                self.converters[format_type] = audio_converter
+        except ImportError:
+            logger.warning("Audio converter not available - morag_audio package not installed")
 
         # Register Archive converter (markitdown-based)
         archive_converter = ArchiveConverter()
         for format_type in archive_converter.supported_formats:
             self.converters[format_type] = archive_converter
 
-        # Register Video converter (markitdown-based)
-        video_converter = VideoConverter()
-        for format_type in video_converter.supported_formats:
-            self.converters[format_type] = video_converter
+        # Register Video converter (markitdown-based) - optional to avoid circular import
+        try:
+            from morag_video.converters.video import VideoConverter
+            video_converter = VideoConverter()
+            for format_type in video_converter.supported_formats:
+                self.converters[format_type] = video_converter
+        except ImportError:
+            logger.warning("Video converter not available - morag_video package not installed")
 
     async def process(self, config: ProcessingConfig) -> ProcessingResult:
         """Process document.

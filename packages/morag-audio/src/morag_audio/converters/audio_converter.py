@@ -2,7 +2,7 @@
 
 import time
 from pathlib import Path
-from typing import Union, List, Dict, Any, Optional, Set
+from typing import Union, List, Dict, Any, Optional, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
 import structlog
 
@@ -15,7 +15,8 @@ from morag_core.interfaces.converter import (
 )
 from morag_core.models.document import Document, DocumentType
 from morag_document.services.markitdown_service import MarkitdownService
-from morag_audio.processor import AudioProcessingResult, AudioSegment
+if TYPE_CHECKING:
+    from morag_audio.processor import AudioProcessingResult, AudioSegment
 
 logger = structlog.get_logger(__name__)
 
@@ -140,7 +141,7 @@ class AudioConverter:
             raise ConversionError(f"Failed to convert audio file: {e}") from e
     
     async def convert_to_json(self,
-                             result: AudioProcessingResult,
+                             result: "AudioProcessingResult",
                              options: Optional[AudioConversionOptions] = None) -> Dict[str, Any]:
         """Convert audio processing result to structured JSON.
 
@@ -229,7 +230,7 @@ class AudioConverter:
             }
 
     async def convert_to_markdown(self,
-                                result: AudioProcessingResult,
+                                result: "AudioProcessingResult",
                                 options: Optional[AudioConversionOptions] = None) -> AudioConversionResult:
         """Convert audio processing result to structured markdown.
         
@@ -361,7 +362,7 @@ class AudioConverter:
                 error_message=str(e)
             )
     
-    def _format_segments(self, segments: List[AudioSegment], options: AudioConversionOptions) -> List[str]:
+    def _format_segments(self, segments: List["AudioSegment"], options: AudioConversionOptions) -> List[str]:
         """Format segments into markdown lines."""
         markdown_lines = []
 

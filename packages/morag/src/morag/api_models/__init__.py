@@ -1,5 +1,8 @@
 """MoRAG API module."""
 
+# MoRAGAPI import moved to avoid circular import
+# from ..api import MoRAGAPI
+
 from .models import (
     ProcessURLRequest,
     ProcessBatchRequest,

@@ -3,7 +3,7 @@
 import structlog
 from fastapi import APIRouter, HTTPException
 
-from morag.api.models import TaskStatus
+from morag.api_models.models import TaskStatus
 from morag.worker import celery_app
 
 logger = structlog.get_logger(__name__)

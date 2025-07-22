@@ -8,8 +8,8 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 
 from morag.api import MoRAGAPI
-from morag.api.models import ProcessURLRequest, ProcessBatchRequest, ProcessingResultResponse, ProcessRemoteFileRequest
-from morag.api.utils import download_remote_file, normalize_content_type, normalize_processing_result, encode_thumbnails_to_base64
+from morag.api_models.models import ProcessURLRequest, ProcessBatchRequest, ProcessingResultResponse, ProcessRemoteFileRequest
+from morag.api_models.utils import download_remote_file, normalize_content_type, normalize_processing_result, encode_thumbnails_to_base64
 from morag.utils.file_upload import get_upload_handler, FileUploadError
 
 logger = structlog.get_logger(__name__)

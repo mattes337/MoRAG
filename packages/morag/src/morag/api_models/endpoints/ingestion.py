@@ -6,11 +6,11 @@ import structlog
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
 
-from morag.api.models import (
+from morag.api_models.models import (
     IngestFileRequest, IngestURLRequest, IngestBatchRequest, 
     IngestRemoteFileRequest, IngestResponse, BatchIngestResponse
 )
-from morag.api.utils import download_remote_file, normalize_content_type
+from morag.api_models.utils import download_remote_file, normalize_content_type
 from morag.utils.file_upload import get_upload_handler, FileUploadError
 from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
 

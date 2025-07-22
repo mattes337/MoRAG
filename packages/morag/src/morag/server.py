@@ -14,12 +14,12 @@ from contextlib import asynccontextmanager
 import structlog
 
 from morag.api import MoRAGAPI
-from morag.api.models import (
+from morag.api_models.models import (
     ProcessURLRequest, ProcessBatchRequest, SearchRequest, ProcessingResultResponse,
     IngestFileRequest, IngestURLRequest, IngestBatchRequest, IngestRemoteFileRequest,
     ProcessRemoteFileRequest, IngestResponse, BatchIngestResponse, TaskStatus
 )
-from morag.api.utils import (
+from morag.api_models.utils import (
     download_remote_file, normalize_content_type, normalize_processing_result,
     encode_thumbnails_to_base64
 )
@@ -34,11 +34,11 @@ from morag.worker import (
 )
 from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
 from morag.endpoints import remote_jobs_router
-from morag.api.endpoints.processing import setup_processing_endpoints
-from morag.api.endpoints.search import setup_search_endpoints
-from morag.api.endpoints.ingestion import setup_ingestion_endpoints
-from morag.api.endpoints.tasks import setup_task_endpoints, setup_task_management_endpoints
-from morag.api.endpoints.admin import setup_admin_endpoints
+from morag.api_models.endpoints.processing import setup_processing_endpoints
+from morag.api_models.endpoints.search import setup_search_endpoints
+from morag.api_models.endpoints.ingestion import setup_ingestion_endpoints
+from morag.api_models.endpoints.tasks import setup_task_endpoints, setup_task_management_endpoints
+from morag.api_models.endpoints.admin import setup_admin_endpoints
 
 logger = structlog.get_logger(__name__)
 

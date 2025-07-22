@@ -3,7 +3,7 @@
 import structlog
 from fastapi import APIRouter, HTTPException
 
-from morag.api.models import SearchRequest
+from morag.api_models.models import SearchRequest
 
 logger = structlog.get_logger(__name__)
 

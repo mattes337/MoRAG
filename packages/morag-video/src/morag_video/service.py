@@ -11,7 +11,8 @@ from morag_core.utils import ensure_directory as ensure_directory_exists
 from morag_embedding import EmbeddingService
 
 from morag_video.processor import VideoProcessor, VideoConfig, VideoProcessingResult, VideoProcessingError
-from morag_video.converters import VideoConverter, VideoConversionOptions
+# VideoConverter import moved to avoid circular dependency
+# from morag_video.converters import VideoConverter, VideoConversionOptions
 
 logger = structlog.get_logger(__name__)
 
@@ -41,7 +42,7 @@ class VideoService:
         """
         self.config = config or VideoConfig()
         self.processor = VideoProcessor(self.config)
-        self.converter = VideoConverter()
+        self._converter = None  # Lazy initialization to avoid circular import
         self.embedding_service = embedding_service
         
         # Set up output directory
@@ -58,6 +59,14 @@ class VideoService:
                    enable_enhanced_audio=self.config.enable_enhanced_audio,
                    enable_ocr=self.config.enable_ocr,
                    has_embedding_service=self.embedding_service is not None)
+
+    @property
+    def converter(self):
+        """Lazy initialization of VideoConverter to avoid circular import."""
+        if self._converter is None:
+            from morag_video.converters import VideoConverter
+            self._converter = VideoConverter()
+        return self._converter
 
     async def health_check(self) -> Dict[str, Any]:
         """Check service health.
