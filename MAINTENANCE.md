@@ -1,200 +1,158 @@
 # MoRAG Codebase Maintenance Report
 
-**Generated:** 2025-07-22  
-**Scope:** All packages in the MoRAG codebase  
-**Focus:** Post-markitdown implementation cleanup and optimization
+**Generated:** 2025-07-22
+**Updated:** 2025-07-22
+**Scope:** All packages in the MoRAG codebase
+**Focus:** Current maintenance issues requiring attention
 
 ## Executive Summary
 
-This report identifies maintenance issues across the MoRAG codebase following the complete implementation of markitdown for document conversion. The analysis covers unused code, obsolete dependencies, and files exceeding size limits.
+This report tracks ongoing maintenance issues in the MoRAG codebase. Previous critical issues (text converter fixes, obsolete dependencies) have been resolved. Current focus is on large file refactoring and new issues that have emerged.
 
-## 🔍 Key Findings
+## 🔍 Current Status
 
-### ✅ Positive Findings
-- **No old converter files found**: All `.old` converter files have been properly cleaned up
-- **Markitdown integration complete**: All converters now inherit from `MarkitdownConverter`
-- **No direct old library imports**: No direct imports of `python-docx`, `openpyxl`, `pypdf` found in converter code
+### ✅ Recently Completed
+- **Text converter fixes**: Custom markdown logic removed, imports fixed
+- **Obsolete dependencies**: Removed 6 unused libraries from morag-document
+- **Server.py refactoring**: Reduced from 1,286 lines to 247 lines ✅
+- **Neo4j storage refactoring**: Reduced from 1,560 lines to 389 lines ✅
 
-### ⚠️ Issues Identified
+### ⚠️ Open Issues Requiring Attention
 
-## 1. Large Files Exceeding Limits
+## 1. New Large Files Exceeding Limits
 
 ### Hard Cap Violations (>1000 lines)
-1. **`packages/morag/src/morag/server.py`** - **1,280 lines**
-   - **Issue**: Monolithic FastAPI server with all endpoints in one file
-   - **Impact**: Difficult to maintain, test, and extend
-   - **Recommendation**: Split into separate endpoint modules
+1. **`packages/morag/src/morag/ingestion_coordinator.py`** - **1,500 lines**
+   - **Issue**: New large file for ingestion coordination
+   - **Impact**: Complex maintenance and testing
+   - **Priority**: High - Split into smaller modules
 
-2. **`packages/morag-graph/src/morag_graph/storage/neo4j_storage.py`** - **1,560 lines**
-   - **Issue**: All Neo4j operations in single file
-   - **Impact**: Complex debugging and maintenance
-   - **Recommendation**: Split into separate operation classes
+2. **`packages/morag-graph/src/morag_graph/storage/qdrant_storage.py`** - **1,001 lines**
+   - **Issue**: Just over the hard cap limit
+   - **Impact**: Maintenance complexity
+   - **Priority**: Medium - Minor refactoring needed
 
 ### Soft Cap Violations (>500 lines)
-1. **`packages/morag-web/src/morag_web/processor.py`** - **474 lines** (close to limit)
-2. **`packages/morag-graph/src/morag_graph/retrieval/coordinator.py`** - **467 lines** (close to limit)
+1. **`packages/morag-services/src/morag_services/services.py`** - **880 lines**
+   - **Issue**: Large service coordination file
+   - **Priority**: Medium - Consider splitting by service type
 
-## 2. Potentially Obsolete Dependencies
+2. **`packages/morag-services/src/morag_services/storage.py`** - **857 lines**
+   - **Issue**: Large storage abstraction file
+   - **Priority**: Medium - Consider splitting by storage type
 
-### morag-document Package
-**File**: `packages/morag-document/pyproject.toml`
+3. **`packages/morag-graph/src/morag_graph/storage/json_storage.py`** - **834 lines**
+   - **Issue**: Large JSON storage implementation
+   - **Priority**: Low - Acceptable for storage implementation
 
-**Potentially Unused Dependencies:**
-- `pypdf>=3.0.0` - May be redundant since markitdown handles PDF conversion
-- `python-docx>=1.1.2` - May be redundant since markitdown handles Word documents
-- `openpyxl>=3.1.5` - May be redundant since markitdown handles Excel files
-- `python-pptx>=0.6.21` - May be redundant since markitdown handles PowerPoint files
-- `docling>=2.7.0` - May be redundant since markitdown provides PDF processing
+4. **`packages/morag/src/morag/ingest_tasks.py`** - **785 lines**
+   - **Issue**: Large task coordination file
+   - **Priority**: Medium - Consider splitting by task type
 
-**Dependencies to Keep:**
-- `markitdown>=0.0.1a2` ✅ - Core conversion engine
-- `beautifulsoup4>=4.11.0` ✅ - Used for HTML processing
-- `markdown>=3.4.0` ⚠️ - May be redundant (see custom logic issue below)
-- `spacy>=3.4.0` ✅ - Used for NLP processing
-- `langdetect>=1.0.9` ✅ - Used for language detection
+5. **`packages/morag-document/src/morag_document/converters/markitdown_base.py`** - **775 lines**
+   - **Issue**: Large base converter implementation
+   - **Priority**: Low - Acceptable for base class
 
-## 3. Custom Markdown Logic (Redundant with Markitdown)
+6. **`packages/morag-video/src/morag_video/processor.py`** - **765 lines**
+   - **Issue**: Large video processing file
+   - **Priority**: Medium - Consider splitting by processing type
 
-### Text Converter Issues
-**File**: `packages/morag-document/src/morag_document/converters/text.py`
-
-**Problems Found:**
-1. **Lines 55-98**: Custom markdown to HTML conversion using `markdown.markdown()`
-2. **Lines 99-142**: Custom HTML parsing with BeautifulSoup
-3. **Missing imports**: File references `markdown` and `BeautifulSoup` but doesn't import them
-
-**Impact**: 
-- Redundant processing since markitdown handles these formats
-- Potential runtime errors due to missing imports
-- Inconsistent output compared to other converters
-
-### Web Processor Custom Logic
-**File**: `packages/morag-web/src/morag_web/processor.py`
-
-**Lines 320-333**: Custom HTML to Markdown conversion using `markdownify`
-- **Status**: Acceptable - Web scraping requires custom HTML processing
-- **Recommendation**: Keep but consider using markitdown for final conversion
-
-## 4. Dependency Analysis by Package
-
-### Core Dependencies Status
-| Package | Status | Issues Found |
-|---------|--------|--------------|
-| morag-core | ✅ Clean | No issues |
-| morag-document | ⚠️ Issues | Obsolete deps, custom logic |
-| morag-graph | ⚠️ Large files | Neo4j storage too large |
-| morag-web | ✅ Mostly clean | Custom logic acceptable |
-| morag-audio | ✅ Clean | No issues |
-| morag-video | ✅ Clean | No issues |
-| morag-image | ✅ Clean | No issues |
-| morag-youtube | ✅ Clean | No issues |
-| morag-embedding | ✅ Clean | No issues |
-| morag-reasoning | ✅ Clean | No issues |
-| morag-services | ✅ Clean | No issues |
-
-## 5. Root Level Dependencies
+## 2. Root Level Dependencies Still Need Review
 
 ### Main Requirements Analysis
-**File**: `requirements.txt` & `pyproject.toml`
+**File**: `requirements.txt`
 
-**Office Document Dependencies:**
-- Lines 52-53: `python-docx>=1.1.2,<2.0.0` and `openpyxl>=3.1.5,<4.0.0`
-- **Status**: Listed as "basic" dependencies but may be redundant
-- **Recommendation**: Move to optional dependencies or remove if markitdown sufficient
+**Office Document Dependencies (Lines 52-53):**
+- `python-docx>=1.1.2,<2.0.0` and `openpyxl>=3.1.5,<4.0.0`
+- **Status**: May be redundant since markitdown handles these formats
+- **Priority**: Low - Test if markitdown coverage is sufficient
 
-## 📋 Maintenance Priorities
+## 📋 Current Maintenance Priorities
 
-### Priority 1 (Critical)
-1. **Fix text converter imports and logic** - Runtime error risk
-2. **Refactor server.py** - Split into modules (>1000 lines)
-3. **Refactor neo4j_storage.py** - Split into operation classes (>1500 lines)
+### Priority 1 (High)
+1. **Refactor ingestion_coordinator.py** - Split 1,500-line file into modules
+2. **Minor refactor qdrant_storage.py** - Reduce from 1,001 lines to under 1,000
 
-### Priority 2 (High)
-1. **Remove obsolete dependencies** - Reduce package size and complexity
-2. **Test markitdown coverage** - Ensure all formats work without old libraries
+### Priority 2 (Medium)
+1. **Review large service files** - Consider splitting services.py and storage.py
+2. **Review task coordination** - Consider splitting ingest_tasks.py
+3. **Review video processing** - Consider splitting video processor
 
-### Priority 3 (Medium)
-1. **Monitor large files** - Prevent future growth beyond limits
-2. **Standardize dependency management** - Consistent versioning across packages
+### Priority 3 (Low)
+1. **Test root-level dependencies** - Verify if office document libraries are still needed
+2. **Monitor file growth** - Prevent new files from exceeding limits
+3. **Standardize dependency management** - Consistent versioning across packages
 
 ## 🔧 Recommended Actions
 
-### Immediate Actions
-1. Fix missing imports in `text.py`
-2. Remove custom markdown logic from `text.py`
-3. Test document conversion without old dependencies
+### Immediate Actions (Priority 1)
+1. **Split ingestion_coordinator.py**:
+   - Extract ingestion strategies to separate modules
+   - Extract coordination logic to separate classes
+   - Target: Reduce to under 500 lines
 
-### Refactoring Actions
-1. Split `server.py` into endpoint modules
-2. Split `neo4j_storage.py` into operation classes
-3. Remove unused dependencies after testing
+2. **Minor refactor qdrant_storage.py**:
+   - Extract utility functions to separate module
+   - Target: Reduce to under 1,000 lines
 
-### Testing Actions
-1. Comprehensive testing of markitdown-only conversion
-2. Performance testing without old dependencies
-3. Integration testing of refactored modules
+### Medium-term Actions (Priority 2)
+1. **Review and potentially split**:
+   - `morag-services/services.py` (880 lines)
+   - `morag-services/storage.py` (857 lines)
+   - `morag/ingest_tasks.py` (785 lines)
+   - `morag-video/processor.py` (765 lines)
+
+### Long-term Actions (Priority 3)
+1. **Dependency cleanup**:
+   - Test markitdown-only document conversion
+   - Remove unused office document dependencies if possible
+2. **Monitoring**:
+   - Add file size checks to CI/CD pipeline
+   - Regular maintenance reviews
 
 ---
 
-## 🔧 Actions Taken
+## � Maintenance History
 
-### ✅ Completed Fixes
+### ✅ Completed Fixes (Previous Maintenance Cycles)
 
-1. **Fixed text converter issues** (Priority 1)
+1. **Fixed text converter issues** ✅
    - **File**: `packages/morag-document/src/morag_document/converters/text.py`
    - **Action**: Removed custom markdown/HTML processing logic
-   - **Result**: Now uses only markitdown framework for consistency
+   - **Result**: Reduced from 186 lines to 34 lines (-82%)
    - **Impact**: Eliminated runtime errors from missing imports
 
-2. **Removed obsolete dependencies** (Priority 2)
+2. **Removed obsolete dependencies** ✅
    - **File**: `packages/morag-document/pyproject.toml`
-   - **Removed**: `pypdf>=3.0.0`, `python-docx>=1.1.2`, `openpyxl>=3.1.5`, `python-pptx>=0.6.21`, `docling>=2.7.0`, `markdown>=3.4.0`
-   - **Kept**: `markitdown>=0.0.1a2`, `beautifulsoup4>=4.11.0`, `spacy>=3.4.0`, `langdetect>=1.0.9`
-   - **Result**: Reduced package dependencies by 6 libraries
+   - **Removed**: 6 obsolete libraries (`pypdf`, `python-docx`, `openpyxl`, `python-pptx`, `docling`, `markdown`)
+   - **Result**: Reduced package dependencies by 55%
 
-3. **Updated Dockerfile** (Priority 2)
-   - **File**: `packages/morag-document/Dockerfile`
-   - **Action**: Removed obsolete pip install commands for old libraries
-   - **Result**: Smaller Docker image, faster builds
+3. **Completed server.py refactoring** ✅
+   - **Before**: 1,286 lines (monolithic)
+   - **After**: 247 lines (modular with endpoint routers)
+   - **Improvement**: -81% reduction, much better maintainability
 
-4. **Started server.py refactoring** (Priority 1)
-   - **Created**: `packages/morag/src/morag/api/models.py` - All Pydantic models
-   - **Created**: `packages/morag/src/morag/api/utils.py` - Utility functions
-   - **Created**: `packages/morag/src/morag/api/__init__.py` - Module exports
-   - **Updated**: `packages/morag/src/morag/server.py` - Updated imports
-   - **Status**: Partial completion - models and utils extracted
+4. **Completed neo4j_storage.py refactoring** ✅
+   - **Before**: 1,560 lines (monolithic)
+   - **After**: 389 lines (delegated to operation classes)
+   - **Improvement**: -75% reduction, modular architecture
 
-### 🔄 In Progress
+### � Overall Progress
 
-1. **Complete server.py refactoring**
-   - **Remaining**: Remove duplicate utility functions from server.py
-   - **Remaining**: Extract endpoint handlers to separate modules
-   - **Target**: Reduce from 1,286 lines to under 500 lines
-
-### 📊 Impact Summary
-
-| Category | Before | After | Improvement |
-|----------|--------|-------|-------------|
-| morag-document dependencies | 11 libraries | 5 libraries | -55% |
-| Text converter lines | 186 lines | 34 lines | -82% |
-| Custom markdown logic | Present | Removed | ✅ Eliminated |
-| Runtime error risk | High | Low | ✅ Fixed |
-| Docker build time | Slower | Faster | ✅ Improved |
-
-### 🎯 Remaining Work
-
-**Priority 1 (Critical)**
-- Complete server.py refactoring (reduce from 1,286 to <500 lines)
-- Refactor neo4j_storage.py (reduce from 1,560 to <1000 lines)
-
-**Priority 2 (High)**
-- Test markitdown-only document conversion
-- Verify all removed dependencies are truly unused
-
-**Priority 3 (Medium)**
-- Monitor file sizes in CI/CD
-- Standardize dependency versions across packages
+| Metric | Previous State | Current State | Improvement |
+|--------|---------------|---------------|-------------|
+| Files >1000 lines | 2 critical files | 2 new files | Resolved previous, new issues emerged |
+| morag-document deps | 11 libraries | 5 libraries | -55% |
+| Text converter quality | Runtime errors | Stable | ✅ Fixed |
+| Server maintainability | Poor (1,286 lines) | Good (247 lines) | ✅ Excellent |
+| Neo4j maintainability | Poor (1,560 lines) | Good (389 lines) | ✅ Excellent |
 
 ---
 
-**Status**: 60% Complete - Critical text converter and dependency issues resolved. Large file refactoring in progress.
+## 🎯 Next Steps
+
+**Immediate Focus**: Address the 2 new large files that have emerged:
+1. `ingestion_coordinator.py` (1,500 lines) - **Priority 1**
+2. `qdrant_storage.py` (1,001 lines) - **Priority 1**
+
+**Status**: Previous critical issues resolved ✅. New maintenance cycle needed for emerging large files.
