@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Union
 import structlog
 
-from morag_core.exceptions import ConversionError, UnsupportedFormatError
+from morag_core.interfaces.converter import ConversionError, UnsupportedFormatError
 from morag_core.config import get_settings
 
 logger = structlog.get_logger(__name__)

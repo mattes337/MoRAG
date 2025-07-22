@@ -7,6 +7,7 @@ from .word import WordConverter
 from .excel import ExcelConverter
 from .presentation import PresentationConverter
 from .text import TextConverter
+from .image import ImageConverter
 
 __all__ = [
     "DocumentConverter",
@@ -16,4 +17,5 @@ __all__ = [
     "ExcelConverter",
     "PresentationConverter",
     "TextConverter",
+    "ImageConverter",
 ]

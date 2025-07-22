@@ -28,6 +28,7 @@ from .converters.word import WordConverter
 from .converters.text import TextConverter
 from .converters.excel import ExcelConverter
 from .converters.presentation import PresentationConverter
+from .converters.image import ImageConverter
 
 logger = structlog.get_logger(__name__)
 
@@ -66,6 +67,11 @@ class DocumentProcessor(BaseProcessor):
         presentation_converter = PresentationConverter()
         for format_type in presentation_converter.supported_formats:
             self.converters[format_type] = presentation_converter
+
+        # Register Image converter (new markitdown capability)
+        image_converter = ImageConverter()
+        for format_type in image_converter.supported_formats:
+            self.converters[format_type] = image_converter
 
     async def process(self, config: ProcessingConfig) -> ProcessingResult:
         """Process document.

@@ -235,9 +235,9 @@ class MarkitdownConverter(BaseConverter):
             "pptx": DocumentType.POWERPOINT,
             "ppt": DocumentType.POWERPOINT,
             "txt": DocumentType.TEXT,
-            "md": DocumentType.TEXT,
-            "html": DocumentType.WEB,
-            "htm": DocumentType.WEB,
+            "md": DocumentType.MARKDOWN,
+            "html": DocumentType.HTML,
+            "htm": DocumentType.HTML,
             "jpg": DocumentType.IMAGE,
             "jpeg": DocumentType.IMAGE,
             "png": DocumentType.IMAGE,
@@ -246,7 +246,7 @@ class MarkitdownConverter(BaseConverter):
             "tiff": DocumentType.IMAGE,
             "webp": DocumentType.IMAGE,
         }
-        return format_mapping.get(format_type.lower(), DocumentType.OTHER)
+        return format_mapping.get(format_type.lower(), DocumentType.UNKNOWN)
 
     async def assess_quality(self, document: Document) -> QualityScore:
         """Assess the quality of the converted document.
