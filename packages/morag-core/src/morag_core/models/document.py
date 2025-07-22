@@ -22,6 +22,8 @@ class DocumentType(str, Enum):
     AUDIO = "audio"
     VIDEO = "video"
     IMAGE = "image"
+    ARCHIVE = "archive"
+    EBOOK = "ebook"
     URL = "url"
     UNKNOWN = "unknown"
 

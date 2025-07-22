@@ -29,6 +29,8 @@ from .converters.text import TextConverter
 from .converters.excel import ExcelConverter
 from .converters.presentation import PresentationConverter
 from .converters.image import ImageConverter
+from .converters.audio import AudioConverter
+from .converters.archive import ArchiveConverter
 
 logger = structlog.get_logger(__name__)
 
@@ -68,10 +70,20 @@ class DocumentProcessor(BaseProcessor):
         for format_type in presentation_converter.supported_formats:
             self.converters[format_type] = presentation_converter
 
-        # Register Image converter (new markitdown capability)
+        # Register Image converter (markitdown-based)
         image_converter = ImageConverter()
         for format_type in image_converter.supported_formats:
             self.converters[format_type] = image_converter
+
+        # Register Audio converter (markitdown-based)
+        audio_converter = AudioConverter()
+        for format_type in audio_converter.supported_formats:
+            self.converters[format_type] = audio_converter
+
+        # Register Archive converter (markitdown-based)
+        archive_converter = ArchiveConverter()
+        for format_type in archive_converter.supported_formats:
+            self.converters[format_type] = archive_converter
 
     async def process(self, config: ProcessingConfig) -> ProcessingResult:
         """Process document.

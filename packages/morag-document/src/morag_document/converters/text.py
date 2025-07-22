@@ -1,33 +1,35 @@
-"""Text document converter implementation."""
+"""Text document converter using markitdown."""
 
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Set
 
 import structlog
-import markdown
-from bs4 import BeautifulSoup
 
-from morag_core.interfaces.converter import (
-    ConversionOptions,
-    ConversionError,
-)
-from morag_core.models.document import Document
-
-from .base import DocumentConverter
+from .markitdown_base import MarkitdownConverter
 
 logger = structlog.get_logger(__name__)
 
 
-class TextConverter(DocumentConverter):
-    """Text document converter implementation."""
+class TextConverter(MarkitdownConverter):
+    """Text document converter using markitdown framework."""
 
     def __init__(self):
-        """Initialize text converter."""
+        """Initialize Text converter."""
         super().__init__()
-        self.supported_formats = {"text", "txt", "markdown", "md", "html", "htm"}
+        self.supported_formats: Set[str] = {"text", "txt", "markdown", "md", "html", "htm"}
 
-    async def _extract_text(self, file_path: Path, document: Document, options: ConversionOptions) -> Document:
+    async def supports_format(self, format_type: str) -> bool:
+        """Check if format is supported.
+
+        Args:
+            format_type: Format type string
+
+        Returns:
+            True if format is supported, False otherwise
+        """
+        return format_type.lower() in {"text", "txt", "markdown", "md", "html", "htm"}
+
+
         """Extract text from text document.
 
         Args:
