@@ -317,13 +317,13 @@ class IntelligentRetrievalTester:
             verbose: Whether to print verbose output
         """
         if not results.get("success"):
-            print(f"❌ Test failed: {results.get('error', 'Unknown error')}")
+            print(f"[FAIL] Test failed: {results.get('error', 'Unknown error')}")
             if "status_code" in results:
                 print(f"   Status code: {results['status_code']}")
             return
         
         data = results["data"]
-        print(f"✅ Test successful!")
+        print(f"[OK] Test successful!")
         print(f"   Query ID: {data['query_id']}")
         print(f"   Query: {data['query']}")
         print(f"   Processing time: {data['processing_time_ms']:.2f}ms")
@@ -340,7 +340,7 @@ class IntelligentRetrievalTester:
         
         # Print key facts
         if data['key_facts']:
-            print("\n📋 Key Facts:")
+            print("\n[INFO] Key Facts:")
             for i, fact in enumerate(data['key_facts'], 1):
                 print(f"   {i}. {fact['fact']}")
                 print(f"      Type: {fact['fact_type']}")
@@ -354,7 +354,7 @@ class IntelligentRetrievalTester:
         
         # Print iteration details if verbose
         if verbose and data['iterations']:
-            print("\n🔄 Iteration Details:")
+            print("\n[PROCESSING] Iteration Details:")
             for iteration in data['iterations']:
                 print(f"   Iteration {iteration['iteration']}:")
                 print(f"     Entities explored: {', '.join(iteration['entities_explored'])}")
@@ -416,7 +416,7 @@ async def main():
         # Initialize service
         print("🔧 Initializing intelligent retrieval service...")
         if not await tester.initialize():
-            print("❌ Failed to initialize service")
+            print("[FAIL] Failed to initialize service")
             return 1
 
         # Check health if requested
@@ -426,7 +426,7 @@ async def main():
             print(f"Health status: {health.get('status', 'unknown')}")
             if health.get('services'):
                 for service, status in health['services'].items():
-                    status_icon = "✅" if status else "❌"
+                    status_icon = "[OK]" if status else "[FAIL]"
                     print(f"  {status_icon} {service}: {'available' if status else 'unavailable'}")
             if health.get('error'):
                 print(f"Error: {health['error']}")

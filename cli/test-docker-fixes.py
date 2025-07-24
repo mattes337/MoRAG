@@ -29,12 +29,12 @@ def test_qdrant_health_endpoint():
         try:
             response = requests.get(f"http://localhost:6333{endpoint}", timeout=5)
             if response.status_code == 200:
-                print(f"✅ Qdrant {endpoint} endpoint working (status: {response.status_code})")
+                print(f"[OK] Qdrant {endpoint} endpoint working (status: {response.status_code})")
                 return True
             else:
-                print(f"❌ Qdrant {endpoint} endpoint failed (status: {response.status_code})")
+                print(f"[FAIL] Qdrant {endpoint} endpoint failed (status: {response.status_code})")
         except requests.exceptions.RequestException as e:
-            print(f"❌ Qdrant {endpoint} endpoint error: {e}")
+            print(f"[FAIL] Qdrant {endpoint} endpoint error: {e}")
     
     return False
 
@@ -64,18 +64,18 @@ def test_docker_compose_health():
             
             if 'qdrant' in name.lower():
                 if health == 'healthy':
-                    print(f"✅ {name} is healthy")
+                    print(f"[OK] {name} is healthy")
                 else:
-                    print(f"❌ {name} health check failed: {health}")
+                    print(f"[FAIL] {name} health check failed: {health}")
                     return False
         
         return True
         
     except subprocess.CalledProcessError as e:
-        print(f"❌ Docker compose command failed: {e}")
+        print(f"[FAIL] Docker compose command failed: {e}")
         return False
     except json.JSONDecodeError as e:
-        print(f"❌ Failed to parse docker-compose output: {e}")
+        print(f"[FAIL] Failed to parse docker-compose output: {e}")
         return False
 
 def test_api_health():
@@ -86,7 +86,7 @@ def test_api_health():
         response = requests.get("http://localhost:8000/health", timeout=10)
         if response.status_code == 200:
             health_data = response.json()
-            print(f"✅ MoRAG API is healthy")
+            print(f"[OK] MoRAG API is healthy")
             
             # Check Qdrant status in API response
             if 'services' in health_data and 'qdrant' in health_data['services']:
@@ -94,20 +94,20 @@ def test_api_health():
                 print(f"  Qdrant status via API: {qdrant_status}")
                 
                 if qdrant_status.get('status') == 'healthy':
-                    print("✅ Qdrant is healthy via API")
+                    print("[OK] Qdrant is healthy via API")
                     return True
                 else:
-                    print("❌ Qdrant is not healthy via API")
+                    print("[FAIL] Qdrant is not healthy via API")
                     return False
             else:
-                print("⚠️  No Qdrant status in API response")
+                print("[WARN]  No Qdrant status in API response")
                 return True
         else:
-            print(f"❌ MoRAG API health check failed (status: {response.status_code})")
+            print(f"[FAIL] MoRAG API health check failed (status: {response.status_code})")
             return False
             
     except requests.exceptions.RequestException as e:
-        print(f"❌ MoRAG API health check error: {e}")
+        print(f"[FAIL] MoRAG API health check error: {e}")
         return False
 
 def test_whisper_initialization():
@@ -120,17 +120,17 @@ def test_whisper_initialization():
         response = requests.get("http://localhost:8000/audio/models", timeout=10)
         
         if response.status_code == 200:
-            print("✅ Audio service is accessible")
+            print("[OK] Audio service is accessible")
             return True
         elif response.status_code == 404:
-            print("⚠️  Audio models endpoint not found (this is OK)")
+            print("[WARN]  Audio models endpoint not found (this is OK)")
             return True
         else:
-            print(f"❌ Audio service error (status: {response.status_code})")
+            print(f"[FAIL] Audio service error (status: {response.status_code})")
             return False
             
     except requests.exceptions.RequestException as e:
-        print(f"❌ Audio service test error: {e}")
+        print(f"[FAIL] Audio service test error: {e}")
         return False
 
 def main():
@@ -148,7 +148,7 @@ def main():
     results = []
     
     for test_name, test_func in tests:
-        print(f"\n📋 Running: {test_name}")
+        print(f"\n[INFO] Running: {test_name}")
         print("-" * 30)
         
         try:
@@ -156,12 +156,12 @@ def main():
             results.append((test_name, result))
             
             if result:
-                print(f"✅ {test_name}: PASSED")
+                print(f"[OK] {test_name}: PASSED")
             else:
-                print(f"❌ {test_name}: FAILED")
+                print(f"[FAIL] {test_name}: FAILED")
                 
         except Exception as e:
-            print(f"💥 {test_name}: ERROR - {e}")
+            print(f"[ERROR] {test_name}: ERROR - {e}")
             results.append((test_name, False))
     
     # Summary
@@ -173,16 +173,16 @@ def main():
     total = len(results)
     
     for test_name, result in results:
-        status = "✅ PASSED" if result else "❌ FAILED"
+        status = "[OK] PASSED" if result else "[FAIL] FAILED"
         print(f"{test_name}: {status}")
     
     print(f"\nOverall: {passed}/{total} tests passed")
     
     if passed == total:
-        print("🎉 All tests passed! Docker fixes are working correctly.")
+        print("[SUCCESS] All tests passed! Docker fixes are working correctly.")
         return 0
     else:
-        print("⚠️  Some tests failed. Check the output above for details.")
+        print("[WARN]  Some tests failed. Check the output above for details.")
         return 1
 
 if __name__ == "__main__":

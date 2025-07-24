@@ -56,13 +56,13 @@ def test_imports():
     for package, items in packages:
         try:
             exec(f"from {package} import {items}")
-            print(f"✅ {package}: {items}")
+            print(f"[OK] {package}: {items}")
             results[package] = True
         except ImportError as e:
-            print(f"❌ {package}: {e}")
+            print(f"[FAIL] {package}: {e}")
             results[package] = False
         except Exception as e:
-            print(f"⚠️  {package}: {e}")
+            print(f"[WARN] {package}: {e}")
             results[package] = False
     
     return results
@@ -78,12 +78,12 @@ def test_basic_functionality():
         
         # Test ServiceConfig creation
         config = ServiceConfig()
-        print("✅ ServiceConfig creation successful")
-        
+        print("[OK] ServiceConfig creation successful")
+
         # Test ProcessingConfig creation
         proc_config = ProcessingConfig()
-        print("✅ ProcessingConfig creation successful")
-        
+        print("[OK] ProcessingConfig creation successful")
+
         # Test ContentType enum
         content_types = [
             ContentType.DOCUMENT,
@@ -93,12 +93,12 @@ def test_basic_functionality():
             ContentType.WEB,
             ContentType.YOUTUBE
         ]
-        print(f"✅ ContentType enum has {len(content_types)} types")
+        print(f"[OK] ContentType enum has {len(content_types)} types")
         
         return True
         
     except Exception as e:
-        print(f"❌ Basic functionality test failed: {e}")
+        print(f"[FAIL] Basic functionality test failed: {e}")
         return False
 
 
@@ -119,10 +119,10 @@ def test_sample_files():
         path = Path(file_path)
         if path.exists():
             size_mb = path.stat().st_size / 1024 / 1024
-            print(f"✅ {path.name} ({size_mb:.2f} MB)")
+            print(f"[OK] {path.name} ({size_mb:.2f} MB)")
             found_files.append(file_path)
         else:
-            print(f"❌ {file_path} not found")
+            print(f"[FAIL] {file_path} not found")
     
     return found_files
 
@@ -142,9 +142,9 @@ def test_docker_files():
     for file_path in docker_files:
         path = Path(file_path)
         if path.exists():
-            print(f"✅ {file_path}")
+            print(f"[OK] {file_path}")
         else:
-            print(f"❌ {file_path} not found")
+            print(f"[FAIL] {file_path} not found")
 
 
 def test_environment():
@@ -154,9 +154,9 @@ def test_environment():
     # Check for .env file
     env_file = Path(".env")
     if env_file.exists():
-        print("✅ .env file found")
+        print("[OK] .env file found")
     else:
-        print("❌ .env file not found (copy from .env.example)")
+        print("[FAIL] .env file not found (copy from .env.example)")
 
     # Check for required environment variables
     required_vars = ["GEMINI_API_KEY"]
@@ -165,20 +165,20 @@ def test_environment():
     for var in required_vars:
         value = os.getenv(var)
         if value:
-            print(f"✅ {var} is set")
+            print(f"[OK] {var} is set")
         else:
             # Check for backward compatibility
             if var == "GEMINI_API_KEY" and os.getenv("GOOGLE_API_KEY"):
-                print(f"⚠️  {var} not set, but GOOGLE_API_KEY found (consider updating)")
+                print(f"[WARN]  {var} not set, but GOOGLE_API_KEY found (consider updating)")
             else:
-                print(f"❌ {var} is not set")
+                print(f"[FAIL] {var} is not set")
 
     for var in optional_vars:
         value = os.getenv(var)
         if value:
-            print(f"✅ {var} is set ({value})")
+            print(f"[OK] {var} is set ({value})")
         else:
-            print(f"ℹ️  {var} not set (using defaults)")
+            print(f"[INFO]  {var} not set (using defaults)")
 
 
 def test_documentation():
@@ -197,9 +197,9 @@ def test_documentation():
     for file_path in doc_files:
         path = Path(file_path)
         if path.exists():
-            print(f"✅ {file_path}")
+            print(f"[OK] {file_path}")
         else:
-            print(f"❌ {file_path} not found")
+            print(f"[FAIL] {file_path} not found")
 
 
 def main():
@@ -230,12 +230,12 @@ def main():
     total_packages = len(import_results)
     successful_imports = sum(import_results.values())
     
-    print(f"📦 Package Imports: {successful_imports}/{total_packages} successful")
-    print(f"⚙️  Basic Functionality: {'✅ PASS' if basic_test else '❌ FAIL'}")
-    print(f"📁 Sample Files: {len(sample_files)} found")
+    print(f"[PACKAGE] Package Imports: {successful_imports}/{total_packages} successful")
+    print(f"[CONFIG]  Basic Functionality: {'[OK] PASS' if basic_test else '[FAIL] FAIL'}")
+    print(f"[FILES] Sample Files: {len(sample_files)} found")
     
     if successful_imports >= total_packages * 0.8 and basic_test:
-        print("\n🎉 MoRAG system appears to be working correctly!")
+        print("\n[SUCCESS] MoRAG system appears to be working correctly!")
         print("\nNext steps:")
         print("1. Try individual test scripts:")
         print("   python tests/cli/test-audio.py uploads/Sprache.mp3")
@@ -246,7 +246,7 @@ def main():
         print("   http://localhost:8000/docs")
         return True
     else:
-        print("\n⚠️  MoRAG system has some issues.")
+        print("\n[WARN]  MoRAG system has some issues.")
         print("Check the error messages above and ensure all packages are installed.")
         return False
 
@@ -256,10 +256,10 @@ if __name__ == "__main__":
         success = main()
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

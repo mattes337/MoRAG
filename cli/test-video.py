@@ -48,7 +48,7 @@ load_dotenv(env_path, override=True)
 try:
     from morag_video import VideoProcessor, VideoConfig
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-video")
@@ -72,7 +72,7 @@ def print_section(title: str):
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
-    print(f"{spaces}📋 {key}: {value}")
+    print(f"{spaces}[INFO] {key}: {value}")
 
 
 async def test_video_processing(video_file: Path, generate_thumbnails: bool = False,
@@ -81,7 +81,7 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
     print_header("MoRAG Video Processing Test")
 
     if not video_file.exists():
-        print(f"❌ Error: Video file not found: {video_file}")
+        print(f"[FAIL] Error: Video file not found: {video_file}")
         return False
 
     print_result("Input File", str(video_file))
@@ -102,26 +102,26 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
             enable_ocr=enable_ocr,
             language=language  # Pass language for consistent processing
         )
-        print_result("Video Configuration", "✅ Created successfully")
-        print_result("Generate Thumbnails", "✅ Enabled" if generate_thumbnails else "❌ Disabled")
+        print_result("Video Configuration", "[OK] Created successfully")
+        print_result("Generate Thumbnails", "[OK] Enabled" if generate_thumbnails else "[FAIL] Disabled")
         print_result("Thumbnail Count", str(thumbnail_count) if generate_thumbnails else "N/A")
-        print_result("OCR Enabled", "✅ Enabled" if enable_ocr else "❌ Disabled")
+        print_result("OCR Enabled", "[OK] Enabled" if enable_ocr else "[FAIL] Disabled")
 
         # Initialize video processor
         processor = VideoProcessor(config)
-        print_result("Video Processor", "✅ Initialized successfully")
+        print_result("Video Processor", "[OK] Initialized successfully")
 
         print_section("Processing Video File")
-        print("🔄 Starting video processing...")
+        print("[PROCESSING] Starting video processing...")
         print("   This may take a while for large videos...")
 
         # Process the video file
         result = await processor.process_video(video_file)
 
-        print("✅ Video processing completed successfully!")
+        print("[OK] Video processing completed successfully!")
 
         print_section("Processing Results")
-        print_result("Status", "✅ Success")
+        print_result("Status", "[OK] Success")
         print_result("Processing Time", f"{result.processing_time:.2f} seconds")
 
         print_section("Video Metadata")
@@ -131,12 +131,12 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
         print_result("FPS", f"{metadata.fps:.2f}")
         print_result("Codec", metadata.codec)
         print_result("Format", metadata.format)
-        print_result("Has Audio", "✅ Yes" if metadata.has_audio else "❌ No")
+        print_result("Has Audio", "[OK] Yes" if metadata.has_audio else "[FAIL] No")
         print_result("File Size", f"{metadata.file_size / 1024 / 1024:.2f} MB")
 
         if result.audio_path:
             print_section("Audio Processing")
-            print_result("Audio Extracted", "✅ Yes")
+            print_result("Audio Extracted", "[OK] Yes")
             print_result("Audio Path", str(result.audio_path))
 
             if result.audio_processing_result:
@@ -164,7 +164,7 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
 
         if result.ocr_results:
             print_section("OCR Results")
-            print_result("OCR Performed", "✅ Yes")
+            print_result("OCR Performed", "[OK] Yes")
             print_result("OCR Data", json.dumps(result.ocr_results, indent=2))
 
         # Save results to file
@@ -203,7 +203,7 @@ async def test_video_processing(video_file: Path, generate_thumbnails: bool = Fa
         return True
 
     except Exception as e:
-        print(f"❌ Error during video processing: {e}")
+        print(f"[FAIL] Error during video processing: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -236,7 +236,7 @@ async def test_video_ingestion(
     print_header("MoRAG Video Ingestion Test")
 
     if not video_file.exists():
-        print(f"❌ Error: Video file not found: {video_file}")
+        print(f"[FAIL] Error: Video file not found: {video_file}")
         return False
 
     print_result("Input File", str(video_file))
@@ -245,8 +245,8 @@ async def test_video_ingestion(
     print_result("Webhook URL", webhook_url or "None")
     print_result("Metadata", json.dumps(metadata, indent=2) if metadata else "None")
     print_result("Language", language or "Auto-detect")
-    print_result("Use Qdrant", "✅ Yes" if use_qdrant else "❌ No")
-    print_result("Use Neo4j", "✅ Yes" if use_neo4j else "❌ No")
+    print_result("Use Qdrant", "[OK] Yes" if use_qdrant else "[FAIL] No")
+    print_result("Use Neo4j", "[OK] Yes" if use_neo4j else "[FAIL] No")
 
     try:
         from morag.api import MoRAGAPI
@@ -254,7 +254,7 @@ async def test_video_ingestion(
         import uuid
 
         print_section("Processing Video File")
-        print("🔄 Starting video processing...")
+        print("[PROCESSING] Starting video processing...")
         print("   This may take a while for large videos...")
 
         # Initialize the API for video processing
@@ -278,7 +278,7 @@ async def test_video_ingestion(
             print_result("Intermediate File Created", str(intermediate_file))
 
         if result.success and result.text_content:
-            print("✅ Video processing completed successfully!")
+            print("[OK] Video processing completed successfully!")
 
             print_section("Ingesting to Databases")
             print("📊 Starting comprehensive ingestion...")
@@ -338,10 +338,10 @@ async def test_video_ingestion(
                 language=language  # Pass language for consistent extraction
             )
 
-            print("✅ Content ingested successfully!")
+            print("[OK] Content ingested successfully!")
 
             print_section("Ingestion Results")
-            print_result("Status", "✅ Success")
+            print_result("Status", "[OK] Success")
             print_result("Ingestion ID", ingestion_result['ingestion_id'])
             print_result("Document ID", ingestion_result['source_info']['document_id'])
             print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
@@ -354,7 +354,7 @@ async def test_video_ingestion(
             if 'database_results' in ingestion_result:
                 for db_type, db_result in ingestion_result['database_results'].items():
                     if db_result.get('success'):
-                        print_result(f"{db_type.title()} Storage", "✅ Success")
+                        print_result(f"{db_type.title()} Storage", "[OK] Success")
                         if db_type == 'qdrant' and 'points_stored' in db_result:
                             print_result(f"  Points Stored", str(db_result['points_stored']))
                         elif db_type == 'neo4j':
@@ -365,7 +365,7 @@ async def test_video_ingestion(
                             if 'relations_stored' in db_result:
                                 print_result(f"  Relations Stored", str(db_result['relations_stored']))
                     else:
-                        print_result(f"{db_type.title()} Storage", f"❌ Failed: {db_result.get('error', 'Unknown error')}")
+                        print_result(f"{db_type.title()} Storage", f"[FAIL] Failed: {db_result.get('error', 'Unknown error')}")
 
             if webhook_url:
                 print_result("Webhook URL", f"Would notify: {webhook_url}")
@@ -382,13 +382,13 @@ async def test_video_ingestion(
 
             return True
         else:
-            print("❌ Video processing failed!")
+            print("[FAIL] Video processing failed!")
             if result.error_message:
                 print_result("Error", result.error_message)
             return False
 
     except Exception as e:
-        print(f"❌ Error during video ingestion: {e}")
+        print(f"[FAIL] Error during video ingestion: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -458,7 +458,7 @@ Note: Video processing may take several minutes for large files.
         try:
             metadata = json.loads(args.metadata)
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in metadata: {e}")
+            print(f"[FAIL] Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
 
     # Handle intermediate file argument
@@ -466,13 +466,13 @@ Note: Video processing may take several minutes for large files.
         async def handle_intermediate_file():
             intermediate_file = Path(args.use_intermediate)
             if not intermediate_file.exists():
-                print(f"❌ Error: Intermediate file not found: {intermediate_file}")
+                print(f"[FAIL] Error: Intermediate file not found: {intermediate_file}")
                 return False
 
             try:
                 with open(intermediate_file, 'r', encoding='utf-8') as f:
                     text_content = f.read()
-                print(f"✅ Using existing intermediate file: {intermediate_file}")
+                print(f"[OK] Using existing intermediate file: {intermediate_file}")
                 print("💡 Skipping video processing, using transcription from intermediate file...")
 
                 # Create a mock processing result with the intermediate content
@@ -541,16 +541,16 @@ Note: Video processing may take several minutes for large files.
                         language=args.language
                     )
 
-                    print("✅ Content ingested successfully from intermediate file!")
-                    print(f"\n🎉 Video ingestion from intermediate file completed successfully!")
+                    print("[OK] Content ingested successfully from intermediate file!")
+                    print(f"\n[SUCCESS] Video ingestion from intermediate file completed successfully!")
                     return True
                 else:
-                    print("✅ Intermediate file loaded successfully!")
+                    print("[OK] Intermediate file loaded successfully!")
                     print(f"Content length: {len(text_content)} characters")
                     return True
 
             except Exception as e:
-                print(f"❌ Error reading intermediate file: {e}")
+                print(f"[FAIL] Error reading intermediate file: {e}")
                 return False
 
         # Run the async function
@@ -575,11 +575,11 @@ Note: Video processing may take several minutes for large files.
                 language=args.language
             ))
             if success:
-                print("\n🎉 Video ingestion test completed successfully!")
+                print("\n[SUCCESS] Video ingestion test completed successfully!")
                 print("💡 Check the .ingest_result.json and .ingest_data.json files for details.")
                 sys.exit(0)
             else:
-                print("\n💥 Video ingestion test failed!")
+                print("\n[ERROR] Video ingestion test failed!")
                 sys.exit(1)
         else:
             # Processing mode
@@ -591,16 +591,16 @@ Note: Video processing may take several minutes for large files.
                 language=args.language
             ))
             if success:
-                print("\n🎉 Video processing test completed successfully!")
+                print("\n[SUCCESS] Video processing test completed successfully!")
                 sys.exit(0)
             else:
-                print("\n💥 Video processing test failed!")
+                print("\n[ERROR] Video processing test failed!")
                 sys.exit(1)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         sys.exit(1)
 
 

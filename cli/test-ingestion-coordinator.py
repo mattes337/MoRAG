@@ -23,7 +23,7 @@ try:
     from morag.ingestion_coordinator import IngestionCoordinator, DatabaseConfig, DatabaseType
     from morag_core.models.config import ProcessingResult
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag")
@@ -78,7 +78,7 @@ async def test_ingestion_coordinator():
                 port=6333,
                 database_name='morag_documents'
             ))
-            print("✅ Qdrant database configured")
+            print("[OK] Qdrant database configured")
         
         # Add Neo4j if available and properly configured
         neo4j_uri = os.getenv('NEO4J_URI')
@@ -92,12 +92,12 @@ async def test_ingestion_coordinator():
                 password=neo4j_pass,
                 database_name=os.getenv('NEO4J_DATABASE', 'neo4j')
             ))
-            print("✅ Neo4j database configured")
+            print("[OK] Neo4j database configured")
         else:
-            print("⚠️ Neo4j not configured (missing environment variables)")
+            print("[WARN] Neo4j not configured (missing environment variables)")
         
         if not database_configs:
-            print("⚠️ No databases configured, testing file creation only")
+            print("[WARN] No databases configured, testing file creation only")
         
         # Create a mock processing result
         processing_result = ProcessingResult(
@@ -128,10 +128,10 @@ async def test_ingestion_coordinator():
             replace_existing=False
         )
         
-        print("✅ Ingestion completed!")
+        print("[OK] Ingestion completed!")
         
         # Check results
-        print("\n📋 Ingestion Results:")
+        print("\n[INFO] Ingestion Results:")
         print(f"  Ingestion ID: {result['ingestion_id']}")
         print(f"  Document ID: {result['source_info']['document_id']}")
         print(f"  Processing Time: {result['processing_time']:.2f} seconds")
@@ -140,21 +140,21 @@ async def test_ingestion_coordinator():
         print(f"  Relations Extracted: {result['graph_data']['relations_count']}")
         
         # Check file creation
-        print("\n📁 Checking output files:")
+        print("\n[FILES] Checking output files:")
         result_file = test_file.parent / f"{test_file.stem}.ingest_result.json"
         data_file = test_file.parent / f"{test_file.stem}.ingest_data.json"
         
         if result_file.exists():
-            print(f"✅ Ingest result file created: {result_file}")
+            print(f"[OK] Ingest result file created: {result_file}")
             with open(result_file, 'r', encoding='utf-8') as f:
                 result_data = json.load(f)
                 print(f"   File size: {result_file.stat().st_size} bytes")
                 print(f"   Contains: {len(result_data)} top-level keys")
         else:
-            print(f"❌ Ingest result file missing: {result_file}")
+            print(f"[FAIL] Ingest result file missing: {result_file}")
         
         if data_file.exists():
-            print(f"✅ Ingest data file created: {data_file}")
+            print(f"[OK] Ingest data file created: {data_file}")
             with open(data_file, 'r', encoding='utf-8') as f:
                 data_content = json.load(f)
                 print(f"   File size: {data_file.stat().st_size} bytes")
@@ -162,14 +162,14 @@ async def test_ingestion_coordinator():
                 print(f"   Graph entities: {len(data_content.get('graph_data', {}).get('entities', []))}")
                 print(f"   Graph relations: {len(data_content.get('graph_data', {}).get('relations', []))}")
         else:
-            print(f"❌ Ingest data file missing: {data_file}")
+            print(f"[FAIL] Ingest data file missing: {data_file}")
         
         # Check database results
         if 'database_results' in result:
             print("\n💾 Database Results:")
             for db_type, db_result in result['database_results'].items():
                 if db_result.get('success'):
-                    print(f"✅ {db_type.title()}: Success")
+                    print(f"[OK] {db_type.title()}: Success")
                     if db_type == 'qdrant' and 'points_stored' in db_result:
                         print(f"   Points stored: {db_result['points_stored']}")
                     elif db_type == 'neo4j':
@@ -180,12 +180,12 @@ async def test_ingestion_coordinator():
                         if 'relations_stored' in db_result:
                             print(f"   Relations stored: {db_result['relations_stored']}")
                 else:
-                    print(f"❌ {db_type.title()}: Failed - {db_result.get('error', 'Unknown error')}")
+                    print(f"[FAIL] {db_type.title()}: Failed - {db_result.get('error', 'Unknown error')}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Error during ingestion test: {e}")
+        print(f"[FAIL] Error during ingestion test: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -211,12 +211,12 @@ async def main():
     success = await test_ingestion_coordinator()
     
     if success:
-        print("\n🎉 Ingestion coordinator test completed successfully!")
-        print("✅ Both ingest_result.json and ingest_data.json files should be created")
-        print("✅ Actual database ingestion should be performed")
+        print("\n[SUCCESS] Ingestion coordinator test completed successfully!")
+        print("[OK] Both ingest_result.json and ingest_data.json files should be created")
+        print("[OK] Actual database ingestion should be performed")
         return 0
     else:
-        print("\n💥 Ingestion coordinator test failed!")
+        print("\n[ERROR] Ingestion coordinator test failed!")
         return 1
 
 

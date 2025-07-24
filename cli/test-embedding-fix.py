@@ -16,7 +16,7 @@ async def test_embedding_service_instantiation():
     try:
         from morag_services.embedding import GeminiEmbeddingService
         
-        print("✅ Successfully imported GeminiEmbeddingService")
+        print("[OK] Successfully imported GeminiEmbeddingService")
         
         # Try to instantiate (with dummy API key)
         service = GeminiEmbeddingService(
@@ -25,7 +25,7 @@ async def test_embedding_service_instantiation():
             generation_model="gemini-2.0-flash-001"
         )
         
-        print("✅ Successfully instantiated GeminiEmbeddingService")
+        print("[OK] Successfully instantiated GeminiEmbeddingService")
         
         # Check that it has all required methods
         required_methods = [
@@ -40,43 +40,43 @@ async def test_embedding_service_instantiation():
                 missing_methods.append(method)
         
         if missing_methods:
-            print(f"❌ Missing methods: {missing_methods}")
+            print(f"[FAIL] Missing methods: {missing_methods}")
             return False
         else:
-            print("✅ All required methods are present")
+            print("[OK] All required methods are present")
         
         # Test method signatures and return types
         try:
             dimension = service.get_embedding_dimension()
-            print(f"✅ get_embedding_dimension() works: {dimension}")
+            print(f"[OK] get_embedding_dimension() works: {dimension}")
             
             models = service.get_supported_models()
-            print(f"✅ get_supported_models() works: {models}")
+            print(f"[OK] get_supported_models() works: {models}")
             
             max_tokens = service.get_max_tokens()
-            print(f"✅ get_max_tokens() works: {max_tokens}")
+            print(f"[OK] get_max_tokens() works: {max_tokens}")
             
         except Exception as e:
-            print(f"❌ Method call failed: {e}")
+            print(f"[FAIL] Method call failed: {e}")
             return False
         
         # Test health check (without real API key)
         try:
             health = await service.health_check()
-            print(f"✅ Health check method works (status: {health.get('status', 'unknown')})")
+            print(f"[OK] Health check method works (status: {health.get('status', 'unknown')})")
         except Exception as e:
-            print(f"⚠️  Health check failed (expected without real API key): {e}")
+            print(f"[WARN]  Health check failed (expected without real API key): {e}")
         
         return True
         
     except Exception as e:
         error_msg = str(e)
         if "Can't instantiate abstract class GeminiEmbeddingService" in error_msg:
-            print("❌ The abstract class error is still present!")
+            print("[FAIL] The abstract class error is still present!")
             print("   The fix may not have been applied correctly.")
             return False
         else:
-            print(f"❌ Unexpected error: {e}")
+            print(f"[FAIL] Unexpected error: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -90,11 +90,11 @@ async def main():
     
     print("=" * 50)
     if success:
-        print("✅ All tests passed! GeminiEmbeddingService should work now.")
+        print("[OK] All tests passed! GeminiEmbeddingService should work now.")
         print("\nThe abstract class error has been fixed!")
         print("You can now use the embedding service without instantiation errors.")
     else:
-        print("❌ Tests failed. Check the errors above.")
+        print("[FAIL] Tests failed. Check the errors above.")
     
     return success
 

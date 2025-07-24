@@ -43,17 +43,17 @@ def test_content_type_validation():
                 # This should not fail anymore
                 content_type_enum = ContentType(normalized_type)
                 
-                print(f"✅ {ext} -> detected: {detected_type}, normalized: {normalized_type}, enum: {content_type_enum}")
+                print(f"[OK] {ext} -> detected: {detected_type}, normalized: {normalized_type}, enum: {content_type_enum}")
                 
             except Exception as e:
-                print(f"❌ {ext} -> Error: {e}")
+                print(f"[FAIL] {ext} -> Error: {e}")
                 return False
         
-        print("\n✅ All content type validations passed")
+        print("\n[OK] All content type validations passed")
         return True
         
     except Exception as e:
-        print(f"❌ Content type validation test failed: {e}")
+        print(f"[FAIL] Content type validation test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -83,7 +83,7 @@ def test_processing_config_with_task_options():
         print("Testing ProcessingConfig with task options that caused original error:")
         try:
             config = ProcessingConfig(**config_params)
-            print("✅ ProcessingConfig creation successful with task options")
+            print("[OK] ProcessingConfig creation successful with task options")
             print(f"   file_path: {config.file_path}")
             print(f"   webhook_url: {config.webhook_url}")
             print(f"   metadata: {config.metadata}")
@@ -94,11 +94,11 @@ def test_processing_config_with_task_options():
             return True
             
         except Exception as e:
-            print(f"❌ ProcessingConfig creation failed: {e}")
+            print(f"[FAIL] ProcessingConfig creation failed: {e}")
             return False
         
     except Exception as e:
-        print(f"❌ ProcessingConfig test failed: {e}")
+        print(f"[FAIL] ProcessingConfig test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -132,10 +132,10 @@ def test_celery_task_simulation():
             normalized_type = api._normalize_content_type(detected_type)
             content_type_enum = ContentType(normalized_type)
             
-            print(f"✅ Step 1 - Content type detection: {detected_type} -> {normalized_type} -> {content_type_enum}")
+            print(f"[OK] Step 1 - Content type detection: {detected_type} -> {normalized_type} -> {content_type_enum}")
             
         except Exception as e:
-            print(f"❌ Step 1 - Content type detection failed: {e}")
+            print(f"[FAIL] Step 1 - Content type detection failed: {e}")
             return False
         
         # Step 2: ProcessingConfig creation (this was failing with unexpected keyword arguments)
@@ -145,10 +145,10 @@ def test_celery_task_simulation():
                 **task_options
             )
             
-            print(f"✅ Step 2 - ProcessingConfig creation successful")
+            print(f"[OK] Step 2 - ProcessingConfig creation successful")
             
         except Exception as e:
-            print(f"❌ Step 2 - ProcessingConfig creation failed: {e}")
+            print(f"[FAIL] Step 2 - ProcessingConfig creation failed: {e}")
             return False
         
         # Step 3: Exception handling simulation
@@ -166,17 +166,17 @@ def test_celery_task_simulation():
             # Re-raise with proper exception type information
             new_exception = type(test_exception)(str(test_exception))
             
-            print(f"✅ Step 3 - Exception handling: {error_info}")
+            print(f"[OK] Step 3 - Exception handling: {error_info}")
             
         except Exception as e:
-            print(f"❌ Step 3 - Exception handling failed: {e}")
+            print(f"[FAIL] Step 3 - Exception handling failed: {e}")
             return False
         
-        print("\n✅ All Celery task simulation steps passed")
+        print("\n[OK] All Celery task simulation steps passed")
         return True
         
     except Exception as e:
-        print(f"❌ Celery task simulation failed: {e}")
+        print(f"[FAIL] Celery task simulation failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -207,7 +207,7 @@ Any exceptions should be properly serialized for Celery.
         return temp_file.name
         
     except Exception as e:
-        print(f"❌ Failed to create test file: {e}")
+        print(f"[FAIL] Failed to create test file: {e}")
         return None
 
 def main():
@@ -233,11 +233,11 @@ def main():
     total_tests = len(test_results)
     
     if passed_tests == total_tests:
-        print(f"🎉 All {total_tests} worker fix tests PASSED!")
-        print("✅ Worker process errors have been resolved")
+        print(f"[SUCCESS] All {total_tests} worker fix tests PASSED!")
+        print("[OK] Worker process errors have been resolved")
     else:
-        print(f"❌ {total_tests - passed_tests} out of {total_tests} tests FAILED")
-        print("⚠️  Worker process issues may still exist")
+        print(f"[FAIL] {total_tests - passed_tests} out of {total_tests} tests FAILED")
+        print("[WARN]  Worker process issues may still exist")
     
     print("=" * 60)
     

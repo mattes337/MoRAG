@@ -58,14 +58,14 @@ def validate_options_fix():
             issues.append("ingest_batch_task missing 'task_options' parameter")
         
         if issues:
-            print_result("❌ Issues found", "\n    ".join(issues))
+            print_result("[FAIL] Issues found", "\n    ".join(issues))
             return False
         else:
-            print_result("✅ Options variable fix", "Successfully applied")
+            print_result("[OK] Options variable fix", "Successfully applied")
             return True
             
     except Exception as e:
-        print_result("❌ Import error", str(e))
+        print_result("[FAIL] Import error", str(e))
         return False
 
 def validate_auto_detection():
@@ -81,29 +81,29 @@ def validate_auto_detection():
         has_file_detection = hasattr(api, '_detect_content_type_from_file')
         has_url_detection = hasattr(api, '_detect_content_type')
         
-        print_result("File detection method", "✅ Present" if has_file_detection else "❌ Missing")
-        print_result("URL detection method", "✅ Present" if has_url_detection else "❌ Missing")
+        print_result("File detection method", "[OK] Present" if has_file_detection else "[FAIL] Missing")
+        print_result("URL detection method", "[OK] Present" if has_url_detection else "[FAIL] Missing")
         
         if has_file_detection and has_url_detection:
             # Test detection logic
             test_file = Path("test.pdf")
             detected_type = api._detect_content_type_from_file(test_file)
-            print_result("PDF detection test", f"✅ {detected_type}" if detected_type == "document" else f"❌ {detected_type}")
+            print_result("PDF detection test", f"[OK] {detected_type}" if detected_type == "document" else f"[FAIL] {detected_type}")
             
             youtube_url = "https://youtube.com/watch?v=test"
             detected_type = api._detect_content_type(youtube_url)
-            print_result("YouTube detection test", f"✅ {detected_type}" if detected_type == "youtube" else f"❌ {detected_type}")
+            print_result("YouTube detection test", f"[OK] {detected_type}" if detected_type == "youtube" else f"[FAIL] {detected_type}")
             
             web_url = "https://example.com"
             detected_type = api._detect_content_type(web_url)
-            print_result("Web detection test", f"✅ {detected_type}" if detected_type == "web" else f"❌ {detected_type}")
+            print_result("Web detection test", f"[OK] {detected_type}" if detected_type == "web" else f"[FAIL] {detected_type}")
             
             return True
         else:
             return False
             
     except Exception as e:
-        print_result("❌ Auto-detection validation error", str(e))
+        print_result("[FAIL] Auto-detection validation error", str(e))
         return False
 
 def validate_server_models():
@@ -117,13 +117,13 @@ def validate_server_models():
         file_req = IngestFileRequest()
         url_req = IngestURLRequest(url="https://example.com")
         
-        print_result("✅ IngestFileRequest", "source_type is optional")
-        print_result("✅ IngestURLRequest", "source_type is optional")
+        print_result("[OK] IngestFileRequest", "source_type is optional")
+        print_result("[OK] IngestURLRequest", "source_type is optional")
         
         return True
         
     except Exception as e:
-        print_result("❌ Server model validation error", str(e))
+        print_result("[FAIL] Server model validation error", str(e))
         return False
 
 def main():
@@ -147,14 +147,14 @@ def main():
     print_result("Tests passed", f"{passed}/{total}")
     
     if passed == total:
-        print_result("✅ Overall status", "All fixes validated successfully")
-        print("\n🎉 The ingestion system fixes are working correctly!")
+        print_result("[OK] Overall status", "All fixes validated successfully")
+        print("\n[SUCCESS] The ingestion system fixes are working correctly!")
         print("   - Options variable shadowing is fixed")
         print("   - Auto-detection is implemented")
         print("   - Server models support optional source_type")
     else:
-        print_result("❌ Overall status", f"{total - passed} validation(s) failed")
-        print("\n⚠️  Some fixes may need attention. Check the details above.")
+        print_result("[FAIL] Overall status", f"{total - passed} validation(s) failed")
+        print("\n[WARN]  Some fixes may need attention. Check the details above.")
     
     return passed == total
 

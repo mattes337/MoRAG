@@ -53,7 +53,7 @@ try:
     )
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
-    print(f"❌ Error importing MoRAG components: {e}")
+    print(f"[FAIL] Error importing MoRAG components: {e}")
     COMPONENTS_AVAILABLE = False
 
 
@@ -103,7 +103,7 @@ class PromptLogger:
     def log_step(self, step_name: str, details: str = ""):
         """Log a processing step."""
         if self.verbose:
-            print(f"\n🔄 {step_name}")
+            print(f"\n[PROCESSING] {step_name}")
             if details:
                 print(f"   {details}")
     
@@ -165,22 +165,22 @@ async def test_database_connections(args) -> tuple[Optional[Neo4jStorage], Optio
             neo4j_storage = get_default_neo4j_storage()
             if neo4j_storage:
                 await neo4j_storage.connect()
-                print("✅ Neo4j connection established")
+                print("[OK] Neo4j connection established")
             else:
-                print("❌ Failed to create Neo4j storage")
+                print("[FAIL] Failed to create Neo4j storage")
         except Exception as e:
-            print(f"❌ Neo4j connection failed: {e}")
+            print(f"[FAIL] Neo4j connection failed: {e}")
     
     if args.qdrant:
         try:
             qdrant_storage = get_default_qdrant_storage()
             if qdrant_storage:
                 await qdrant_storage.connect()
-                print("✅ Qdrant connection established")
+                print("[OK] Qdrant connection established")
             else:
-                print("❌ Failed to create Qdrant storage")
+                print("[FAIL] Failed to create Qdrant storage")
         except Exception as e:
-            print(f"❌ Qdrant connection failed: {e}")
+            print(f"[FAIL] Qdrant connection failed: {e}")
     
     return neo4j_storage, qdrant_storage
 
@@ -455,11 +455,11 @@ async def main():
     args = parser.parse_args()
     
     if not COMPONENTS_AVAILABLE:
-        print("❌ MoRAG components not available. Please install required packages.")
+        print("[FAIL] MoRAG components not available. Please install required packages.")
         return 1
     
     if not args.neo4j and not args.qdrant:
-        print("❌ Please specify --neo4j, --qdrant, or both")
+        print("[FAIL] Please specify --neo4j, --qdrant, or both")
         return 1
     
     print(f"🚀 Testing prompt: '{args.prompt}'")
@@ -475,7 +475,7 @@ async def main():
     neo4j_storage, qdrant_storage = await test_database_connections(args)
     
     if not neo4j_storage and not qdrant_storage:
-        print("❌ No database connections available")
+        print("[FAIL] No database connections available")
         return 1
     
     # Execute the prompt
@@ -491,7 +491,7 @@ async def main():
         if results.get("final_result"):
             print(results["final_result"])
         else:
-            print("❌ No final result generated")
+            print("[FAIL] No final result generated")
         
         # Show summary
         summary = logger.get_summary()
@@ -513,7 +513,7 @@ async def main():
         return 0
         
     except Exception as e:
-        print(f"❌ Execution failed: {e}")
+        print(f"[FAIL] Execution failed: {e}")
         return 1
     
     finally:
@@ -529,8 +529,8 @@ if __name__ == "__main__":
         exit_code = asyncio.run(main())
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         sys.exit(1)

@@ -20,7 +20,7 @@ try:
     )
     from morag_graph.models import Entity as GraphEntity, Relation as GraphRelation
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the morag-graph package:")
     print("  pip install -e packages/morag-graph")
     raise
@@ -142,7 +142,7 @@ class GraphExtractionService:
             return entities, relations
             
         except Exception as e:
-            print(f"⚠️ Warning: Graph extraction failed: {e}")
+            print(f"[WARN] Warning: Graph extraction failed: {e}")
             return [], []
 
 
@@ -198,7 +198,7 @@ class DatabaseIngestionService:
             return True
             
         except Exception as e:
-            print(f"⚠️ Warning: Failed to initialize Qdrant: {e}")
+            print(f"[WARN] Warning: Failed to initialize Qdrant: {e}")
             return False
     
     def initialize_neo4j(self, config: Optional[Dict[str, Any]] = None) -> bool:
@@ -228,7 +228,7 @@ class DatabaseIngestionService:
             return True
             
         except Exception as e:
-            print(f"⚠️ Warning: Failed to initialize Neo4j: {e}")
+            print(f"[WARN] Warning: Failed to initialize Neo4j: {e}")
             return False
     
     def initialize_graph_builder(self) -> bool:
@@ -247,14 +247,14 @@ class DatabaseIngestionService:
                 storage_backends.append(self.neo4j_storage)
             
             if not storage_backends:
-                print("⚠️ Warning: No storage backends available for graph builder")
+                print("[WARN] Warning: No storage backends available for graph builder")
                 return False
             
             self.graph_builder = GraphBuilder(storage_backends=storage_backends)
             return True
             
         except Exception as e:
-            print(f"⚠️ Warning: Failed to initialize graph builder: {e}")
+            print(f"[WARN] Warning: Failed to initialize graph builder: {e}")
             return False
     
     async def ingest_to_qdrant(
@@ -294,11 +294,11 @@ class DatabaseIngestionService:
             # In practice, you'd use the actual Qdrant storage API
             point_ids = [f"point_{i}" for i in range(len(chunks))]
             
-            print(f"✅ Stored {len(chunks)} chunks in Qdrant")
+            print(f"[OK] Stored {len(chunks)} chunks in Qdrant")
             return point_ids
             
         except Exception as e:
-            print(f"❌ Error ingesting to Qdrant: {e}")
+            print(f"[FAIL] Error ingesting to Qdrant: {e}")
             raise
     
     async def ingest_to_neo4j(
@@ -355,11 +355,11 @@ class DatabaseIngestionService:
                 'document_metadata': doc_metadata
             }
             
-            print(f"✅ Stored {len(graph_entities)} entities and {len(graph_relations)} relations in Neo4j")
+            print(f"[OK] Stored {len(graph_entities)} entities and {len(graph_relations)} relations in Neo4j")
             return result
             
         except Exception as e:
-            print(f"❌ Error ingesting to Neo4j: {e}")
+            print(f"[FAIL] Error ingesting to Neo4j: {e}")
             raise
 
 
@@ -405,7 +405,7 @@ async def extract_and_ingest(
         results['extraction']['entities'] = entities
         results['extraction']['relations'] = relations
         
-        print(f"✅ Extracted {len(entities)} entities and {len(relations)} relations")
+        print(f"[OK] Extracted {len(entities)} entities and {len(relations)} relations")
         
         # Initialize ingestion service
         ingestion_service = DatabaseIngestionService()
@@ -461,6 +461,6 @@ async def extract_and_ingest(
         return results
         
     except Exception as e:
-        print(f"❌ Error in extract_and_ingest: {e}")
+        print(f"[FAIL] Error in extract_and_ingest: {e}")
         results['error'] = str(e)
         return results

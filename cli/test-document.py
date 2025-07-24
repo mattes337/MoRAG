@@ -52,7 +52,7 @@ try:
     from morag_services import QdrantVectorStorage, GeminiEmbeddingService
     from morag_core.models import Document, DocumentChunk
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-document")
@@ -78,7 +78,7 @@ def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
     try:
-        print(f"{spaces}📋 {key}: {value}")
+        print(f"{spaces}[INFO] {key}: {value}")
     except UnicodeEncodeError:
         # Fallback for terminals that don't support Unicode
         print(f"{spaces}[INFO] {key}: {value}")
@@ -90,7 +90,7 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
     print_header("MoRAG Document Processing Test")
 
     if not document_file.exists():
-        print(f"❌ Error: Document file not found: {document_file}")
+        print(f"[FAIL] Error: Document file not found: {document_file}")
         return False
 
     print_result("Input File", str(document_file))
@@ -100,13 +100,13 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
     try:
         # Initialize document processor (no config needed)
         processor = DocumentProcessor()
-        print_result("Document Processor", "✅ Initialized successfully")
+        print_result("Document Processor", "[OK] Initialized successfully")
         print_result("Chunking Strategy", chunking_strategy)
         print_result("Chunk Size", f"{chunk_size} characters")
         print_result("Chunk Overlap", f"{chunk_overlap} characters")
 
         print_section("Processing Document File")
-        print("🔄 Starting document processing...")
+        print("[PROCESSING] Starting document processing...")
 
         # Process the document file with options
         result = await processor.process_file(
@@ -119,13 +119,13 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
 
         if result.success:
             try:
-                print("✅ Document processing completed successfully!")
+                print("[OK] Document processing completed successfully!")
             except UnicodeEncodeError:
                 print("[SUCCESS] Document processing completed successfully!")
 
             print_section("Processing Results")
             try:
-                print_result("Status", "✅ Success")
+                print_result("Status", "[OK] Success")
             except UnicodeEncodeError:
                 print_result("Status", "[SUCCESS]")
             print_result("Processing Time", f"{result.processing_time:.2f} seconds")
@@ -199,7 +199,7 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
 
         else:
             try:
-                print("❌ Document processing failed!")
+                print("[FAIL] Document processing failed!")
             except UnicodeEncodeError:
                 print("[ERROR] Document processing failed!")
             print_result("Error", result.error_message or "Unknown error")
@@ -207,7 +207,7 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
 
     except Exception as e:
         try:
-            print(f"❌ Error during document processing: {e}")
+            print(f"[FAIL] Error during document processing: {e}")
         except UnicodeEncodeError:
             print(f"[ERROR] Error during document processing: {e}")
         import traceback
@@ -222,7 +222,7 @@ async def store_content_in_vector_db(
 ) -> list:
     """Store processed content in vector database."""
     if not content.strip():
-        print("⚠️  Warning: Empty content provided for vector storage")
+        print("[WARN]  Warning: Empty content provided for vector storage")
         return []
 
     try:
@@ -293,12 +293,12 @@ async def store_content_in_vector_db(
             collection_name
         )
 
-        print_result("Vector Storage", f"✅ Stored {len(chunks)} chunks with {len(point_ids)} vectors")
+        print_result("Vector Storage", f"[OK] Stored {len(chunks)} chunks with {len(point_ids)} vectors")
 
         return point_ids
 
     except Exception as e:
-        print(f"❌ Error storing content in vector database: {e}")
+        print(f"[FAIL] Error storing content in vector database: {e}")
         raise
 
 
@@ -313,7 +313,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
     print_header("MoRAG Document Ingestion Test")
 
     if not document_file.exists():
-        print(f"❌ Error: Document file not found: {document_file}")
+        print(f"[FAIL] Error: Document file not found: {document_file}")
         return False
 
     print_result("Input File", str(document_file))
@@ -324,15 +324,15 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
     print_result("Chunking Strategy", chunking_strategy)
     print_result("Chunk Size", f"{chunk_size} characters")
     print_result("Chunk Overlap", f"{chunk_overlap} characters")
-    print_result("Use Qdrant", "✅ Yes" if use_qdrant else "❌ No")
-    print_result("Use Neo4j", "✅ Yes" if use_neo4j else "❌ No")
+    print_result("Use Qdrant", "[OK] Yes" if use_qdrant else "[FAIL] No")
+    print_result("Use Neo4j", "[OK] Yes" if use_neo4j else "[FAIL] No")
 
     try:
         from morag.ingestion_coordinator import IngestionCoordinator, DatabaseConfig, DatabaseType
         import uuid
 
         print_section("Processing Document")
-        print("🔄 Starting document processing...")
+        print("[PROCESSING] Starting document processing...")
 
         # Initialize document processor
         processor = DocumentProcessor()
@@ -347,11 +347,11 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         )
 
         if not result.success:
-            print("❌ Document processing failed!")
+            print("[FAIL] Document processing failed!")
             print_result("Error", result.error_message or "Unknown error")
             return False
 
-        print("✅ Document processing completed successfully!")
+        print("[OK] Document processing completed successfully!")
         print_result("Processing Time", f"{result.processing_time:.2f} seconds")
 
         print_section("Ingesting to Databases")
@@ -412,10 +412,10 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
             replace_existing=False
         )
 
-        print("✅ Document ingestion completed successfully!")
+        print("[OK] Document ingestion completed successfully!")
 
         print_section("Ingestion Results")
-        print_result("Status", "✅ Success")
+        print_result("Status", "[OK] Success")
         print_result("Ingestion ID", ingestion_result['ingestion_id'])
         print_result("Document ID", ingestion_result['source_info']['document_id'])
         print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
@@ -428,7 +428,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         if 'database_results' in ingestion_result:
             for db_type, db_result in ingestion_result['database_results'].items():
                 if db_result.get('success'):
-                    print_result(f"{db_type.title()} Storage", "✅ Success")
+                    print_result(f"{db_type.title()} Storage", "[OK] Success")
                     if db_type == 'qdrant' and 'points_stored' in db_result:
                         print_result(f"  Points Stored", str(db_result['points_stored']))
                     elif db_type == 'neo4j':
@@ -439,7 +439,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
                         if 'relations_stored' in db_result:
                             print_result(f"  Relations Stored", str(db_result['relations_stored']))
                 else:
-                    print_result(f"{db_type.title()} Storage", f"❌ Failed: {db_result.get('error', 'Unknown error')}")
+                    print_result(f"{db_type.title()} Storage", f"[FAIL] Failed: {db_result.get('error', 'Unknown error')}")
 
         print_section("Output Files")
         # The ingestion coordinator automatically creates the files
@@ -454,7 +454,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         return True
 
     except Exception as e:
-        print(f"❌ Error during document ingestion: {e}")
+        print(f"[FAIL] Error during document ingestion: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -520,7 +520,7 @@ Examples:
         try:
             metadata = json.loads(args.metadata)
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in metadata: {e}")
+            print(f"[FAIL] Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
 
     # Handle resume arguments
@@ -543,11 +543,11 @@ Examples:
                 neo4j_database_name=args.neo4j_database
             ))
             if success:
-                print("\n🎉 Document ingestion test completed successfully!")
+                print("\n[SUCCESS] Document ingestion test completed successfully!")
                 print("💡 Check the .ingest_result.json and .ingest_data.json files for details.")
                 sys.exit(0)
             else:
-                print("\n💥 Document ingestion test failed!")
+                print("\n[ERROR] Document ingestion test failed!")
                 sys.exit(1)
         else:
             # Processing mode
@@ -558,17 +558,17 @@ Examples:
                 chunk_overlap=args.chunk_overlap
             ))
             if success:
-                print("\n🎉 Document processing test completed successfully!")
+                print("\n[SUCCESS] Document processing test completed successfully!")
                 sys.exit(0)
             else:
-                print("\n💥 Document processing test failed!")
+                print("\n[ERROR] Document processing test failed!")
                 sys.exit(1)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
         try:
-            print(f"\n❌ Fatal error: {e}")
+            print(f"\n[FAIL] Fatal error: {e}")
         except UnicodeEncodeError:
             print(f"\n[FATAL ERROR]: {e}")
         sys.exit(1)

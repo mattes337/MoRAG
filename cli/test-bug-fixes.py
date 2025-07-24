@@ -53,20 +53,20 @@ def test_content_type_normalization():
         for input_type, expected in test_cases:
             try:
                 normalized = api._normalize_content_type(input_type)
-                status = "✅" if normalized == expected else "❌"
+                status = "[OK]" if normalized == expected else "[FAIL]"
                 print(f"{status} {input_type} -> {normalized} (expected: {expected})")
                 
                 # Test that normalized type can create ContentType enum
                 content_type_enum = ContentType(normalized)
-                print(f"   ✅ ContentType({normalized}) = {content_type_enum}")
+                print(f"   [OK] ContentType({normalized}) = {content_type_enum}")
                 
             except Exception as e:
-                print(f"❌ {input_type} -> Error: {e}")
+                print(f"[FAIL] {input_type} -> Error: {e}")
         
-        print("\n✅ Content type normalization tests completed")
+        print("\n[OK] Content type normalization tests completed")
         
     except Exception as e:
-        print(f"❌ Content type normalization test failed: {e}")
+        print(f"[FAIL] Content type normalization test failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -93,7 +93,7 @@ def test_processing_config_parameters():
         print("Testing ProcessingConfig with additional parameters:")
         try:
             config = ProcessingConfig(**test_params)
-            print("✅ ProcessingConfig creation successful with additional parameters")
+            print("[OK] ProcessingConfig creation successful with additional parameters")
             print(f"   file_path: {config.file_path}")
             print(f"   webhook_url: {config.webhook_url}")
             print(f"   metadata: {config.metadata}")
@@ -103,19 +103,19 @@ def test_processing_config_parameters():
             print(f"   remote: {config.remote}")
             
         except Exception as e:
-            print(f"❌ ProcessingConfig creation failed: {e}")
+            print(f"[FAIL] ProcessingConfig creation failed: {e}")
             import traceback
             traceback.print_exc()
             return
         
         # Test with minimal parameters
         minimal_config = ProcessingConfig(file_path="/test/minimal.pdf")
-        print("✅ ProcessingConfig creation successful with minimal parameters")
+        print("[OK] ProcessingConfig creation successful with minimal parameters")
         
-        print("\n✅ ProcessingConfig parameter handling tests completed")
+        print("\n[OK] ProcessingConfig parameter handling tests completed")
         
     except Exception as e:
-        print(f"❌ ProcessingConfig test failed: {e}")
+        print(f"[FAIL] ProcessingConfig test failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -133,9 +133,9 @@ def test_content_type_enum_validation():
         for content_type in valid_types:
             try:
                 enum_value = ContentType(content_type)
-                print(f"✅ ContentType('{content_type}') = {enum_value}")
+                print(f"[OK] ContentType('{content_type}') = {enum_value}")
             except Exception as e:
-                print(f"❌ ContentType('{content_type}') failed: {e}")
+                print(f"[FAIL] ContentType('{content_type}') failed: {e}")
         
         # Test invalid content types
         invalid_types = ["pdf", "doc", "mp3", "invalid"]
@@ -144,16 +144,16 @@ def test_content_type_enum_validation():
         for content_type in invalid_types:
             try:
                 enum_value = ContentType(content_type)
-                print(f"❌ ContentType('{content_type}') should have failed but got: {enum_value}")
+                print(f"[FAIL] ContentType('{content_type}') should have failed but got: {enum_value}")
             except ValueError as e:
-                print(f"✅ ContentType('{content_type}') correctly failed: {e}")
+                print(f"[OK] ContentType('{content_type}') correctly failed: {e}")
             except Exception as e:
-                print(f"❌ ContentType('{content_type}') failed with unexpected error: {e}")
+                print(f"[FAIL] ContentType('{content_type}') failed with unexpected error: {e}")
         
-        print("\n✅ ContentType enum validation tests completed")
+        print("\n[OK] ContentType enum validation tests completed")
         
     except Exception as e:
-        print(f"❌ ContentType enum test failed: {e}")
+        print(f"[FAIL] ContentType enum test failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -183,20 +183,20 @@ async def test_api_content_type_handling():
             try:
                 detected_type = api._detect_content_type_from_file(Path(filename))
                 normalized_type = api._normalize_content_type(detected_type)
-                print(f"✅ {filename} -> detected: {detected_type}, normalized: {normalized_type}")
+                print(f"[OK] {filename} -> detected: {detected_type}, normalized: {normalized_type}")
                 
                 # Verify normalized type can create ContentType enum
                 from morag_services import ContentType
                 content_type_enum = ContentType(normalized_type)
-                print(f"   ✅ ContentType({normalized_type}) = {content_type_enum}")
+                print(f"   [OK] ContentType({normalized_type}) = {content_type_enum}")
                 
             except Exception as e:
-                print(f"❌ {filename} -> Error: {e}")
+                print(f"[FAIL] {filename} -> Error: {e}")
         
-        print("\n✅ API content type handling tests completed")
+        print("\n[OK] API content type handling tests completed")
 
     except Exception as e:
-        print(f"❌ API content type handling test failed: {e}")
+        print(f"[FAIL] API content type handling test failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -220,23 +220,23 @@ async def test_image_processing_api_fix():
         try:
             # This should fail gracefully with proper error message, not AttributeError
             result = await processor.process_image(tmp_path, config)
-            print("❌ Expected ExternalServiceError but processing succeeded")
+            print("[FAIL] Expected ExternalServiceError but processing succeeded")
             return False
         except Exception as e:
             if "AttributeError" in str(type(e)) and "get_api_key" in str(e):
-                print(f"❌ Still getting the old API error: {e}")
+                print(f"[FAIL] Still getting the old API error: {e}")
                 return False
             elif "Gemini API key not configured" in str(e):
-                print("✅ Image processing API fix working - proper error message")
+                print("[OK] Image processing API fix working - proper error message")
                 return True
             else:
-                print(f"❌ Unexpected error: {e}")
+                print(f"[FAIL] Unexpected error: {e}")
                 return False
         finally:
             tmp_path.unlink(missing_ok=True)
 
     except ImportError as e:
-        print(f"❌ Import error: {e}")
+        print(f"[FAIL] Import error: {e}")
         return False
 
 async def test_web_service_method_signature_fix():
@@ -251,22 +251,22 @@ async def test_web_service_method_signature_fix():
         # This should not fail with TypeError about unexpected 'config' argument
         try:
             result = await services.process_url("https://httpbin.org/get")
-            print("✅ Web service method signature fix working")
+            print("[OK] Web service method signature fix working")
             return True
         except TypeError as e:
             if "unexpected keyword argument 'config'" in str(e):
-                print(f"❌ Method signature still broken: {e}")
+                print(f"[FAIL] Method signature still broken: {e}")
                 return False
             else:
-                print(f"❌ Unexpected TypeError: {e}")
+                print(f"[FAIL] Unexpected TypeError: {e}")
                 return False
         except Exception as e:
             # Other exceptions are fine (network issues, etc.)
-            print(f"✅ Web service method signature fix working (got expected error: {type(e).__name__})")
+            print(f"[OK] Web service method signature fix working (got expected error: {type(e).__name__})")
             return True
 
     except ImportError as e:
-        print(f"❌ Import error: {e}")
+        print(f"[FAIL] Import error: {e}")
         return False
 
 async def test_search_endpoint_implementation():
@@ -283,14 +283,14 @@ async def test_search_endpoint_implementation():
 
         # Should return a list (even if empty due to no vector storage)
         if isinstance(results, list):
-            print("✅ Search endpoint implementation working")
+            print("[OK] Search endpoint implementation working")
             return True
         else:
-            print(f"❌ Search returned unexpected type: {type(results)}")
+            print(f"[FAIL] Search returned unexpected type: {type(results)}")
             return False
 
     except Exception as e:
-        print(f"❌ Search implementation error: {e}")
+        print(f"[FAIL] Search implementation error: {e}")
         return False
 
 async def test_youtube_bot_detection_fix():
@@ -309,26 +309,26 @@ async def test_youtube_bot_detection_fix():
         try:
             result = await processor.process_url(test_url, config)
             if result.success:
-                print("✅ YouTube bot detection fix working - metadata extracted successfully")
+                print("[OK] YouTube bot detection fix working - metadata extracted successfully")
                 return True
             else:
                 error_msg = result.error_message or "Unknown error"
                 if "Sign in to confirm you're not a bot" in error_msg:
-                    print(f"❌ Bot detection still occurring: {error_msg}")
+                    print(f"[FAIL] Bot detection still occurring: {error_msg}")
                     return False
                 else:
-                    print(f"✅ YouTube bot detection fix working (different error, not bot detection): {error_msg}")
+                    print(f"[OK] YouTube bot detection fix working (different error, not bot detection): {error_msg}")
                     return True
         except Exception as e:
             if "Sign in to confirm you're not a bot" in str(e):
-                print(f"❌ Bot detection still occurring: {e}")
+                print(f"[FAIL] Bot detection still occurring: {e}")
                 return False
             else:
-                print(f"✅ YouTube bot detection fix working (different error, not bot detection): {e}")
+                print(f"[OK] YouTube bot detection fix working (different error, not bot detection): {e}")
                 return True
 
     except ImportError as e:
-        print(f"❌ Import error: {e}")
+        print(f"[FAIL] Import error: {e}")
         return False
 
 async def main():
@@ -372,7 +372,7 @@ async def main():
             success = await test_func()
             results[test_name] = success
         except Exception as e:
-            print(f"❌ {test_name} failed with exception: {e}")
+            print(f"[FAIL] {test_name} failed with exception: {e}")
             results[test_name] = False
 
     print("\n" + "=" * 60)
@@ -383,7 +383,7 @@ async def main():
     total = len(results)
 
     for test_name, success in results.items():
-        status = "✅ PASS" if success else "❌ FAIL"
+        status = "[OK] PASS" if success else "[FAIL] FAIL"
         print(f"{status} {test_name}")
         if success:
             passed += 1
@@ -391,14 +391,14 @@ async def main():
     print(f"\nCritical fixes: {passed}/{total} tests passed")
 
     print("\n" + "=" * 60)
-    print("🎉 Bug fix test suite completed!")
+    print("[SUCCESS] Bug fix test suite completed!")
     print("=" * 60)
 
     if passed == total:
-        print("🎉 All critical bug fixes are working!")
+        print("[SUCCESS] All critical bug fixes are working!")
         return 0
     else:
-        print("⚠️  Some critical bug fixes need attention")
+        print("[WARN]  Some critical bug fixes need attention")
         return 1
 
 if __name__ == "__main__":

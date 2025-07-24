@@ -46,7 +46,7 @@ load_dotenv(env_path)
 try:
     from morag_web import WebProcessor, WebScrapingConfig
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-web")
@@ -70,7 +70,7 @@ def print_section(title: str):
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
-    print(f"{spaces}📋 {key}: {value}")
+    print(f"{spaces}[INFO] {key}: {value}")
 
 
 def validate_url(url: str) -> bool:
@@ -87,7 +87,7 @@ async def test_web_processing(url: str) -> bool:
     print_header("MoRAG Web Processing Test")
     
     if not validate_url(url):
-        print(f"❌ Error: Invalid URL format: {url}")
+        print(f"[FAIL] Error: Invalid URL format: {url}")
         return False
     
     print_result("Target URL", url)
@@ -95,7 +95,7 @@ async def test_web_processing(url: str) -> bool:
     try:
         # Initialize web processor
         processor = WebProcessor()
-        print_result("Web Processor", "✅ Initialized successfully")
+        print_result("Web Processor", "[OK] Initialized successfully")
 
         # Create web scraping configuration
         config = WebScrapingConfig(
@@ -108,20 +108,20 @@ async def test_web_processing(url: str) -> bool:
             remove_navigation=True,
             remove_footer=True
         )
-        print_result("Web Scraping Config", "✅ Created successfully")
+        print_result("Web Scraping Config", "[OK] Created successfully")
 
         print_section("Processing Web Content")
-        print("🔄 Starting web content extraction...")
+        print("[PROCESSING] Starting web content extraction...")
         print("   This may take a while depending on the website...")
 
         # Process the URL
         result = await processor.process_url(url, config)
         
         if result.success:
-            print("✅ Web processing completed successfully!")
+            print("[OK] Web processing completed successfully!")
 
             print_section("Processing Results")
-            print_result("Status", "✅ Success")
+            print_result("Status", "[OK] Success")
             print_result("Processing Time", f"{result.processing_time:.2f} seconds")
             print_result("URL", result.url or url)
 
@@ -207,12 +207,12 @@ async def test_web_processing(url: str) -> bool:
             return True
 
         else:
-            print("❌ Web processing failed!")
+            print("[FAIL] Web processing failed!")
             print_result("Error", result.error_message or "Unknown error")
             return False
 
     except Exception as e:
-        print(f"❌ Error during web processing: {e}")
+        print(f"[FAIL] Error during web processing: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -227,7 +227,7 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
     print_header("MoRAG Web Ingestion Test")
 
     if not validate_url(url):
-        print(f"❌ Error: Invalid URL format: {url}")
+        print(f"[FAIL] Error: Invalid URL format: {url}")
         return False
 
     print_result("Target URL", url)
@@ -240,7 +240,7 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
         import uuid
         
         print_section("Processing Web Content")
-        print("🔄 Starting web processing...")
+        print("[PROCESSING] Starting web processing...")
 
         # Initialize the API
         api = MoRAGAPI()
@@ -256,7 +256,7 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
         result = await api.process_url(url, 'web', options)
         
         if result.success:
-            print("✅ Web processing completed successfully!")
+            print("[OK] Web processing completed successfully!")
             
             # Generate a task ID for compatibility
             task_id = str(uuid.uuid4())
@@ -316,10 +316,10 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
                     replace_existing=False
                 )
 
-                print("✅ Web ingestion completed successfully!")
+                print("[OK] Web ingestion completed successfully!")
             
             print_section("Ingestion Results")
-            print_result("Status", "✅ Success")
+            print_result("Status", "[OK] Success")
             print_result("Ingestion ID", ingestion_result['ingestion_id'])
             print_result("Document ID", ingestion_result['source_info']['document_id'])
             print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
@@ -332,7 +332,7 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
             if 'database_results' in ingestion_result:
                 for db_type, db_result in ingestion_result['database_results'].items():
                     if db_result.get('success'):
-                        print_result(f"{db_type.title()} Storage", "✅ Success")
+                        print_result(f"{db_type.title()} Storage", "[OK] Success")
                         if 'chunks_stored' in db_result:
                             print_result(f"  Chunks Stored", str(db_result['chunks_stored']))
                         if 'entities_stored' in db_result:
@@ -340,7 +340,7 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
                         if 'relations_stored' in db_result:
                             print_result(f"  Relations Stored", str(db_result['relations_stored']))
                     else:
-                        print_result(f"{db_type.title()} Storage", f"❌ Failed: {db_result.get('error', 'Unknown error')}")
+                        print_result(f"{db_type.title()} Storage", f"[FAIL] Failed: {db_result.get('error', 'Unknown error')}")
             
             if webhook_url:
                 print_result("Webhook URL", f"Would notify: {webhook_url}")
@@ -369,13 +369,13 @@ async def test_web_ingestion(url: str, webhook_url: Optional[str] = None,
 
             return True
         else:
-            print("❌ Web processing failed!")
+            print("[FAIL] Web processing failed!")
             if result.error_message:
                 print_result("Error", result.error_message)
             return False
 
     except Exception as e:
-        print(f"❌ Error during web ingestion: {e}")
+        print(f"[FAIL] Error during web ingestion: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -435,7 +435,7 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
         try:
             metadata = json.loads(args.metadata)
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in metadata: {e}")
+            print(f"[FAIL] Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
 
     # Handle resume arguments
@@ -455,26 +455,26 @@ Note: Make sure the URL is accessible and includes the protocol (http:// or http
                 neo4j_database_name=args.neo4j_database
             ))
             if success:
-                print("\n🎉 Web ingestion test completed successfully!")
+                print("\n[SUCCESS] Web ingestion test completed successfully!")
                 print("💡 Use the task ID to monitor progress and retrieve results.")
                 sys.exit(0)
             else:
-                print("\n💥 Web ingestion test failed!")
+                print("\n[ERROR] Web ingestion test failed!")
                 sys.exit(1)
         else:
             # Processing mode
             success = asyncio.run(test_web_processing(args.url))
             if success:
-                print("\n🎉 Web processing test completed successfully!")
+                print("\n[SUCCESS] Web processing test completed successfully!")
                 sys.exit(0)
             else:
-                print("\n💥 Web processing test failed!")
+                print("\n[ERROR] Web processing test failed!")
                 sys.exit(1)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         sys.exit(1)
 
 

@@ -13,37 +13,37 @@ def test_imports():
     
     try:
         import morag_core
-        print("✅ morag_core imported successfully")
+        print("[OK] morag_core imported successfully")
     except Exception as e:
-        print(f"❌ morag_core import failed: {e}")
+        print(f"[FAIL] morag_core import failed: {e}")
         return False
     
     try:
         import morag_document
-        print("✅ morag_document imported successfully")
+        print("[OK] morag_document imported successfully")
     except Exception as e:
-        print(f"❌ morag_document import failed: {e}")
+        print(f"[FAIL] morag_document import failed: {e}")
         return False
     
     try:
         import morag_audio
-        print("✅ morag_audio imported successfully")
+        print("[OK] morag_audio imported successfully")
     except Exception as e:
-        print(f"❌ morag_audio import failed: {e}")
+        print(f"[FAIL] morag_audio import failed: {e}")
         return False
     
     try:
         import morag_video
-        print("✅ morag_video imported successfully")
+        print("[OK] morag_video imported successfully")
     except Exception as e:
-        print(f"❌ morag_video import failed: {e}")
+        print(f"[FAIL] morag_video import failed: {e}")
         return False
     
     try:
         import morag_image
-        print("✅ morag_image imported successfully")
+        print("[OK] morag_image imported successfully")
     except Exception as e:
-        print(f"❌ morag_image import failed: {e}")
+        print(f"[FAIL] morag_image import failed: {e}")
         return False
     
     return True
@@ -55,11 +55,11 @@ def test_document_processor():
     try:
         from morag_document import DocumentProcessor
         processor = DocumentProcessor()
-        print("✅ DocumentProcessor initialized successfully")
+        print("[OK] DocumentProcessor initialized successfully")
         print(f"   Supported formats: {len(processor.converters)} converters")
         return True
     except Exception as e:
-        print(f"❌ DocumentProcessor initialization failed: {e}")
+        print(f"[FAIL] DocumentProcessor initialization failed: {e}")
         traceback.print_exc()
         return False
 
@@ -69,14 +69,14 @@ def test_markitdown():
     
     try:
         import markitdown
-        print("✅ markitdown imported successfully")
+        print("[OK] markitdown imported successfully")
         
         # Test basic functionality
         md = markitdown.MarkItDown()
-        print("✅ MarkItDown instance created successfully")
+        print("[OK] MarkItDown instance created successfully")
         return True
     except Exception as e:
-        print(f"❌ markitdown test failed: {e}")
+        print(f"[FAIL] markitdown test failed: {e}")
         return False
 
 def main():
@@ -101,9 +101,9 @@ def main():
     
     print("\n" + "=" * 60)
     if all_passed:
-        print("🎉 All tests passed! CLI functionality is working.")
+        print("[SUCCESS] All tests passed! CLI functionality is working.")
     else:
-        print("❌ Some tests failed. Check the output above for details.")
+        print("[FAIL] Some tests failed. Check the output above for details.")
     print("=" * 60)
     
     return 0 if all_passed else 1

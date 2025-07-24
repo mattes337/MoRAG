@@ -87,7 +87,7 @@ def test_metadata_null_fix():
     test_file = create_test_pdf()
     
     try:
-        print("🔄 Testing document ingestion that previously caused metadata null error...")
+        print("[PROCESSING] Testing document ingestion that previously caused metadata null error...")
         
         # Test file ingestion with document that might return None metadata
         with open(test_file, 'rb') as f:
@@ -109,12 +109,12 @@ def test_metadata_null_fix():
         
         if response.status_code == 200:
             result = response.json()
-            print_result("✅ File upload successful", f"Task ID: {result['task_id']}")
+            print_result("[OK] File upload successful", f"Task ID: {result['task_id']}")
             print_result("Status", result['status'])
             print_result("Message", result['message'])
             return result['task_id']
         else:
-            print_result("❌ File upload failed", f"Status: {response.status_code}")
+            print_result("[FAIL] File upload failed", f"Status: {response.status_code}")
             print_result("Error", response.text)
             return None
             
@@ -139,33 +139,33 @@ def monitor_task_for_metadata_error(task_id):
                 
                 if status['status'] in ['SUCCESS', 'FAILURE']:
                     if status['status'] == 'SUCCESS':
-                        print_result("✅ Task completed successfully", "No metadata errors!")
+                        print_result("[OK] Task completed successfully", "No metadata errors!")
                         
                         # Check if vector storage worked
                         if status.get('result') and status['result'].get('metadata'):
                             metadata = status['result']['metadata']
                             if 'vector_point_ids' in metadata:
-                                print_result("✅ Vector storage successful", 
+                                print_result("[OK] Vector storage successful", 
                                            f"Stored {len(metadata['vector_point_ids'])} chunks")
                             if 'stored_in_vector_db' in metadata:
-                                print_result("✅ Vector DB flag set", 
+                                print_result("[OK] Vector DB flag set", 
                                            metadata['stored_in_vector_db'])
                         
                         return True
                     else:
                         error_msg = status.get('error', 'Unknown error')
-                        print_result("❌ Task failed", error_msg)
+                        print_result("[FAIL] Task failed", error_msg)
                         
                         # Check if it's the metadata error we're trying to fix
                         if "'NoneType' object is not a mapping" in error_msg:
-                            print_result("❌ METADATA NULL ERROR STILL EXISTS", 
+                            print_result("[FAIL] METADATA NULL ERROR STILL EXISTS", 
                                        "The fix did not work!")
                             return False
                         elif "metadata" in error_msg.lower():
-                            print_result("❌ Other metadata error", error_msg)
+                            print_result("[FAIL] Other metadata error", error_msg)
                             return False
                         else:
-                            print_result("❌ Different error", error_msg)
+                            print_result("[FAIL] Different error", error_msg)
                             return False
                     
             time.sleep(2)
@@ -194,14 +194,14 @@ def main():
 
         print_section("Test Results")
         if success is True:
-            print("✅ METADATA NULL REFERENCE FIX SUCCESSFUL!")
+            print("[OK] METADATA NULL REFERENCE FIX SUCCESSFUL!")
             print("   - No 'NoneType' object is not a mapping errors")
             print("   - Vector storage completed successfully")
             print("   - Metadata properly initialized as dictionary")
             print("   - API input sanitization working correctly")
             print("   - Worker-level defensive programming effective")
         elif success is False:
-            print("❌ METADATA NULL REFERENCE FIX FAILED!")
+            print("[FAIL] METADATA NULL REFERENCE FIX FAILED!")
             print("   - The original error still occurs")
             print("   - Additional debugging needed")
             print("   - Check both API and worker level fixes")
@@ -211,7 +211,7 @@ def main():
             print("   - Check server logs for details")
     else:
         print_section("Test Results")
-        print("❌ COULD NOT START TEST")
+        print("[FAIL] COULD NOT START TEST")
         print("   - File upload failed")
         print("   - Check if MoRAG server is running")
         print("   - Ensure Docker containers are accessible on localhost:8000")

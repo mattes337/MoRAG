@@ -22,20 +22,20 @@ def test_api_startup_validation():
         response = requests.get("http://localhost:8000/health", timeout=5)
         
         if response.status_code == 200:
-            print("✅ API server is running and healthy")
+            print("[OK] API server is running and healthy")
             health_data = response.json()
             print(f"   Health status: {health_data}")
             return True
         else:
-            print(f"❌ API server health check failed (status: {response.status_code})")
+            print(f"[FAIL] API server health check failed (status: {response.status_code})")
             return False
             
     except requests.exceptions.ConnectionError:
-        print("❌ Cannot connect to API server (not running or startup failed)")
+        print("[FAIL] Cannot connect to API server (not running or startup failed)")
         print("   This could indicate temp directory validation failed during startup")
         return False
     except Exception as e:
-        print(f"❌ API server test error: {e}")
+        print(f"[FAIL] API server test error: {e}")
         return False
 
 def test_file_upload_endpoint():
@@ -61,12 +61,12 @@ def test_file_upload_endpoint():
                 )
             
             if response.status_code == 200:
-                print("✅ File upload and processing successful")
+                print("[OK] File upload and processing successful")
                 result = response.json()
                 print(f"   Processing success: {result.get('success', False)}")
                 return True
             else:
-                print(f"❌ File upload failed (status: {response.status_code})")
+                print(f"[FAIL] File upload failed (status: {response.status_code})")
                 print(f"   Response: {response.text}")
                 return False
                 
@@ -76,12 +76,12 @@ def test_file_upload_endpoint():
                 os.unlink(test_file_path)
                 
     except Exception as e:
-        print(f"❌ File upload test error: {e}")
+        print(f"[FAIL] File upload test error: {e}")
         return False
 
 def test_temp_directory_consistency():
     """Test that temp directory is consistently used across components."""
-    print("📁 Testing temp directory consistency...")
+    print("[FILES] Testing temp directory consistency...")
     
     try:
         from morag.utils.file_upload import get_upload_handler
@@ -94,11 +94,11 @@ def test_temp_directory_consistency():
         
         # Check if it's using shared volume
         if str(temp_dir).startswith('/app/temp'):
-            print("✅ Using shared Docker volume (/app/temp)")
+            print("[OK] Using shared Docker volume (/app/temp)")
         elif str(temp_dir).startswith('./temp'):
-            print("✅ Using local development directory (./temp)")
+            print("[OK] Using local development directory (./temp)")
         elif str(temp_dir).startswith('/tmp/'):
-            print("⚠️  Using system temp directory (may cause issues in containers)")
+            print("[WARN]  Using system temp directory (may cause issues in containers)")
         else:
             print(f"❓ Using unknown temp directory: {temp_dir}")
         
@@ -106,12 +106,12 @@ def test_temp_directory_consistency():
         test_file = temp_dir / "consistency_test.txt"
         test_file.write_text("consistency test")
         test_file.unlink()
-        print("✅ Write permissions verified")
+        print("[OK] Write permissions verified")
         
         return True
         
     except Exception as e:
-        print(f"❌ Temp directory consistency test error: {e}")
+        print(f"[FAIL] Temp directory consistency test error: {e}")
         return False
 
 def test_worker_file_access():
@@ -141,7 +141,7 @@ def test_worker_file_access():
             if response.status_code == 200:
                 result = response.json()
                 task_id = result.get('task_id')
-                print(f"✅ File submitted for background processing (task: {task_id})")
+                print(f"[OK] File submitted for background processing (task: {task_id})")
                 
                 # Check task status after a short delay
                 time.sleep(2)
@@ -157,18 +157,18 @@ def test_worker_file_access():
                     if status_data.get('status') == 'FAILURE':
                         error = status_data.get('error', 'Unknown error')
                         if 'File not found' in error:
-                            print("❌ Worker cannot access uploaded file - volume mapping issue!")
+                            print("[FAIL] Worker cannot access uploaded file - volume mapping issue!")
                             return False
                         else:
                             print(f"   Task failed with different error: {error}")
                     
-                    print("✅ Worker can access uploaded files")
+                    print("[OK] Worker can access uploaded files")
                     return True
                 else:
-                    print(f"❌ Cannot check task status (status: {status_response.status_code})")
+                    print(f"[FAIL] Cannot check task status (status: {status_response.status_code})")
                     return False
             else:
-                print(f"❌ File ingestion failed (status: {response.status_code})")
+                print(f"[FAIL] File ingestion failed (status: {response.status_code})")
                 print(f"   Response: {response.text}")
                 return False
                 
@@ -178,7 +178,7 @@ def test_worker_file_access():
                 os.unlink(test_file_path)
                 
     except Exception as e:
-        print(f"❌ Worker file access test error: {e}")
+        print(f"[FAIL] Worker file access test error: {e}")
         return False
 
 def main():
@@ -204,17 +204,17 @@ def main():
             if test_func():
                 passed += 1
             else:
-                print(f"❌ {test_name} failed")
+                print(f"[FAIL] {test_name} failed")
         except Exception as e:
-            print(f"❌ {test_name} failed with exception: {e}")
+            print(f"[FAIL] {test_name} failed with exception: {e}")
     
     print(f"\n📊 Test Results: {passed}/{total} tests passed")
     
     if passed == total:
-        print("🎉 All temp directory validation tests passed!")
+        print("[SUCCESS] All temp directory validation tests passed!")
         return True
     else:
-        print("❌ Some tests failed - check temp directory configuration")
+        print("[FAIL] Some tests failed - check temp directory configuration")
         return False
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ async def test_qdrant_instantiation():
     try:
         from morag_services.storage import QdrantVectorStorage
         
-        print("✅ Successfully imported QdrantVectorStorage")
+        print("[OK] Successfully imported QdrantVectorStorage")
         
         # Try to instantiate
         storage = QdrantVectorStorage(
@@ -25,7 +25,7 @@ async def test_qdrant_instantiation():
             collection_name="test_collection"
         )
         
-        print("✅ Successfully instantiated QdrantVectorStorage")
+        print("[OK] Successfully instantiated QdrantVectorStorage")
         
         # Check that it has all required methods
         required_methods = [
@@ -41,22 +41,22 @@ async def test_qdrant_instantiation():
                 missing_methods.append(method)
         
         if missing_methods:
-            print(f"❌ Missing methods: {missing_methods}")
+            print(f"[FAIL] Missing methods: {missing_methods}")
             return False
         else:
-            print("✅ All required methods are present")
+            print("[OK] All required methods are present")
         
         # Test health check (without connecting to actual Qdrant)
         try:
             health = await storage.health_check()
-            print(f"✅ Health check method works (status: {health.get('status', 'unknown')})")
+            print(f"[OK] Health check method works (status: {health.get('status', 'unknown')})")
         except Exception as e:
-            print(f"⚠️  Health check failed (expected if Qdrant not running): {e}")
+            print(f"[WARN]  Health check failed (expected if Qdrant not running): {e}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[FAIL] Error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -70,11 +70,11 @@ async def main():
     
     print("=" * 50)
     if success:
-        print("✅ All tests passed! QdrantVectorStorage should work now.")
+        print("[OK] All tests passed! QdrantVectorStorage should work now.")
         print("\nThe abstract class error has been fixed!")
         print("You can now run MoRAG workers without the instantiation error.")
     else:
-        print("❌ Tests failed. Check the errors above.")
+        print("[FAIL] Tests failed. Check the errors above.")
     
     return success
 

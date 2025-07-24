@@ -32,7 +32,7 @@ def test_auto_detection_file():
         temp_file = Path(f.name)
     
     try:
-        print("🔄 Testing file upload without source_type...")
+        print("[PROCESSING] Testing file upload without source_type...")
         
         # Test without source_type (should auto-detect)
         with open(temp_file, 'rb') as f:
@@ -53,12 +53,12 @@ def test_auto_detection_file():
         
         if response.status_code == 200:
             result = response.json()
-            print_result("✅ Auto-detection successful", f"Task ID: {result['task_id']}")
+            print_result("[OK] Auto-detection successful", f"Task ID: {result['task_id']}")
             print_result("Status", result['status'])
             print_result("Message", result['message'])
             return result['task_id']
         else:
-            print_result("❌ Auto-detection failed", f"Status: {response.status_code}")
+            print_result("[FAIL] Auto-detection failed", f"Status: {response.status_code}")
             print_result("Error", response.text)
             return None
             
@@ -71,7 +71,7 @@ def test_auto_detection_url():
     print_section("Testing Auto-Detection for URL Ingestion")
     
     # Test YouTube URL auto-detection
-    print("🔄 Testing YouTube URL auto-detection...")
+    print("[PROCESSING] Testing YouTube URL auto-detection...")
     
     data = {
         'url': 'https://youtube.com/watch?v=dQw4w9WgXcQ',
@@ -89,17 +89,17 @@ def test_auto_detection_url():
     
     if response.status_code == 200:
         result = response.json()
-        print_result("✅ YouTube auto-detection successful", f"Task ID: {result['task_id']}")
+        print_result("[OK] YouTube auto-detection successful", f"Task ID: {result['task_id']}")
         print_result("Status", result['status'])
         print_result("Message", result['message'])
         youtube_task_id = result['task_id']
     else:
-        print_result("❌ YouTube auto-detection failed", f"Status: {response.status_code}")
+        print_result("[FAIL] YouTube auto-detection failed", f"Status: {response.status_code}")
         print_result("Error", response.text)
         youtube_task_id = None
     
     # Test web URL auto-detection
-    print("\n🔄 Testing web URL auto-detection...")
+    print("\n[PROCESSING] Testing web URL auto-detection...")
     
     data = {
         'url': 'https://httpbin.org/html',
@@ -117,12 +117,12 @@ def test_auto_detection_url():
     
     if response.status_code == 200:
         result = response.json()
-        print_result("✅ Web auto-detection successful", f"Task ID: {result['task_id']}")
+        print_result("[OK] Web auto-detection successful", f"Task ID: {result['task_id']}")
         print_result("Status", result['status'])
         print_result("Message", result['message'])
         web_task_id = result['task_id']
     else:
-        print_result("❌ Web auto-detection failed", f"Status: {response.status_code}")
+        print_result("[FAIL] Web auto-detection failed", f"Status: {response.status_code}")
         print_result("Error", response.text)
         web_task_id = None
     
@@ -133,7 +133,7 @@ def test_batch_auto_detection():
     """Test automatic content type detection for batch ingestion."""
     print_section("Testing Auto-Detection for Batch Ingestion")
     
-    print("🔄 Testing batch ingestion with mixed auto-detection...")
+    print("[PROCESSING] Testing batch ingestion with mixed auto-detection...")
     
     data = {
         'items': [
@@ -157,12 +157,12 @@ def test_batch_auto_detection():
     
     if response.status_code == 200:
         result = response.json()
-        print_result("✅ Batch auto-detection successful", f"Batch ID: {result['batch_id']}")
+        print_result("[OK] Batch auto-detection successful", f"Batch ID: {result['batch_id']}")
         print_result("Task IDs", result['task_ids'])
         print_result("Total items", result['total_items'])
         return result['task_ids']
     else:
-        print_result("❌ Batch auto-detection failed", f"Status: {response.status_code}")
+        print_result("[FAIL] Batch auto-detection failed", f"Status: {response.status_code}")
         print_result("Error", response.text)
         return []
 
@@ -184,14 +184,14 @@ def monitor_task(task_id, description="Task"):
                 
                 if status['status'] in ['SUCCESS', 'FAILURE']:
                     if status['status'] == 'SUCCESS':
-                        print_result(f"✅ {description} completed", "Success")
+                        print_result(f"[OK] {description} completed", "Success")
                         if status.get('result'):
                             result = status['result']
                             if 'metadata' in result:
                                 print_result("Detected source type", 
                                            result['metadata'].get('source_type', 'unknown'))
                     else:
-                        print_result(f"❌ {description} failed", status.get('error', 'Unknown error'))
+                        print_result(f"[FAIL] {description} failed", status.get('error', 'Unknown error'))
                     
                     return status
                     
@@ -235,7 +235,7 @@ def main():
         monitor_task(task_id, f"Batch item {i+1}")
     
     print_section("Test Summary")
-    print("✅ All ingestion fix tests completed!")
+    print("[OK] All ingestion fix tests completed!")
     print("📝 Check the logs above for any failures or issues.")
     print("🔧 The options variable error should be fixed.")
     print("🎯 Auto-detection should work for files and URLs.")
