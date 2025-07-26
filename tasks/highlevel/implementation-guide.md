@@ -41,12 +41,12 @@
    QDRANT_URL=http://localhost:6333
    ```
 
-### Implementation Order
+### Implementation Status & Next Steps
 
-#### Phase 1: Foundation (Weeks 1-2)
-Start with the core entity and relation extraction improvements:
+#### ✅ Phase 1: Foundation (COMPLETED)
+The core entity and relation extraction is fully implemented:
 
-1. **Begin with Task 1: SpaCy NER Integration**
+1. **✅ Task 1: SpaCy NER Integration - COMPLETED**
    ```bash
    # Create the SpaCy extractor
    touch packages/morag-graph/src/morag_graph/extraction/spacy_extractor.py
