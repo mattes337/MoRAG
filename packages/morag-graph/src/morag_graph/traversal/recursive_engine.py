@@ -19,7 +19,7 @@ logger = structlog.get_logger(__name__)
 
 @dataclass
 class TraversalState:
-    """Represents the current state of traversal."""
+    """Represents the current state of traversal with enhanced context preservation."""
     current_entity: Entity
     visited_entities: Set[str]
     path_entities: List[Entity]
@@ -27,6 +27,59 @@ class TraversalState:
     depth: int
     accumulated_score: float
     metadata: Dict[str, Any]
+
+    # Enhanced context preservation fields
+    relationship_chain: List[str] = None  # Semantic chain of relationships
+    context_summary: str = ""  # Running summary of path context
+    semantic_coherence: float = 1.0  # Measure of semantic coherence
+    query_relevance_history: List[float] = None  # Relevance at each hop
+    source_documents: Set[str] = None  # Documents contributing to this path
+
+    def __post_init__(self):
+        """Initialize default values for new fields."""
+        if self.relationship_chain is None:
+            self.relationship_chain = []
+        if self.query_relevance_history is None:
+            self.query_relevance_history = []
+        if self.source_documents is None:
+            self.source_documents = set()
+
+    def add_hop(self, entity: Entity, relation: Relation, relevance_score: float,
+                context_description: str = "") -> 'TraversalState':
+        """Create new state with added hop and preserved context."""
+        new_visited = self.visited_entities.copy()
+        new_visited.add(entity.id)
+
+        new_chain = self.relationship_chain.copy()
+        if relation:
+            new_chain.append(f"{relation.type}: {context_description}")
+
+        new_relevance_history = self.query_relevance_history.copy()
+        new_relevance_history.append(relevance_score)
+
+        # Update context summary
+        new_context = self.context_summary
+        if context_description:
+            new_context += f" -> {context_description}"
+
+        # Calculate semantic coherence decay
+        coherence_decay = 0.9 if relevance_score > 0.7 else 0.8
+        new_coherence = self.semantic_coherence * coherence_decay
+
+        return TraversalState(
+            current_entity=entity,
+            visited_entities=new_visited,
+            path_entities=self.path_entities + [entity],
+            path_relations=self.path_relations + ([relation] if relation else []),
+            depth=self.depth + 1,
+            accumulated_score=self.accumulated_score * relevance_score,
+            metadata=self.metadata.copy(),
+            relationship_chain=new_chain,
+            context_summary=new_context,
+            semantic_coherence=new_coherence,
+            query_relevance_history=new_relevance_history,
+            source_documents=self.source_documents.copy()
+        )
 
 
 @dataclass
@@ -236,7 +289,12 @@ class RecursiveTraversalEngine:
                 path_relations=[],
                 depth=0,
                 accumulated_score=1.0,
-                metadata={}
+                metadata={'query': query_context.query if hasattr(query_context, 'query') else ''},
+                relationship_chain=[],
+                context_summary=f"Starting from {entity.name}",
+                semantic_coherence=1.0,
+                query_relevance_history=[1.0],
+                source_documents=set()
             )
             queue.append(initial_state)
         
@@ -260,9 +318,19 @@ class RecursiveTraversalEngine:
                     path_score = PathRelevanceScore(
                         path=path,
                         relevance_score=current_state.accumulated_score,
-                        confidence=0.8,
-                        reasoning=f"Breadth-first path at depth {current_state.depth}",
-                        metadata={'traversal_method': 'breadth_first'}
+                        confidence=min(0.9, current_state.semantic_coherence),
+                        reasoning=f"Breadth-first path at depth {current_state.depth}: {current_state.context_summary}",
+                        metadata={
+                            'traversal_method': 'breadth_first',
+                            'depth': current_state.depth,
+                            'semantic_coherence': current_state.semantic_coherence
+                        },
+                        relationship_chain=current_state.relationship_chain.copy(),
+                        context_summary=current_state.context_summary,
+                        semantic_coherence=current_state.semantic_coherence,
+                        query_alignment=self._calculate_query_alignment(current_state, query_context),
+                        source_documents=current_state.source_documents.copy(),
+                        hop_relevances=current_state.query_relevance_history.copy()
                     )
                     discovered_paths.append(path_score)
                 continue
@@ -413,8 +481,138 @@ class RecursiveTraversalEngine:
         max_depth: int
     ) -> Tuple[List[PathRelevanceScore], Dict[str, int]]:
         """Perform relevance-guided traversal using LLM scoring."""
-        # For now, use breadth-first with enhanced scoring
-        return await self._traverse_breadth_first(starting_entities, query_context, max_depth)
+        discovered_paths = []
+        entities_visited = 0
+        relations_traversed = 0
+
+        # Use priority queue for relevance-guided exploration
+        from heapq import heappush, heappop
+
+        # Priority queue: (-relevance_score, depth, path)
+        priority_queue = []
+
+        # Initialize with starting entities
+        for entity in starting_entities:
+            initial_path = PathRelevanceScore(
+                path=GraphPath(entities=[entity], relations=[]),
+                relevance_score=1.0,  # Starting entities get max relevance
+                confidence=0.9,
+                reasoning="Starting entity",
+                metadata={'depth': 0}
+            )
+            heappush(priority_queue, (-1.0, 0, initial_path))
+
+        visited_paths = set()
+
+        while priority_queue and len(discovered_paths) < self.max_paths_per_depth:
+            neg_relevance, depth, current_path = heappop(priority_queue)
+            relevance = -neg_relevance
+
+            # Skip if we've reached max depth
+            if depth >= max_depth:
+                discovered_paths.append(current_path)
+                continue
+
+            # Skip if we've seen this path before
+            path_signature = self._get_path_signature(current_path.path)
+            if path_signature in visited_paths:
+                continue
+            visited_paths.add(path_signature)
+
+            # Add current path to results
+            discovered_paths.append(current_path)
+            entities_visited += 1
+
+            # Get neighbors of the last entity in the path
+            last_entity = current_path.path.entities[-1]
+
+            try:
+                neighbors = await self.graph_operations.find_neighbors(
+                    last_entity.id, max_distance=1
+                )
+
+                # Score and filter neighbors using path selector if available
+                if hasattr(self, 'path_selector') and self.path_selector:
+                    neighbor_paths = []
+                    for neighbor in neighbors:
+                        # Create extended path
+                        extended_path = GraphPath(
+                            entities=current_path.path.entities + [neighbor],
+                            relations=current_path.path.relations + [
+                                # Simplified relation - in practice, get actual relation
+                                type('Relation', (), {'type': 'RELATED_TO', 'id': f"rel_{last_entity.id}_{neighbor.id}"})()
+                            ]
+                        )
+                        neighbor_paths.append(extended_path)
+
+                    # Score paths with LLM
+                    scored_neighbor_paths = await self.path_selector.select_paths(
+                        query_context.query if hasattr(query_context, 'query') else "",
+                        starting_entities,
+                        neighbor_paths,
+                        query_context
+                    )
+
+                    # Add scored paths to priority queue
+                    for scored_path in scored_neighbor_paths:
+                        if scored_path.relevance_score > 0.3:  # Threshold for exploration
+                            heappush(priority_queue, (
+                                -scored_path.relevance_score,
+                                depth + 1,
+                                scored_path
+                            ))
+                            relations_traversed += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to get neighbors for entity {last_entity.id}: {e}")
+                continue
+
+        return discovered_paths, {
+            'entities_visited': entities_visited,
+            'relations_traversed': relations_traversed
+        }
+
+    def _get_path_signature(self, path: GraphPath) -> str:
+        """Generate a unique signature for a path to detect duplicates."""
+        entity_ids = [entity.id for entity in path.entities]
+        return "->".join(entity_ids)
+
+    def _calculate_query_alignment(self, state: TraversalState, query_context: QueryContext) -> float:
+        """Calculate how well the current path aligns with the query."""
+        try:
+            # Get query terms
+            query_terms = set()
+            if hasattr(query_context, 'query'):
+                query_terms.update(query_context.query.lower().split())
+            if hasattr(query_context, 'keywords'):
+                query_terms.update([k.lower() for k in query_context.keywords])
+
+            if not query_terms:
+                return 0.5  # Default alignment if no query terms
+
+            # Check alignment with path entities
+            path_terms = set()
+            for entity in state.path_entities:
+                path_terms.update(entity.name.lower().split())
+                if hasattr(entity, 'type') and entity.type:
+                    path_terms.add(entity.type.lower())
+
+            # Check alignment with relationship chain
+            for rel_desc in state.relationship_chain:
+                path_terms.update(rel_desc.lower().split())
+
+            # Calculate overlap
+            if not path_terms:
+                return 0.3
+
+            overlap = len(query_terms.intersection(path_terms))
+            total_terms = len(query_terms.union(path_terms))
+
+            return overlap / total_terms if total_terms > 0 else 0.0
+
+        except Exception as e:
+            logger.warning(f"Failed to calculate query alignment: {e}")
+            return 0.5
     
     async def _traverse_adaptive(
         self,

@@ -267,37 +267,48 @@ class ResponseGenerator:
         facts: List[CitedFact],
         options: ResponseOptions
     ) -> str:
-        """Create prompt for LLM response generation."""
-        # Format facts for prompt
-        facts_text = "\n".join([
-            f"Fact {i+1}: {fact.fact.content} (Confidence: {fact.score:.2f})"
-            for i, fact in enumerate(facts)
-        ])
-        
-        # Create prompt based on format and structure
-        prompt = f"""
-You are an expert research assistant tasked with generating a comprehensive response to a user query based on gathered facts.
+        """Create enhanced prompt for LLM response generation."""
+        # Analyze facts for conflicts and relationships
+        fact_analysis = self._analyze_facts_for_synthesis(facts)
 
-User Query: "{query}"
+        # Format facts with enhanced context
+        facts_text = self._format_facts_for_prompt(facts, fact_analysis)
 
-Available Facts:
+        # Create enhanced prompt
+        prompt = f"""You are an expert research assistant with advanced analytical capabilities. Generate a comprehensive, well-reasoned response to the user query based on the provided facts.
+
+USER QUERY: "{query}"
+
+FACT ANALYSIS:
+{fact_analysis['summary']}
+
+AVAILABLE FACTS:
 {facts_text}
 
-Instructions:
-1. Generate a {options.format.value} response in {options.structure.value} structure
-2. Maximum length: {options.max_length} words
-3. Tone: {options.tone}
-4. Language: {options.language}
-5. Include proper reasoning if requested: {options.include_reasoning}
-6. Include confidence assessment if requested: {options.include_confidence}
+SYNTHESIS INSTRUCTIONS:
+1. **Response Format**: {options.format.value} in {options.structure.value} structure
+2. **Length**: Maximum {options.max_length} words
+3. **Tone**: {options.tone}
+4. **Language**: {options.language}
+5. **Reasoning**: {'Include detailed reasoning' if options.include_reasoning else 'Focus on conclusions'}
+6. **Confidence**: {'Include confidence assessments' if options.include_confidence else 'Standard presentation'}
 
-Response Requirements:
-- Synthesize the facts into a coherent, well-structured response
-- Maintain logical flow and clear organization
-- Address the user query directly and comprehensively
-- Use appropriate citations (will be added separately)
-- Ensure factual accuracy and consistency
-- Provide reasoning for conclusions when appropriate
+CRITICAL REQUIREMENTS:
+- **Fact Integration**: Synthesize facts into a coherent narrative, not just a list
+- **Conflict Resolution**: {fact_analysis['conflict_guidance']}
+- **Evidence Hierarchy**: Prioritize higher-confidence facts and multiple-source information
+- **Logical Flow**: Ensure clear progression from evidence to conclusions
+- **Query Alignment**: Directly address all aspects of the user's question
+- **Transparency**: Acknowledge limitations or uncertainties when appropriate
+
+RESPONSE STRUCTURE GUIDELINES:
+- Start with a clear, direct answer to the main query
+- Present supporting evidence in logical order
+- Address any nuances, exceptions, or conflicting information
+- Conclude with synthesis and implications
+- Use transitional phrases to maintain flow
+
+Generate a response that demonstrates sophisticated understanding and synthesis of the provided information."""
 
 Format your response as JSON:
 {{
@@ -310,6 +321,130 @@ Format your response as JSON:
 """
         
         return prompt
+
+    def _analyze_facts_for_synthesis(self, facts: List[CitedFact]) -> Dict[str, str]:
+        """Analyze facts to guide synthesis and identify conflicts."""
+        analysis = {
+            'summary': '',
+            'conflict_guidance': 'No significant conflicts detected'
+        }
+
+        if not facts:
+            analysis['summary'] = "No facts available for analysis"
+            return analysis
+
+        # Analyze fact distribution
+        high_confidence_facts = [f for f in facts if f.score >= 0.8]
+        medium_confidence_facts = [f for f in facts if 0.5 <= f.score < 0.8]
+        low_confidence_facts = [f for f in facts if f.score < 0.5]
+
+        # Analyze fact types
+        fact_types = {}
+        for fact in facts:
+            fact_type = fact.fact.fact_type.value
+            fact_types[fact_type] = fact_types.get(fact_type, 0) + 1
+
+        # Analyze source diversity
+        all_sources = set()
+        for fact in facts:
+            all_sources.update(fact.sources)
+
+        # Create summary
+        summary_parts = [
+            f"Total facts: {len(facts)}",
+            f"High confidence (≥0.8): {len(high_confidence_facts)}",
+            f"Medium confidence (0.5-0.8): {len(medium_confidence_facts)}",
+            f"Low confidence (<0.5): {len(low_confidence_facts)}",
+            f"Unique sources: {len(all_sources)}",
+            f"Fact types: {', '.join([f'{k}({v})' for k, v in fact_types.items()])}"
+        ]
+        analysis['summary'] = " | ".join(summary_parts)
+
+        # Detect potential conflicts
+        conflicts = self._detect_fact_conflicts(facts)
+        if conflicts:
+            analysis['conflict_guidance'] = f"Address {len(conflicts)} potential conflicts by weighing evidence quality and source reliability"
+
+        return analysis
+
+    def _format_facts_for_prompt(self, facts: List[CitedFact], analysis: Dict[str, str]) -> str:
+        """Format facts with enhanced context for the prompt."""
+        formatted_facts = []
+
+        for i, fact in enumerate(facts):
+            # Basic fact information
+            fact_text = f"Fact {i+1}: {fact.fact.content}"
+
+            # Add confidence and source information
+            confidence_text = f"Confidence: {fact.score:.2f}"
+            source_count = len(fact.sources)
+            source_text = f"Sources: {source_count}"
+
+            # Add fact type and context
+            fact_type = fact.fact.fact_type.value
+            type_text = f"Type: {fact_type}"
+
+            # Add extraction context if available
+            context_parts = []
+            if hasattr(fact.fact, 'context') and fact.fact.context:
+                if fact.fact.context.get('semantic_context'):
+                    context_parts.append(f"Context: {fact.fact.context['semantic_context']}")
+                if fact.fact.context.get('hop_position') is not None:
+                    context_parts.append(f"Hop: {fact.fact.context['hop_position']}")
+
+            # Combine all information
+            metadata = [confidence_text, source_text, type_text] + context_parts
+            formatted_fact = f"{fact_text} [{' | '.join(metadata)}]"
+            formatted_facts.append(formatted_fact)
+
+        return "\n".join(formatted_facts)
+
+    def _detect_fact_conflicts(self, facts: List[CitedFact]) -> List[Dict[str, Any]]:
+        """Detect potential conflicts between facts."""
+        conflicts = []
+
+        # Simple conflict detection based on content similarity and opposing statements
+        for i, fact1 in enumerate(facts):
+            for j, fact2 in enumerate(facts[i+1:], i+1):
+                # Check for contradictory statements
+                if self._are_facts_contradictory(fact1, fact2):
+                    conflicts.append({
+                        'fact1_id': i,
+                        'fact2_id': j,
+                        'fact1_content': fact1.fact.content,
+                        'fact2_content': fact2.fact.content,
+                        'fact1_confidence': fact1.score,
+                        'fact2_confidence': fact2.score,
+                        'type': 'contradiction'
+                    })
+
+        return conflicts
+
+    def _are_facts_contradictory(self, fact1: CitedFact, fact2: CitedFact) -> bool:
+        """Check if two facts are contradictory."""
+        # Simple heuristic: look for negation words and opposing statements
+        content1 = fact1.fact.content.lower()
+        content2 = fact2.fact.content.lower()
+
+        # Check for explicit negations
+        negation_words = ['not', 'no', 'never', 'cannot', 'does not', 'is not', 'are not']
+
+        # Extract key terms (simplified approach)
+        words1 = set(content1.split())
+        words2 = set(content2.split())
+
+        # Check if one contains negation and they share key terms
+        has_negation1 = any(neg in content1 for neg in negation_words)
+        has_negation2 = any(neg in content2 for neg in negation_words)
+
+        if has_negation1 != has_negation2:  # One has negation, other doesn't
+            # Check if they share significant terms
+            common_words = words1.intersection(words2)
+            significant_words = [w for w in common_words if len(w) > 3]
+            if len(significant_words) >= 2:
+                return True
+
+        return False
     
     def _parse_llm_response(
         self,

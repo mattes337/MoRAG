@@ -265,17 +265,23 @@ class CitationManager:
         document_id: str,
         fact: ExtractedFact
     ) -> Optional[SourceReference]:
-        """Create source reference from document ID."""
+        """Create enhanced source reference from document ID."""
         # Check cache first
         if self._source_cache and document_id in self._source_cache:
             cached_ref = self._source_cache[document_id]
+
+            # Extract chunk information from fact context
+            chunk_id = self._extract_chunk_id_from_fact(fact, document_id)
+            page_number = self._extract_page_number_from_fact(fact, cached_ref)
+            timestamp = self._extract_timestamp_from_fact(fact, cached_ref)
+
             return SourceReference(
                 document_id=document_id,
-                document_title=cached_ref.get('title'),
-                chunk_id=None,  # Would need to be determined from fact context
-                page_number=cached_ref.get('page'),
-                timestamp=cached_ref.get('timestamp'),
-                confidence=fact.confidence,
+                document_title=cached_ref.get('title', f"Document {document_id}"),
+                chunk_id=chunk_id,
+                page_number=page_number,
+                timestamp=timestamp,
+                confidence=self._calculate_source_confidence(fact, cached_ref),
                 url=cached_ref.get('url'),
                 author=cached_ref.get('author'),
                 publication_date=cached_ref.get('publication_date'),
@@ -482,5 +488,102 @@ class CitationManager:
             return "verified"
         elif verification_ratio >= 0.5:
             return "partially_verified"
+
+    def _extract_chunk_id_from_fact(self, fact: ExtractedFact, document_id: str) -> Optional[str]:
+        """Extract chunk ID from fact context."""
+        if hasattr(fact, 'context') and fact.context:
+            # Look for chunk information in context
+            chunk_info = fact.context.get('chunk_id')
+            if chunk_info:
+                return str(chunk_info)
+
+        if hasattr(fact, 'metadata') and fact.metadata:
+            # Look for chunk information in metadata
+            chunk_info = fact.metadata.get('chunk_id')
+            if chunk_info:
+                return str(chunk_info)
+
+        # Generate chunk ID from extraction path if available
+        if fact.extraction_path and len(fact.extraction_path) > 0:
+            return f"chunk_{document_id}_{hash(''.join(fact.extraction_path)) % 10000}"
+
+        return None
+
+    def _extract_page_number_from_fact(self, fact: ExtractedFact, cached_ref: Dict[str, Any]) -> Optional[int]:
+        """Extract page number from fact context or cached reference."""
+        # Check fact context first
+        if hasattr(fact, 'context') and fact.context:
+            page_info = fact.context.get('page_number') or fact.context.get('page')
+            if page_info and isinstance(page_info, (int, str)):
+                try:
+                    return int(page_info)
+                except ValueError:
+                    pass
+
+        # Check fact metadata
+        if hasattr(fact, 'metadata') and fact.metadata:
+            page_info = fact.metadata.get('page_number') or fact.metadata.get('page')
+            if page_info and isinstance(page_info, (int, str)):
+                try:
+                    return int(page_info)
+                except ValueError:
+                    pass
+
+        # Fall back to cached reference
+        page_info = cached_ref.get('page')
+        if page_info and isinstance(page_info, (int, str)):
+            try:
+                return int(page_info)
+            except ValueError:
+                pass
+
+        return None
+
+    def _extract_timestamp_from_fact(self, fact: ExtractedFact, cached_ref: Dict[str, Any]) -> Optional[str]:
+        """Extract timestamp from fact context or cached reference."""
+        # Check fact metadata for extraction timestamp
+        if hasattr(fact, 'metadata') and fact.metadata:
+            extraction_time = fact.metadata.get('extraction_timestamp')
+            if extraction_time:
+                try:
+                    dt = datetime.fromtimestamp(extraction_time)
+                    return dt.strftime("%Y-%m-%d %H:%M:%S")
+                except (ValueError, OSError):
+                    pass
+
+        # Check fact context for temporal information
+        if hasattr(fact, 'context') and fact.context:
+            timestamp_info = fact.context.get('timestamp')
+            if timestamp_info:
+                return str(timestamp_info)
+
+        # Fall back to cached reference
+        return cached_ref.get('timestamp')
+
+    def _calculate_source_confidence(self, fact: ExtractedFact, cached_ref: Dict[str, Any]) -> float:
+        """Calculate confidence score for the source reference."""
+        base_confidence = fact.confidence
+
+        # Adjust based on source metadata quality
+        metadata_quality = 0.0
+        if cached_ref.get('title'):
+            metadata_quality += 0.1
+        if cached_ref.get('author'):
+            metadata_quality += 0.1
+        if cached_ref.get('publication_date'):
+            metadata_quality += 0.1
+        if cached_ref.get('url'):
+            metadata_quality += 0.05
+
+        # Adjust based on fact context completeness
+        context_quality = 0.0
+        if hasattr(fact, 'context') and fact.context:
+            if fact.context.get('semantic_context'):
+                context_quality += 0.05
+            if fact.context.get('hop_position') is not None:
+                context_quality += 0.05
+
+        final_confidence = base_confidence + metadata_quality + context_quality
+        return min(1.0, final_confidence)
         else:
             return "unverified"

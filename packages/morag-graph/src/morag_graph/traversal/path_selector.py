@@ -22,13 +22,50 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 
-class PathRelevanceScore(NamedTuple):
-    """Represents a path with its relevance score."""
+@dataclass
+class PathRelevanceScore:
+    """Represents a path with its relevance score and enhanced context."""
     path: GraphPath
     relevance_score: float
     confidence: float
     reasoning: str
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = None
+
+    # Enhanced context fields
+    relationship_chain: List[str] = None  # Semantic description of relationships
+    context_summary: str = ""  # Summary of path context
+    semantic_coherence: float = 1.0  # Measure of semantic coherence
+    query_alignment: float = 0.0  # How well path aligns with query
+    source_documents: Set[str] = None  # Contributing source documents
+    hop_relevances: List[float] = None  # Relevance at each hop
+
+    def __post_init__(self):
+        """Initialize default values."""
+        if self.metadata is None:
+            self.metadata = {}
+        if self.relationship_chain is None:
+            self.relationship_chain = []
+        if self.source_documents is None:
+            self.source_documents = set()
+        if self.hop_relevances is None:
+            self.hop_relevances = []
+
+    def get_context_description(self) -> str:
+        """Get a human-readable description of the path context."""
+        if not self.relationship_chain:
+            return "Direct path with no intermediate relationships"
+
+        return " -> ".join(self.relationship_chain)
+
+    def calculate_overall_quality(self) -> float:
+        """Calculate overall path quality considering multiple factors."""
+        factors = [
+            self.relevance_score * 0.4,  # Primary relevance
+            self.confidence * 0.2,       # Confidence in scoring
+            self.semantic_coherence * 0.2,  # Semantic coherence
+            self.query_alignment * 0.2   # Query alignment
+        ]
+        return sum(factors)
 
 
 class TraversalStrategy(Enum):
@@ -252,27 +289,51 @@ class LLMPathSelector:
         paths: List[GraphPath],
         query_context: Optional[QueryContext]
     ) -> str:
-        """Create evaluation prompt for LLM."""
-        prompt = f"""
-You are an expert at evaluating graph paths for relevance to user queries.
+        """Create enhanced evaluation prompt for LLM."""
+        # Add context information
+        context_info = ""
+        if query_context:
+            context_info = f"""
+Query Context:
+- Intent: {query_context.intent if hasattr(query_context, 'intent') else 'Unknown'}
+- Complexity: {query_context.complexity_score if hasattr(query_context, 'complexity_score') else 'Unknown'}
+- Domain: {query_context.domain if hasattr(query_context, 'domain') else 'General'}
+"""
+
+        prompt = f"""You are an expert knowledge graph analyst evaluating paths for relevance to user queries.
 
 Query: "{query}"
+{context_info}
 
-Please evaluate the following paths and score their relevance to the query on a scale of 0.0 to 1.0:
+EVALUATION CRITERIA:
+1. **Direct Relevance**: How directly does the path answer the query?
+2. **Semantic Coherence**: Do the entities and relations form a logical chain?
+3. **Information Value**: How much useful information does the path provide?
+4. **Path Quality**: Are the connections meaningful and not just coincidental?
+5. **Completeness**: Does the path provide a complete answer or useful partial information?
 
+PATHS TO EVALUATE:
 """
-        
+
         for i, path in enumerate(paths):
-            path_description = self._describe_path(path)
+            path_description = self._describe_path_enhanced(path)
             prompt += f"\nPath {i+1}: {path_description}\n"
-        
+
         prompt += """
+SCORING GUIDELINES:
+- 0.9-1.0: Directly answers the query with high-quality, relevant information
+- 0.7-0.8: Highly relevant with good information value
+- 0.5-0.6: Moderately relevant, provides some useful information
+- 0.3-0.4: Tangentially related, limited usefulness
+- 0.0-0.2: Not relevant or poor quality connections
+
 For each path, provide:
 1. Relevance score (0.0-1.0)
-2. Confidence (0.0-1.0)
-3. Brief reasoning
+2. Confidence in your evaluation (0.0-1.0)
+3. Brief reasoning explaining your score
+4. Key strengths or weaknesses
 
-Format your response as JSON:
+Format as JSON:
 {
   "evaluations": [
     {
@@ -303,6 +364,52 @@ Format your response as JSON:
                 description_parts.append(f" --[{relation.type}]--> ")
         
         return "".join(description_parts)
+
+    def _describe_path_enhanced(self, path: GraphPath) -> str:
+        """Create an enhanced human-readable description of a path with context."""
+        if not path.entities or not path.relations:
+            return "Empty path"
+
+        # Build detailed description
+        description = f"Length: {len(path.entities)} entities, {len(path.relations)} relations\n"
+        description += "Path: "
+
+        path_parts = []
+        for i, entity in enumerate(path.entities):
+            # Add entity with type and description if available
+            entity_desc = f"{entity.name}"
+            if hasattr(entity, 'type') and entity.type:
+                entity_desc += f" ({entity.type})"
+
+            path_parts.append(entity_desc)
+
+            # Add relation if not the last entity
+            if i < len(path.relations):
+                relation = path.relations[i]
+                relation_desc = f" --[{relation.type}]"
+                if hasattr(relation, 'properties') and relation.properties:
+                    # Add key properties for context
+                    key_props = []
+                    for key, value in relation.properties.items():
+                        if key in ['confidence', 'weight', 'strength'] and isinstance(value, (int, float)):
+                            key_props.append(f"{key}:{value:.2f}")
+                    if key_props:
+                        relation_desc += f"({', '.join(key_props)})"
+                relation_desc += "--> "
+                path_parts.append(relation_desc)
+
+        description += "".join(path_parts)
+
+        # Add metadata if available
+        if hasattr(path, 'metadata') and path.metadata:
+            metadata_info = []
+            for key, value in path.metadata.items():
+                if key in ['confidence', 'weight', 'relevance'] and isinstance(value, (int, float)):
+                    metadata_info.append(f"{key}: {value:.3f}")
+            if metadata_info:
+                description += f"\nMetadata: {', '.join(metadata_info)}"
+
+        return description
     
     def _parse_llm_response(
         self,

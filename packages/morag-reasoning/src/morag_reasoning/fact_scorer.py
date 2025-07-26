@@ -415,18 +415,50 @@ class FactRelevanceScorer:
         return min(1.0, overlap / len(query_words))
     
     def _calculate_source_quality(self, fact: ExtractedFact) -> float:
-        """Calculate source quality score."""
+        """Calculate enhanced source quality score."""
         quality_score = 0.5  # Base score
-        
-        # Boost for multiple sources
-        if len(fact.source_documents) > 1:
-            quality_score += 0.2
-        
-        # Boost for direct facts (more reliable)
-        if fact.fact_type == FactType.DIRECT:
-            quality_score += 0.2
-        elif fact.fact_type == FactType.CHAIN:
-            quality_score += 0.1
+
+        # Source diversity bonus
+        num_sources = len(fact.source_documents)
+        if num_sources > 1:
+            # Logarithmic scaling for multiple sources
+            source_bonus = min(0.3, 0.1 * (num_sources - 1))
+            quality_score += source_bonus
+
+        # Fact type reliability
+        fact_type_scores = {
+            FactType.DIRECT: 0.3,      # Most reliable
+            FactType.CONTEXTUAL: 0.2,  # Good reliability
+            FactType.CHAIN: 0.15,      # Moderate reliability
+            FactType.INFERRED: 0.1,    # Lower reliability
+            FactType.TEMPORAL: 0.1     # Context-dependent
+        }
+        quality_score += fact_type_scores.get(fact.fact_type, 0.0)
+
+        # Entity type reliability
+        if hasattr(fact, 'context') and fact.context:
+            entity_types = [
+                fact.context.get('source_entity_type', ''),
+                fact.context.get('target_entity_type', '')
+            ]
+            reliable_types = {'PERSON', 'ORGANIZATION', 'LOCATION', 'CONCEPT'}
+            reliable_count = sum(1 for et in entity_types if et in reliable_types)
+            quality_score += reliable_count * 0.05
+
+        # Path length penalty for chain facts
+        if fact.fact_type == FactType.CHAIN and hasattr(fact, 'metadata'):
+            path_length = fact.metadata.get('path_length', 2)
+            if path_length > 3:
+                penalty = min(0.2, (path_length - 3) * 0.05)
+                quality_score -= penalty
+
+        # Extraction method bonus
+        if hasattr(fact, 'metadata') and fact.metadata:
+            extraction_method = fact.metadata.get('extraction_method', '')
+            if 'enhanced' in extraction_method:
+                quality_score += 0.1
+            elif 'llm' in extraction_method.lower():
+                quality_score += 0.05
         
         # Boost for facts with entity sources
         if fact.source_entities:
@@ -435,14 +467,97 @@ class FactRelevanceScorer:
         return min(1.0, quality_score)
     
     def _calculate_confidence_score(self, fact: ExtractedFact) -> float:
-        """Calculate confidence score."""
-        return fact.confidence
+        """Calculate enhanced confidence score."""
+        base_confidence = fact.confidence
+
+        # Adjust based on extraction context
+        confidence_adjustments = 0.0
+
+        # Boost for facts with semantic context
+        if hasattr(fact, 'context') and fact.context:
+            if fact.context.get('semantic_context'):
+                confidence_adjustments += 0.05
+
+            # Boost for facts with clear entity types
+            entity_types = [
+                fact.context.get('source_entity_type', ''),
+                fact.context.get('target_entity_type', '')
+            ]
+            if all(et and et != 'Unknown' for et in entity_types):
+                confidence_adjustments += 0.1
+
+        # Adjust based on fact type
+        fact_type_adjustments = {
+            FactType.DIRECT: 0.1,      # Direct facts are more reliable
+            FactType.CONTEXTUAL: 0.05, # Contextual facts are moderately reliable
+            FactType.CHAIN: -0.05,     # Chain facts have some uncertainty
+            FactType.INFERRED: -0.1,   # Inferred facts are less certain
+            FactType.TEMPORAL: 0.0     # Temporal facts depend on context
+        }
+        confidence_adjustments += fact_type_adjustments.get(fact.fact_type, 0.0)
+
+        # Adjust based on source count
+        if len(fact.source_documents) > 1:
+            confidence_adjustments += min(0.15, len(fact.source_documents) * 0.03)
+
+        # Adjust based on extraction metadata
+        if hasattr(fact, 'metadata') and fact.metadata:
+            # Boost for recent extractions (more likely to use better methods)
+            extraction_time = fact.metadata.get('extraction_timestamp', 0)
+            if extraction_time > time.time() - 3600:  # Within last hour
+                confidence_adjustments += 0.05
+
+            # Boost for enhanced extraction methods
+            extraction_method = fact.metadata.get('extraction_method', '')
+            if 'enhanced' in extraction_method:
+                confidence_adjustments += 0.1
+
+        final_confidence = base_confidence + confidence_adjustments
+        return min(1.0, max(0.0, final_confidence))
     
     def _calculate_recency_score(self, fact: ExtractedFact) -> float:
-        """Calculate recency score."""
-        # For now, return neutral score
-        # This could be enhanced with temporal analysis
-        return 0.5
+        """Calculate enhanced recency score."""
+        recency_score = 0.5  # Base score for unknown recency
+
+        # Check for temporal information in fact content
+        if self._contains_temporal_indicators(fact.content):
+            recency_score += 0.2
+
+        # Check extraction timestamp
+        if hasattr(fact, 'metadata') and fact.metadata:
+            extraction_time = fact.metadata.get('extraction_timestamp', 0)
+            if extraction_time > 0:
+                # More recent extractions get higher scores
+                time_diff = time.time() - extraction_time
+                if time_diff < 3600:  # Within 1 hour
+                    recency_score += 0.3
+                elif time_diff < 86400:  # Within 1 day
+                    recency_score += 0.2
+                elif time_diff < 604800:  # Within 1 week
+                    recency_score += 0.1
+
+        # Check for temporal context in fact metadata
+        if hasattr(fact, 'context') and fact.context:
+            temporal_context = fact.context.get('temporal_context')
+            if temporal_context:
+                # Boost for facts with explicit temporal context
+                recency_score += 0.15
+
+        # Check fact type - temporal facts get boost
+        if fact.fact_type == FactType.TEMPORAL:
+            recency_score += 0.2
+
+        return min(1.0, recency_score)
+
+    def _contains_temporal_indicators(self, content: str) -> bool:
+        """Check if content contains temporal indicators."""
+        temporal_words = [
+            'recent', 'recently', 'current', 'currently', 'now', 'today',
+            'yesterday', 'tomorrow', 'this year', 'last year', 'next year',
+            'modern', 'contemporary', 'latest', 'new', 'updated'
+        ]
+        content_lower = content.lower()
+        return any(word in content_lower for word in temporal_words)
     
     def _calculate_completeness_score(self, fact: ExtractedFact) -> float:
         """Calculate completeness score."""

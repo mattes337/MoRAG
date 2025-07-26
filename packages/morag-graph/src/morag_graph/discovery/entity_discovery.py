@@ -215,29 +215,29 @@ class QueryEntityDiscovery:
             return []
     
     async def _analyze_query(self, query: str) -> QueryAnalysis:
-        """Analyze query to understand intent and extract keywords."""
+        """Analyze query to understand intent and extract keywords using enhanced LLM analysis."""
         try:
-            # Basic keyword extraction
+            # Use LLM for comprehensive query analysis if available
+            if self.llm_enabled and hasattr(self, 'llm_client'):
+                llm_analysis = await self._analyze_query_with_llm(query)
+                if llm_analysis:
+                    return llm_analysis
+
+            # Fallback to basic analysis
             keywords = self._extract_keywords(query)
-            
-            # Detect query intent
             intent = self._detect_intent(query, keywords)
-            
-            # Calculate complexity score
             complexity_score = self._calculate_complexity(query, keywords)
-            
-            # Extract mentioned entities (simple approach)
             entities_mentioned = self._extract_mentioned_entities(query)
-            
+
             return QueryAnalysis(
                 query=query,
                 intent=intent,
                 keywords=keywords,
                 entities_mentioned=entities_mentioned,
                 complexity_score=complexity_score,
-                domain=None,  # Could be enhanced with domain detection
-                temporal_context=None,  # Could be enhanced with temporal extraction
-                metadata={}
+                domain=self._detect_domain(query, keywords),
+                temporal_context=self._extract_temporal_context(query),
+                metadata={'analysis_method': 'basic'}
             )
             
         except Exception as e:
@@ -250,7 +250,76 @@ class QueryEntityDiscovery:
                 complexity_score=0.5,
                 metadata={'analysis_error': str(e)}
             )
-    
+
+    async def _analyze_query_with_llm(self, query: str) -> Optional[QueryAnalysis]:
+        """Analyze query using LLM for enhanced understanding."""
+        try:
+            from morag_core.ai.models import QueryAnalysisResult
+
+            prompt = f"""Analyze this user query comprehensively:
+
+Query: "{query}"
+
+Provide a detailed analysis including:
+1. Intent (factual, exploratory, comparative, analytical, etc.)
+2. Entities mentioned (people, places, concepts, etc.)
+3. Important keywords
+4. Query type (simple, complex, multi-part)
+5. Complexity level (simple, medium, complex)
+6. Domain (if identifiable: medical, technical, general, etc.)
+7. Temporal context (if any time references)
+
+Be thorough and accurate in your analysis."""
+
+            # Use the LLM client to analyze the query
+            if hasattr(self, 'llm_client') and self.llm_client:
+                result = await self.llm_client.generate_structured(
+                    prompt=prompt,
+                    response_model=QueryAnalysisResult
+                )
+
+                # Convert to our QueryAnalysis format
+                return QueryAnalysis(
+                    query=query,
+                    intent=self._map_intent(result.intent),
+                    keywords=result.keywords,
+                    entities_mentioned=result.entities,
+                    complexity_score=self._complexity_to_score(result.complexity),
+                    domain=result.metadata.get('domain'),
+                    temporal_context=result.metadata.get('temporal_context'),
+                    metadata={
+                        'analysis_method': 'llm',
+                        'confidence': result.confidence.value if hasattr(result.confidence, 'value') else 'medium',
+                        'query_type': result.query_type
+                    }
+                )
+
+        except Exception as e:
+            logger.warning(f"LLM query analysis failed, falling back to basic: {e}")
+
+        return None
+
+    def _complexity_to_score(self, complexity: str) -> float:
+        """Convert complexity string to numeric score."""
+        complexity_map = {
+            'simple': 0.3,
+            'medium': 0.6,
+            'complex': 0.9
+        }
+        return complexity_map.get(complexity.lower(), 0.5)
+
+    def _map_intent(self, intent_str: str) -> 'QueryIntent':
+        """Map string intent to QueryIntent enum."""
+        from .models import QueryIntent
+
+        intent_map = {
+            'factual': QueryIntent.FACTUAL,
+            'exploratory': QueryIntent.EXPLORATORY,
+            'comparative': QueryIntent.COMPARATIVE,
+            'analytical': QueryIntent.ANALYTICAL
+        }
+        return intent_map.get(intent_str.lower(), QueryIntent.FACTUAL)
+
     def _extract_keywords(self, query: str) -> List[str]:
         """Extract keywords from query."""
         # Simple keyword extraction (could be enhanced with NLP)
@@ -362,25 +431,117 @@ class QueryEntityDiscovery:
         query_analysis: QueryAnalysis,
         entities: List[Entity]
     ) -> List[EntityRelevanceScore]:
-        """Score a batch of entities for relevance."""
+        """Score a batch of entities for relevance using enhanced semantic matching."""
         scored_entities = []
-        
-        for entity in entities:
-            # Calculate relevance score
-            relevance_score = self._calculate_entity_relevance(query_analysis, entity)
-            
-            if relevance_score >= self.min_relevance_threshold:
-                scored_entity = EntityRelevanceScore(
-                    entity=entity,
-                    relevance_score=relevance_score,
-                    confidence=0.8,  # Could be enhanced with more sophisticated confidence calculation
-                    reasoning=f"Entity relevance based on name and type matching",
-                    match_type="heuristic",
-                    metadata={'scoring_method': 'heuristic'}
-                )
-                scored_entities.append(scored_entity)
+
+        # Use semantic similarity if vector storage is available
+        if hasattr(self, 'vector_storage') and self.vector_storage:
+            scored_entities = await self._score_entities_semantic(query_analysis, entities)
+        else:
+            # Fallback to heuristic scoring
+            for entity in entities:
+                relevance_score = self._calculate_entity_relevance(query_analysis, entity)
+
+                if relevance_score >= self.min_relevance_threshold:
+                    scored_entity = EntityRelevanceScore(
+                        entity=entity,
+                        relevance_score=relevance_score,
+                        confidence=0.8,
+                        reasoning=f"Entity relevance based on name and type matching",
+                        match_type="heuristic",
+                        metadata={'scoring_method': 'heuristic'}
+                    )
+                    scored_entities.append(scored_entity)
         
         return scored_entities
+
+    async def _score_entities_semantic(
+        self,
+        query_analysis: QueryAnalysis,
+        entities: List[Entity]
+    ) -> List[EntityRelevanceScore]:
+        """Score entities using semantic similarity."""
+        scored_entities = []
+
+        try:
+            # Create query embedding
+            query_text = f"{query_analysis.query} {' '.join(query_analysis.keywords)}"
+
+            # Score each entity
+            for entity in entities:
+                # Create entity text for comparison
+                entity_text = f"{entity.name} {entity.type if hasattr(entity, 'type') else ''}"
+                if hasattr(entity, 'description') and entity.description:
+                    entity_text += f" {entity.description}"
+
+                # Calculate semantic similarity (simplified approach)
+                semantic_score = await self._calculate_semantic_similarity(query_text, entity_text)
+
+                # Combine with heuristic score
+                heuristic_score = self._calculate_entity_relevance(query_analysis, entity)
+                combined_score = (semantic_score * 0.7) + (heuristic_score * 0.3)
+
+                if combined_score >= self.min_relevance_threshold:
+                    scored_entity = EntityRelevanceScore(
+                        entity=entity,
+                        relevance_score=combined_score,
+                        confidence=min(0.9, semantic_score + 0.1),
+                        reasoning=f"Semantic similarity: {semantic_score:.3f}, Heuristic: {heuristic_score:.3f}",
+                        match_type="semantic",
+                        metadata={
+                            'scoring_method': 'semantic',
+                            'semantic_score': semantic_score,
+                            'heuristic_score': heuristic_score
+                        }
+                    )
+                    scored_entities.append(scored_entity)
+
+        except Exception as e:
+            logger.warning(f"Semantic scoring failed, falling back to heuristic: {e}")
+            # Fallback to heuristic scoring
+            for entity in entities:
+                relevance_score = self._calculate_entity_relevance(query_analysis, entity)
+                if relevance_score >= self.min_relevance_threshold:
+                    scored_entity = EntityRelevanceScore(
+                        entity=entity,
+                        relevance_score=relevance_score,
+                        confidence=0.7,
+                        reasoning="Heuristic scoring (semantic failed)",
+                        match_type="heuristic_fallback",
+                        metadata={'scoring_method': 'heuristic_fallback'}
+                    )
+                    scored_entities.append(scored_entity)
+
+        return scored_entities
+
+    async def _calculate_semantic_similarity(self, text1: str, text2: str) -> float:
+        """Calculate semantic similarity between two texts."""
+        try:
+            # If we have access to vector storage, use it for similarity
+            if hasattr(self, 'vector_storage') and self.vector_storage:
+                # This would require implementing vector similarity in the storage layer
+                # For now, use a simple text similarity approach
+                pass
+
+            # Fallback to simple text similarity
+            return self._calculate_text_similarity(text1, text2)
+
+        except Exception as e:
+            logger.warning(f"Semantic similarity calculation failed: {e}")
+            return 0.0
+
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate simple text similarity using word overlap."""
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+
+        if not words1 or not words2:
+            return 0.0
+
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+
+        return len(intersection) / len(union) if union else 0.0
     
     def _calculate_entity_relevance(
         self,
@@ -439,3 +600,45 @@ class QueryEntityDiscovery:
                 seen_entity_ids.add(scored_entity.entity.id)
         
         return combined
+
+    def _detect_domain(self, query: str, keywords: List[str]) -> Optional[str]:
+        """Detect the domain/field of the query."""
+        # Domain keywords mapping
+        domain_keywords = {
+            'medical': ['health', 'disease', 'treatment', 'medicine', 'doctor', 'patient', 'symptom', 'therapy', 'drug', 'medical'],
+            'technical': ['software', 'programming', 'code', 'algorithm', 'system', 'technology', 'computer', 'data'],
+            'scientific': ['research', 'study', 'experiment', 'theory', 'hypothesis', 'analysis', 'scientific'],
+            'business': ['company', 'market', 'business', 'finance', 'economy', 'profit', 'revenue', 'strategy'],
+            'legal': ['law', 'legal', 'court', 'judge', 'attorney', 'contract', 'regulation', 'compliance']
+        }
+
+        query_lower = query.lower()
+        keywords_lower = [k.lower() for k in keywords]
+
+        for domain, domain_words in domain_keywords.items():
+            if any(word in query_lower or word in keywords_lower for word in domain_words):
+                return domain
+
+        return None
+
+    def _extract_temporal_context(self, query: str) -> Optional[str]:
+        """Extract temporal context from the query."""
+        import re
+
+        # Temporal patterns
+        temporal_patterns = [
+            r'\b(today|yesterday|tomorrow)\b',
+            r'\b(last|next|this)\s+(week|month|year|day)\b',
+            r'\b\d{4}\b',  # Years
+            r'\b(january|february|march|april|may|june|july|august|september|october|november|december)\b',
+            r'\b(before|after|during|since|until)\b',
+            r'\b(recent|recently|current|currently|now)\b'
+        ]
+
+        query_lower = query.lower()
+        for pattern in temporal_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                return match.group()
+
+        return None
