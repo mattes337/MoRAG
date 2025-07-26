@@ -75,6 +75,7 @@ class OpenIEService:
         self.enable_caching = self.config.get('enable_caching', True)
         self.cache_size = self.config.get('cache_size', 1000)
         self.enable_metrics = self.config.get('enable_metrics', True)
+        self.max_text_length = self.config.get('max_text_length', 50000)  # Maximum text length for processing
 
         # Initialize components
         self._openie_client = None
@@ -256,6 +257,16 @@ class OpenIEService:
 
         if not text or not text.strip():
             return []
+
+        # Enhanced input validation
+        if len(text) > self.max_text_length:
+            logger.warning(
+                "Text too long for OpenIE processing, truncating",
+                original_length=len(text),
+                max_length=self.max_text_length,
+                source_doc_id=source_doc_id
+            )
+            text = text[:self.max_text_length]
 
         # Check cache first
         cache_key = self._get_cache_key(text)

@@ -199,9 +199,9 @@ class GraphProcessor:
                 )
 
                 logger.info("Standard graph processing components initialized successfully")
-            else:
-                logger.warning("Neo4j configuration incomplete - graph processing disabled")
-                self.config.enabled = False
+        else:
+            logger.warning("Neo4j configuration incomplete - graph processing disabled")
+            self.config.enabled = False
                 
         except Exception as e:
             logger.error("Failed to initialize graph processing components", error=str(e))
