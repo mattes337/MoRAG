@@ -11,6 +11,14 @@ from .models import Entity, Relation, Graph
 # Extraction components
 from .extraction import EntityExtractor, RelationExtractor
 
+# OpenIE components (optional)
+try:
+    from .extractors import OpenIEExtractor
+    _OPENIE_AVAILABLE = True
+except ImportError:
+    _OPENIE_AVAILABLE = False
+    OpenIEExtractor = None
+
 # Storage backends
 from .storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
 
@@ -19,6 +27,15 @@ from .operations import GraphCRUD, GraphTraversal, GraphPath, GraphAnalytics
 
 # Builders
 from .builders import GraphBuilder, GraphBuildResult, GraphBuildError
+
+# Enhanced builders (optional)
+try:
+    from .builders import EnhancedGraphBuilder, EnhancedGraphBuildResult
+    _ENHANCED_BUILDER_AVAILABLE = True
+except ImportError:
+    _ENHANCED_BUILDER_AVAILABLE = False
+    EnhancedGraphBuilder = None
+    EnhancedGraphBuildResult = None
 
 # Database configuration models
 from .models.database_config import DatabaseType, DatabaseConfig, DatabaseServerConfig, DatabaseServerArray, DatabaseResult

@@ -2,8 +2,20 @@
 
 from .graph_builder import GraphBuilder, GraphBuildResult, GraphBuildError
 
+# Enhanced builder with OpenIE (optional)
+try:
+    from .enhanced_graph_builder import EnhancedGraphBuilder, EnhancedGraphBuildResult
+    _ENHANCED_AVAILABLE = True
+except ImportError:
+    _ENHANCED_AVAILABLE = False
+    EnhancedGraphBuilder = None
+    EnhancedGraphBuildResult = None
+
 __all__ = [
     "GraphBuilder",
-    "GraphBuildResult", 
+    "GraphBuildResult",
     "GraphBuildError"
 ]
+
+if _ENHANCED_AVAILABLE:
+    __all__.extend(["EnhancedGraphBuilder", "EnhancedGraphBuildResult"])

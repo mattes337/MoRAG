@@ -10,7 +10,7 @@ import nltk
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 from morag_core.config import get_settings
-from morag_core.exceptions import ProcessingError, ConfigurationError
+from morag_core.exceptions import ProcessingError, ValidationError
 
 logger = structlog.get_logger(__name__)
 
@@ -84,7 +84,7 @@ class OpenIEService:
             
         except Exception as e:
             logger.error("Failed to initialize OpenIE service", error=str(e), error_type=type(e).__name__)
-            raise ConfigurationError(f"OpenIE initialization failed: {e}")
+            raise ValidationError(f"OpenIE initialization failed: {e}")
     
     def _init_openie_client(self) -> None:
         """Initialize OpenIE client (runs in thread pool)."""
@@ -105,7 +105,7 @@ class OpenIEService:
                 
                 logger.info("Stanford OpenIE client initialized", temp_dir=temp_dir)
             else:
-                raise ConfigurationError(f"Unsupported OpenIE implementation: {self.implementation}")
+                raise ValidationError(f"Unsupported OpenIE implementation: {self.implementation}")
                 
         except ImportError as e:
             raise ConfigurationError(f"OpenIE dependencies not available: {e}")

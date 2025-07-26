@@ -20,6 +20,14 @@ from .neo4j_operations import (
     QueryOperations
 )
 
+# OpenIE operations (optional)
+try:
+    from .neo4j_operations import OpenIEOperations
+    _OPENIE_AVAILABLE = True
+except ImportError:
+    _OPENIE_AVAILABLE = False
+    OpenIEOperations = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +68,7 @@ class Neo4jStorage(BaseStorage):
         self._relation_ops: Optional[RelationOperations] = None
         self._graph_ops: Optional[GraphOperations] = None
         self._query_ops: Optional[QueryOperations] = None
+        self._openie_ops: Optional[OpenIEOperations] = None
     
     async def connect(self) -> None:
         """Connect to Neo4J database."""
@@ -76,8 +85,13 @@ class Neo4jStorage(BaseStorage):
         self._relation_ops = RelationOperations(self.driver, self.config.database)
         self._graph_ops = GraphOperations(self.driver, self.config.database)
         self._query_ops = QueryOperations(self.driver, self.config.database)
-        
-        logger.info("Neo4J storage initialized with modular operations")
+
+        # Initialize OpenIE operations if available
+        if _OPENIE_AVAILABLE and OpenIEOperations:
+            self._openie_ops = OpenIEOperations(self.driver, self.config.database)
+            logger.info("Neo4J storage initialized with modular operations including OpenIE")
+        else:
+            logger.info("Neo4J storage initialized with modular operations (OpenIE not available)")
     
     async def disconnect(self) -> None:
         """Disconnect from Neo4J database."""
@@ -386,3 +400,38 @@ class Neo4jStorage(BaseStorage):
         if not self._graph_ops:
             raise RuntimeError("Connection not initialized")
         return await self._graph_ops.optimize_database()
+
+    # OpenIE Operations
+    async def initialize_openie_schema(self) -> None:
+        """Initialize OpenIE schema in Neo4j."""
+        if not self._openie_ops:
+            if not _OPENIE_AVAILABLE:
+                raise RuntimeError("OpenIE operations not available")
+            raise RuntimeError("Connection not initialized")
+        return await self._openie_ops.initialize_schema()
+
+    async def store_openie_triplets(
+        self,
+        triplets,  # List[ValidatedTriplet] - avoiding import for optional dependency
+        entity_matches=None,  # Optional[List[EntityMatch]]
+        normalized_predicates=None,  # Optional[List[NormalizedPredicate]]
+        source_doc_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Store OpenIE triplets in Neo4j.
+
+        Args:
+            triplets: List of validated triplets
+            entity_matches: Optional entity matches for linking
+            normalized_predicates: Optional normalized predicates
+            source_doc_id: Optional source document ID
+
+        Returns:
+            Storage results with counts and metadata
+        """
+        if not self._openie_ops:
+            if not _OPENIE_AVAILABLE:
+                raise RuntimeError("OpenIE operations not available")
+            raise RuntimeError("Connection not initialized")
+        return await self._openie_ops.store_triplets(
+            triplets, entity_matches, normalized_predicates, source_doc_id
+        )
