@@ -6,6 +6,14 @@ from .base import BaseExtractor
 from .pattern_matcher import EntityPatternMatcher, EntityPattern, PatternType
 from .hybrid_extractor import HybridEntityExtractor
 
+# SpaCy extractor
+try:
+    from .spacy_extractor import SpacyEntityExtractor
+    _SPACY_AVAILABLE = True
+except ImportError:
+    _SPACY_AVAILABLE = False
+    SpacyEntityExtractor = None
+
 # OpenIE extractors
 try:
     from ..extractors import OpenIEExtractor
@@ -23,6 +31,9 @@ __all__ = [
     "PatternType",
     "HybridEntityExtractor",
 ]
+
+if _SPACY_AVAILABLE:
+    __all__.append("SpacyEntityExtractor")
 
 if _OPENIE_AVAILABLE:
     __all__.append("OpenIEExtractor")
