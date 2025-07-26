@@ -20,10 +20,22 @@ try:
         Entity, Relation
     )
     from morag_graph.extraction.base import LLMConfig
+    from morag_graph.ingestion import FileIngestion
+
+    # Try to import enhanced graph builder with OpenIE support
+    try:
+        from morag_graph.builders import EnhancedGraphBuilder, EnhancedGraphBuildResult
+        ENHANCED_BUILDER_AVAILABLE = True
+    except ImportError:
+        EnhancedGraphBuilder = None
+        EnhancedGraphBuildResult = None
+        ENHANCED_BUILDER_AVAILABLE = False
+
     GRAPH_AVAILABLE = True
 except ImportError as e:
     logger.warning("morag-graph package not available - graph processing disabled", error=str(e))
     GRAPH_AVAILABLE = False
+    ENHANCED_BUILDER_AVAILABLE = False
     EntityExtractor = None
     RelationExtractor = None
     Neo4jStorage = None
@@ -36,6 +48,9 @@ except ImportError as e:
     Entity = None
     Relation = None
     LLMConfig = None
+    FileIngestion = None
+    EnhancedGraphBuilder = None
+    EnhancedGraphBuildResult = None
 
 logger = structlog.get_logger(__name__)
 
@@ -59,6 +74,12 @@ class GraphProcessingConfig(BaseModel):
     max_chunk_size: int = 4000
     entity_types: Optional[Dict[str, str]] = None
     relation_types: Optional[Dict[str, str]] = None
+
+    # OpenIE configuration
+    enable_openie: bool = True
+    openie_min_confidence: float = 0.7
+    openie_enable_entity_linking: bool = True
+    openie_enable_predicate_normalization: bool = True
     
     @classmethod
     def from_env(cls) -> "GraphProcessingConfig":
@@ -73,13 +94,17 @@ class GraphProcessingConfig(BaseModel):
             llm_api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
             llm_model=os.getenv("MORAG_GRAPH_LLM_MODEL"),
             chunk_by_structure=os.getenv("MORAG_GRAPH_CHUNK_BY_STRUCTURE", "true").lower() == "true",
-            max_chunk_size=int(os.getenv("MORAG_GRAPH_MAX_CHUNK_SIZE", "4000"))
+            max_chunk_size=int(os.getenv("MORAG_GRAPH_MAX_CHUNK_SIZE", "4000")),
+            enable_openie=os.getenv("MORAG_OPENIE_ENABLED", "true").lower() == "true",
+            openie_min_confidence=float(os.getenv("MORAG_OPENIE_CONFIDENCE_THRESHOLD", "0.7")),
+            openie_enable_entity_linking=os.getenv("MORAG_OPENIE_ENABLE_ENTITY_LINKING", "true").lower() == "true",
+            openie_enable_predicate_normalization=os.getenv("MORAG_OPENIE_ENABLE_PREDICATE_NORMALIZATION", "true").lower() == "true"
         )
 
 
 class GraphProcessingResult(BaseModel):
     """Result of graph processing."""
-    
+
     success: bool
     entities_count: int = 0
     relations_count: int = 0
@@ -88,6 +113,13 @@ class GraphProcessingResult(BaseModel):
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = {}
     database_results: List[Dict[str, Any]] = []  # Results for each database
+
+    # OpenIE-specific metrics
+    openie_enabled: bool = False
+    openie_relations_count: int = 0
+    openie_triplets_processed: int = 0
+    openie_entity_matches: int = 0
+    openie_normalized_predicates: int = 0
 
 
 class GraphProcessor:
@@ -102,6 +134,7 @@ class GraphProcessor:
         self.config = config or GraphProcessingConfig.from_env()
         self._entity_extractor = None
         self._relation_extractor = None
+        self._enhanced_builder = None
         self._storage = None
         self._file_ingestion = None
         self._llm_config = None
@@ -123,18 +156,7 @@ class GraphProcessor:
                 model=self.config.llm_model
             )
 
-            # Initialize extractors
-            self._entity_extractor = EntityExtractor(
-                config=self._llm_config,
-                entity_types=self.config.entity_types
-            )
-
-            self._relation_extractor = RelationExtractor(
-                config=self._llm_config,
-                relation_types=self.config.relation_types
-            )
-            
-            # Initialize Neo4j storage
+            # Initialize Neo4j storage first
             if all([self.config.neo4j_uri, self.config.neo4j_username, self.config.neo4j_password]):
                 self._storage = Neo4jStorage(
                     uri=self.config.neo4j_uri,
@@ -142,11 +164,41 @@ class GraphProcessor:
                     password=self.config.neo4j_password,
                     database=self.config.neo4j_database
                 )
-                
+
                 # Initialize file ingestion
                 self._file_ingestion = FileIngestion(self._storage)
-                
-                logger.info("Graph processing components initialized successfully")
+
+            # Initialize enhanced graph builder if available
+            if ENHANCED_BUILDER_AVAILABLE and self.config.enable_openie:
+                openie_config = {
+                    "min_confidence": self.config.openie_min_confidence,
+                    "enable_entity_linking": self.config.openie_enable_entity_linking,
+                    "enable_predicate_normalization": self.config.openie_enable_predicate_normalization
+                }
+
+                self._enhanced_builder = EnhancedGraphBuilder(
+                    storage=self._storage,
+                    llm_config=self._llm_config,
+                    entity_types=self.config.entity_types,
+                    relation_types=self.config.relation_types,
+                    enable_openie=True,
+                    openie_config=openie_config
+                )
+
+                logger.info("Enhanced graph builder with OpenIE initialized successfully")
+            else:
+                # Fallback to individual extractors
+                self._entity_extractor = EntityExtractor(
+                    config=self._llm_config,
+                    entity_types=self.config.entity_types
+                )
+
+                self._relation_extractor = RelationExtractor(
+                    config=self._llm_config,
+                    relation_types=self.config.relation_types
+                )
+
+                logger.info("Standard graph processing components initialized successfully")
             else:
                 logger.warning("Neo4j configuration incomplete - graph processing disabled")
                 self.config.enabled = False
@@ -568,70 +620,137 @@ Provide only the intention summary (maximum {max_length} characters):
                        chunks_count=len(chunks),
                        chunk_by_structure=self.config.chunk_by_structure)
 
-            all_entities = []
-            all_relations = []
-            
-            # Process each chunk
-            for i, (chunk_content, chunk_metadata) in enumerate(chunks):
-                try:
-                    # Extract entities with intention context
-                    entities = await self._entity_extractor.extract(
+            # Use enhanced graph builder if available, otherwise fallback to individual extractors
+            if self._enhanced_builder:
+                # Use enhanced graph builder with OpenIE integration
+                if len(chunks) == 1:
+                    # Single chunk - use process_document
+                    chunk_content, chunk_metadata = chunks[0]
+                    enhanced_result = await self._enhanced_builder.process_document(
                         chunk_content,
-                        source_doc_id=document_path,
-                        intention=intention
+                        document_path or "unknown_document",
+                        metadata=document_metadata
                     )
 
-                    # Extract relations with intention context
-                    relations = await self._relation_extractor.extract(
-                        chunk_content,
-                        entities=entities,
-                        intention=intention
+                    all_entities_count = enhanced_result.entities_created
+                    all_relations_count = enhanced_result.relations_created
+                    openie_relations_count = enhanced_result.openie_relations_created
+                    openie_triplets_processed = enhanced_result.openie_triplets_processed
+                    openie_entity_matches = enhanced_result.openie_entity_matches
+                    openie_normalized_predicates = enhanced_result.openie_normalized_predicates
+
+                else:
+                    # Multiple chunks - use process_document_chunks
+                    from morag_graph.models import DocumentChunk
+
+                    document_chunks = []
+                    for i, (chunk_content, chunk_metadata) in enumerate(chunks):
+                        chunk = DocumentChunk(
+                            id=f"chunk_{i}",
+                            text=chunk_content,
+                            metadata=chunk_metadata
+                        )
+                        document_chunks.append(chunk)
+
+                    enhanced_result = await self._enhanced_builder.process_document_chunks(
+                        document_chunks,
+                        document_path or "unknown_document",
+                        metadata=document_metadata
                     )
-                    
-                    # Add chunk metadata to entities and relations
-                    for entity in entities:
-                        entity.metadata.update(chunk_metadata)
-                        entity.metadata['chunk_index'] = i
-                    
-                    for relation in relations:
-                        relation.metadata.update(chunk_metadata)
-                        relation.metadata['chunk_index'] = i
-                    
-                    all_entities.extend(entities)
-                    all_relations.extend(relations)
-                    
-                    logger.debug("Processed chunk for graph extraction",
-                               chunk_index=i,
-                               entities_count=len(entities),
-                               relations_count=len(relations))
-                    
-                except Exception as e:
-                    logger.warning("Failed to process chunk for graph extraction",
-                                 chunk_index=i,
-                                 error=str(e))
-                    continue
-            
-            # Store in Neo4j
-            if all_entities or all_relations:
-                await self._storage.store_entities(all_entities)
-                await self._storage.store_relations(all_relations)
-                
-                logger.info("Graph data stored successfully",
-                           entities_count=len(all_entities),
-                           relations_count=len(all_relations))
+
+                    all_entities_count = enhanced_result.entities_created
+                    all_relations_count = enhanced_result.relations_created
+                    openie_relations_count = enhanced_result.openie_relations_created
+                    openie_triplets_processed = enhanced_result.openie_triplets_processed
+                    openie_entity_matches = enhanced_result.openie_entity_matches
+                    openie_normalized_predicates = enhanced_result.openie_normalized_predicates
+
+                logger.info("Enhanced graph processing completed",
+                           entities_count=all_entities_count,
+                           relations_count=all_relations_count,
+                           openie_relations_count=openie_relations_count,
+                           openie_triplets_processed=openie_triplets_processed)
+
+            else:
+                # Fallback to individual extractors (legacy mode)
+                all_entities = []
+                all_relations = []
+
+                # Process each chunk
+                for i, (chunk_content, chunk_metadata) in enumerate(chunks):
+                    try:
+                        # Extract entities with intention context
+                        entities = await self._entity_extractor.extract(
+                            chunk_content,
+                            source_doc_id=document_path,
+                            intention=intention
+                        )
+
+                        # Extract relations with intention context
+                        relations = await self._relation_extractor.extract(
+                            chunk_content,
+                            entities=entities,
+                            intention=intention
+                        )
+
+                        # Add chunk metadata to entities and relations
+                        for entity in entities:
+                            entity.metadata.update(chunk_metadata)
+                            entity.metadata['chunk_index'] = i
+
+                        for relation in relations:
+                            relation.metadata.update(chunk_metadata)
+                            relation.metadata['chunk_index'] = i
+
+                        all_entities.extend(entities)
+                        all_relations.extend(relations)
+
+                        logger.debug("Processed chunk for graph extraction",
+                                   chunk_index=i,
+                                   entities_count=len(entities),
+                                   relations_count=len(relations))
+
+                    except Exception as e:
+                        logger.warning("Failed to process chunk for graph extraction",
+                                     chunk_index=i,
+                                     error=str(e))
+                        continue
+
+                # Store in Neo4j
+                if all_entities or all_relations:
+                    await self._storage.store_entities(all_entities)
+                    await self._storage.store_relations(all_relations)
+
+                    logger.info("Graph data stored successfully",
+                               entities_count=len(all_entities),
+                               relations_count=len(all_relations))
+
+                all_entities_count = len(all_entities)
+                all_relations_count = len(all_relations)
+                openie_relations_count = 0
+                openie_triplets_processed = 0
+                openie_entity_matches = 0
+                openie_normalized_predicates = 0
             
             processing_time = time.time() - start_time
             
             return GraphProcessingResult(
                 success=True,
-                entities_count=len(all_entities),
-                relations_count=len(all_relations),
+                entities_count=all_entities_count,
+                relations_count=all_relations_count,
                 chunks_processed=len(chunks),
                 processing_time=processing_time,
+                openie_enabled=self._enhanced_builder is not None,
+                openie_relations_count=openie_relations_count,
+                openie_triplets_processed=openie_triplets_processed,
+                openie_entity_matches=openie_entity_matches,
+                openie_normalized_predicates=openie_normalized_predicates,
                 metadata={
                     'document_path': document_path,
                     'chunk_strategy': 'structure' if self.config.chunk_by_structure else 'size',
-                    'total_chunks': len(chunks)
+                    'total_chunks': len(chunks),
+                    'enhanced_builder_used': self._enhanced_builder is not None,
+                    'openie_enabled': self._enhanced_builder is not None
                 }
             )
             

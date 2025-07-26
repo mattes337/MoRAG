@@ -61,6 +61,8 @@ def main():
         ("test-simple.py", "Basic system test"),
         ("test-embedding.py", "Embedding test"),
         ("test-cli-fix.py", "CLI fix verification"),
+        ("test-openie.py", "OpenIE relation extraction test"),
+        ("validate-openie-config.py", "OpenIE configuration validation"),
     ]
     
     results = []

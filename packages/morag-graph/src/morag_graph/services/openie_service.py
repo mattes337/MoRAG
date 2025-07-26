@@ -108,9 +108,9 @@ class OpenIEService:
                 raise ValidationError(f"Unsupported OpenIE implementation: {self.implementation}")
                 
         except ImportError as e:
-            raise ConfigurationError(f"OpenIE dependencies not available: {e}")
+            raise ValidationError(f"OpenIE dependencies not available: {e}")
         except Exception as e:
-            raise ConfigurationError(f"Failed to initialize OpenIE client: {e}")
+            raise ValidationError(f"Failed to initialize OpenIE client: {e}")
     
     async def _ensure_nltk_data(self) -> None:
         """Ensure required NLTK data is downloaded."""
