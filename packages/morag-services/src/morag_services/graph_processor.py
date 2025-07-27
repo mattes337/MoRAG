@@ -168,40 +168,40 @@ class GraphProcessor:
                 # Initialize file ingestion
                 self._file_ingestion = FileIngestion(self._storage)
 
-            # Initialize enhanced graph builder if available
-            if ENHANCED_BUILDER_AVAILABLE and self.config.enable_openie:
-                openie_config = {
-                    "min_confidence": self.config.openie_min_confidence,
-                    "enable_entity_linking": self.config.openie_enable_entity_linking,
-                    "enable_predicate_normalization": self.config.openie_enable_predicate_normalization
-                }
+                # Initialize enhanced graph builder if available
+                if ENHANCED_BUILDER_AVAILABLE and self.config.enable_openie:
+                    openie_config = {
+                        "min_confidence": self.config.openie_min_confidence,
+                        "enable_entity_linking": self.config.openie_enable_entity_linking,
+                        "enable_predicate_normalization": self.config.openie_enable_predicate_normalization
+                    }
 
-                self._enhanced_builder = EnhancedGraphBuilder(
-                    storage=self._storage,
-                    llm_config=self._llm_config,
-                    entity_types=self.config.entity_types,
-                    relation_types=self.config.relation_types,
-                    enable_openie=True,
-                    openie_config=openie_config
-                )
+                    self._enhanced_builder = EnhancedGraphBuilder(
+                        storage=self._storage,
+                        llm_config=self._llm_config,
+                        entity_types=self.config.entity_types,
+                        relation_types=self.config.relation_types,
+                        enable_openie=True,
+                        openie_config=openie_config
+                    )
 
-                logger.info("Enhanced graph builder with OpenIE initialized successfully")
+                    logger.info("Enhanced graph builder with OpenIE initialized successfully")
+                else:
+                    # Fallback to individual extractors
+                    self._entity_extractor = EntityExtractor(
+                        config=self._llm_config,
+                        entity_types=self.config.entity_types
+                    )
+
+                    self._relation_extractor = RelationExtractor(
+                        config=self._llm_config,
+                        relation_types=self.config.relation_types
+                    )
+
+                    logger.info("Standard graph processing components initialized successfully")
             else:
-                # Fallback to individual extractors
-                self._entity_extractor = EntityExtractor(
-                    config=self._llm_config,
-                    entity_types=self.config.entity_types
-                )
-
-                self._relation_extractor = RelationExtractor(
-                    config=self._llm_config,
-                    relation_types=self.config.relation_types
-                )
-
-                logger.info("Standard graph processing components initialized successfully")
-        else:
-            logger.warning("Neo4j configuration incomplete - graph processing disabled")
-            self.config.enabled = False
+                logger.warning("Neo4j configuration incomplete - graph processing disabled")
+                self.config.enabled = False
                 
         except Exception as e:
             logger.error("Failed to initialize graph processing components", error=str(e))

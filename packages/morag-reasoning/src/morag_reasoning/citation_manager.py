@@ -585,5 +585,3 @@ class CitationManager:
 
         final_confidence = base_confidence + metadata_quality + context_quality
         return min(1.0, final_confidence)
-        else:
-            return "unverified"

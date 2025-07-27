@@ -308,7 +308,7 @@ RESPONSE STRUCTURE GUIDELINES:
 - Conclude with synthesis and implications
 - Use transitional phrases to maintain flow
 
-Generate a response that demonstrates sophisticated understanding and synthesis of the provided information."""
+Generate a response that demonstrates sophisticated understanding and synthesis of the provided information.
 
 Format your response as JSON:
 {{
