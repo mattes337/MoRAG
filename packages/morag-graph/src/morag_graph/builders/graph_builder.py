@@ -6,9 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from ..extraction.entity_extractor import EntityExtractor
-from ..extraction.relation_extractor import RelationExtractor
-from ..extraction.base import LLMConfig
+from ..extraction import EntityExtractor, RelationExtractor
 from ..storage.base import BaseStorage
 from ..models.entity import Entity
 from ..models.relation import Relation
@@ -49,7 +47,7 @@ class GraphBuilder:
     def __init__(
         self,
         storage: BaseStorage,
-        llm_config: Optional[LLMConfig] = None,
+        domain: str = "general",
         entity_types: Optional[Dict[str, str]] = None,
         relation_types: Optional[Dict[str, str]] = None
     ):
@@ -57,21 +55,22 @@ class GraphBuilder:
         
         Args:
             storage: Graph storage backend
-            llm_config: Configuration for LLM-based extraction
+            domain: Domain for LangExtract specialization
             entity_types: Custom entity types for extraction
             relation_types: Custom relation types for extraction
         """
         self.storage = storage
+        self.domain = domain
         self.logger = logging.getLogger(__name__)
-        
-        # Initialize extractors
+
+        # Initialize LangExtract-based extractors
         self.entity_extractor = EntityExtractor(
-            config=llm_config,
+            domain=domain,
             entity_types=entity_types
         )
-        
+
         self.relation_extractor = RelationExtractor(
-            config=llm_config,
+            domain=domain,
             relation_types=relation_types
         )
         

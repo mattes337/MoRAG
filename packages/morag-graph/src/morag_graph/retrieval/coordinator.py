@@ -58,7 +58,7 @@ class HybridRetrievalCoordinator:
             RetrievalError: If all retrieval methods fail
         """
         try:
-            self.logger.info(f"Starting hybrid retrieval for query: {query}")
+            self.logger.info(f"Starting retrieval for query: {query}")
             
             # Analyze query and extract entities
             query_analysis = await self.query_entity_extractor.extract_and_link_entities(query)

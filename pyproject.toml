@@ -26,7 +26,7 @@ dependencies = [
     "python-multipart==0.0.17",
     "pydantic==2.10.3",
     "pydantic-settings==2.7.0",
-    "pydantic-ai>=0.0.14",
+
     "celery==5.3.6",
 
     "redis==5.2.1",
@@ -65,10 +65,8 @@ docling = [
 ]
 
 nlp = [
-    "spacy>=3.7.0,<4.0.0",
     "unstructured>=0.11.0,<1.0.0",
     "cloudpathlib>=0.20.0,<1.0.0",
-
 ]
 
 audio = [

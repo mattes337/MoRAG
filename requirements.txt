@@ -54,12 +54,10 @@ trafilatura>=1.6.0,<2.0.0
 # Markitdown for universal document conversion
 markitdown>=0.0.1a2
 
-# NLP (basic)
-spacy>=3.7.0,<4.0.0
 
-# OpenIE dependencies
-stanford-openie>=1.3.0,<2.0.0
-nltk>=3.8,<4.0.0
+
+# LangExtract dependencies
+langextract>=1.0.0,<2.0.0
 
 # Optional advanced dependencies (commented out by default)
 # Uncomment these for enhanced functionality:

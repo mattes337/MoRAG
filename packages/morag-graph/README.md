@@ -10,17 +10,17 @@ This package has been optimized to create **document-agnostic knowledge graphs**
 
 ## Features
 
+- **LangExtract Integration**: Powered by LangExtract for state-of-the-art entity and relation extraction
+- **Domain-Specific Extraction**: Specialized extraction for medical, technical, legal, and other domains
+- **Multi-Language Support**: Extract entities and relations from text in multiple languages
+- **Source Grounding**: Precise tracking of extraction sources with character-level accuracy
+- **Confidence Scoring**: Built-in confidence assessment for all extractions
+- **Visualization**: HTML-based visualization of extraction results and knowledge graphs
 - Neo4J graph database integration
-- LLM-based entity and relation extraction with context-aware relation type detection
-- **Intention-based extraction**: Document intention analysis for guided type abstraction
-- Document-agnostic entity and relation extraction
 - **Type abstraction**: Automatic reduction of overly specific types for better graph connectivity
-- Enhanced relation types (PLAYED_ROLE, PORTRAYED, PRACTICES, ENGAGED_IN, STUDIED)
 - Dynamic schema evolution
-- JSON-first development approach
 - Graph construction pipeline
 - Graph traversal utilities
-- Hybrid retrieval system
 - Production-ready ingestion scripts
 
 ## Installation
@@ -32,7 +32,7 @@ pip install morag-graph
 ## Dependencies
 
 - Neo4J (>=5.15.0)
-- Google Gemini API access for LLM-based extraction
+- LangExtract API access (Google Gemini or compatible LLM)
 - morag-core package
 
 ## Usage
@@ -41,65 +41,28 @@ pip install morag-graph
 
 ```python
 from morag_graph.models import Entity, Relation, Graph
-from morag_graph.extraction import EntityExtractor, RelationExtractor, HybridEntityExtractor
+from morag_graph.extraction import EntityExtractor, RelationExtractor
 from morag_graph.storage import Neo4jStorage
 
-# Standard AI-based extraction
-entity_extractor = EntityExtractor()
-relation_extractor = RelationExtractor()
+# LangExtract-based extraction with domain specialization
+entity_extractor = EntityExtractor(domain="medical")
+relation_extractor = RelationExtractor(domain="medical")
 
-entities = await entity_extractor.extract("Your text content here")
-relations = await relation_extractor.extract("Your text content here", entities)
-
-# Enhanced hybrid extraction (AI + Pattern Matching)
-hybrid_extractor = HybridEntityExtractor(
-    min_confidence=0.7,
-    enable_pattern_matching=True,
-    pattern_confidence_boost=0.1
-)
-enhanced_entities = await hybrid_extractor.extract("Your text content here")
+# Extract entities and relations
+text = "Dr. Smith prescribed aspirin to treat the patient's headache."
+entities = await entity_extractor.extract(text, source_doc_id="doc_1")
+relations = await relation_extractor.extract(text, entities=entities, source_doc_id="doc_1")
 
 # Store in Neo4J
 storage = Neo4jStorage(uri="neo4j://localhost:7687", auth=("neo4j", "password"))
-for entity in enhanced_entities:
-    await storage.store_entity(entity)
+await storage.store_entities(entities)
+await storage.store_relations(relations)
 for relation in relations:
     await storage.store_relation(relation)
 ```
 
-### Hybrid Entity Extraction
 
-The package now includes enhanced entity extraction that combines AI-based extraction with pattern matching for improved accuracy:
 
-```python
-from morag_graph.extraction import HybridEntityExtractor, EntityPatternMatcher, EntityPattern, PatternType
-
-# Create hybrid extractor
-extractor = HybridEntityExtractor(
-    min_confidence=0.6,
-    enable_pattern_matching=True,
-    pattern_confidence_boost=0.1,  # Boost confidence for pattern matches
-    ai_confidence_boost=0.0        # Boost confidence for AI matches
-)
-
-# Extract entities with enhanced accuracy
-text = "I'm using Python and React to build applications for Microsoft."
-entities = await extractor.extract(text)
-
-# Add custom patterns
-pattern_matcher = EntityPatternMatcher()
-custom_pattern = EntityPattern(
-    pattern=r"\bCustomTech\b",
-    entity_type="TECHNOLOGY",
-    pattern_type=PatternType.REGEX,
-    confidence=0.9,
-    description="Custom technology pattern"
-)
-pattern_matcher.add_pattern(custom_pattern)
-
-# Get extraction statistics
-stats = extractor.get_extraction_stats()
-print(f"Using {stats['pattern_count']} patterns")
 ```
 
 ### Command Line Scripts
