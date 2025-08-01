@@ -618,7 +618,8 @@ class IngestionCoordinator:
 
                             # Add chunk metadata
                             cleaned_attributes['chunk_index'] = i
-                            cleaned_attributes['chunk_content_preview'] = chunk_content[:100] + "..." if len(chunk_content) > 100 else chunk_content
+                            # Remove chunk_content_preview as it contains source-specific text
+                            # Entities should be generic without relation to source files
 
                             entity = Entity(
                                 # Let Entity model generate unified ID automatically
@@ -654,9 +655,8 @@ class IngestionCoordinator:
                             description = relation_data.get('description', '')
                             context = relation_attributes.get('context', description)  # Use description as fallback for context
 
-                            # If they're the same, make context more specific
-                            if context == description and description:
-                                context = f"Found in chunk {i+1}: {description}"
+                            # Context should contain only relevant untransformed text from source file
+                            # Remove verbose "Found in chunk xx" prefixes as they are not required
 
                             relation = Relation(
                                 # Let Relation model generate unified ID automatically

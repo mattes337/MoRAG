@@ -135,7 +135,7 @@ class GraphExtractor:
                     'id': entity.id,
                     'name': entity.name,
                     'type': str(entity.type),  # Handle both enum and string types
-                    'description': entity.attributes.get('context', ''),
+                    'description': entity.description if hasattr(entity, 'description') else '',
                     'attributes': entity.attributes or {},
                     'confidence': entity.confidence,
                     'source_doc_id': entity.source_doc_id
@@ -149,7 +149,8 @@ class GraphExtractor:
                     'source_entity_id': relation.source_entity_id,
                     'target_entity_id': relation.target_entity_id,
                     'relation_type': str(relation.type),  # Handle both enum and string types
-                    'description': relation.attributes.get('context', ''),
+                    'description': relation.description if hasattr(relation, 'description') else '',
+                    'context': relation.context if hasattr(relation, 'context') else '',
                     'attributes': relation.attributes or {},
                     'confidence': relation.confidence,
                     'source_doc_id': relation.source_doc_id
