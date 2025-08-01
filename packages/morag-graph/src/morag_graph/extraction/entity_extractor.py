@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any
 
 from ..models import Entity
 from ..ai import EntityExtractionAgent
+from ..normalizers.entity_normalizer import EnhancedEntityNormalizer
 
 logger = structlog.get_logger(__name__)
 
@@ -12,7 +13,7 @@ logger = structlog.get_logger(__name__)
 class EntityExtractor:
     """PydanticAI-based entity extractor - completely new implementation."""
 
-    def __init__(self, config=None, min_confidence: float = 0.6, chunk_size: int = 4000, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, language: Optional[str] = None, **kwargs):
+    def __init__(self, config=None, min_confidence: float = 0.6, chunk_size: int = 4000, dynamic_types: bool = True, entity_types: Optional[Dict[str, str]] = None, language: Optional[str] = None, enable_normalization: bool = True, **kwargs):
         """Initialize the entity extractor.
 
         Args:
@@ -22,6 +23,7 @@ class EntityExtractor:
             dynamic_types: Whether to use dynamic entity types (LLM-determined)
             entity_types: Custom entity types dict (type_name -> description). If None and dynamic_types=True, uses pure dynamic mode
             language: Language code for processing (e.g., 'en', 'de', 'fr')
+            enable_normalization: Whether to enable entity normalization during extraction
             **kwargs: Additional arguments passed to the agent
         """
         self.min_confidence = min_confidence
@@ -29,6 +31,16 @@ class EntityExtractor:
         self.dynamic_types = dynamic_types
         self.entity_types = entity_types or {}
         self.language = language
+        self.enable_normalization = enable_normalization
+
+        # Initialize enhanced normalizer if enabled
+        if self.enable_normalization:
+            # Extract LLM service from kwargs if available for normalizer
+            llm_service = kwargs.get('llm_service')
+            normalizer_config = kwargs.get('normalizer_config', {})
+            self.normalizer = EnhancedEntityNormalizer(llm_service, normalizer_config)
+        else:
+            self.normalizer = None
 
         # Handle config parameter for test compatibility
         if config is not None:
@@ -96,7 +108,7 @@ class EntityExtractor:
         """Extract entities from text using PydanticAI agent."""
         if source_doc_id is None and doc_id is not None:
             source_doc_id = doc_id
-        
+
         try:
             entities = await self.agent.extract_entities(
                 text=text,
@@ -104,15 +116,20 @@ class EntityExtractor:
                 source_doc_id=source_doc_id
             )
 
+            # Apply normalization if enabled
+            if self.enable_normalization and self.normalizer and entities:
+                entities = await self._normalize_entities(entities)
+
             self.logger.info(
                 "Entity extraction completed",
                 text_length=len(text),
                 entities_found=len(entities),
-                source_doc_id=source_doc_id
+                source_doc_id=source_doc_id,
+                normalization_enabled=self.enable_normalization
             )
 
             return entities
-            
+
         except Exception as e:
             self.logger.error(
                 "Entity extraction failed",
@@ -145,3 +162,59 @@ class EntityExtractor:
         # For now, just call the regular extract method
         # The PydanticAI agent handles context internally
         return await self.extract(text, source_doc_id=source_doc_id, **kwargs)
+
+    async def _normalize_entities(self, entities: List[Entity]) -> List[Entity]:
+        """Normalize extracted entities using the enhanced normalizer.
+
+        Args:
+            entities: List of extracted entities
+
+        Returns:
+            List of entities with normalized names
+        """
+        if not entities:
+            return entities
+
+        try:
+            # Extract entity names and types for normalization
+            entity_names = [entity.name for entity in entities]
+            entity_types = [str(entity.type) for entity in entities]
+
+            # Normalize entities
+            normalized_entities = await self.normalizer.normalizer.normalize_entities(
+                entity_names,
+                entity_types,
+                source_doc_id=entities[0].source_doc_id if entities else None
+            )
+
+            # Update entity names with normalized forms
+            for i, (entity, normalized) in enumerate(zip(entities, normalized_entities)):
+                if normalized.confidence >= 0.7:  # Only apply high-confidence normalizations
+                    # Update entity name to normalized form
+                    entity.name = normalized.normalized_text
+
+                    # Add normalization metadata
+                    if not entity.attributes:
+                        entity.attributes = {}
+                    entity.attributes.update({
+                        'original_name': normalized.original_text,
+                        'normalization_confidence': normalized.confidence,
+                        'normalization_method': normalized.normalization_method,
+                        'canonical_form': normalized.canonical_form
+                    })
+
+                    self.logger.debug(
+                        "Entity normalized",
+                        original=normalized.original_text,
+                        normalized=normalized.normalized_text,
+                        confidence=normalized.confidence
+                    )
+
+            return entities
+
+        except Exception as e:
+            self.logger.warning(
+                "Entity normalization failed, returning original entities",
+                error=str(e)
+            )
+            return entities

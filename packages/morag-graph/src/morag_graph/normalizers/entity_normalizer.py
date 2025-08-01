@@ -2,16 +2,39 @@
 
 import asyncio
 import re
-from typing import List, Dict, Any, Optional, NamedTuple, Set, Callable
+import json
+from typing import List, Dict, Any, Optional, NamedTuple, Set, Callable, Tuple, Type
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from difflib import SequenceMatcher
 import structlog
 
 from morag_core.config import get_settings
 from morag_core.exceptions import ProcessingError
 from morag_core.ai import MoRAGBaseAgent
 from pydantic import BaseModel, Field
+from ..config.normalization_config import get_config_for_component
+from ..monitoring.normalization_metrics import NormalizationMonitor, PerformanceTimer
 
 logger = structlog.get_logger(__name__)
+
+
+@dataclass
+class EntityVariation:
+    """Represents a variation of an entity during normalization."""
+    original: str
+    normalized: str
+    confidence: float
+    rule_applied: str
+
+
+@dataclass
+class EntityMergeCandidate:
+    """Represents entities that should be merged."""
+    entities: List[str]
+    canonical_form: str
+    confidence: float
+    merge_reason: str
 
 
 class NormalizedEntity(BaseModel):
@@ -32,13 +55,19 @@ class EntityNormalizationResult(BaseModel):
     entities: List[NormalizedEntity]
 
 
+class EntityMergeAnalysisResult(BaseModel):
+    """Result from LLM entity merge analysis."""
+    merge_groups: List[Dict[str, Any]] = Field(description="Groups of entities that should be merged")
+
+
 class EntityNormalizationAgent(MoRAGBaseAgent[EntityNormalizationResult]):
     """PydanticAI agent for entity normalization."""
-    
-    def __init__(self, **kwargs):
-        super().__init__(
-            result_type=EntityNormalizationResult,
-            system_prompt="""You are an expert entity normalizer. Your task is to normalize entity names to their canonical, singular, non-conjugated forms while preserving their semantic meaning.
+
+    def get_result_type(self) -> Type[EntityNormalizationResult]:
+        return EntityNormalizationResult
+
+    def get_system_prompt(self) -> str:
+        return """You are an expert entity normalizer. Your task is to normalize entity names to their canonical, singular, non-conjugated forms while preserving their semantic meaning.
 
 Guidelines:
 1. Convert to singular form (e.g., "pilots" → "pilot", "companies" → "company")
@@ -54,45 +83,332 @@ For each entity, provide:
 - canonical_form: The canonical representation
 - language: Detected language (en, es, de, or null)
 - confidence: Confidence in normalization (0.0-1.0)
-- variations: Alternative forms of the entity""",
-            **kwargs
+- variations: Alternative forms of the entity"""
+
+
+class EntityMergeAnalysisAgent(MoRAGBaseAgent[EntityMergeAnalysisResult]):
+    """PydanticAI agent for analyzing entity merge candidates."""
+
+    def get_result_type(self) -> Type[EntityMergeAnalysisResult]:
+        return EntityMergeAnalysisResult
+
+    def get_system_prompt(self) -> str:
+        return """You are an expert entity deduplication analyst. Your task is to identify entities that refer to the same real-world entity and should be merged.
+
+Consider variations in:
+- Spelling and formatting
+- Abbreviations vs full forms
+- Different name formats (e.g., "John Smith" vs "Smith, John")
+- Language variations
+- Punctuation differences
+
+Only suggest merges with high confidence (>0.7). Be conservative to avoid incorrect merges."""
+
+
+class EnhancedEntityNormalizer:
+    """Enhanced entity normalizer with LLM-based deduplication and merge detection."""
+
+    def __init__(self, llm_service=None, config: Optional[Dict[str, Any]] = None):
+        """Initialize enhanced entity normalizer.
+
+        Args:
+            llm_service: LLM service for normalization (optional)
+            config: Optional configuration dictionary
+        """
+        self.llm_service = llm_service
+
+        # Load configuration from file or use provided config
+        if config is None:
+            self.config = get_config_for_component('normalizer')
+        else:
+            # Merge provided config with defaults
+            default_config = get_config_for_component('normalizer')
+            default_config.update(config)
+            self.config = default_config
+
+        # Cache for LLM-based normalization results to avoid repeated calls
+        self.normalization_cache = {}
+        self.entity_type_cache = {}
+        self.similarity_cache = {}
+
+        # Configuration
+        self.batch_size = self.config.get('batch_size', 20)
+        self.min_confidence = self.config.get('min_confidence', 0.7)
+        self.merge_confidence_threshold = self.config.get('merge_confidence_threshold', 0.8)
+        self.enable_llm_normalization = self.config.get('enable_llm_normalization', True)
+        self.enable_rule_based_fallback = self.config.get('enable_rule_based_fallback', True)
+
+        # Initialize LLM agents if service is available and enabled
+        if self.llm_service and self.enable_llm_normalization:
+            self.normalization_agent = EntityNormalizationAgent()
+            self.merge_analysis_agent = EntityMergeAnalysisAgent()
+        else:
+            self.normalization_agent = None
+            self.merge_analysis_agent = None
+
+        # Initialize monitoring
+        monitoring_enabled = self.config.get('monitoring', {}).get('enabled', True)
+        self.monitor = NormalizationMonitor(enabled=monitoring_enabled)
+
+        logger.info(
+            "Enhanced entity normalizer initialized",
+            has_llm_service=self.llm_service is not None,
+            batch_size=self.batch_size,
+            min_confidence=self.min_confidence,
+            monitoring_enabled=monitoring_enabled
         )
+
+    async def normalize_entity(self, entity: str, language: str = None) -> EntityVariation:
+        """Normalize a single entity using LLM-based analysis."""
+        original = entity
+
+        # Record entity processing
+        self.monitor.record_entity_processed(entity, language=language)
+
+        with PerformanceTimer(self.monitor, "normalize_entity"):
+            # Check cache first
+            cache_key = f"{entity}:{language or 'auto'}"
+            if cache_key in self.normalization_cache:
+                cached_result = self.normalization_cache[cache_key]
+                variation = EntityVariation(
+                    original=original,
+                    normalized=cached_result['normalized'],
+                    confidence=cached_result['confidence'],
+                    rule_applied=cached_result['rule_applied']
+                )
+
+                # Record normalization from cache
+                self.monitor.record_entity_normalized(
+                    original, variation.normalized, variation.confidence,
+                    "cached", variation.rule_applied
+                )
+                return variation
+
+            # Use LLM for normalization
+            try:
+                normalized, confidence, rule_applied = await self._llm_normalize_entity(entity, language)
+
+                # Cache result
+                self.normalization_cache[cache_key] = {
+                    'normalized': normalized,
+                    'confidence': confidence,
+                    'rule_applied': rule_applied
+                }
+
+                variation = EntityVariation(
+                    original=original,
+                    normalized=normalized,
+                    confidence=confidence,
+                    rule_applied=rule_applied
+                )
+
+                # Record normalization
+                self.monitor.record_entity_normalized(
+                    original, normalized, confidence, "llm", rule_applied
+                )
+
+                return variation
+
+            except Exception as e:
+                self.monitor.record_error(e, f"normalize_entity: {entity}")
+                raise
+
+    async def find_merge_candidates(self, entities: List[str], language: str = None) -> List[EntityMergeCandidate]:
+        """Find entities that should be merged using LLM-based similarity analysis."""
+        candidates = []
+
+        with PerformanceTimer(self.monitor, "find_merge_candidates"):
+            try:
+                # Use LLM to analyze entity similarities in batches
+                batch_size = 20  # Process entities in batches to avoid token limits
+
+                for i in range(0, len(entities), batch_size):
+                    batch = entities[i:i + batch_size]
+                    batch_candidates = await self._llm_find_merge_candidates(batch, language)
+                    candidates.extend(batch_candidates)
+
+                # Record merge candidates found
+                self.monitor.record_merge_candidates(len(candidates))
+
+                return candidates
+
+            except Exception as e:
+                self.monitor.record_error(e, f"find_merge_candidates: {len(entities)} entities")
+                raise
+
+    async def _llm_normalize_entity(self, entity: str, language: str = None) -> Tuple[str, float, str]:
+        """Use LLM to normalize entity."""
+        if not self.normalization_agent:
+            # Fallback to basic normalization
+            return entity.strip(), 0.5, "basic_cleanup"
+
+        prompt = f"""
+        Normalize the following entity name to its canonical form. Consider:
+        - Remove unnecessary punctuation and formatting
+        - Standardize capitalization appropriately
+        - Expand common abbreviations if beneficial
+        - Maintain the core meaning and identity
+
+        Entity: "{entity}"
+        Language context: {language or "auto-detect"}
+
+        Respond with JSON:
+        {{
+            "normalized": "canonical form",
+            "confidence": 0.0-1.0,
+            "reasoning": "brief explanation of changes made"
+        }}
+        """
+
+        try:
+            result = await self.normalization_agent.run(prompt)
+
+            if result and result.entities and len(result.entities) > 0:
+                normalized_entity = result.entities[0]
+                return (
+                    normalized_entity.normalized_text,
+                    normalized_entity.confidence,
+                    normalized_entity.normalization_method
+                )
+            else:
+                # Fallback if no result
+                return entity.strip(), 0.3, "llm_no_result"
+
+        except Exception as e:
+            logger.warning("LLM normalization failed", error=str(e))
+            # Fallback on LLM failure
+            return entity.strip(), 0.3, f"llm_error: {str(e)}"
+
+    async def _llm_find_merge_candidates(self, entities: List[str], language: str = None) -> List[EntityMergeCandidate]:
+        """Use LLM to find entities that should be merged."""
+        if not self.merge_analysis_agent or len(entities) < 2:
+            return []
+
+        entities_text = "\n".join([f"{i+1}. {entity}" for i, entity in enumerate(entities)])
+
+        prompt = f"""
+        Analyze the following entities and identify which ones refer to the same real-world entity and should be merged.
+        Consider variations in:
+        - Spelling and formatting
+        - Abbreviations vs full forms
+        - Different name formats (e.g., "John Smith" vs "Smith, John")
+        - Language variations
+        - Punctuation differences
+
+        Entities:
+        {entities_text}
+
+        Language context: {language or "auto-detect"}
+
+        Respond with JSON array of merge groups:
+        [
+            {{
+                "entities": ["entity1", "entity2"],
+                "canonical_form": "preferred form",
+                "confidence": 0.0-1.0,
+                "reason": "explanation"
+            }}
+        ]
+
+        Only include groups with confidence > 0.7.
+        """
+
+        try:
+            result = await self.merge_analysis_agent.run(prompt)
+
+            candidates = []
+            if result and result.merge_groups:
+                for group in result.merge_groups:
+                    if (isinstance(group, dict) and
+                        'entities' in group and
+                        len(group['entities']) >= 2 and
+                        group.get('confidence', 0) > 0.7):
+
+                        candidates.append(EntityMergeCandidate(
+                            entities=group['entities'],
+                            canonical_form=group.get('canonical_form', group['entities'][0]),
+                            confidence=float(group.get('confidence', 0.8)),
+                            merge_reason=group.get('reason', 'llm_similarity_analysis')
+                        ))
+
+            return candidates
+
+        except Exception as e:
+            logger.warning("LLM merge analysis failed", error=str(e))
+            # Fallback to simple string similarity
+            return self._fallback_similarity_matching(entities)
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get normalization metrics.
+
+        Returns:
+            Dictionary of current metrics
+        """
+        return self.monitor.get_metrics()
+
+    def log_metrics_summary(self):
+        """Log a summary of normalization metrics."""
+        self.monitor.log_summary()
+
+    def reset_metrics(self):
+        """Reset normalization metrics."""
+        self.monitor.reset_metrics()
+
+    def _fallback_similarity_matching(self, entities: List[str]) -> List[EntityMergeCandidate]:
+        """Fallback similarity matching when LLM is unavailable."""
+        candidates = []
+
+        for i, entity1 in enumerate(entities):
+            for entity2 in entities[i+1:]:
+                # Simple string similarity
+                similarity = SequenceMatcher(None, entity1.lower(), entity2.lower()).ratio()
+
+                if similarity > 0.85:  # High similarity threshold
+                    canonical = entity1 if len(entity1) >= len(entity2) else entity2
+                    candidates.append(EntityMergeCandidate(
+                        entities=[entity1, entity2],
+                        canonical_form=canonical,
+                        confidence=similarity,
+                        merge_reason="string_similarity_fallback"
+                    ))
+
+        return candidates
 
 
 class EntityNormalizer:
     """Advanced entity normalizer with LLM-based multilingual support."""
-    
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize entity normalizer.
-        
+
         Args:
             config: Optional configuration dictionary
         """
         self.settings = get_settings()
         self.config = config or {}
-        
+
         # Configuration
         self.enable_llm_normalization = self.config.get('enable_llm_normalization', True)
         self.enable_rule_based_fallback = self.config.get('enable_rule_based_fallback', True)
         self.supported_languages = self.config.get('supported_languages', ['en', 'es', 'de'])
         self.batch_size = self.config.get('batch_size', 20)
         self.min_confidence = self.config.get('min_confidence', 0.7)
-        
+
         # Initialize LLM agent
         if self.enable_llm_normalization:
             self.llm_agent = EntityNormalizationAgent()
         else:
             self.llm_agent = None
-        
+
         # Thread pool for CPU-intensive operations
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="entity_norm")
-        
+
         # Compiled patterns for rule-based normalization
         self._normalization_patterns = self._compile_normalization_patterns()
-        
+
         # Language-specific normalizers
         self._language_normalizers = self._setup_language_normalizers()
-        
+
         logger.info(
             "Entity normalizer initialized",
             enable_llm_normalization=self.enable_llm_normalization,

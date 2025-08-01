@@ -1,0 +1,214 @@
+# Entity Normalization Configuration
+entity_normalization:
+  # Enable/disable entity normalization during extraction
+  enabled: true
+  
+  # Confidence threshold for applying normalizations
+  confidence_threshold: 0.8
+  
+  # Merge confidence threshold for entity deduplication
+  merge_confidence_threshold: 0.8
+  
+  # Batch size for processing entities
+  batch_size: 20
+  
+  # Minimum confidence for LLM-based normalization
+  min_confidence: 0.7
+  
+  # Enable LLM-based normalization (requires API key)
+  enable_llm_normalization: true
+  
+  # Enable rule-based fallback when LLM fails
+  enable_rule_based_fallback: true
+  
+  # Supported languages for normalization
+  supported_languages:
+    - en  # English
+    - es  # Spanish
+    - de  # German
+    - fr  # French
+  
+  # Normalization rules configuration
+  rules:
+    # Enable acronym expansion (AI -> Artificial Intelligence)
+    acronym_expansion: true
+    
+    # Enable person name standardization (Smith, John -> John Smith)
+    person_name_standardization: true
+    
+    # Enable organization name cleanup (Google Inc. -> Google)
+    organization_cleanup: true
+    
+    # Enable general lowercasing for consistency
+    general_lowercasing: false
+    
+    # Remove articles and prepositions
+    remove_articles: true
+    
+    # Handle plural forms
+    handle_plurals: true
+    
+    # Handle verb conjugations
+    handle_conjugations: true
+  
+  # Merge thresholds by entity type
+  merge_thresholds:
+    # Acronyms and abbreviations (high confidence needed)
+    acronym: 0.9
+    
+    # Person names (medium-high confidence)
+    person: 0.8
+    
+    # Organizations (medium-high confidence)
+    organization: 0.85
+    
+    # Locations (high confidence needed)
+    location: 0.9
+    
+    # General entities (very high confidence needed)
+    general: 0.95
+  
+  # Custom acronym mappings (domain-specific)
+  custom_acronyms:
+    # AI/ML terms
+    "gpt": "generative pre-trained transformer"
+    "bert": "bidirectional encoder representations from transformers"
+    "llm": "large language model"
+    "nlp": "natural language processing"
+    "ml": "machine learning"
+    "ai": "artificial intelligence"
+    "dl": "deep learning"
+    "nn": "neural network"
+    "cnn": "convolutional neural network"
+    "rnn": "recurrent neural network"
+    "lstm": "long short-term memory"
+    "gru": "gated recurrent unit"
+    
+    # Technology terms
+    "api": "application programming interface"
+    "sdk": "software development kit"
+    "ide": "integrated development environment"
+    "ui": "user interface"
+    "ux": "user experience"
+    "db": "database"
+    "sql": "structured query language"
+    "nosql": "not only sql"
+    "rest": "representational state transfer"
+    "json": "javascript object notation"
+    "xml": "extensible markup language"
+    "html": "hypertext markup language"
+    "css": "cascading style sheets"
+    "js": "javascript"
+    
+    # Business terms
+    "ceo": "chief executive officer"
+    "cto": "chief technology officer"
+    "cfo": "chief financial officer"
+    "hr": "human resources"
+    "pr": "public relations"
+    "roi": "return on investment"
+    "kpi": "key performance indicator"
+    "b2b": "business to business"
+    "b2c": "business to consumer"
+    "saas": "software as a service"
+    "paas": "platform as a service"
+    "iaas": "infrastructure as a service"
+  
+  # Language-specific normalization patterns
+  language_patterns:
+    en:
+      # English plural patterns
+      plurals:
+        - pattern: "ies$"
+          replacement: "y"
+        - pattern: "es$"
+          replacement: ""
+        - pattern: "s$"
+          replacement: ""
+      
+      # English verb patterns
+      verbs:
+        - pattern: "ing$"
+          replacement: ""
+        - pattern: "ed$"
+          replacement: ""
+    
+    es:
+      # Spanish plural patterns
+      plurals:
+        - pattern: "es$"
+          replacement: ""
+        - pattern: "s$"
+          replacement: ""
+      
+      # Spanish verb patterns
+      verbs:
+        - pattern: "ando$"
+          replacement: "ar"
+        - pattern: "iendo$"
+          replacement: "ir"
+    
+    de:
+      # German plural patterns
+      plurals:
+        - pattern: "en$"
+          replacement: ""
+        - pattern: "er$"
+          replacement: ""
+        - pattern: "e$"
+          replacement: ""
+      
+      # German verb patterns
+      verbs:
+        - pattern: "end$"
+          replacement: "en"
+  
+  # Monitoring and metrics
+  monitoring:
+    # Enable metrics collection
+    enabled: true
+    
+    # Track normalization effectiveness
+    track_effectiveness: true
+    
+    # Log normalization decisions
+    log_decisions: false
+    
+    # Metrics to collect
+    metrics:
+      - entities_processed
+      - entities_normalized
+      - merge_candidates_found
+      - merges_applied
+      - normalization_rules_used
+      - average_confidence
+      - processing_time
+      - error_rate
+  
+  # Cache configuration
+  cache:
+    # Enable caching of normalization results
+    enabled: true
+    
+    # Cache size (number of entries)
+    max_size: 10000
+    
+    # Cache TTL in seconds (1 hour)
+    ttl: 3600
+    
+    # Cache key strategy
+    key_strategy: "entity_language_type"
+  
+  # Performance tuning
+  performance:
+    # Maximum concurrent normalization tasks
+    max_concurrent_tasks: 5
+    
+    # Timeout for LLM requests (seconds)
+    llm_timeout: 30
+    
+    # Maximum retries for failed normalizations
+    max_retries: 3
+    
+    # Backoff strategy for retries
+    retry_backoff: "exponential"
