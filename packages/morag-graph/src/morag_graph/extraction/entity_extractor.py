@@ -28,7 +28,7 @@ class EntityExtractor:
         dynamic_types: bool = True,
         entity_types: Optional[Dict[str, str]] = None,
         language: Optional[str] = None,
-        model_id: str = "gemini-2.5-flash",
+        model_id: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
         max_workers: int = 10,
         extraction_passes: int = 2,

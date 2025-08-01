@@ -761,7 +761,7 @@ class EmbeddingServiceFactory:
     def create_gemini_service(
         api_key: str,
         embedding_model: str = "text-embedding-004",
-        generation_model: str = "gemini-2.0-flash-001"
+        generation_model: str = "gemini-2.0-flash"
     ) -> GeminiEmbeddingService:
         """Create a Gemini embedding service."""
         return GeminiEmbeddingService(api_key, embedding_model, generation_model)
