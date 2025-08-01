@@ -349,6 +349,81 @@ class LangExtractExamples:
                         }
                     ),
                 ]
+            ),
+            lx.data.ExampleData(
+                text="Hashimoto's thyroiditis affects the thyroid gland, causing inflammation and autoimmune damage.",
+                extractions=[
+                    lx.data.Extraction(
+                        extraction_class="disease_organ_relationship",
+                        extraction_text="Hashimoto's thyroiditis affects the thyroid gland",
+                        attributes={
+                            "source_entity": "Hashimoto",
+                            "target_entity": "Schilddrüse",
+                            "relationship_type": "AFFECTS",
+                            "mechanism": "autoimmune"
+                        }
+                    ),
+                    lx.data.Extraction(
+                        extraction_class="pathological_process",
+                        extraction_text="causing inflammation and autoimmune damage",
+                        attributes={
+                            "source_entity": "Hashimoto",
+                            "target_entity": "Entzündung",
+                            "relationship_type": "CAUSES",
+                            "process": "inflammation"
+                        }
+                    ),
+                ]
+            ),
+            lx.data.ExampleData(
+                text="Heavy metals like mercury accumulate in brain tissue and damage neurons.",
+                extractions=[
+                    lx.data.Extraction(
+                        extraction_class="toxin_accumulation",
+                        extraction_text="mercury accumulate in brain tissue",
+                        attributes={
+                            "source_entity": "Quecksilber",
+                            "target_entity": "Gehirn",
+                            "relationship_type": "ACCUMULATES_IN",
+                            "mechanism": "bioaccumulation"
+                        }
+                    ),
+                    lx.data.Extraction(
+                        extraction_class="toxic_damage",
+                        extraction_text="damage neurons",
+                        attributes={
+                            "source_entity": "Quecksilber",
+                            "target_entity": "Neuronen",
+                            "relationship_type": "DAMAGES",
+                            "effect": "cellular_damage"
+                        }
+                    ),
+                ]
+            ),
+            lx.data.ExampleData(
+                text="Silizium detoxifies aluminum from the body and protects against heavy metal toxicity.",
+                extractions=[
+                    lx.data.Extraction(
+                        extraction_class="detoxification",
+                        extraction_text="Silizium detoxifies aluminum",
+                        attributes={
+                            "source_entity": "Silizium",
+                            "target_entity": "Aluminium",
+                            "relationship_type": "DETOXIFIES",
+                            "mechanism": "chelation"
+                        }
+                    ),
+                    lx.data.Extraction(
+                        extraction_class="protection",
+                        extraction_text="protects against heavy metal toxicity",
+                        attributes={
+                            "source_entity": "Silizium",
+                            "target_entity": "Schwermetalle",
+                            "relationship_type": "PROTECTS",
+                            "effect": "protective"
+                        }
+                    ),
+                ]
             )
         ]
 
@@ -491,12 +566,18 @@ class DomainEntityTypes:
     """Predefined entity types for different domains."""
 
     GENERAL = {
-        "person": "Human beings, individuals",
-        "organization": "Companies, institutions, groups",
-        "location": "Places, cities, countries, addresses",
-        "event": "Meetings, conferences, incidents",
-        "product": "Items, services, offerings",
-        "concept": "Ideas, theories, abstract notions"
+        "person": "Human beings, individuals, professionals",
+        "organization": "Companies, institutions, groups, agencies",
+        "location": "Places, cities, countries, addresses, facilities",
+        "event": "Meetings, conferences, incidents, processes",
+        "product": "Items, services, offerings, substances, materials",
+        "concept": "Ideas, theories, abstract notions, methods",
+        "substance": "Chemical compounds, materials, elements",
+        "condition": "States, situations, diseases, disorders",
+        "process": "Procedures, methods, protocols, activities",
+        "measurement": "Quantities, values, metrics, levels",
+        "time": "Dates, periods, durations, schedules",
+        "document": "Papers, reports, studies, publications"
     }
 
     MEDICAL = {
@@ -507,7 +588,20 @@ class DomainEntityTypes:
         "symptom": "Observable sign of disease or condition",
         "treatment": "Medical intervention, therapy",
         "medical_facility": "Hospital, clinic, medical center",
-        "vital_sign": "Measurable bodily function indicator"
+        "vital_sign": "Measurable bodily function indicator",
+        "toxin": "Harmful substance, environmental toxin",
+        "chemical": "Chemical compound, substance",
+        "mineral": "Mineral, trace element, supplement",
+        "vitamin": "Vitamin, nutrient",
+        "enzyme": "Biological enzyme, protein",
+        "hormone": "Hormone, endocrine substance",
+        "detox_method": "Detoxification method, cleansing protocol",
+        "supplement": "Dietary supplement, nutritional product",
+        "heavy_metal": "Heavy metal, toxic metal",
+        "pesticide": "Pesticide, agricultural chemical",
+        "protocol": "Treatment protocol, therapeutic regimen",
+        "organ": "Body organ, anatomical structure",
+        "substance": "Chemical substance, compound"
     }
 
     TECHNICAL = {
@@ -564,7 +658,17 @@ class DomainRelationTypes:
         "part_of": "Membership or component relationship",
         "related_to": "General association",
         "owns": "Ownership relationship",
-        "manages": "Management relationship"
+        "manages": "Management relationship",
+        "causes": "Causation relationship",
+        "affects": "Influence or impact relationship",
+        "contains": "Containment relationship",
+        "produces": "Production or creation relationship",
+        "uses": "Usage or utilization relationship",
+        "interacts_with": "Interaction relationship",
+        "depends_on": "Dependency relationship",
+        "leads_to": "Consequence or result relationship",
+        "prevents": "Prevention or blocking relationship",
+        "supports": "Support or assistance relationship"
     }
 
     MEDICAL = {
@@ -573,7 +677,22 @@ class DomainRelationTypes:
         "prescribed": "Prescription relationship",
         "causes": "Causation relationship",
         "manifests_as": "Symptom manifestation",
-        "administered_at": "Location of medical care"
+        "administered_at": "Location of medical care",
+        "affects": "Disease or condition affecting an organ or body part",
+        "damages": "Harmful effect on organ or tissue",
+        "protects": "Protective effect against disease or damage",
+        "detoxifies": "Removal or neutralization of toxins",
+        "binds_to": "Chemical or molecular binding relationship",
+        "accumulates_in": "Substance accumulation in organ or tissue",
+        "depletes": "Reduction or depletion of substance",
+        "supports": "Supportive or beneficial effect",
+        "inhibits": "Inhibitory or blocking effect",
+        "activates": "Activation or stimulation effect",
+        "metabolizes": "Metabolic processing relationship",
+        "excretes": "Elimination or excretion pathway",
+        "absorbs": "Absorption or uptake relationship",
+        "converts_to": "Chemical conversion or transformation",
+        "interacts_with": "Interaction between substances or processes"
     }
 
     TECHNICAL = {

@@ -23,16 +23,16 @@ class RelationExtractor:
     
     def __init__(
         self,
-        min_confidence: float = 0.6,
-        chunk_size: int = 1000,
+        min_confidence: float = 0.5,  # Lower threshold for better recall
+        chunk_size: int = 800,  # Smaller chunks for better accuracy
         dynamic_types: bool = True,
         relation_types: Optional[Dict[str, str]] = None,
         language: Optional[str] = None,
         model_id: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
-        max_workers: int = 10,
-        extraction_passes: int = 2,
-        domain: str = "general"
+        max_workers: int = 15,  # More workers for parallel processing
+        extraction_passes: int = 3,  # More passes for better coverage
+        domain: str = "general"  # Default to general domain, configurable by user
     ):
         """Initialize the LangExtract relation extractor.
 
@@ -217,37 +217,49 @@ class RelationExtractor:
         for extraction in result.extractions:
             try:
                 attrs = extraction.attributes or {}
-                
+
                 # Extract source and target entities from attributes
                 source_entity_name = attrs.get('source_entity', '')
                 target_entity_name = attrs.get('target_entity', '')
                 relationship_type = attrs.get('relationship_type', extraction.extraction_class.upper())
-                
+
                 if not source_entity_name or not target_entity_name:
                     continue
-                
-                # Try to resolve entity IDs
-                source_entity_id = entity_lookup.get(source_entity_name.lower())
-                target_entity_id = entity_lookup.get(target_entity_name.lower())
-                
-                # If we can't resolve IDs, create placeholder IDs
-                if not source_entity_id:
-                    source_entity_id = f"entity_{hash(source_entity_name.lower())}"
-                if not target_entity_id:
-                    target_entity_id = f"entity_{hash(target_entity_name.lower())}"
-                
-                # Create relation
-                relation = Relation(
-                    source_entity_id=source_entity_id,
-                    target_entity_id=target_entity_id,
-                    type=relationship_type,
-                    context=extraction.extraction_text,
-                    attributes=attrs,
-                    source_doc_id=source_doc_id,
-                    confidence=getattr(extraction, 'confidence', 1.0)
-                )
-                relations.append(relation)
-                
+
+                # Split comma-separated entities and create multiple relations
+                source_entities = self._split_entity_names(source_entity_name)
+                target_entities = self._split_entity_names(target_entity_name)
+
+                # Create relations for all combinations of source and target entities
+                for source_name in source_entities:
+                    for target_name in target_entities:
+                        # Try to resolve entity IDs
+                        source_entity_id = entity_lookup.get(source_name.lower())
+                        target_entity_id = entity_lookup.get(target_name.lower())
+
+                        # If we can't resolve IDs, create placeholder IDs
+                        if not source_entity_id:
+                            source_entity_id = f"entity_{hash(source_name.lower())}"
+                        if not target_entity_id:
+                            target_entity_id = f"entity_{hash(target_name.lower())}"
+
+                        # Create updated attributes for this specific relation
+                        relation_attrs = attrs.copy()
+                        relation_attrs['source_entity'] = source_name
+                        relation_attrs['target_entity'] = target_name
+
+                        # Create relation
+                        relation = Relation(
+                            source_entity_id=source_entity_id,
+                            target_entity_id=target_entity_id,
+                            type=relationship_type,
+                            context=extraction.extraction_text,
+                            attributes=relation_attrs,
+                            source_doc_id=source_doc_id,
+                            confidence=getattr(extraction, 'confidence', 1.0)
+                        )
+                        relations.append(relation)
+
             except Exception as e:
                 self.logger.warning(
                     "Failed to convert extraction to relation",
@@ -257,9 +269,33 @@ class RelationExtractor:
                 continue
         
         return relations
-    
 
-    
+    def _split_entity_names(self, entity_name: str) -> List[str]:
+        """Split comma-separated entity names into individual entities.
+
+        Args:
+            entity_name: Entity name that may contain multiple comma-separated entities
+
+        Returns:
+            List of individual entity names, cleaned and stripped
+        """
+        if not entity_name:
+            return []
+
+        # Split by comma and clean up each entity name
+        entities = []
+        for name in entity_name.split(','):
+            cleaned_name = name.strip()
+            if cleaned_name:  # Only add non-empty names
+                entities.append(cleaned_name)
+
+        # If no commas found, return the original name as a single-item list
+        if not entities:
+            entities = [entity_name.strip()]
+
+        return entities
+
+
     def get_system_prompt(self) -> str:
         """Get the system prompt used by LangExtract."""
         return self._prompt

@@ -14,6 +14,7 @@ except ImportError:
 
 from ..models import Entity
 from .langextract_examples import LangExtractExamples, DomainEntityTypes
+from .entity_normalizer import LLMEntityNormalizer
 
 logger = structlog.get_logger(__name__)
 
@@ -23,16 +24,16 @@ class EntityExtractor:
     
     def __init__(
         self,
-        min_confidence: float = 0.6,
-        chunk_size: int = 1000,  # LangExtract optimal chunk size
+        min_confidence: float = 0.5,  # Lower threshold for better recall
+        chunk_size: int = 800,  # Smaller chunks for better accuracy
         dynamic_types: bool = True,
         entity_types: Optional[Dict[str, str]] = None,
         language: Optional[str] = None,
         model_id: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
-        max_workers: int = 10,
-        extraction_passes: int = 2,
-        domain: str = "general"
+        max_workers: int = 15,  # More workers for parallel processing
+        extraction_passes: int = 3,  # More passes for better coverage
+        domain: str = "general"  # Default to general domain, configurable by user
     ):
         """Initialize the LangExtract entity extractor.
 
@@ -66,13 +67,17 @@ class EntityExtractor:
         
         # Thread pool for async execution
         self._executor = ThreadPoolExecutor(max_workers=2)
-        
+
         # Create examples for entity extraction
         self._examples = self._create_entity_examples()
         self._prompt = self._create_entity_prompt()
-        
-        # Legacy compatibility
-        self.normalizer = None  # LangExtract handles normalization internally
+
+        # Initialize entity normalizer
+        self.normalizer = LLMEntityNormalizer(
+            model_name=self.model_id,
+            api_key=self.api_key,
+            language=self.language or "auto"
+        )
     
     def _get_api_key(self) -> Optional[str]:
         """Get API key from environment variables."""
@@ -134,13 +139,15 @@ class EntityExtractor:
     async def extract(
         self,
         text: str,
-        source_doc_id: Optional[str] = None
+        source_doc_id: Optional[str] = None,
+        auto_infer_domain: bool = False
     ) -> List[Entity]:
         """Extract entities from text using LangExtract.
 
         Args:
             text: Text to extract entities from
             source_doc_id: Optional source document ID
+            auto_infer_domain: Whether to automatically infer domain from text content
 
         Returns:
             List of Entity objects
@@ -152,7 +159,15 @@ class EntityExtractor:
         if not self.api_key:
             self.logger.warning("No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY.")
             return []
-        
+
+        # Optionally infer domain from text content
+        current_domain = self.domain
+        if auto_infer_domain:
+            inferred_domain = self._infer_domain_from_text(text)
+            if inferred_domain != 'general':
+                current_domain = inferred_domain
+                self.logger.info(f"Inferred domain '{inferred_domain}' from text content")
+
         try:
             # Run LangExtract in thread pool to avoid blocking
             result = await asyncio.get_event_loop().run_in_executor(
@@ -163,8 +178,8 @@ class EntityExtractor:
             )
             
             # Convert LangExtract results to MoRAG Entity objects
-            entities = self._convert_to_entities(result, source_doc_id)
-            
+            entities = await self._convert_to_entities_async(result, source_doc_id)
+
             # Filter by confidence
             entities = [e for e in entities if e.confidence >= self.min_confidence]
             
@@ -230,7 +245,147 @@ class EntityExtractor:
                 continue
         
         return entities
-    
+
+    def _infer_domain_from_text(self, text: str) -> str:
+        """Infer domain from text content using keyword analysis.
+
+        Args:
+            text: Text to analyze for domain inference
+
+        Returns:
+            Inferred domain string
+        """
+        text_lower = text.lower()
+
+        # Medical/health keywords
+        medical_keywords = [
+            'patient', 'doctor', 'medical', 'health', 'disease', 'treatment', 'medication',
+            'symptom', 'diagnosis', 'therapy', 'clinical', 'hospital', 'medicine',
+            'toxin', 'detox', 'vitamin', 'mineral', 'supplement', 'enzyme', 'hormone',
+            'schwermetall', 'entgiftung', 'schilddrüse', 'quecksilber', 'aluminium'
+        ]
+
+        # Technical keywords
+        technical_keywords = [
+            'system', 'software', 'database', 'server', 'network', 'algorithm',
+            'programming', 'code', 'api', 'framework', 'technology', 'computer'
+        ]
+
+        # Legal keywords
+        legal_keywords = [
+            'court', 'judge', 'law', 'legal', 'contract', 'agreement', 'regulation',
+            'statute', 'ruling', 'litigation', 'attorney', 'lawyer'
+        ]
+
+        # Business keywords
+        business_keywords = [
+            'company', 'business', 'market', 'sales', 'revenue', 'profit', 'customer',
+            'strategy', 'management', 'finance', 'investment', 'corporate'
+        ]
+
+        # Count keyword matches
+        medical_score = sum(1 for keyword in medical_keywords if keyword in text_lower)
+        technical_score = sum(1 for keyword in technical_keywords if keyword in text_lower)
+        legal_score = sum(1 for keyword in legal_keywords if keyword in text_lower)
+        business_score = sum(1 for keyword in business_keywords if keyword in text_lower)
+
+        # Determine domain based on highest score
+        scores = {
+            'medical': medical_score,
+            'technical': technical_score,
+            'legal': legal_score,
+            'business': business_score
+        }
+
+        max_score = max(scores.values())
+        if max_score >= 3:  # Minimum threshold for domain inference
+            return max(scores, key=scores.get)
+
+        return 'general'  # Default to general if no clear domain
+
+    async def _convert_to_entities_async(self, result: Any, source_doc_id: Optional[str]) -> List[Entity]:
+        """Convert LangExtract results to MoRAG Entity objects with normalization."""
+        entities = []
+
+        if not result or not hasattr(result, 'extractions'):
+            return entities
+
+        # First, extract all entity names and types for batch normalization
+        entity_data = []
+        for extraction in result.extractions:
+            try:
+                entity_data.append({
+                    'extraction': extraction,
+                    'name': extraction.extraction_text,
+                    'type': extraction.extraction_class.upper()
+                })
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to prepare extraction for normalization",
+                    extraction_text=getattr(extraction, 'extraction_text', 'unknown'),
+                    error=str(e)
+                )
+                continue
+
+        # Normalize entities in batch
+        entity_names = [data['name'] for data in entity_data]
+        entity_types = [data['type'] for data in entity_data]
+
+        if entity_names and self.normalizer:
+            try:
+                normalization_results = await self.normalizer.normalize_entities_batch(
+                    entity_names, entity_types
+                )
+            except Exception as e:
+                self.logger.warning(
+                    "Batch normalization failed, using original names",
+                    error=str(e)
+                )
+                normalization_results = None
+        else:
+            normalization_results = None
+
+        # Create Entity objects with normalized names
+        for i, data in enumerate(entity_data):
+            try:
+                extraction = data['extraction']
+                original_name = data['name']
+
+                # Use normalized name if available
+                if normalization_results and i < len(normalization_results):
+                    normalized_result = normalization_results[i]
+                    entity_name = normalized_result.normalized
+                    # Add normalization info to attributes
+                    attributes = extraction.attributes or {}
+                    attributes.update({
+                        'original_name': original_name,
+                        'normalization_confidence': normalized_result.confidence,
+                        'normalization_rule': normalized_result.rule_applied
+                    })
+                else:
+                    entity_name = original_name
+                    attributes = extraction.attributes or {}
+
+                # Create Entity object
+                entity = Entity(
+                    name=entity_name,
+                    type=data['type'],
+                    attributes=attributes,
+                    source_doc_id=source_doc_id,
+                    confidence=getattr(extraction, 'confidence', 1.0)
+                )
+                entities.append(entity)
+
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to convert extraction to entity",
+                    extraction_text=getattr(extraction, 'extraction_text', 'unknown'),
+                    error=str(e)
+                )
+                continue
+
+        return entities
+
     async def extract_with_context(
         self,
         text: str,
