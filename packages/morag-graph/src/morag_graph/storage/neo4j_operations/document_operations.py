@@ -1,5 +1,6 @@
 """Document and chunk operations for Neo4j storage."""
 
+import json
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -24,28 +25,36 @@ class DocumentOperations(BaseOperations):
         """
         query = """
         MERGE (d:Document {id: $id})
-        SET d.title = $title,
-            d.content = $content,
-            d.source_type = $source_type,
-            d.source_path = $source_path,
+        SET d.name = $name,
+            d.source_file = $source_file,
+            d.file_name = $file_name,
+            d.file_size = $file_size,
             d.checksum = $checksum,
+            d.mime_type = $mime_type,
             d.ingestion_timestamp = $ingestion_timestamp,
+            d.last_modified = $last_modified,
+            d.model = $model,
+            d.summary = $summary,
             d.metadata = $metadata,
             d.updated_at = datetime()
         RETURN d.id as document_id
         """
-        
+
         result = await self._execute_query(
             query,
             {
                 "id": document.id,
-                "title": document.title,
-                "content": document.content,
-                "source_type": document.source_type,
-                "source_path": document.source_path,
+                "name": document.name,
+                "source_file": document.source_file,
+                "file_name": document.file_name,
+                "file_size": document.file_size,
                 "checksum": document.checksum,
+                "mime_type": document.mime_type,
                 "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
-                "metadata": document.metadata
+                "last_modified": document.last_modified.isoformat() if document.last_modified else None,
+                "model": document.model,
+                "summary": document.summary,
+                "metadata": json.dumps(document.metadata) if document.metadata else "{}"
             }
         )
         
@@ -64,24 +73,26 @@ class DocumentOperations(BaseOperations):
         MERGE (c:DocumentChunk {id: $id})
         SET c.document_id = $document_id,
             c.chunk_index = $chunk_index,
-            c.content = $content,
-            c.start_char = $start_char,
-            c.end_char = $end_char,
+            c.text = $text,
+            c.start_position = $start_position,
+            c.end_position = $end_position,
+            c.chunk_type = $chunk_type,
             c.metadata = $metadata,
             c.updated_at = datetime()
         RETURN c.id as chunk_id
         """
-        
+
         result = await self._execute_query(
             query,
             {
                 "id": chunk.id,
                 "document_id": chunk.document_id,
                 "chunk_index": chunk.chunk_index,
-                "content": chunk.content,
-                "start_char": chunk.start_char,
-                "end_char": chunk.end_char,
-                "metadata": chunk.metadata
+                "text": chunk.text,
+                "start_position": chunk.start_position,
+                "end_position": chunk.end_position,
+                "chunk_type": chunk.chunk_type,
+                "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}"
             }
         )
         
@@ -161,25 +172,33 @@ class DocumentOperations(BaseOperations):
         """
         query = """
         MERGE (d:Document {id: $id})
-        SET d.title = $title,
-            d.content = $content,
-            d.source_type = $source_type,
-            d.source_path = $source_path,
+        SET d.name = $name,
+            d.source_file = $source_file,
+            d.file_name = $file_name,
+            d.file_size = $file_size,
             d.checksum = $checksum,
+            d.mime_type = $mime_type,
             d.ingestion_timestamp = $ingestion_timestamp,
+            d.last_modified = $last_modified,
+            d.model = $model,
+            d.summary = $summary,
             d.metadata = $metadata
         RETURN d.id as id
         """
-        
+
         parameters = {
             "id": document.id,
-            "title": document.title,
-            "content": document.content,
-            "source_type": document.source_type,
-            "source_path": document.source_path,
+            "name": document.name,
+            "source_file": document.source_file,
+            "file_name": document.file_name,
+            "file_size": document.file_size,
             "checksum": document.checksum,
+            "mime_type": document.mime_type,
             "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
-            "metadata": document.metadata
+            "last_modified": document.last_modified.isoformat() if document.last_modified else None,
+            "model": document.model,
+            "summary": document.summary,
+            "metadata": json.dumps(document.metadata) if document.metadata else "{}"
         }
         
         result = await self._execute_query(query, parameters)
@@ -198,21 +217,23 @@ class DocumentOperations(BaseOperations):
         MERGE (c:DocumentChunk {id: $id})
         SET c.document_id = $document_id,
             c.chunk_index = $chunk_index,
-            c.content = $content,
-            c.start_char = $start_char,
-            c.end_char = $end_char,
+            c.text = $text,
+            c.start_position = $start_position,
+            c.end_position = $end_position,
+            c.chunk_type = $chunk_type,
             c.metadata = $metadata
         RETURN c.id as id
         """
-        
+
         parameters = {
             "id": chunk.id,
             "document_id": chunk.document_id,
             "chunk_index": chunk.chunk_index,
-            "content": chunk.content,
-            "start_char": chunk.start_char,
-            "end_char": chunk.end_char,
-            "metadata": chunk.metadata
+            "text": chunk.text,
+            "start_position": chunk.start_position,
+            "end_position": chunk.end_position,
+            "chunk_type": chunk.chunk_type,
+            "metadata": json.dumps(chunk.metadata) if chunk.metadata else "{}"
         }
         
         result = await self._execute_query(query, parameters)

@@ -1249,7 +1249,7 @@ class IngestionCoordinator:
         await neo4j_storage.connect()
 
         # Test the connection and ensure database exists
-        await neo4j_storage._execute_query("RETURN 1", {})
+        await neo4j_storage.test_connection()
 
         logger.info("Neo4j database initialized",
                    database=neo4j_config.database,

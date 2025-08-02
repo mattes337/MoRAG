@@ -414,12 +414,60 @@ async def _recreate_chunk_entity_mapping(chunks, entities_data, chunk_size=4000)
     return chunk_entity_mapping
 
 
+def auto_detect_resume_files(source_file: str) -> Dict[str, Optional[str]]:
+    """
+    Auto-detect existing resume files for a source file.
+
+    Args:
+        source_file: Path to the source file
+
+    Returns:
+        Dictionary with 'process_result' and 'ingestion_data' keys containing file paths or None
+    """
+    source_path = Path(source_file)
+    base_name = source_path.stem
+    source_dir = source_path.parent
+
+    # Look for process result file
+    process_result_file = source_dir / f"{base_name}.process_result.json"
+    process_result_path = process_result_file if process_result_file.exists() else None
+
+    # Look for ingestion data file
+    ingestion_data_file = source_dir / f"{base_name}.ingest_data.json"
+    ingestion_data_path = ingestion_data_file if ingestion_data_file.exists() else None
+
+    # Also check for ingest_result.json (older format)
+    if not ingestion_data_path:
+        ingest_result_file = source_dir / f"{base_name}.ingest_result.json"
+        if ingest_result_file.exists():
+            ingestion_data_path = ingest_result_file
+
+    return {
+        'process_result': str(process_result_path) if process_result_path else None,
+        'ingestion_data': str(ingestion_data_path) if ingestion_data_path else None
+    }
+
+
 def handle_resume_arguments(args, source_file: str, content_type: str, metadata: Optional[Dict[str, Any]] = None):
     """
     Handle --use-process-result and --use-ingestion-data arguments.
+    Also auto-detects existing resume files if no explicit arguments provided.
     Returns True if resume was handled, False if normal processing should continue.
     """
     import asyncio
+
+    # Auto-detect resume files if no explicit arguments provided
+    if not hasattr(args, 'use_process_result') or not args.use_process_result:
+        if not hasattr(args, 'use_ingestion_data') or not args.use_ingestion_data:
+            detected_files = auto_detect_resume_files(source_file)
+
+            # Prefer ingestion data over process result (more complete)
+            if detected_files['ingestion_data']:
+                print(f"[AUTO-DETECT] Found existing ingestion data: {detected_files['ingestion_data']}")
+                args.use_ingestion_data = detected_files['ingestion_data']
+            elif detected_files['process_result']:
+                print(f"[AUTO-DETECT] Found existing process result: {detected_files['process_result']}")
+                args.use_process_result = detected_files['process_result']
     
     # Handle --use-process-result argument
     if hasattr(args, 'use_process_result') and args.use_process_result:

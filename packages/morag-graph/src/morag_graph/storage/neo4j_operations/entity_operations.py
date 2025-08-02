@@ -1,5 +1,6 @@
 """Entity operations for Neo4j storage."""
 
+import json
 import logging
 from typing import Dict, List, Optional, Any, Set
 from datetime import datetime
@@ -29,10 +30,12 @@ class EntityOperations(BaseOperations):
             Entity ID
         """
         # Validate entity ID format
-        if not IDValidator.is_valid_entity_id(entity.id):
+        try:
+            IDValidator.validate_entity_id(entity.id)
+        except Exception:
             logger.warning(f"Invalid entity ID format: {entity.id}")
             # Generate a new valid ID
-            entity.id = UnifiedIDGenerator.generate_entity_id(entity.name, entity.type)
+            entity.id = UnifiedIDGenerator.generate_entity_id(entity.name, str(entity.type))
             logger.info(f"Generated new entity ID: {entity.id}")
 
         query = """
@@ -58,14 +61,14 @@ class EntityOperations(BaseOperations):
         RETURN e.id as id, e.type as final_type
         """
 
-        properties = entity.metadata.copy() if entity.metadata else {}
-        
+        properties = entity.attributes.copy() if entity.attributes else {}
+
         result = await self._execute_query(query, {
             "id": entity.id,
             "name": entity.name,
             "type": entity.type,
             "confidence": entity.confidence,
-            "metadata": properties
+            "metadata": json.dumps(properties) if properties else "{}"
         })
 
         if result:
@@ -79,32 +82,46 @@ class EntityOperations(BaseOperations):
         """Create a missing entity with minimal information.
 
         Args:
-            entity_id: ID of the entity to create
+            entity_id: ID of the entity to create (may be invalid format)
             entity_name: Name of the entity
 
         Returns:
-            Entity ID
+            Entity ID (properly formatted)
         """
-        # Extract type from entity ID if possible
-        entity_type = "unknown"
-        if "_" in entity_id:
-            parts = entity_id.split("_")
-            if len(parts) >= 2:
-                entity_type = parts[1]
+        # Check if the provided entity_id is in valid format
+        try:
+            IDValidator.validate_entity_id(entity_id)
+            # If valid, use it as-is
+            valid_entity_id = entity_id
+        except:
+            # If invalid, generate a proper unified ID
+            logger.warning(f"Invalid entity ID format: {entity_id}, generating new unified ID")
+            valid_entity_id = UnifiedIDGenerator.generate_entity_id(
+                name=entity_name,
+                entity_type="CUSTOM",  # Default type for auto-created entities
+                source_doc_id=""  # No specific source document
+            )
+            logger.info(f"Generated new unified entity ID: {valid_entity_id}")
 
-        # Create minimal entity
+        # Extract type from entity ID if possible
+        entity_type = "CUSTOM"
+        if "_" in valid_entity_id:
+            parts = valid_entity_id.split("_")
+            if len(parts) >= 2:
+                entity_type = parts[1].upper()
+
+        # Create minimal entity with valid ID
         entity = Entity(
-            id=entity_id,
             name=entity_name,
             type=entity_type,
             confidence=0.1,  # Low confidence for auto-created entities
-            metadata={"auto_created": True, "created_at": datetime.now().isoformat()}
+            attributes={"auto_created": True, "created_at": datetime.now().isoformat()}
         )
 
         # Store the entity
         await self.store_entity(entity)
-        logger.info(f"Created missing entity: {entity_id} (name: {entity_name})")
-        return entity_id
+        logger.info(f"Created missing entity: {entity.id} (name: {entity_name})")
+        return entity.id  # Return the valid entity ID, not the original invalid one
     
     async def store_entities(self, entities: List[Entity]) -> List[EntityId]:
         """Store multiple entities in Neo4J.
@@ -423,18 +440,24 @@ class EntityOperations(BaseOperations):
         Returns:
             True if entity was updated, False otherwise
         """
-        properties = entity.metadata.copy() if entity.metadata else {}
+        properties = entity.attributes.copy() if entity.attributes else {}
 
         query = """
         MATCH (e:Entity {id: $entity_id})
-        SET e += $properties,
+        SET e.name = $name,
+            e.type = $type,
+            e.confidence = $confidence,
+            e.metadata = $metadata,
             e.updated_at = datetime()
         RETURN e
         """
 
         result = await self._execute_query(query, {
             "entity_id": entity.id,
-            "properties": properties
+            "name": entity.name,
+            "type": entity.type,
+            "confidence": entity.confidence,
+            "metadata": json.dumps(properties) if properties else "{}"
         })
 
         return len(result) > 0

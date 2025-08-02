@@ -378,6 +378,19 @@ class Neo4jStorage(BaseStorage):
             raise RuntimeError("Connection not initialized")
         return await self._graph_ops.get_statistics()
 
+    async def test_connection(self) -> bool:
+        """Test the database connection.
+
+        Returns:
+            True if connection is working
+        """
+        if not self._connection_ops:
+            raise RuntimeError("Connection not initialized")
+
+        # Use the connection operations to test the connection
+        result = await self._connection_ops._execute_query("RETURN 1 as test", {})
+        return len(result) > 0 and result[0].get("test") == 1
+
     async def get_graph_metrics(self) -> Dict[str, Any]:
         """Get advanced graph metrics."""
         if not self._graph_ops:

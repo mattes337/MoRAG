@@ -123,6 +123,30 @@ class MarkitdownService:
     def _convert_sync(self, file_path: str, options: Dict[str, Any]):
         """Synchronous conversion method for thread pool execution."""
         try:
+            # For markdown files, try to read directly with proper encoding first
+            if file_path.lower().endswith(('.md', '.markdown')):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    # Create a simple result object that mimics markitdown's output
+                    class SimpleResult:
+                        def __init__(self, text_content):
+                            self.text_content = text_content
+                    return SimpleResult(content)
+                except UnicodeDecodeError:
+                    # If UTF-8 fails, try with different encodings
+                    for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+                        try:
+                            with open(file_path, 'r', encoding=encoding) as f:
+                                content = f.read()
+                            class SimpleResult:
+                                def __init__(self, text_content):
+                                    self.text_content = text_content
+                            return SimpleResult(content)
+                        except UnicodeDecodeError:
+                            continue
+                    # If all encodings fail, fall through to markitdown
+
             return self._markitdown.convert(file_path)
         except Exception as e:
             # Check if it's an unsupported format error
