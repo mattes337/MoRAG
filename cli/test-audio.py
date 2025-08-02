@@ -46,7 +46,7 @@ env_path = project_root / '.env'
 load_dotenv(env_path)
 
 try:
-    from morag_audio import AudioProcessor, AudioConfig
+    from morag_audio import AudioProcessor, AudioConfig, AudioService
     from morag_core.models import ProcessingConfig
     from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 except ImportError as e:
@@ -106,81 +106,110 @@ async def test_audio_processing(audio_file: Path, model_size: str = "base",
         print_result("Speaker Diarization", "[OK] Enabled" if enable_diarization else "[FAIL] Disabled")
         print_result("Topic Segmentation", "[OK] Enabled" if enable_topics else "[FAIL] Disabled")
 
-        # Initialize audio processor
-        processor = AudioProcessor(config)
-        print_result("Audio Processor", "[OK] Initialized successfully")
+        # Use AudioService for proper markdown output
+        service = AudioService(config=config, output_dir=audio_file.parent)
+        print_result("Audio Service", "[OK] Initialized successfully")
 
         print_section("Processing Audio File")
         print("[PROCESSING] Starting audio processing...")
+        print("   This may take a while for large audio files...")
 
-        # Process the audio file
-        result = await processor.process(audio_file)
+        # Process the audio file using AudioService
+        service_result = await service.process_file(
+            file_path=audio_file,
+            save_output=True,
+            output_format="markdown"
+        )
 
-        if result.success:
+        if service_result.get('success', False):
             print("[OK] Audio processing completed successfully!")
+
+            # Extract result data from service result
+            result_data = service_result.get('result', {})
 
             print_section("Processing Results")
             print_result("Status", "[OK] Success")
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
-            print_result("Transcript Length", f"{len(result.transcript)} characters")
-            print_result("Segments Count", f"{len(result.segments)}")
+            print_result("Processing Time", f"{service_result.get('processing_time', 0):.2f} seconds")
 
-            if result.metadata:
+            # Check for audio processing results
+            if result_data:
+                print_result("Transcript Length", f"{len(result_data.get('transcript', ''))}")
+                print_result("Segments Count", f"{len(result_data.get('segments', []))}")
+
+                # Check for speaker diarization
+                segments = result_data.get('segments', [])
+                if segments:
+                    has_speakers = any(seg.get('speaker') for seg in segments)
+                    has_topics = any(seg.get('topic_id') is not None for seg in segments)
+                    print_result("Speaker Diarization", "[OK] Enabled" if has_speakers else "[INFO] No speakers detected")
+                    print_result("Topic Segmentation", "[OK] Enabled" if has_topics else "[INFO] No topics detected")
+
+            metadata = result_data.get('metadata', {})
+            if metadata:
                 print_section("Metadata")
-                for key, value in result.metadata.items():
+                for key, value in metadata.items():
                     if isinstance(value, (dict, list)):
                         print_result(key, json.dumps(value, indent=2))
                     else:
                         print_result(key, str(value))
 
-            if result.transcript:
+            transcript = result_data.get('transcript', '')
+            if transcript:
                 print_section("Transcript Preview")
-                transcript_preview = result.transcript[:500] + "..." if len(result.transcript) > 500 else result.transcript
-                print(f"📄 Transcript ({len(result.transcript)} characters):")
+                transcript_preview = transcript[:500] + "..." if len(transcript) > 500 else transcript
+                print(f"📄 Transcript ({len(transcript)} characters):")
                 print(transcript_preview)
 
-            if result.segments:
+            segments = result_data.get('segments', [])
+            if segments:
                 print_section("Segments Preview (first 3)")
-                for i, segment in enumerate(result.segments[:3]):
-                    print(f"  Segment {i+1}: [{segment.start:.2f}s - {segment.end:.2f}s]")
-                    print(f"    Text: {segment.text[:100]}{'...' if len(segment.text) > 100 else ''}")
-                    if segment.speaker:
-                        print(f"    Speaker: {segment.speaker}")
-                    if segment.confidence:
-                        print(f"    Confidence: {segment.confidence:.3f}")
+                for i, segment in enumerate(segments[:3]):
+                    start = segment.get('start', 0)
+                    end = segment.get('end', 0)
+                    text = segment.get('text', '')
+                    print(f"  Segment {i+1}: [{start:.2f}s - {end:.2f}s]")
+                    print(f"    Text: {text[:100]}{'...' if len(text) > 100 else ''}")
+                    if segment.get('speaker'):
+                        print(f"    Speaker: {segment['speaker']}")
+                    if segment.get('confidence'):
+                        print(f"    Confidence: {segment['confidence']:.3f}")
 
-            # Save results to file
+            # Save comprehensive results to JSON file
             output_file = audio_file.parent / f"{audio_file.stem}_test_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     'mode': 'processing',
-                    'success': result.success,
-                    'processing_time': result.processing_time,
-                    'transcript': result.transcript,
-                    'segments': [
-                        {
-                            'start': seg.start,
-                            'end': seg.end,
-                            'text': seg.text,
-                            'speaker': seg.speaker,
-                            'confidence': seg.confidence,
-                            'topic_id': seg.topic_id,
-                            'topic_label': seg.topic_label
-                        } for seg in result.segments
-                    ],
-                    'metadata': result.metadata,
-                    'file_path': result.file_path,
-                    'error_message': result.error_message
+                    'success': service_result.get('success', False),
+                    'processing_time': service_result.get('processing_time', 0),
+                    'enable_diarization': enable_diarization,
+                    'enable_topic_segmentation': enable_topics,
+                    'model_size': model_size,
+                    'transcript': result_data.get('transcript', ''),
+                    'segments': result_data.get('segments', []),
+                    'metadata': result_data.get('metadata', {}),
+                    'output_files': service_result.get('output_files', {})
                 }, f, indent=2, ensure_ascii=False)
 
-            print_section("Output")
-            print_result("Results saved to", str(output_file))
+            # Create intermediate markdown file for ingestion
+            if service_result.get('content'):
+                intermediate_file = audio_file.parent / f"{audio_file.stem}_intermediate.md"
+                with open(intermediate_file, 'w', encoding='utf-8') as f:
+                    f.write(service_result['content'])
+                print_result("Intermediate Markdown File", str(intermediate_file))
+
+            print_section("Output Files")
+            print_result("JSON Results", str(output_file))
+
+            # Show all output files created by AudioService
+            output_files = service_result.get('output_files', {})
+            for file_type, file_path in output_files.items():
+                print_result(f"{file_type.title()} File", str(file_path))
 
             return True
 
         else:
             print("[FAIL] Audio processing failed!")
-            print_result("Error", result.error_message or "Unknown error")
+            print_result("Error", service_result.get('error', 'Unknown error'))
             return False
 
     except Exception as e:

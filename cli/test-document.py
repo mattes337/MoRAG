@@ -47,8 +47,9 @@ env_path = project_root / '.env'
 load_dotenv(env_path)
 
 try:
-    from morag_document import DocumentProcessor
+    from morag_document import DocumentProcessor, DocumentService
     from morag_core.interfaces.processor import ProcessingConfig
+    from morag_core.interfaces.service import ServiceConfig
     from morag_services import QdrantVectorStorage, GeminiEmbeddingService
     from morag_core.models import Document, DocumentChunk
 except ImportError as e:
@@ -98,102 +99,132 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
     print_result("File Extension", document_file.suffix.lower())
 
     try:
-        # Initialize document processor (no config needed)
-        processor = DocumentProcessor()
-        print_result("Document Processor", "[OK] Initialized successfully")
+        # Use DocumentService for proper markdown output
+        config = ServiceConfig()
+        service = DocumentService(config=config, output_dir=document_file.parent)
+        await service.initialize()
+        print_result("Document Service", "[OK] Initialized successfully")
         print_result("Chunking Strategy", chunking_strategy)
         print_result("Chunk Size", f"{chunk_size} characters")
         print_result("Chunk Overlap", f"{chunk_overlap} characters")
 
         print_section("Processing Document File")
         print("[PROCESSING] Starting document processing...")
+        print("   This may take a while for large documents...")
 
-        # Process the document file with options
-        result = await processor.process_file(
-            document_file,
-            extract_metadata=True,
-            chunking_strategy=chunking_strategy,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+        # Process the document file using DocumentService
+        service_result = await service.process_file(
+            file_path=document_file,
+            save_output=True,
+            output_format="markdown"
         )
 
-        if result.success:
+        if service_result.get('success', False):
             try:
                 print("[OK] Document processing completed successfully!")
             except UnicodeEncodeError:
                 print("[SUCCESS] Document processing completed successfully!")
+
+            # Extract result data from service result
+            result_data = service_result.get('result', {})
 
             print_section("Processing Results")
             try:
                 print_result("Status", "[OK] Success")
             except UnicodeEncodeError:
                 print_result("Status", "[SUCCESS]")
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+            print_result("Processing Time", f"{service_result.get('processing_time', 0):.2f} seconds")
 
-            if result.metadata:
+            # Check for document processing results
+            if result_data:
+                content = result_data.get('content', '')
+                chunks = result_data.get('chunks', [])
+                print_result("Content Length", f"{len(content)} characters")
+                print_result("Chunks Count", f"{len(chunks)}")
+
+            metadata = result_data.get('metadata', {})
+            if metadata:
                 print_section("Metadata")
-                for key, value in result.metadata.items():
+                for key, value in metadata.items():
                     if isinstance(value, (dict, list)):
                         print_result(key, json.dumps(value, indent=2))
                     else:
                         print_result(key, str(value))
 
-            if result.document:
-                print_section("Document Information")
-                doc = result.document
-                print_result("Title", doc.metadata.title or "N/A")
-                print_result("Author", doc.metadata.author or "N/A")
-                print_result("Page Count", str(doc.metadata.page_count or "N/A"))
-                print_result("Word Count", str(doc.metadata.word_count or "N/A"))
-                print_result("Chunks Count", str(len(doc.chunks)))
+            content = result_data.get('content', '')
+            chunks = result_data.get('chunks', [])
 
-                if doc.raw_text:
+            if content or chunks:
+                print_section("Document Information")
+                print_result("Content Available", "[OK] Yes" if content else "[INFO] No")
+                print_result("Chunks Available", "[OK] Yes" if chunks else "[INFO] No")
+
+                if content:
                     print_section("Content Preview")
-                    content_preview = doc.raw_text[:500] + "..." if len(doc.raw_text) > 500 else doc.raw_text
-                    print(f"📄 Raw Text ({len(doc.raw_text)} characters):")
+                    content_preview = content[:500] + "..." if len(content) > 500 else content
+                    print(f"📄 Content ({len(content)} characters):")
                     print(content_preview)
 
-                if doc.chunks:
+                if chunks:
                     print_section("Chunks Preview (first 3)")
-                    for i, chunk in enumerate(doc.chunks[:3]):
-                        print(f"  Chunk {i+1}:")
-                        print(f"    Content: {chunk.content[:100]}{'...' if len(chunk.content) > 100 else ''}")
-                        if chunk.page_number:
-                            print(f"    Page: {chunk.page_number}")
-                        if chunk.metadata:
-                            print(f"    Metadata: {chunk.metadata}")
+                    for i, chunk in enumerate(chunks[:3]):
+                        # Handle both dict and object chunks
+                        if hasattr(chunk, 'content'):
+                            chunk_content = chunk.content
+                            chunk_index = getattr(chunk, 'chunk_index', None)
+                            chunk_metadata = getattr(chunk, 'metadata', None)
+                        else:
+                            chunk_content = chunk.get('content', '')
+                            chunk_index = chunk.get('chunk_index')
+                            chunk_metadata = chunk.get('metadata')
 
-            # Save results to file
+                        print(f"  Chunk {i+1}:")
+                        print(f"    Content: {chunk_content[:100]}{'...' if len(chunk_content) > 100 else ''}")
+                        if chunk_index is not None:
+                            print(f"    Index: {chunk_index}")
+                        if chunk_metadata:
+                            print(f"    Metadata: {chunk_metadata}")
+
+            # Convert chunks to serializable format
+            serializable_chunks = []
+            for chunk in chunks:
+                if hasattr(chunk, 'content'):
+                    # DocumentChunk object
+                    chunk_dict = {
+                        'content': chunk.content,
+                        'chunk_index': getattr(chunk, 'chunk_index', None),
+                        'metadata': getattr(chunk, 'metadata', {}),
+                        'start_char': getattr(chunk, 'start_char', None),
+                        'end_char': getattr(chunk, 'end_char', None)
+                    }
+                else:
+                    # Already a dict
+                    chunk_dict = chunk
+                serializable_chunks.append(chunk_dict)
+
+            # Save comprehensive results to JSON file
             output_file = document_file.parent / f"{document_file.stem}_test_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     'mode': 'processing',
-                    'success': result.success,
-                    'processing_time': result.processing_time,
+                    'success': service_result.get('success', False),
+                    'processing_time': service_result.get('processing_time', 0),
                     'chunking_strategy': chunking_strategy,
                     'chunk_size': chunk_size,
                     'chunk_overlap': chunk_overlap,
-                    'metadata': result.metadata,
-                    'document': {
-                        'title': result.document.metadata.title if result.document else None,
-                        'author': result.document.metadata.author if result.document else None,
-                        'page_count': result.document.metadata.page_count if result.document else None,
-                        'word_count': result.document.metadata.word_count if result.document else None,
-                        'raw_text': result.document.raw_text if result.document else None,
-                        'chunks_count': len(result.document.chunks) if result.document else 0,
-                        'chunks': [
-                            {
-                                'content': chunk.content,
-                                'page_number': chunk.page_number,
-                                'metadata': chunk.metadata
-                            } for chunk in result.document.chunks
-                        ] if result.document else []
-                    },
-                    'error_message': result.error_message
+                    'content': result_data.get('content', ''),
+                    'chunks': serializable_chunks,
+                    'metadata': result_data.get('metadata', {}),
+                    'output_files': service_result.get('output_files', {})
                 }, f, indent=2, ensure_ascii=False)
 
-            print_section("Output")
-            print_result("Results saved to", str(output_file))
+            print_section("Output Files")
+            print_result("JSON Results", str(output_file))
+
+            # Show all output files created by DocumentService
+            output_files = service_result.get('output_files', {})
+            for file_type, file_path in output_files.items():
+                print_result(f"{file_type.title()} File", str(file_path))
 
             return True
 
@@ -202,7 +233,7 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
                 print("[FAIL] Document processing failed!")
             except UnicodeEncodeError:
                 print("[ERROR] Document processing failed!")
-            print_result("Error", result.error_message or "Unknown error")
+            print_result("Error", service_result.get('error', 'Unknown error'))
             return False
 
     except Exception as e:

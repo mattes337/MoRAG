@@ -47,7 +47,7 @@ env_path = project_root / '.env'
 load_dotenv(env_path)
 
 try:
-    from morag_image import ImageProcessor
+    from morag_image import ImageProcessor, ImageService
     from morag_image.processor import ImageConfig
     from morag_core.interfaces.processor import ProcessingConfig
 except ImportError as e:
@@ -108,46 +108,65 @@ async def test_image_processing(
     start_time = time.time()
     
     try:
-        # Initialize image processor (no API key for basic functionality)
-        processor = ImageProcessor()
-        print_result("Image Processor", "[OK] Initialized successfully")
-
-        # Create image configuration (disable OCR since tesseract is not installed)
-        image_config = ImageConfig(
-            generate_caption=False,  # Requires API key
-            extract_text=False,  # Requires tesseract
-            extract_metadata=True,
-            resize_max_dimension=1024
-        )
-        print_result("Image Config", "[OK] Created successfully")
+        # Use ImageService for proper markdown output
+        api_key = os.getenv('GOOGLE_API_KEY')  # Get API key from environment
+        service = ImageService(api_key=api_key, output_dir=image_file.parent)
+        await service.initialize()
+        print_result("Image Service", "[OK] Initialized successfully")
+        print_result("API Key Available", "[OK] Yes" if api_key else "[INFO] No (limited functionality)")
 
         print_section("Processing Image File")
         print("[PROCESSING] Starting image processing...")
+        print("   This may take a while for large images...")
 
-        # Process the image file
-        result = await processor.process_image(image_file, image_config)
+        # Process the image file using ImageService
+        service_result = await service.process_file(
+            file_path=image_file,
+            save_output=True,
+            output_format="markdown"
+        )
 
-        if not result or not hasattr(result, 'processing_time'):
+        if not service_result.get('success', False):
             print("[FAIL] Image processing failed!")
+            print_result("Error", service_result.get('error', 'Unknown error'))
             return False
 
         print("[OK] Image processing completed successfully!")
         processing_time = time.time() - start_time
 
+        # Extract result data from service result
+        result_data = service_result.get('result', {})
+
         print_section("Processing Results")
         print_result("Status", "[OK] Success")
-        print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+        print_result("Processing Time", f"{service_result.get('processing_time', 0):.2f} seconds")
+
+        # Check for image processing results
+        if result_data:
+            caption = result_data.get('caption', '')
+            extracted_text = result_data.get('extracted_text', '')
+            metadata = result_data.get('metadata', {})
+            confidence_scores = result_data.get('confidence_scores', {})
+
+            print_result("Caption Available", "[OK] Yes" if caption else "[INFO] No")
+            print_result("Text Extracted", "[OK] Yes" if extracted_text else "[INFO] No")
+            print_result("Metadata Extracted", "[OK] Yes" if metadata else "[INFO] No")
+
+            if metadata:
+                print_result("Image Dimensions", f"{metadata.get('width', 'N/A')}x{metadata.get('height', 'N/A')} pixels")
+                print_result("Image Format", metadata.get('format', 'N/A'))
 
         # Prepare text content for graph extraction
         text_content = ""
-        if result.caption:
-            text_content += f"Image Caption: {result.caption}\n"
-        if result.extracted_text:
-            text_content += f"Extracted Text: {result.extracted_text}\n"
-        
+        if result_data.get('caption'):
+            text_content += f"Image Caption: {result_data['caption']}\n"
+        if result_data.get('extracted_text'):
+            text_content += f"Extracted Text: {result_data['extracted_text']}\n"
+
         # Add metadata as text
-        metadata = result.metadata
-        text_content += f"Image Dimensions: {metadata.width}x{metadata.height} pixels\n"
+        metadata = result_data.get('metadata', {})
+        if metadata:
+            text_content += f"Image Dimensions: {metadata.get('width', 'N/A')}x{metadata.get('height', 'N/A')} pixels\n"
         text_content += f"Image Format: {metadata.format}\n"
         if metadata.camera_make:
             text_content += f"Camera: {metadata.camera_make}"

@@ -22,16 +22,24 @@ logger = structlog.get_logger(__name__)
 class DocumentService(BaseService):
     """Document processing service implementation."""
 
-    def __init__(self, config: Optional[ServiceConfig] = None):
+    def __init__(self, config: Optional[ServiceConfig] = None, output_dir: Optional[Union[str, Path]] = None):
         """Initialize document service.
 
         Args:
             config: Service configuration
+            output_dir: Directory to store processed files
         """
         self.config = config or ServiceConfig()
         self.processor = DocumentProcessor()
         self.embedding_service = None
         self._status = ServiceStatus.INITIALIZING
+
+        # Set up output directory
+        if output_dir:
+            self.output_dir = Path(output_dir)
+            self.output_dir.mkdir(exist_ok=True)
+        else:
+            self.output_dir = None
 
     async def initialize(self) -> bool:
         """Initialize service.
@@ -96,6 +104,77 @@ class DocumentService(BaseService):
             health["embedding"] = embedding_health
 
         return health
+
+    async def process_file(
+        self,
+        file_path: Union[str, Path],
+        save_output: bool = True,
+        output_format: str = "markdown"
+    ) -> Dict[str, Any]:
+        """Process a document file and optionally save output files.
+
+        Args:
+            file_path: Path to the document file
+            save_output: Whether to save output files
+            output_format: Output format ('markdown', 'json', or 'both')
+
+        Returns:
+            Dictionary containing processing results and output file paths
+        """
+        file_path = Path(file_path)
+
+        if not file_path.exists():
+            raise ValidationError(f"File not found: {file_path}")
+
+        logger.info("Processing document file", file_path=str(file_path))
+
+        try:
+            # Process the document using existing method
+            result = await self.process_document(file_path)
+
+            if not result.success:
+                return {
+                    "success": False,
+                    "error": result.error_message,
+                    "processing_time": result.processing_time
+                }
+
+            # Extract content from document
+            content = ""
+            chunks = []
+            if result.document:
+                content = getattr(result.document, 'raw_text', '') or ""
+                chunks = getattr(result.document, 'chunks', [])
+
+            # Prepare response
+            response = {
+                "success": True,
+                "processing_time": result.processing_time,
+                "result": {
+                    "content": content,
+                    "metadata": result.metadata,
+                    "chunks": chunks
+                }
+            }
+
+            # Save output files if requested
+            if save_output and self.output_dir:
+                output_files = await self._save_output_files(file_path, result, content, output_format)
+                response["output_files"] = output_files
+
+                # Add markdown content to response if generated
+                if output_format in ["markdown", "both"]:
+                    response["content"] = content
+
+            return response
+
+        except Exception as e:
+            logger.error("Document processing failed", error=str(e), file_path=str(file_path))
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_time": 0
+            }
 
     async def process_document(self, file_path: Union[str, Path], **kwargs) -> ProcessingResult:
         """Process document.
@@ -403,3 +482,81 @@ class DocumentService(BaseService):
                 error_type=e.__class__.__name__,
             )
             raise ProcessingError(f"Failed to summarize document: {str(e)}")
+
+    async def _save_output_files(
+        self,
+        file_path: Path,
+        result: ProcessingResult,
+        content: str,
+        output_format: str
+    ) -> Dict[str, str]:
+        """Save processing results to output files.
+
+        Args:
+            file_path: Original file path
+            result: Processing result
+            output_format: Output format ('markdown', 'json', or 'both')
+
+        Returns:
+            Dictionary mapping file types to file paths
+        """
+        output_files = {}
+        base_name = file_path.stem
+
+        # Create output directory for this file
+        file_output_dir = self.output_dir / base_name
+        file_output_dir.mkdir(exist_ok=True)
+
+        # Save content as markdown
+        if output_format in ["markdown", "both"] and content:
+            markdown_path = file_output_dir / f"{base_name}.md"
+            with open(markdown_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            output_files["markdown"] = str(markdown_path)
+
+        # Save chunks as JSON if available
+        chunks = []
+        if result.document and hasattr(result.document, 'chunks'):
+            chunks = result.document.chunks
+
+        if chunks:
+            import json
+            chunks_path = file_output_dir / f"{base_name}_chunks.json"
+            chunks_data = []
+
+            for chunk in chunks:
+                chunk_data = {
+                    "content": getattr(chunk, 'content', ''),
+                    "metadata": getattr(chunk, 'metadata', {}),
+                    "chunk_index": getattr(chunk, 'chunk_index', None),
+                    "start_char": getattr(chunk, 'start_char', None),
+                    "end_char": getattr(chunk, 'end_char', None)
+                }
+                chunks_data.append(chunk_data)
+
+            chunks_path.write_text(json.dumps(chunks_data, indent=2, ensure_ascii=False))
+            output_files["chunks"] = str(chunks_path)
+
+            logger.info("Saved chunks file",
+                       chunks_count=len(chunks_data),
+                       chunks_path=str(chunks_path))
+
+        # Save metadata as JSON
+        import json
+        metadata_path = file_output_dir / f"{base_name}_metadata.json"
+        metadata_dict = {
+            "file_path": str(file_path),
+            "file_size": file_path.stat().st_size,
+            "processing_time": result.processing_time,
+            "content_length": len(content) if content else 0,
+            "chunks_count": len(chunks) if chunks else 0,
+            "metadata": result.metadata
+        }
+        metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False))
+        output_files["metadata"] = str(metadata_path)
+
+        logger.info("Saved document output files",
+                   output_dir=str(file_output_dir),
+                   files_created=list(output_files.keys()))
+
+        return output_files

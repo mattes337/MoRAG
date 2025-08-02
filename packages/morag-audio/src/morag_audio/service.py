@@ -227,6 +227,31 @@ class AudioService:
             with open(transcript_path, "w", encoding="utf-8") as f:
                 f.write(result.transcript)
             output_files["transcript"] = str(transcript_path)
+
+        # Save segments as JSON if available
+        if result.segments:
+            import json
+            segments_path = file_output_dir / f"{base_name}_segments.json"
+            segments_data = []
+
+            for segment in result.segments:
+                segment_data = {
+                    "start": getattr(segment, 'start', 0),
+                    "end": getattr(segment, 'end', 0),
+                    "text": getattr(segment, 'text', ''),
+                    "speaker": getattr(segment, 'speaker', None),
+                    "confidence": getattr(segment, 'confidence', None),
+                    "topic_id": getattr(segment, 'topic_id', None),
+                    "topic_label": getattr(segment, 'topic_label', None)
+                }
+                segments_data.append(segment_data)
+
+            segments_path.write_text(json.dumps(segments_data, indent=2, ensure_ascii=False))
+            output_files["segments"] = str(segments_path)
+
+            logger.info("Saved segments file",
+                       segments_count=len(segments_data),
+                       segments_path=str(segments_path))
         
         # Save markdown if available
         if markdown_content:
@@ -234,6 +259,22 @@ class AudioService:
             with open(markdown_path, "w", encoding="utf-8") as f:
                 f.write(markdown_content)
             output_files["markdown"] = str(markdown_path)
+
+        # Save metadata as JSON
+        import json
+        metadata_path = file_output_dir / f"{base_name}_metadata.json"
+        metadata_dict = {
+            "file_path": str(file_path),
+            "file_size": file_path.stat().st_size,
+            "processing_time": result.processing_time,
+            "transcript_length": len(result.transcript) if result.transcript else 0,
+            "segments_count": len(result.segments) if result.segments else 0,
+            "has_speaker_diarization": any(getattr(seg, 'speaker', None) for seg in result.segments) if result.segments else False,
+            "has_topic_segmentation": any(getattr(seg, 'topic_id', None) is not None for seg in result.segments) if result.segments else False,
+            "metadata": result.metadata
+        }
+        metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False))
+        output_files["metadata"] = str(metadata_path)
         
         # Save segments as JSON
         if result.segments:
