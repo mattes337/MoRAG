@@ -15,6 +15,7 @@ except ImportError:
 from ..models import Entity
 from .langextract_examples import LangExtractExamples, DomainEntityTypes
 from .entity_normalizer import LLMEntityNormalizer
+from ..utils.retry_utils import retry_with_exponential_backoff
 
 logger = structlog.get_logger(__name__)
 
@@ -169,20 +170,34 @@ class EntityExtractor:
                 self.logger.info(f"Inferred domain '{inferred_domain}' from text content")
 
         try:
-            # Run LangExtract in thread pool to avoid blocking
-            result = await asyncio.get_event_loop().run_in_executor(
-                self._executor,
-                self._extract_sync,
-                text,
-                source_doc_id
+            # Get retry configuration from settings
+            from morag_core.config import settings
+
+            # Define the extraction function with retry logic
+            async def extract_with_retry():
+                return await asyncio.get_event_loop().run_in_executor(
+                    self._executor,
+                    self._extract_sync,
+                    text,
+                    source_doc_id
+                )
+
+            # Run LangExtract with retry logic for API errors
+            result = await retry_with_exponential_backoff(
+                extract_with_retry,
+                max_retries=settings.entity_extraction_max_retries,
+                base_delay=settings.entity_extraction_retry_base_delay,
+                max_delay=settings.entity_extraction_retry_max_delay,
+                jitter=settings.retry_jitter,
+                operation_name="entity extraction"
             )
-            
+
             # Convert LangExtract results to MoRAG Entity objects
             entities = await self._convert_to_entities_async(result, source_doc_id)
 
             # Filter by confidence
             entities = [e for e in entities if e.confidence >= self.min_confidence]
-            
+
             self.logger.info(
                 "Entity extraction completed",
                 text_length=len(text),
@@ -191,16 +206,17 @@ class EntityExtractor:
                 langextract_extractions=len(result.extractions) if result else 0,
                 domain=self.domain
             )
-            
+
             return entities
-            
+
         except Exception as e:
             self.logger.error(
                 "Entity extraction failed",
                 error=str(e),
                 error_type=type(e).__name__,
                 text_length=len(text),
-                domain=self.domain
+                domain=self.domain,
+                component="langextract_entity_extractor"
             )
             raise
     

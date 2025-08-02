@@ -34,18 +34,12 @@ class ConnectionOperations(BaseOperations):
             }
             
             # Handle SSL configuration for newer Neo4j driver versions
-            if not self.config.verify_ssl:
-                # For newer Neo4j drivers, use trust constants
-                from neo4j import Config, TRUST_SYSTEM_CA_SIGNED_CERTIFICATES
-                driver_kwargs["config"] = Config(
-                    trust=TRUST_SYSTEM_CA_SIGNED_CERTIFICATES
-                )
-            elif self.config.trust_all_certificates:
-                # Trust all certificates (for self-signed)
-                from neo4j import Config, TRUST_ALL_CERTIFICATES
-                driver_kwargs["config"] = Config(
-                    trust=TRUST_ALL_CERTIFICATES
-                )
+            # Note: The 'trust' parameter has been deprecated in Neo4j driver 5.x
+            # For now, we'll use the basic SSL configuration without the deprecated trust parameter
+            if not self.config.verify_ssl or self.config.trust_all_certificates:
+                # For SSL configurations, we'll rely on the URI scheme (bolt+s, neo4j+s, etc.)
+                # and let the driver handle SSL based on the URI
+                pass
             
             self.driver = AsyncGraphDatabase.driver(self.config.uri, **driver_kwargs)
             

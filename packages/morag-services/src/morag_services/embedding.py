@@ -599,6 +599,8 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         # For non-rate-limit errors, still use limited retries
         max_retries_non_rate_limit = 3
+        # Use configurable max retries for rate limit errors when not retrying indefinitely
+        max_retries_rate_limit = getattr(settings, 'entity_extraction_max_retries', 20)
         attempt = 0
 
         while True:
@@ -635,15 +637,15 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                         time.sleep(delay)
                         continue
                     else:
-                        # Legacy behavior: limited retries
-                        if attempt <= max_retries_non_rate_limit:
-                            delay = base_delay * (exponential_base ** (attempt - 1))
+                        # Legacy behavior: limited retries with configurable max retries
+                        if attempt <= max_retries_rate_limit:
+                            delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
                             if use_jitter:
-                                delay += (time.time() % 1)
+                                delay *= (0.5 + (time.time() % 1) * 0.5)  # Add 0-50% jitter
                             logger.warning(
                                 "Rate limit hit in text generation, retrying with limited attempts",
                                 attempt=attempt,
-                                max_retries=max_retries_non_rate_limit,
+                                max_retries=max_retries_rate_limit,
                                 delay=delay,
                                 error=error_str
                             )
@@ -651,7 +653,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                             continue
                         else:
                             logger.error("Rate limit exceeded after all retries in text generation", error=error_str)
-                            raise RateLimitError(f"Rate limit exceeded after {max_retries_non_rate_limit} retries: {error_str}")
+                            raise RateLimitError(f"Rate limit exceeded after {max_retries_rate_limit} retries: {error_str}")
                 else:
                     # Non-rate-limit error, use limited retries
                     if attempt <= max_retries_non_rate_limit:

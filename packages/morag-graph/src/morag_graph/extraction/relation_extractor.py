@@ -14,6 +14,7 @@ except ImportError:
 
 from ..models import Entity, Relation
 from .langextract_examples import LangExtractExamples, DomainRelationTypes
+from ..utils.retry_utils import retry_with_exponential_backoff
 
 logger = structlog.get_logger(__name__)
 
@@ -147,20 +148,34 @@ class RelationExtractor:
             return []
         
         try:
-            # Run LangExtract in thread pool
-            result = await asyncio.get_event_loop().run_in_executor(
-                self._executor,
-                self._extract_sync,
-                text,
-                source_doc_id
+            # Get retry configuration from settings
+            from morag_core.config import settings
+
+            # Define the extraction function with retry logic
+            async def extract_with_retry():
+                return await asyncio.get_event_loop().run_in_executor(
+                    self._executor,
+                    self._extract_sync,
+                    text,
+                    source_doc_id
+                )
+
+            # Run LangExtract with retry logic for API errors
+            result = await retry_with_exponential_backoff(
+                extract_with_retry,
+                max_retries=settings.entity_extraction_max_retries,
+                base_delay=settings.entity_extraction_retry_base_delay,
+                max_delay=settings.entity_extraction_retry_max_delay,
+                jitter=settings.retry_jitter,
+                operation_name="relation extraction"
             )
-            
+
             # Convert LangExtract results to MoRAG Relation objects
             relations = self._convert_to_relations(result, entities, source_doc_id)
-            
+
             # Filter by confidence
             relations = [r for r in relations if r.confidence >= self.min_confidence]
-            
+
             self.logger.info(
                 "Relation extraction completed",
                 text_length=len(text),
@@ -170,16 +185,17 @@ class RelationExtractor:
                 langextract_extractions=len(result.extractions) if result else 0,
                 domain=self.domain
             )
-            
+
             return relations
-            
+
         except Exception as e:
             self.logger.error(
                 "Relation extraction failed",
                 error=str(e),
                 error_type=type(e).__name__,
                 text_length=len(text),
-                domain=self.domain
+                domain=self.domain,
+                component="langextract_relation_extractor"
             )
             raise
     

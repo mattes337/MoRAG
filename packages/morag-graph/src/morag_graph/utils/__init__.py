@@ -8,10 +8,19 @@ from .id_generation import (
     IDCollisionError
 )
 
+from .retry_utils import (
+    retry_with_exponential_backoff,
+    retry_on_api_errors,
+    is_retryable_error
+)
+
 __all__ = [
     'UnifiedIDGenerator',
-    'IDValidator', 
+    'IDValidator',
     'IDCollisionDetector',
     'IDValidationError',
-    'IDCollisionError'
+    'IDCollisionError',
+    'retry_with_exponential_backoff',
+    'retry_on_api_errors',
+    'is_retryable_error'
 ]

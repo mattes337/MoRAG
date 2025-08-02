@@ -111,6 +111,11 @@ class Settings(BaseSettings):
     retry_exponential_base: float = Field(default=2.0, alias="MORAG_RETRY_EXPONENTIAL_BASE")  # Exponential backoff multiplier
     retry_jitter: bool = Field(default=True, alias="MORAG_RETRY_JITTER")  # Add random jitter to delays
 
+    # Entity Extraction Retry Configuration
+    entity_extraction_max_retries: int = Field(default=20, alias="MORAG_ENTITY_EXTRACTION_MAX_RETRIES")  # Max retries for entity extraction
+    entity_extraction_retry_base_delay: float = Field(default=1.0, alias="MORAG_ENTITY_EXTRACTION_RETRY_BASE_DELAY")  # Base delay for entity extraction retries
+    entity_extraction_retry_max_delay: float = Field(default=300.0, alias="MORAG_ENTITY_EXTRACTION_RETRY_MAX_DELAY")  # Max delay for entity extraction retries
+
     # Celery Task Configuration
     celery_task_soft_time_limit: int = Field(default=120 * 60, alias="MORAG_CELERY_TASK_SOFT_TIME_LIMIT")  # 2 hours (7200 seconds) - soft limit
     celery_task_time_limit: int = Field(default=150 * 60, alias="MORAG_CELERY_TASK_TIME_LIMIT")  # 2.5 hours (9000 seconds) - hard limit
