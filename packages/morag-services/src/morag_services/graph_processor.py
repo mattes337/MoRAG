@@ -19,7 +19,18 @@ try:
         Neo4jConfig, QdrantConfig, DatabaseType, DatabaseConfig, DatabaseResult,
         Entity, Relation
     )
-    from morag_graph.extraction.base import LLMConfig
+    # Import LLMConfig from morag-reasoning package
+    try:
+        from morag_reasoning.llm import LLMConfig
+    except ImportError:
+        # Fallback LLMConfig for compatibility
+        from pydantic import BaseModel
+        class LLMConfig(BaseModel):
+            provider: str = "gemini"
+            model: str = "gemini-1.5-flash"
+            api_key: str = None
+            temperature: float = 0.1
+            max_tokens: int = 2000
     from morag_graph.ingestion import FileIngestion
 
     # Try to import enhanced graph builder with OpenIE support
