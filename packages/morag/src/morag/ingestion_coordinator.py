@@ -308,9 +308,13 @@ class IngestionCoordinator:
                 'document_id': document_id,
                 'chunk_index': i,
                 'chunk_size': len(chunk),
+                'chunk_text': chunk,  # Store chunk text for metadata extraction
                 'created_at': datetime.now(timezone.utc).isoformat(),
                 **metadata
             }
+
+            # Add total chunks count for better context
+            chunk_meta['total_chunks'] = len(chunks)
 
             # Add content-type-specific metadata
             content_type = metadata.get('content_type', 'document')
@@ -321,6 +325,11 @@ class IngestionCoordinator:
                 chunk_meta.update(self._add_audio_video_chunk_metadata(chunk, i, metadata))
             elif content_type == 'document':
                 chunk_meta.update(self._add_document_chunk_metadata(chunk, i, metadata))
+
+            # Ensure we have a location reference for all chunks
+            if 'location_reference' not in chunk_meta:
+                chunk_meta['location_reference'] = f"Chunk {i + 1} of {len(chunks)}"
+                chunk_meta['location_type'] = 'chunk_index'
 
             chunk_metadata.append(chunk_meta)
             
@@ -1682,33 +1691,53 @@ class IngestionCoordinator:
         """
         additional_meta = {}
 
-        # Try to extract timestamp information from the chunk text or metadata
-        # Look for timestamp patterns in the chunk text
-        import re
-        timestamp_pattern = r'\[(\d{2}:\d{2}:\d{2})\]|\[(\d+:\d{2})\]|(\d+:\d{2}:\d{2})|(\d+:\d{2})'
-        timestamp_matches = re.findall(timestamp_pattern, chunk_text)
+        # Extract timestamp information from segments data if available
+        segments = metadata.get('segments', [])
+        if segments and chunk_index < len(segments):
+            segment = segments[chunk_index]
+            if isinstance(segment, dict):
+                # Use segment start/end times for precise location metadata
+                if 'start_time' in segment:
+                    additional_meta['start_timestamp_seconds'] = segment['start_time']
+                    additional_meta['start_timestamp'] = self._seconds_to_timestamp(segment['start_time'])
+                if 'end_time' in segment:
+                    additional_meta['end_timestamp_seconds'] = segment['end_time']
+                    additional_meta['end_timestamp'] = self._seconds_to_timestamp(segment['end_time'])
+                if 'duration' in segment:
+                    additional_meta['segment_duration'] = segment['duration']
+                if 'title' in segment:
+                    additional_meta['topic_title'] = segment['title']
+                if 'summary' in segment:
+                    additional_meta['topic_summary'] = segment['summary']
 
-        if timestamp_matches:
-            # Use the first timestamp found
-            timestamp_str = next(filter(None, timestamp_matches[0]))
-            additional_meta['start_timestamp'] = timestamp_str
+        # Fallback: Try to extract timestamp information from the chunk text
+        if 'start_timestamp_seconds' not in additional_meta:
+            import re
+            timestamp_pattern = r'\[(\d{2}:\d{2}:\d{2})\]|\[(\d+:\d{2})\]|(\d+:\d{2}:\d{2})|(\d+:\d{2})'
+            timestamp_matches = re.findall(timestamp_pattern, chunk_text)
 
-            # Try to convert to seconds for easier processing
-            try:
-                time_parts = timestamp_str.split(':')
-                if len(time_parts) == 3:  # HH:MM:SS
-                    seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
-                elif len(time_parts) == 2:  # MM:SS
-                    seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                else:
-                    seconds = int(time_parts[0])
-                additional_meta['start_timestamp_seconds'] = seconds
-            except (ValueError, IndexError):
-                pass
+            if timestamp_matches:
+                # Use the first timestamp found
+                timestamp_str = next(filter(None, timestamp_matches[0]))
+                additional_meta['start_timestamp'] = timestamp_str
+
+                # Try to convert to seconds for easier processing
+                try:
+                    time_parts = timestamp_str.split(':')
+                    if len(time_parts) == 3:  # HH:MM:SS
+                        seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
+                    elif len(time_parts) == 2:  # MM:SS
+                        seconds = int(time_parts[0]) * 60 + int(time_parts[1])
+                    else:
+                        seconds = int(time_parts[0])
+                    additional_meta['start_timestamp_seconds'] = seconds
+                except (ValueError, IndexError):
+                    pass
 
         # Add topic information if available
         if metadata.get('has_topic_info', False):
             # Try to extract topic title from chunk text
+            import re
             topic_title_pattern = r'^###?\s*(.+?)(?:\n|$)'
             topic_match = re.search(topic_title_pattern, chunk_text, re.MULTILINE)
             if topic_match:
@@ -1716,16 +1745,36 @@ class IngestionCoordinator:
                 additional_meta['chunk_summary'] = f"Topic: {topic_match.group(1).strip()}"
 
         # Add speaker information if available
-        speaker_pattern = r'Speaker (\d+):|Speaker ([A-Z]+):'
+        import re
+        speaker_pattern = r'Speaker (\d+):|Speaker ([A-Z]+):|SPEAKER_(\d+)'
         speaker_matches = re.findall(speaker_pattern, chunk_text)
         if speaker_matches:
             speakers = set()
             for match in speaker_matches:
-                speaker = match[0] or match[1]
-                speakers.add(speaker)
+                speaker = match[0] or match[1] or match[2]
+                speakers.add(f"SPEAKER_{speaker}")
             additional_meta['speakers'] = list(speakers)
 
+        # Add media type and duration information
+        if 'duration' in metadata:
+            additional_meta['total_duration'] = metadata['duration']
+        if 'content_type' in metadata:
+            additional_meta['media_type'] = metadata['content_type']
+
+        # Add location context for easy reference
+        if 'start_timestamp_seconds' in additional_meta:
+            timestamp_str = additional_meta.get('start_timestamp', self._seconds_to_timestamp(additional_meta['start_timestamp_seconds']))
+            additional_meta['location_reference'] = f"[{timestamp_str}]"
+            additional_meta['location_type'] = 'timestamp'
+
         return additional_meta
+
+    def _seconds_to_timestamp(self, seconds: float) -> str:
+        """Convert seconds to HH:MM:SS timestamp format."""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
     def _add_document_chunk_metadata(self, chunk_text: str, chunk_index: int, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Add document-specific metadata to chunk.
@@ -1739,22 +1788,103 @@ class IngestionCoordinator:
             Dictionary with additional metadata
         """
         additional_meta = {}
-
-        # Try to extract section/chapter information
         import re
 
-        # Look for chapter/section headers
-        header_pattern = r'^(#{1,6})\s*(.+?)(?:\n|$)'
-        header_match = re.search(header_pattern, chunk_text, re.MULTILINE)
-        if header_match:
-            header_level = len(header_match.group(1))
-            header_text = header_match.group(2).strip()
-            additional_meta['section_title'] = header_text
-            additional_meta['section_level'] = header_level
-            additional_meta['chunk_summary'] = f"Section: {header_text}"
+        # Extract page information from multiple sources
+        page_number = None
 
-        # Add page information if available from metadata
-        if 'page_number' in metadata:
-            additional_meta['page_number'] = metadata['page_number']
+        # 1. Check if page info is in metadata
+        if 'page_number' in metadata and metadata['page_number'] is not None:
+            page_number = metadata['page_number']
+
+        # 2. Try to extract page number from chunk text
+        if page_number is None:
+            # Look for page indicators in text
+            page_patterns = [
+                r'Page\s+(\d+)',
+                r'page\s+(\d+)',
+                r'PAGE\s+(\d+)',
+                r'^(\d+)$',  # Standalone number at beginning of line
+                r'^\s*(\d+)\s*$'  # Standalone number with whitespace
+            ]
+
+            for pattern in page_patterns:
+                page_match = re.search(pattern, chunk_text, re.MULTILINE | re.IGNORECASE)
+                if page_match:
+                    try:
+                        page_number = int(page_match.group(1))
+                        break
+                    except (ValueError, IndexError):
+                        continue
+
+        # 3. Estimate page number based on chunk position and document metadata
+        if page_number is None and 'page_count' in metadata and metadata['page_count']:
+            # Rough estimation: distribute chunks across pages
+            total_chunks = metadata.get('total_chunks', chunk_index + 1)
+            page_count = metadata['page_count']
+            if total_chunks > 0 and page_count > 0:
+                estimated_page = max(1, int((chunk_index / total_chunks) * page_count) + 1)
+                page_number = estimated_page
+                additional_meta['page_number_estimated'] = True
+
+        if page_number is not None:
+            additional_meta['page_number'] = page_number
+
+        # Extract section/chapter information
+        section_title = None
+        section_level = None
+
+        # Look for various header patterns
+        header_patterns = [
+            r'^(#{1,6})\s*(.+?)(?:\n|$)',  # Markdown headers
+            r'^(\d+\.?\d*\.?)\s+(.+?)(?:\n|$)',  # Numbered sections (1. 1.1. etc.)
+            r'^(Chapter|CHAPTER)\s+(\d+)[:\.]?\s*(.+?)(?:\n|$)',  # Chapter X: Title
+            r'^(Section|SECTION)\s+(\d+)[:\.]?\s*(.+?)(?:\n|$)',  # Section X: Title
+            r'^([A-Z][A-Z\s]{2,})\s*$',  # ALL CAPS titles
+        ]
+
+        for pattern in header_patterns:
+            header_match = re.search(pattern, chunk_text, re.MULTILINE)
+            if header_match:
+                groups = header_match.groups()
+                if pattern.startswith(r'^(#{1,6})'):  # Markdown headers
+                    section_level = len(groups[0])
+                    section_title = groups[1].strip()
+                elif pattern.startswith(r'^(\d+\.?\d*\.?)'):  # Numbered sections
+                    section_level = groups[0].count('.') + 1
+                    section_title = groups[1].strip()
+                elif 'Chapter' in pattern or 'Section' in pattern:
+                    section_level = 1
+                    section_title = f"{groups[0]} {groups[1]}: {groups[2].strip()}"
+                else:  # ALL CAPS
+                    section_level = 1
+                    section_title = groups[0].strip()
+                break
+
+        if section_title:
+            additional_meta['section_title'] = section_title
+            additional_meta['section_level'] = section_level
+            additional_meta['chunk_summary'] = f"Section: {section_title}"
+
+        # Add document type and format information
+        if 'file_extension' in metadata:
+            additional_meta['document_format'] = metadata['file_extension']
+        if 'content_type' in metadata:
+            additional_meta['document_type'] = metadata['content_type']
+
+        # Create location reference for documents
+        location_parts = []
+        if page_number is not None:
+            location_parts.append(f"Page {page_number}")
+        if section_title:
+            location_parts.append(f"Section: {section_title}")
+
+        if location_parts:
+            additional_meta['location_reference'] = " | ".join(location_parts)
+            additional_meta['location_type'] = 'document_position'
+        else:
+            # Fallback to chunk index
+            additional_meta['location_reference'] = f"Chunk {chunk_index + 1}"
+            additional_meta['location_type'] = 'chunk_index'
 
         return additional_meta

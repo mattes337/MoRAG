@@ -1,0 +1,47 @@
+# ============================================================================
+# MoRAG - Minimal Requirements for Basic Functionality
+# ============================================================================
+
+# Core Web Framework
+fastapi==0.115.4
+uvicorn==0.32.1
+python-multipart==0.0.17
+pydantic>=2.11.2
+pydantic-settings>=2.7.0
+
+# Task Processing
+celery==5.3.6
+redis==5.2.1
+
+# Vector Database
+qdrant-client==1.12.1
+
+# LLM Services
+google-genai==1.18.0
+pydantic-ai>=0.3.4
+
+# Basic Document Processing
+markitdown>=0.1.2
+beautifulsoup4>=4.13.0
+python-dotenv==1.0.1
+structlog==24.4.0
+psutil==6.1.0
+
+# HTTP and File Handling
+httpx==0.28.1
+aiofiles==24.1.0
+requests>=2.32.0
+
+# Entity Extraction
+langextract>=1.0.0
+
+# Graph Database
+neo4j>=5.28.0
+
+# Basic Text Processing
+markdown>=3.7
+markdownify>=0.11.6
+
+# gRPC Compatibility
+grpcio>=1.73.0,<2.0.0
+protobuf>=6.30.0,<7.0.0

@@ -33,17 +33,18 @@ class ConnectionOperations(BaseOperations):
                 "connection_acquisition_timeout": self.config.connection_acquisition_timeout,
             }
             
-            # Handle SSL configuration
+            # Handle SSL configuration for newer Neo4j driver versions
             if not self.config.verify_ssl:
-                # Disable SSL verification
-                from neo4j import Config
-                driver_kwargs["config"] = Config(encrypted=False)
+                # For newer Neo4j drivers, use trust constants
+                from neo4j import Config, TRUST_SYSTEM_CA_SIGNED_CERTIFICATES
+                driver_kwargs["config"] = Config(
+                    trust=TRUST_SYSTEM_CA_SIGNED_CERTIFICATES
+                )
             elif self.config.trust_all_certificates:
                 # Trust all certificates (for self-signed)
-                from neo4j import Config, TrustStrategy
+                from neo4j import Config, TRUST_ALL_CERTIFICATES
                 driver_kwargs["config"] = Config(
-                    encrypted=True,
-                    trust=TrustStrategy.trust_all_certificates()
+                    trust=TRUST_ALL_CERTIFICATES
                 )
             
             self.driver = AsyncGraphDatabase.driver(self.config.uri, **driver_kwargs)

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import asyncio
 import re
 
+from ..utils.llm_response_parser import parse_json_response, LLMResponseParseError
+
 try:
     import google.generativeai as genai
     GOOGLE_AI_AVAILABLE = True
@@ -186,14 +188,21 @@ class LLMEntityNormalizer:
                 )
             )
             
-            # Parse JSON response
-            response_text = response.text.strip()
-            if response_text.startswith('```json'):
-                response_text = response_text[7:-3].strip()
-            elif response_text.startswith('```'):
-                response_text = response_text[3:-3].strip()
-            
-            result = json.loads(response_text)
+            # Parse JSON response using robust utility
+            response_text = response.text if response.text else ""
+
+            # Use the robust JSON parser with fallback
+            fallback_result = {
+                'normalized': entity_name,
+                'confidence': 0.5,
+                'reasoning': 'fallback_due_to_parse_error'
+            }
+
+            result = parse_json_response(
+                response_text,
+                fallback_value=fallback_result,
+                context=f"entity_normalization:{entity_name}"
+            )
             
             return (
                 result.get('normalized', entity_name),
@@ -203,7 +212,7 @@ class LLMEntityNormalizer:
             
         except Exception as e:
             self.logger.warning(
-                "Failed to parse LLM normalization response",
+                "LLM normalization failed",
                 entity=entity_name,
                 error=str(e)
             )

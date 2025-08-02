@@ -11,6 +11,7 @@ from morag_core.config import get_settings
 from morag_core.exceptions import ProcessingError
 from ..models import Entity, Relation
 from ..operations.traversal import GraphTraversal, GraphPath
+from ..utils.llm_response_parser import parse_json_response
 
 logger = structlog.get_logger(__name__)
 
@@ -418,17 +419,13 @@ Format as JSON:
     ) -> List[PathRelevanceScore]:
         """Parse LLM response into path scores."""
         try:
-            import json
-            
-            # Extract JSON from response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
-            
-            if start_idx == -1 or end_idx == 0:
-                raise ValueError("No JSON found in response")
-            
-            json_text = response_text[start_idx:end_idx]
-            data = json.loads(json_text)
+            # Use robust JSON parser with fallback
+            fallback_data = {'evaluations': []}
+            data = parse_json_response(
+                response_text,
+                fallback_value=fallback_data,
+                context="path_evaluation"
+            )
             
             scored_paths = []
             evaluations = data.get('evaluations', [])

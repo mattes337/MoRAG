@@ -1,71 +1,194 @@
-# Core dependencies for MoRAG
+# ============================================================================
+# MoRAG - Multimodal RAG Ingestion Pipeline
+# Complete Requirements File for Production Installation
+# ============================================================================
+
+# ============================================================================
+# CORE DEPENDENCIES (Required for basic functionality)
+# ============================================================================
+
+# FastAPI and Web Framework
 fastapi==0.115.4
 uvicorn==0.32.1
 python-multipart==0.0.17
-pydantic==2.10.3
-pydantic-settings==2.7.0
-pydantic-ai>=0.0.14
+starlette==0.41.3
+
+# Pydantic and Data Validation
+pydantic>=2.11.2
+pydantic-settings>=2.7.0
+pydantic-ai>=0.3.4
+
+# Task Queue and Background Processing
 celery==5.3.6
-
 redis==5.2.1
+
+# Vector Database and Search
 qdrant-client==1.12.1
+
+# LLM and AI Services
 google-genai==1.18.0
-# Explicitly install grpcio-tools to ensure compatibility
-grpcio-tools>=1.73.0,<2.0.0
-yt-dlp==2024.12.13
-beautifulsoup4==4.12.3
-markdownify==0.14.1
+google-generativeai>=0.3.2
 
-# Fix protobuf version conflict between grpcio-tools and google-generativeai
-protobuf>=6.30.0,<7.0.0
+# gRPC and Protocol Buffers (version compatibility fixes)
 grpcio>=1.73.0,<2.0.0
-grpcio-status>=1.73.0,<2.0.0
+grpcio-status>=1.62.3,<2.0.0
+grpcio-tools>=1.73.0,<2.0.0
+protobuf>=6.30.0,<7.0.0
 
-
-markdown==3.7
-
-aiofiles==24.1.0
+# HTTP and Network
 httpx==0.28.1
+aiofiles==24.1.0
+requests>=2.32.0
+
+# Configuration and Environment
 python-dotenv==1.0.1
 structlog==24.4.0
-psutil==6.1.0
 
-# Optional dependencies for basic functionality
-# Audio processing (basic)
+# System and Utilities
+psutil==6.1.0
+click>=8.1.0
+
+# ============================================================================
+# DOCUMENT PROCESSING DEPENDENCIES
+# ============================================================================
+
+# Universal Document Conversion
+markitdown>=0.1.2
+
+# PDF Processing
+pypdf>=5.6.0
+pdfminer.six>=20250506
+
+# Office Documents
+python-docx>=1.1.2
+openpyxl>=3.1.5
+python-pptx>=1.0.2
+
+# Text Processing and NLP
+spacy>=3.8.0
+nltk>=3.9.0
+langdetect>=1.0.9
+
+# Markdown and HTML
+markdown>=3.7
+markdownify>=0.11.6
+beautifulsoup4>=4.13.0
+html2text>=2025.4.15
+
+# ============================================================================
+# AUDIO PROCESSING DEPENDENCIES
+# ============================================================================
+
+# Audio Conversion and Processing
 pydub>=0.25.1
 ffmpeg-python>=0.2.0
-# Python 3.11 compatibility for audio processing
-# audioop-lts>=0.2.1  # Requires Python 3.13+, not compatible with 3.11
-# Optional: onnxruntime for VAD filter (Voice Activity Detection)
-# Note: May have compatibility issues on some Windows systems
-# onnxruntime>=1.22.0
+mutagen>=1.47.0
+soundfile>=0.13.0
+audioread>=3.0.0
 
-# Image processing (basic)
-Pillow>=10.0.0,<11.0.0
-pytesseract>=0.3.10,<1.0.0
+# Speech Recognition and Transcription
+faster-whisper>=1.1.0
 
-# Web scraping (basic)
-playwright>=1.40.0,<2.0.0
-trafilatura>=1.6.0,<2.0.0
+# Advanced Audio Processing
+pyannote.audio>=3.3.0
+sentence-transformers>=5.0.0
+torch>=2.7.0
+torchaudio>=2.7.0
 
-# PDF processing (enhanced) - now handled by markitdown
-# docling>=2.7.0,<3.0.0  # Removed - markitdown handles PDF processing
+# PyAnnote.audio dependencies
+asteroid-filterbanks>=0.4.0
+pytorch-lightning>=2.5.0
+pyannote-metrics>=3.2.0
+pytorch-metric-learning>=2.0.0
+speechbrain>=1.0.0
+tensorboardx>=2.6.0
 
-# Markitdown for universal document conversion
-markitdown>=0.0.1a2
+# Audio Utilities
+audioop-lts>=0.2.1
+onnxruntime>=1.22.0
 
+# ============================================================================
+# VIDEO PROCESSING DEPENDENCIES
+# ============================================================================
 
+# Video Processing
+opencv-python>=4.11.0
+moviepy>=2.2.0
+imageio>=2.37.0
+imageio-ffmpeg>=0.6.0
 
-# LangExtract dependencies
-langextract>=1.0.0,<2.0.0
+# ============================================================================
+# IMAGE PROCESSING DEPENDENCIES
+# ============================================================================
 
-# Optional advanced dependencies (commented out by default)
-# Uncomment these for enhanced functionality:
+# Image Processing and OCR
+Pillow>=10.4.0
+pytesseract>=0.3.13
+easyocr>=1.7.2
+opencv-python-headless>=4.11.0
 
-# Advanced audio processing
-# pyannote.audio>=3.1.0  # Speaker diarization
-# sentence-transformers>=2.2.0  # Topic segmentation
+# ============================================================================
+# WEB SCRAPING DEPENDENCIES
+# ============================================================================
 
-# Advanced web processing
-# readability>=0.3.1  # Content cleaning
-# newspaper3k>=0.2.8  # Article extraction
+# Web Content Extraction
+yt-dlp>=2025.5.22
+playwright>=1.40.0
+trafilatura>=1.6.0
+
+# ============================================================================
+# GRAPH AND KNOWLEDGE EXTRACTION
+# ============================================================================
+
+# Graph Database
+neo4j>=5.28.0
+
+# Entity and Relation Extraction
+langextract>=1.0.0
+
+# ============================================================================
+# SCIENTIFIC AND DATA PROCESSING
+# ============================================================================
+
+# Scientific Computing
+numpy>=2.2.0
+pandas>=2.2.0
+scipy>=1.15.0
+scikit-learn>=1.6.0
+
+# ============================================================================
+# DEVELOPMENT AND TESTING (Optional - uncomment for development)
+# ============================================================================
+
+# Testing Framework
+# pytest>=8.3.0
+# pytest-asyncio>=1.0.0
+# pytest-cov>=6.1.0
+
+# Code Quality
+# black>=25.1.0
+# isort>=6.0.0
+# flake8>=7.2.0
+# mypy>=1.16.0
+
+# Pre-commit Hooks
+# pre-commit>=4.2.0
+
+# ============================================================================
+# INSTALLATION INSTRUCTIONS
+# ============================================================================
+#
+# Basic Installation:
+#   pip install -r requirements.txt
+#
+# Development Installation:
+#   1. Uncomment development dependencies above
+#   2. pip install -r requirements.txt
+#
+# Alternative Installation Methods:
+#   pip install -e ".[all-extras]"  # Install with all optional dependencies
+#   pip install -e ".[audio]"       # Install with audio processing only
+#   pip install -e ".[video]"       # Install with video processing only
+#   pip install -e ".[web]"         # Install with web scraping only
+#
+# ============================================================================
