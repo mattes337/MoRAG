@@ -205,22 +205,48 @@ class VideoConverter:
                     markdown_parts.append(f"{text.strip()}\n\n")
         
         # Add transcript section if available
-        if options.include_transcript and result.audio_processing_result and result.audio_processing_result.transcript:
+        if options.include_transcript and result.audio_processing_result:
             markdown_parts.append("## Transcript\n")
 
-            # Handle different transcript formats based on options
-            if options.group_by_speaker and result.audio_processing_result.segments:
-                # Group by speaker using segments
-                markdown_parts.append(self._format_segments_by_speaker(result.audio_processing_result.segments))
-            elif options.group_by_topic and result.audio_processing_result.segments:
-                # Group by topic using segments
-                markdown_parts.append(self._format_segments_by_topic(result.audio_processing_result.segments))
-            elif result.audio_processing_result.segments:
-                # Use regular segments
-                markdown_parts.append(self._format_segments(result.audio_processing_result.segments))
-            else:
-                # Use full transcript
+            # Check if we have segments with proper attributes
+            has_segments = (hasattr(result.audio_processing_result, 'segments') and
+                          result.audio_processing_result.segments and
+                          len(result.audio_processing_result.segments) > 0)
+
+            if has_segments:
+                segments = result.audio_processing_result.segments
+
+                # Check if segments have speaker information
+                has_speakers = any(hasattr(seg, 'speaker') and seg.speaker and seg.speaker.strip() for seg in segments)
+
+                # Check if segments have topic information
+                has_topics = any(hasattr(seg, 'topic_id') and seg.topic_id is not None for seg in segments)
+
+                logger.info("Processing segments for markdown",
+                           segments_count=len(segments),
+                           has_speakers=has_speakers,
+                           has_topics=has_topics,
+                           group_by_speaker=options.group_by_speaker,
+                           group_by_topic=options.group_by_topic)
+
+                # Handle different transcript formats based on options and available data
+                if options.group_by_speaker and has_speakers:
+                    # Group by speaker using segments
+                    markdown_parts.append(self._format_segments_by_speaker(segments))
+                elif options.group_by_topic and has_topics:
+                    # Group by topic using segments
+                    markdown_parts.append(self._format_segments_by_topic(segments))
+                else:
+                    # Use regular segments with timestamps (ALWAYS show timestamps)
+                    logger.info("Using timestamped segments format")
+                    markdown_parts.append(self._format_segments(segments))
+            elif result.audio_processing_result.transcript:
+                # Fallback to full transcript
+                logger.warning("No segments available, using full transcript")
                 markdown_parts.append(result.audio_processing_result.transcript)
+            else:
+                logger.warning("No transcript or segments available")
+                markdown_parts.append("*No transcript available*")
 
             markdown_parts.append("\n")
         
@@ -378,6 +404,29 @@ class VideoConverter:
 
         return "\n".join(result)
 
+    def _format_segments(self, segments: List[Any]) -> str:
+        """Format transcript segments with timestamps."""
+        result = []
+
+        for segment in segments:
+            # Skip empty segments
+            if not hasattr(segment, 'text') or not segment.text or not segment.text.strip():
+                continue
+
+            # Format timestamp
+            start_time = getattr(segment, 'start', 0)
+            end_time = getattr(segment, 'end', 0)
+            timestamp = f"[{self._format_duration(start_time)} - {self._format_duration(end_time)}]"
+
+            # Add speaker if available
+            speaker = getattr(segment, 'speaker', None)
+            if speaker:
+                result.append(f"{timestamp} **{speaker}**: {segment.text.strip()}")
+            else:
+                result.append(f"{timestamp} {segment.text.strip()}")
+
+        return "\n".join(result)
+
     def _format_segments_by_speaker(self, segments: List[Any]) -> str:
         """Format transcript segments grouped by speaker."""
         # Group segments by speaker
@@ -392,8 +441,8 @@ class VideoConverter:
         for speaker, speaker_segments in speaker_groups.items():
             # Calculate speaker timestamp range
             if speaker_segments:
-                start_time = min(seg.start for seg in speaker_segments)
-                end_time = max(seg.end for seg in speaker_segments)
+                start_time = min(getattr(seg, 'start', 0) for seg in speaker_segments)
+                end_time = max(getattr(seg, 'end', 0) for seg in speaker_segments)
                 speaker_timestamp = f"({self._format_duration(start_time)} - {self._format_duration(end_time)})"
                 result.append(f"### {speaker} {speaker_timestamp}")
             else:
@@ -401,9 +450,11 @@ class VideoConverter:
 
             for segment in speaker_segments:
                 # Skip empty segments
-                if not segment.text or not segment.text.strip():
+                if not hasattr(segment, 'text') or not segment.text or not segment.text.strip():
                     continue
-                timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
+                start_time = getattr(segment, 'start', 0)
+                end_time = getattr(segment, 'end', 0)
+                timestamp = f"[{self._format_duration(start_time)} - {self._format_duration(end_time)}]"
                 result.append(f"{timestamp} {segment.text.strip()}")
 
             result.append("")  # Single empty line between speakers
@@ -427,8 +478,8 @@ class VideoConverter:
         for topic, topic_segments in topic_groups.items():
             # Calculate topic timestamp range
             if topic_segments:
-                start_time = min(seg.start for seg in topic_segments)
-                end_time = max(seg.end for seg in topic_segments)
+                start_time = min(getattr(seg, 'start', 0) for seg in topic_segments)
+                end_time = max(getattr(seg, 'end', 0) for seg in topic_segments)
                 topic_timestamp = f"({self._format_duration(start_time)} - {self._format_duration(end_time)})"
                 result.append(f"### {topic} {topic_timestamp}")
             else:
@@ -436,10 +487,18 @@ class VideoConverter:
 
             for segment in topic_segments:
                 # Skip empty segments
-                if not segment.text or not segment.text.strip():
+                if not hasattr(segment, 'text') or not segment.text or not segment.text.strip():
                     continue
-                timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-                result.append(f"{timestamp} {segment.text.strip()}")
+                start_time = getattr(segment, 'start', 0)
+                end_time = getattr(segment, 'end', 0)
+                timestamp = f"[{self._format_duration(start_time)} - {self._format_duration(end_time)}]"
+
+                # Add speaker if available
+                speaker = getattr(segment, 'speaker', None)
+                if speaker:
+                    result.append(f"{timestamp} **{speaker}**: {segment.text.strip()}")
+                else:
+                    result.append(f"{timestamp} {segment.text.strip()}")
 
             result.append("")  # Single empty line between topics
 

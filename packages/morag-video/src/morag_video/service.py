@@ -164,6 +164,10 @@ class VideoService:
             if output_format == "markdown":
                 try:
                     logger.info("Converting video processing result to markdown")
+
+                    # Import here to avoid circular imports
+                    from morag_video.converters.video import VideoConversionOptions
+
                     conversion_options = VideoConversionOptions(
                         include_metadata=True,
                         include_thumbnails=True,
@@ -327,21 +331,29 @@ class VideoService:
             output_files["markdown"] = str(markdown_path)
         
         # Save segments as JSON if available
-        if result.audio_processing_result and result.audio_processing_result.segments:
+        if result.audio_processing_result and hasattr(result.audio_processing_result, 'segments') and result.audio_processing_result.segments:
             import json
             segments_path = file_output_dir / f"{base_name}_segments.json"
-            segments_data = [
-                {
-                    "start": segment.start,
-                    "end": segment.end,
-                    "text": segment.text,
-                    "speaker": segment.speaker if hasattr(segment, "speaker") else None,
-                    "topic": segment.topic if hasattr(segment, "topic") else None
+            segments_data = []
+
+            for segment in result.audio_processing_result.segments:
+                segment_data = {
+                    "start": getattr(segment, 'start', 0),
+                    "end": getattr(segment, 'end', 0),
+                    "text": getattr(segment, 'text', ''),
+                    "speaker": getattr(segment, 'speaker', None),
+                    "topic": getattr(segment, 'topic', None),
+                    "topic_id": getattr(segment, 'topic_id', None),
+                    "topic_label": getattr(segment, 'topic_label', None)
                 }
-                for segment in result.audio_processing_result.segments
-            ]
-            segments_path.write_text(json.dumps(segments_data, indent=2))
+                segments_data.append(segment_data)
+
+            segments_path.write_text(json.dumps(segments_data, indent=2, ensure_ascii=False))
             output_files["segments"] = str(segments_path)
+
+            logger.info("Saved segments file",
+                       segments_count=len(segments_data),
+                       segments_path=str(segments_path))
         
         # Save metadata as JSON
         import json
