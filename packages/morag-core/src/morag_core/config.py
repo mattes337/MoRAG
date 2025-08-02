@@ -83,8 +83,11 @@ class Settings(BaseSettings):
     gemini_vision_model: str = Field(default="gemini-1.5-flash", alias="MORAG_GEMINI_VISION_MODEL")
 
     # Embedding Configuration
-    embedding_batch_size: int = Field(default=50, alias="MORAG_EMBEDDING_BATCH_SIZE")
+    embedding_batch_size: int = Field(default=100, alias="MORAG_EMBEDDING_BATCH_SIZE")
     enable_batch_embedding: bool = Field(default=True, alias="MORAG_ENABLE_BATCH_EMBEDDING")
+    embedding_delay_between_batches: float = Field(default=0.05, alias="MORAG_EMBEDDING_DELAY_BETWEEN_BATCHES")
+    rate_limit_per_minute: int = Field(default=200, alias="MORAG_RATE_LIMIT_PER_MINUTE")
+    enable_performance_monitoring: bool = Field(default=True, alias="MORAG_ENABLE_PERFORMANCE_MONITORING")
 
     # Redis Configuration
     redis_url: str = Field(default="redis://localhost:6379/0", alias="MORAG_REDIS_URL")
