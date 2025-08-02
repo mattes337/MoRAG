@@ -41,14 +41,18 @@ class RelationOperations(BaseOperations):
             logger.warning(f"Target entity {relation.target_entity_id} not found, creating placeholder")
             await self._create_missing_entity(relation.target_entity_id, f"Entity_{relation.target_entity_id}")
 
-        # Store the relation
-        query = """
-        MATCH (source:Entity {id: $source_id}), (target:Entity {id: $target_id})
-        MERGE (source)-[r:RELATION {
-            id: $relation_id,
-            type: $relation_type
-        }]->(target)
-        SET r.confidence = $confidence,
+        # Get the normalized Neo4j relationship type
+        neo4j_rel_type = relation.get_neo4j_type()
+
+        # Store the relation with dynamic relationship type
+        # Note: We need to match entities by any label since they now have specific labels
+        query = f"""
+        MATCH (source {{id: $source_id}}), (target {{id: $target_id}})
+        MERGE (source)-[r:{neo4j_rel_type} {{
+            id: $relation_id
+        }}]->(target)
+        SET r.type = $relation_type,
+            r.confidence = $confidence,
             r.metadata = $metadata,
             r.created_at = coalesce(r.created_at, datetime()),
             r.updated_at = datetime()

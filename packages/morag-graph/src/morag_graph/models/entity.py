@@ -115,9 +115,15 @@ class Entity(BaseModel):
             normalized = f"TYPE_{normalized}" if normalized else "UNKNOWN"
 
         return normalized
-    
 
-    
+    def get_neo4j_label(self) -> str:
+        """Get the Neo4j label for this entity.
+
+        Returns:
+            Normalized Neo4j label based on entity type
+        """
+        return self._normalize_label(str(self.type))
+
     @field_validator('confidence')
     @classmethod
     def validate_confidence(cls, v: float) -> float:

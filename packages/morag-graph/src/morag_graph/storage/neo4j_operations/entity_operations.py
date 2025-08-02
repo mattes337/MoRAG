@@ -38,9 +38,13 @@ class EntityOperations(BaseOperations):
             entity.id = UnifiedIDGenerator.generate_entity_id(entity.name, str(entity.type))
             logger.info(f"Generated new entity ID: {entity.id}")
 
-        query = """
-        MERGE (e:Entity {name: $name})
-        ON CREATE SET 
+        # Get the normalized Neo4j label from the entity type
+        neo4j_label = entity.get_neo4j_label()
+
+        # Create dynamic query with the specific entity type as label
+        query = f"""
+        MERGE (e:{neo4j_label} {{name: $name}})
+        ON CREATE SET
             e.id = $id,
             e.type = $type,
             e.confidence = $confidence,
@@ -48,13 +52,13 @@ class EntityOperations(BaseOperations):
             e.created_at = datetime(),
             e.updated_at = datetime()
         ON MATCH SET
-            e.type = CASE 
-                WHEN $confidence > coalesce(e.confidence, 0.0) THEN $type 
-                ELSE e.type 
+            e.type = CASE
+                WHEN $confidence > coalesce(e.confidence, 0.0) THEN $type
+                ELSE e.type
             END,
-            e.confidence = CASE 
-                WHEN $confidence > coalesce(e.confidence, 0.0) THEN $confidence 
-                ELSE e.confidence 
+            e.confidence = CASE
+                WHEN $confidence > coalesce(e.confidence, 0.0) THEN $confidence
+                ELSE e.confidence
             END,
             e.metadata = $metadata,
             e.updated_at = datetime()

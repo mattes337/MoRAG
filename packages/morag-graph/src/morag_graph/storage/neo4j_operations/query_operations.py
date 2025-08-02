@@ -30,17 +30,21 @@ class QueryOperations(BaseOperations):
             List of neighboring entities
         """
         # Build query based on parameters
+        # Note: Using () instead of (:Entity) to match nodes with any label
         if relation_type:
             query = f"""
-            MATCH (e:Entity {{id: $entity_id}})-[:RELATION {{type: $relation_type}}*1..{max_depth}]-(neighbor:Entity)
+            MATCH (e {{id: $entity_id}})-[r*1..{max_depth}]-(neighbor)
             WHERE neighbor.id <> $entity_id
+            AND ALL(rel in r WHERE rel.type = $relation_type)
+            AND neighbor.id IS NOT NULL
             RETURN DISTINCT neighbor
             """
             parameters = {"entity_id": entity_id, "relation_type": relation_type}
         else:
             query = f"""
-            MATCH (e:Entity {{id: $entity_id}})-[:RELATION*1..{max_depth}]-(neighbor:Entity)
+            MATCH (e {{id: $entity_id}})-[r*1..{max_depth}]-(neighbor)
             WHERE neighbor.id <> $entity_id
+            AND neighbor.id IS NOT NULL
             RETURN DISTINCT neighbor
             """
             parameters = {"entity_id": entity_id}
@@ -73,7 +77,8 @@ class QueryOperations(BaseOperations):
             List of paths (each path is a list of entity IDs)
         """
         query = f"""
-        MATCH path = (source:Entity {{id: $source_id}})-[:RELATION*1..{max_depth}]-(target:Entity {{id: $target_id}})
+        MATCH path = (source {{id: $source_id}})-[r*1..{max_depth}]-(target {{id: $target_id}})
+        WHERE source.id IS NOT NULL AND target.id IS NOT NULL
         RETURN [node in nodes(path) | node.id] as path_ids
         LIMIT 10
         """
@@ -102,9 +107,11 @@ class QueryOperations(BaseOperations):
             List of matching entities
         """
         # Build the query
+        # Note: Using () instead of (:Entity) to match nodes with any label
         base_query = """
-        MATCH (e:Entity)
+        MATCH (e)
         WHERE toLower(e.name) CONTAINS toLower($search_term)
+        AND e.id IS NOT NULL
         """
         
         parameters = {"search_term": search_term, "limit": limit}
@@ -157,9 +164,10 @@ class QueryOperations(BaseOperations):
             relation_filter = ""
         
         query = f"""
-        MATCH path = (start:Entity {{id: $entity_id}})-[:RELATION*1..{max_depth}]-(related:Entity)
+        MATCH path = (start {{id: $entity_id}})-[r*1..{max_depth}]-(related)
         {relation_filter}
         WHERE related.id <> $entity_id
+        AND start.id IS NOT NULL AND related.id IS NOT NULL
         WITH related, path, length(path) as distance
         ORDER BY distance, related.confidence DESC
         LIMIT $limit
@@ -201,7 +209,8 @@ class QueryOperations(BaseOperations):
             List of entity clusters with metadata
         """
         query = """
-        MATCH (e:Entity)-[:RELATION]-(connected:Entity)
+        MATCH (e)-[r]-(connected)
+        WHERE e.id IS NOT NULL AND connected.id IS NOT NULL
         WITH e, count(connected) as connection_count, collect(connected) as connections
         WHERE connection_count >= $min_cluster_size
         ORDER BY connection_count DESC
@@ -252,7 +261,8 @@ class QueryOperations(BaseOperations):
             List of shortest paths with relationship details
         """
         query = f"""
-        MATCH path = shortestPath((source:Entity {{id: $source_id}})-[:RELATION*1..{max_depth}]-(target:Entity {{id: $target_id}}))
+        MATCH path = shortestPath((source {{id: $source_id}})-[r*1..{max_depth}]-(target {{id: $target_id}}))
+        WHERE source.id IS NOT NULL AND target.id IS NOT NULL
         RETURN path,
                length(path) as path_length,
                [node in nodes(path) | {{id: node.id, name: node.name, type: node.type}}] as entities,

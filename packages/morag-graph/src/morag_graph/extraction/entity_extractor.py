@@ -97,15 +97,30 @@ class EntityExtractor:
         base_prompt = """Extract entities from the text in order of appearance.
         Focus on important entities like people, organizations, locations, concepts, and objects.
         Use exact text for extractions. Do not paraphrase or overlap entities.
-        Provide meaningful attributes for each entity to add context."""
-        
+        Provide meaningful attributes for each entity to add context.
+
+        IMPORTANT: Create SPECIFIC, DESCRIPTIVE entity types that reflect the actual nature of each entity.
+        - Instead of generic types like "PERSON", use specific types like "RESEARCHER", "EXECUTIVE", "PATIENT", "AUTHOR"
+        - Instead of generic types like "ORGANIZATION", use specific types like "UNIVERSITY", "HOSPITAL", "COMPANY", "GOVERNMENT_AGENCY"
+        - Instead of generic types like "CONCEPT", use specific types like "MEDICAL_CONDITION", "TECHNOLOGY", "METHODOLOGY", "THEORY"
+        - Instead of generic types like "LOCATION", use specific types like "CITY", "COUNTRY", "FACILITY", "REGION"
+
+        The entity type should be:
+        1. Specific to the domain and context
+        2. Descriptive of the entity's role or nature
+        3. Uppercase with underscores (e.g., "RESEARCH_INSTITUTION", "PHARMACEUTICAL_DRUG")
+        4. Never generic (avoid "ENTITY", "THING", "ITEM", "OBJECT")"""
+
         if self.entity_types:
             type_descriptions = "\n".join([f"- {name}: {desc}" for name, desc in self.entity_types.items()])
-            base_prompt += f"\n\nFocus on these entity types:\n{type_descriptions}"
-        
+            base_prompt += f"\n\nConsider these domain-specific entity types as inspiration (but create more specific types as needed):\n{type_descriptions}"
+
+        if self.domain and self.domain != "general":
+            base_prompt += f"\n\nDomain context: {self.domain}. Generate entity types that are specific to this domain."
+
         if self.language:
             base_prompt += f"\n\nProcess text in {self.language} language."
-        
+
         return base_prompt
     
     def _create_entity_examples(self) -> List[Any]:

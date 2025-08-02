@@ -88,15 +88,30 @@ class RelationExtractor:
         base_prompt = """Extract relationships between entities in the text.
         Focus on meaningful connections between people, organizations, locations, and concepts.
         Use exact text spans for relationships. Provide context and attributes.
-        Each relationship should connect two specific entities mentioned in the text."""
-        
+        Each relationship should connect two specific entities mentioned in the text.
+
+        IMPORTANT: Create SPECIFIC, DESCRIPTIVE relationship types that precisely describe the nature of the relationship.
+        - Instead of generic types like "RELATES_TO", use specific types like "EMPLOYS", "RESEARCHES", "TREATS", "DEVELOPS"
+        - Instead of generic types like "ASSOCIATED_WITH", use specific types like "COLLABORATES_WITH", "COMPETES_WITH", "SUPPLIES_TO"
+        - Instead of generic types like "CONNECTED_TO", use specific types like "MANAGES", "OWNS", "FOUNDED", "ACQUIRED"
+
+        The relationship type should be:
+        1. A specific action or connection (e.g., "DIAGNOSES", "PRESCRIBES", "MANUFACTURES")
+        2. Descriptive of the exact nature of the relationship
+        3. Uppercase with underscores (e.g., "IS_EMPLOYED_BY", "CONDUCTS_RESEARCH_ON", "IS_LOCATED_IN")
+        4. Never generic (avoid "RELATES", "CONNECTS", "LINKS", "MENTIONS")
+        5. Express the relationship from source to target entity clearly"""
+
         if self.relation_types:
             type_descriptions = "\n".join([f"- {name}: {desc}" for name, desc in self.relation_types.items()])
-            base_prompt += f"\n\nFocus on these relationship types:\n{type_descriptions}"
-        
+            base_prompt += f"\n\nConsider these domain-specific relationship types as inspiration (but create more specific types as needed):\n{type_descriptions}"
+
+        if self.domain and self.domain != "general":
+            base_prompt += f"\n\nDomain context: {self.domain}. Generate relationship types that are specific to this domain."
+
         if self.language:
             base_prompt += f"\n\nProcess text in {self.language} language."
-        
+
         return base_prompt
     
     def _create_relation_examples(self) -> List[Any]:
