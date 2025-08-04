@@ -1803,7 +1803,9 @@ class FactExtractionWrapper:
 
     def __init__(self):
         """Initialize the wrapper."""
-        self.fact_extractor_service = None
+        self.fact_extractor = None
+        self.graph_builder = None
+        self._initialized = False
 
     async def extract_facts_and_relationships(
         self,
@@ -1824,7 +1826,7 @@ class FactExtractionWrapper:
             Tuple of (facts, relationships)
         """
         # Initialize fact extractor service if needed
-        if self.fact_extractor_service is None:
+        if not self._initialized:
             from morag_graph.extraction.fact_extractor import FactExtractor
             from morag_graph.extraction.fact_graph_builder import FactGraphBuilder
 
@@ -1844,14 +1846,20 @@ class FactExtractionWrapper:
                 api_key=api_key
             )
 
+            self._initialized = True
+            logger.info("FactExtractionWrapper initialized successfully")
+
         try:
             # Extract facts
+            logger.debug("Extracting facts from text", text_length=len(text), doc_id=doc_id)
             facts = await self.fact_extractor.extract_facts(
                 chunk_text=text,
                 chunk_id=f"{doc_id}_chunk",
                 document_id=doc_id,
                 context=context or {}
             )
+
+            logger.info("Facts extracted", facts_count=len(facts), doc_id=doc_id)
 
             # Extract relationships if we have multiple facts
             relationships = []
@@ -1860,11 +1868,12 @@ class FactExtractionWrapper:
                     fact_graph = await self.graph_builder.build_fact_graph(facts)
                     if hasattr(fact_graph, 'relationships'):
                         relationships = fact_graph.relationships
+                    logger.info("Relationships extracted", relationships_count=len(relationships), doc_id=doc_id)
                 except Exception as e:
                     logger.warning("Failed to extract fact relationships", error=str(e))
 
             return facts, relationships
 
         except Exception as e:
-            logger.warning("Fact extraction failed", error=str(e))
+            logger.error("Fact extraction failed", error=str(e), doc_id=doc_id)
             return [], []
