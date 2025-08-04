@@ -77,3 +77,8 @@ Instead of extracting generic entities and relations, extract structured **facts
 2. Compare results and performance
 3. Gradually migrate to fact-based approach
 4. Deprecate generic entity extraction once validated
+
+## Important
+- Each fact must be self-contained, self-explanatory. All information must be in the fact itself, no external context required.
+- Facts must be verifiable from the source text. No hallucination or inference allowed.
+- Facts must always relate to the source file and the chunk including metadata like page, chapter, timecode, etc. so we can use them for citations and verification.
