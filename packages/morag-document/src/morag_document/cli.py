@@ -50,7 +50,7 @@ async def process_document(args: argparse.Namespace) -> None:
 
         # Print document info
         print(f"Document: {result.document.metadata.title}")
-        print(f"Type: {result.document.metadata.file_type}")
+        print(f"Type: {result.document.metadata.mime_type}")
         print(f"Word count: {result.document.metadata.word_count}")
         print(f"Chunks: {len(result.document.chunks)}")
         print(f"Quality score: {result.metadata.get('quality_score', 'N/A')}")
