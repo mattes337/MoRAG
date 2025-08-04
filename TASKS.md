@@ -1234,18 +1234,21 @@ For detailed information about completed tasks and implementation history, see [
 - **Timeout Testing**: Verified worker loads correct timeout values (2h soft / 2.5h hard)
 
 ### ✅ Task 51: Enhanced JSON Parsing Error Recovery (January 2025)
-- **Issue**: Entity extraction failing with JSON parsing errors ("Expecting ',' delimiter")
-- **Root Cause**: LLM responses containing malformed JSON due to token limits or incomplete responses
-- **Solution**: Enhanced JSON parsing with robust error recovery mechanisms
+- **Issue**: Entity extraction failing with JSON parsing errors ("Expecting ',' delimiter", "Expecting value")
+- **Root Cause**: LangExtract library internal JSON parsing failures due to malformed LLM responses, token limits, or incomplete responses
+- **Solution**: Robust error handling wrapper around LangExtract with multiple fallback strategies
 - **Implementation**:
-  - Improved `parse_json_response()` method with multi-level error handling
-  - Added `_extract_partial_json()` method to recover valid objects from malformed JSON
-  - Enhanced `_fix_common_json_issues()` with better incomplete string handling
-  - Added comprehensive logging for debugging JSON parsing issues
+  - Enhanced `_extract_sync()` methods in both EntityExtractor and RelationExtractor to catch JSON parsing errors
+  - Added `_extract_with_fallback()` method with progressive fallback strategies
+  - Implemented four fallback strategies: smaller chunks, reduced workers, single pass, minimal config
+  - Added comprehensive logging for debugging LangExtract JSON parsing issues
+  - Created fallback result object when all strategies fail to prevent complete extraction failure
 - **Files Modified**:
-  - `packages/morag-graph/src/morag_graph/extraction/base.py`: Enhanced JSON parsing logic
-- **Testing**: Verified with malformed JSON test cases and real extraction scenarios
-- **Result**: ✅ Entity extraction now successfully handles malformed JSON responses with graceful fallback
+  - `packages/morag-graph/src/morag_graph/extraction/entity_extractor.py`: Added robust error handling and fallback strategies
+  - `packages/morag-graph/src/morag_graph/extraction/relation_extractor.py`: Added robust error handling and fallback strategies
+  - `test_langextract_error_handling.py`: Test script for verifying error handling functionality
+- **Testing**: Created comprehensive test script with problematic text inputs that trigger JSON parsing errors
+- **Result**: ✅ Entity and relation extraction now gracefully handle LangExtract JSON parsing errors with progressive fallback strategies
 
 ## 🔄 Future Enhancement Opportunities:
 - [ ] Performance optimization for large documents

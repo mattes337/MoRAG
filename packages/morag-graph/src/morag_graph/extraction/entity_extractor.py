@@ -236,7 +236,98 @@ class EntityExtractor:
             raise
     
     def _extract_sync(self, text: str, source_doc_id: Optional[str]) -> Any:
-        """Synchronous extraction using LangExtract."""
+        """Synchronous extraction using LangExtract with robust error handling."""
+        try:
+            return lx.extract(
+                text_or_documents=text,
+                prompt_description=self._prompt,
+                examples=self._examples,
+                model_id=self.model_id,
+                api_key=self.api_key,
+                max_workers=self.max_workers,
+                extraction_passes=self.extraction_passes,
+                max_char_buffer=self.chunk_size
+            )
+        except Exception as e:
+            error_msg = str(e).lower()
+
+            # Check if this is a JSON parsing error from langextract
+            if any(keyword in error_msg for keyword in [
+                'failed to parse content',
+                'expecting value',
+                'expecting \',\' delimiter',
+                'json.decoder.jsondecodeerror',
+                'invalid json'
+            ]):
+                self.logger.warning(
+                    "LangExtract JSON parsing error, attempting fallback strategies",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    text_length=len(text),
+                    source_doc_id=source_doc_id
+                )
+
+                # Try fallback strategies
+                return self._extract_with_fallback(text, source_doc_id, original_error=e)
+            else:
+                # Re-raise non-JSON parsing errors
+                raise
+
+    def _extract_with_fallback(self, text: str, source_doc_id: Optional[str], original_error: Exception) -> Any:
+        """Implement fallback strategies when LangExtract JSON parsing fails."""
+        fallback_strategies = [
+            self._fallback_smaller_chunks,
+            self._fallback_reduced_workers,
+            self._fallback_single_pass,
+            self._fallback_minimal_config
+        ]
+
+        for i, strategy in enumerate(fallback_strategies):
+            try:
+                self.logger.info(
+                    f"Attempting fallback strategy {i+1}/{len(fallback_strategies)}",
+                    strategy=strategy.__name__,
+                    text_length=len(text),
+                    source_doc_id=source_doc_id
+                )
+
+                result = strategy(text)
+
+                self.logger.info(
+                    f"Fallback strategy {i+1} succeeded",
+                    strategy=strategy.__name__,
+                    extractions_found=len(result.extractions) if result and hasattr(result, 'extractions') else 0
+                )
+
+                return result
+
+            except Exception as e:
+                self.logger.warning(
+                    f"Fallback strategy {i+1} failed",
+                    strategy=strategy.__name__,
+                    error=str(e),
+                    error_type=type(e).__name__
+                )
+                continue
+
+        # If all fallback strategies fail, return empty result
+        self.logger.error(
+            "All fallback strategies failed, returning empty result",
+            original_error=str(original_error),
+            text_length=len(text),
+            source_doc_id=source_doc_id
+        )
+
+        # Create a minimal result object that matches LangExtract's structure
+        class FallbackResult:
+            def __init__(self):
+                self.extractions = []
+                self.text = text
+
+        return FallbackResult()
+
+    def _fallback_smaller_chunks(self, text: str) -> Any:
+        """Fallback strategy: Use smaller chunk size to reduce JSON complexity."""
         return lx.extract(
             text_or_documents=text,
             prompt_description=self._prompt,
@@ -245,9 +336,48 @@ class EntityExtractor:
             api_key=self.api_key,
             max_workers=self.max_workers,
             extraction_passes=self.extraction_passes,
+            max_char_buffer=min(400, self.chunk_size // 2)  # Halve chunk size, minimum 400
+        )
+
+    def _fallback_reduced_workers(self, text: str) -> Any:
+        """Fallback strategy: Reduce parallel workers to minimize race conditions."""
+        return lx.extract(
+            text_or_documents=text,
+            prompt_description=self._prompt,
+            examples=self._examples,
+            model_id=self.model_id,
+            api_key=self.api_key,
+            max_workers=min(3, self.max_workers),  # Reduce to max 3 workers
+            extraction_passes=self.extraction_passes,
             max_char_buffer=self.chunk_size
         )
-    
+
+    def _fallback_single_pass(self, text: str) -> Any:
+        """Fallback strategy: Use single extraction pass for simplicity."""
+        return lx.extract(
+            text_or_documents=text,
+            prompt_description=self._prompt,
+            examples=self._examples,
+            model_id=self.model_id,
+            api_key=self.api_key,
+            max_workers=1,  # Single worker
+            extraction_passes=1,  # Single pass
+            max_char_buffer=min(600, self.chunk_size)
+        )
+
+    def _fallback_minimal_config(self, text: str) -> Any:
+        """Fallback strategy: Minimal configuration for maximum stability."""
+        return lx.extract(
+            text_or_documents=text,
+            prompt_description=self._prompt,
+            examples=self._examples,
+            model_id=self.model_id,
+            api_key=self.api_key,
+            max_workers=1,
+            extraction_passes=1,
+            max_char_buffer=300  # Very small chunks
+        )
+
     def _convert_to_entities(self, result: Any, source_doc_id: Optional[str]) -> List[Entity]:
         """Convert LangExtract results to MoRAG Entity objects."""
         entities = []
