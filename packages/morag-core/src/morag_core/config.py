@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=200, alias="MORAG_RATE_LIMIT_PER_MINUTE")
     enable_performance_monitoring: bool = Field(default=True, alias="MORAG_ENABLE_PERFORMANCE_MONITORING")
 
+    # LLM Batch Configuration
+    llm_batch_size: int = Field(default=10, alias="MORAG_LLM_BATCH_SIZE", ge=1, le=50, description="Number of prompts to batch together for LLM calls")
+    enable_llm_batching: bool = Field(default=True, alias="MORAG_ENABLE_LLM_BATCHING", description="Enable batching of LLM requests to reduce API calls")
+    llm_batch_delay: float = Field(default=1.0, alias="MORAG_LLM_BATCH_DELAY", ge=0.0, le=10.0, description="Delay between LLM batch requests in seconds")
+    llm_max_batch_tokens: int = Field(default=800000, alias="MORAG_LLM_MAX_BATCH_TOKENS", ge=100000, le=1000000, description="Maximum tokens per batch request (considering Gemini's 1M context limit)")
+    llm_batch_timeout: int = Field(default=120, alias="MORAG_LLM_BATCH_TIMEOUT", ge=30, le=300, description="Timeout for batch LLM requests in seconds")
+
     # Redis Configuration
     redis_url: str = Field(default="redis://localhost:6379/0", alias="MORAG_REDIS_URL")
 

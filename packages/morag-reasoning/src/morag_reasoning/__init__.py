@@ -7,6 +7,16 @@ __version__ = "0.1.0"
 
 # Core components
 from .llm import LLMClient, LLMConfig
+from .batch_processor import (
+    BatchProcessor,
+    BatchItem,
+    BatchResult,
+    TextAnalysisBatchProcessor,
+    DocumentChunkBatchProcessor,
+    batch_llm_calls,
+    batch_text_analysis,
+    batch_document_chunks
+)
 from .path_selection import PathSelectionAgent, ReasoningPathFinder, PathRelevanceScore, ReasoningStrategy
 from .iterative_retrieval import IterativeRetriever, ContextGap, ContextAnalysis, RetrievalContext
 
@@ -48,6 +58,14 @@ from .response_assessor import ResponseQualityAssessor, QualityAssessment, Quali
 __all__ = [
     "LLMClient",
     "LLMConfig",
+    "BatchProcessor",
+    "BatchItem",
+    "BatchResult",
+    "TextAnalysisBatchProcessor",
+    "DocumentChunkBatchProcessor",
+    "batch_llm_calls",
+    "batch_text_analysis",
+    "batch_document_chunks",
     "PathSelectionAgent",
     "ReasoningPathFinder",
     "PathRelevanceScore",

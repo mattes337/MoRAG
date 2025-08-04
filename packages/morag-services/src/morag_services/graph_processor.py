@@ -19,9 +19,11 @@ try:
         Neo4jConfig, QdrantConfig, DatabaseType, DatabaseConfig, DatabaseResult,
         Entity, Relation
     )
-    # Import LLMConfig from morag-reasoning package
+    # Import LLMConfig and batch processing from morag-reasoning package
     try:
-        from morag_reasoning.llm import LLMConfig
+        from morag_reasoning.llm import LLMConfig, LLMClient
+        from morag_reasoning.batch_processor import batch_document_chunks
+        BATCH_PROCESSING_AVAILABLE = True
     except ImportError:
         # Fallback LLMConfig for compatibility
         from pydantic import BaseModel
@@ -31,6 +33,9 @@ try:
             api_key: str = None
             temperature: float = 0.1
             max_tokens: int = 2000
+        LLMClient = None
+        batch_document_chunks = None
+        BATCH_PROCESSING_AVAILABLE = False
     from morag_graph.ingestion import FileIngestion
 
     # Try to import enhanced graph builder with OpenIE support
@@ -149,6 +154,7 @@ class GraphProcessor:
         self._storage = None
         self._file_ingestion = None
         self._llm_config = None
+        self._llm_client = None
         
         if not GRAPH_AVAILABLE:
             self.config.enabled = False
@@ -166,6 +172,15 @@ class GraphProcessor:
                 api_key=self.config.llm_api_key,
                 model=self.config.llm_model
             )
+
+            # Initialize LLM client for batch processing if available
+            if BATCH_PROCESSING_AVAILABLE and LLMClient:
+                try:
+                    self._llm_client = LLMClient(self._llm_config)
+                    logger.info("LLM client initialized for batch processing")
+                except Exception as e:
+                    logger.warning("Failed to initialize LLM client for batch processing", error=str(e))
+                    self._llm_client = None
 
             # Initialize Neo4j storage first
             if all([self.config.neo4j_uri, self.config.neo4j_username, self.config.neo4j_password]):
@@ -687,45 +702,158 @@ Provide only the intention summary (maximum {max_length} characters):
                 all_entities = []
                 all_relations = []
 
-                # Process each chunk
-                for i, (chunk_content, chunk_metadata) in enumerate(chunks):
+                # Try batch processing if available and beneficial
+                if (self._llm_client and BATCH_PROCESSING_AVAILABLE and
+                    batch_document_chunks and len(chunks) > 1):
+
+                    logger.info(f"Using batch processing for {len(chunks)} chunks")
+
                     try:
-                        # Extract entities with intention context
-                        entities = await self._entity_extractor.extract(
-                            chunk_content,
-                            source_doc_id=document_path,
-                            intention=intention
+                        # Prepare chunks for batch processing
+                        chunk_data = []
+                        for i, (chunk_content, chunk_metadata) in enumerate(chunks):
+                            chunk_data.append({
+                                "id": f"chunk_{i}",
+                                "text": chunk_content,
+                                "document_id": document_path or "unknown",
+                                "metadata": chunk_metadata,
+                                "chunk_index": i,
+                                "intention": intention
+                            })
+
+                        # Process chunks in batch for entity extraction
+                        batch_results = await batch_document_chunks(
+                            self._llm_client,
+                            chunk_data,
+                            processing_type="extraction"
                         )
 
-                        # Extract relations with intention context
-                        relations = await self._relation_extractor.extract(
-                            chunk_content,
-                            entities=entities,
-                            intention=intention
-                        )
+                        # Process batch results
+                        for result in batch_results:
+                            if result.success and result.result:
+                                chunk_index = result.item.get("chunk_index", 0)
+                                chunk_metadata = result.item.get("metadata", {})
 
-                        # Add chunk metadata to entities and relations
-                        for entity in entities:
-                            entity.metadata.update(chunk_metadata)
-                            entity.metadata['chunk_index'] = i
+                                # Extract entities from batch result
+                                entities_data = result.result.get("entities", [])
+                                for entity_data in entities_data:
+                                    try:
+                                        entity = Entity(
+                                            name=entity_data.get("name", ""),
+                                            type=entity_data.get("type", "UNKNOWN"),
+                                            confidence=entity_data.get("confidence", 0.5),
+                                            source_doc_id=document_path,
+                                            metadata={**chunk_metadata, "chunk_index": chunk_index}
+                                        )
+                                        all_entities.append(entity)
+                                    except Exception as e:
+                                        logger.warning(f"Failed to create entity from batch result: {str(e)}")
 
-                        for relation in relations:
-                            relation.metadata.update(chunk_metadata)
-                            relation.metadata['chunk_index'] = i
+                                # Extract relations from batch result
+                                relations_data = result.result.get("relations", [])
+                                for relation_data in relations_data:
+                                    try:
+                                        relation = Relation(
+                                            source_entity_id=relation_data.get("source", ""),
+                                            target_entity_id=relation_data.get("target", ""),
+                                            type=relation_data.get("relation", "RELATED_TO"),
+                                            confidence=relation_data.get("confidence", 0.5),
+                                            source_doc_id=document_path,
+                                            metadata={**chunk_metadata, "chunk_index": chunk_index}
+                                        )
+                                        all_relations.append(relation)
+                                    except Exception as e:
+                                        logger.warning(f"Failed to create relation from batch result: {str(e)}")
+                            else:
+                                logger.warning(f"Batch processing failed for chunk: {result.error_message}")
 
-                        all_entities.extend(entities)
-                        all_relations.extend(relations)
-
-                        logger.debug("Processed chunk for graph extraction",
-                                   chunk_index=i,
-                                   entities_count=len(entities),
-                                   relations_count=len(relations))
+                        logger.info(f"Batch processing completed: {len(all_entities)} entities, {len(all_relations)} relations")
 
                     except Exception as e:
-                        logger.warning("Failed to process chunk for graph extraction",
-                                     chunk_index=i,
-                                     error=str(e))
-                        continue
+                        logger.warning(f"Batch processing failed, falling back to individual processing: {str(e)}")
+                        # Fall back to individual processing
+                        all_entities = []
+                        all_relations = []
+
+                        # Process each chunk individually
+                        for i, (chunk_content, chunk_metadata) in enumerate(chunks):
+                            try:
+                                # Extract entities with intention context
+                                entities = await self._entity_extractor.extract(
+                                    chunk_content,
+                                    source_doc_id=document_path,
+                                    intention=intention
+                                )
+
+                                # Extract relations with intention context
+                                relations = await self._relation_extractor.extract(
+                                    chunk_content,
+                                    entities=entities,
+                                    intention=intention
+                                )
+
+                                # Add chunk metadata to entities and relations
+                                for entity in entities:
+                                    entity.metadata.update(chunk_metadata)
+                                    entity.metadata['chunk_index'] = i
+
+                                for relation in relations:
+                                    relation.metadata.update(chunk_metadata)
+                                    relation.metadata['chunk_index'] = i
+
+                                all_entities.extend(entities)
+                                all_relations.extend(relations)
+
+                                logger.debug("Processed chunk for graph extraction",
+                                           chunk_index=i,
+                                           entities_count=len(entities),
+                                           relations_count=len(relations))
+
+                            except Exception as e:
+                                logger.warning("Failed to process chunk for graph extraction",
+                                             chunk_index=i,
+                                             error=str(e))
+                                continue
+                else:
+                    # Process each chunk individually (original behavior)
+                    for i, (chunk_content, chunk_metadata) in enumerate(chunks):
+                        try:
+                            # Extract entities with intention context
+                            entities = await self._entity_extractor.extract(
+                                chunk_content,
+                                source_doc_id=document_path,
+                                intention=intention
+                            )
+
+                            # Extract relations with intention context
+                            relations = await self._relation_extractor.extract(
+                                chunk_content,
+                                entities=entities,
+                                intention=intention
+                            )
+
+                            # Add chunk metadata to entities and relations
+                            for entity in entities:
+                                entity.metadata.update(chunk_metadata)
+                                entity.metadata['chunk_index'] = i
+
+                            for relation in relations:
+                                relation.metadata.update(chunk_metadata)
+                                relation.metadata['chunk_index'] = i
+
+                            all_entities.extend(entities)
+                            all_relations.extend(relations)
+
+                            logger.debug("Processed chunk for graph extraction",
+                                       chunk_index=i,
+                                       entities_count=len(entities),
+                                       relations_count=len(relations))
+
+                        except Exception as e:
+                            logger.warning("Failed to process chunk for graph extraction",
+                                         chunk_index=i,
+                                         error=str(e))
+                            continue
 
                 # Store in Neo4j
                 if all_entities or all_relations:
