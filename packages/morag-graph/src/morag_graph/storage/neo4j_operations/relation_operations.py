@@ -32,14 +32,14 @@ class RelationOperations(BaseOperations):
         source_result = await self._execute_query(source_exists_query, {"entity_id": relation.source_entity_id})
         target_result = await self._execute_query(target_exists_query, {"entity_id": relation.target_entity_id})
         
-        # Create missing entities if needed
+        # Check if entities exist, but don't create useless placeholder entities
         if source_result[0]["count"] == 0:
-            logger.warning(f"Source entity {relation.source_entity_id} not found, creating placeholder")
-            await self._create_missing_entity(relation.source_entity_id, f"Entity_{relation.source_entity_id}")
-        
+            logger.warning(f"Source entity {relation.source_entity_id} not found, skipping relation")
+            return None  # Skip this relation instead of creating useless entities
+
         if target_result[0]["count"] == 0:
-            logger.warning(f"Target entity {relation.target_entity_id} not found, creating placeholder")
-            await self._create_missing_entity(relation.target_entity_id, f"Entity_{relation.target_entity_id}")
+            logger.warning(f"Target entity {relation.target_entity_id} not found, skipping relation")
+            return None  # Skip this relation instead of creating useless entities
 
         # Get the normalized Neo4j relationship type
         neo4j_rel_type = relation.get_neo4j_type()

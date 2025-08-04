@@ -412,11 +412,10 @@ class RelationExtractor:
                         source_entity_id = entity_lookup.get(source_name.lower())
                         target_entity_id = entity_lookup.get(target_name.lower())
 
-                        # If we can't resolve IDs, create placeholder IDs
-                        if not source_entity_id:
-                            source_entity_id = f"entity_{hash(source_name.lower())}"
-                        if not target_entity_id:
-                            target_entity_id = f"entity_{hash(target_name.lower())}"
+                        # Skip relation if we can't resolve entity IDs properly
+                        if not source_entity_id or not target_entity_id:
+                            self.logger.debug(f"Skipping relation - could not resolve entity IDs for '{source_name}' -> '{target_name}'")
+                            continue
 
                         # Create updated attributes for this specific relation
                         relation_attrs = attrs.copy()

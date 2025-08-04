@@ -477,6 +477,45 @@ class EntityExtractor:
 
         return 'general'  # Default to general if no clear domain
 
+    def _is_generic_entity_name(self, name: str) -> bool:
+        """Check if entity name is generic and should be avoided.
+
+        Args:
+            name: Entity name to check
+
+        Returns:
+            True if the name is generic and should be avoided
+        """
+        if not name or len(name.strip()) < 2:
+            return True
+
+        name_lower = name.lower().strip()
+
+        # Check for exact generic names
+        if name_lower in ['entity', 'unknown', 'placeholder']:
+            return True
+
+        # Generic patterns to avoid
+        generic_patterns = [
+            'entity_',
+            'entity ',
+            'unknown',
+            'placeholder',
+            'temp_',
+            'auto_',
+            'generated_'
+        ]
+
+        for pattern in generic_patterns:
+            if name_lower.startswith(pattern):
+                return True
+
+        # Check if it's just "Entity" followed by an ID or hash
+        if name_lower.startswith('entity') and ('_' in name or name.isdigit()):
+            return True
+
+        return False
+
     async def _convert_to_entities_async(self, result: Any, source_doc_id: Optional[str]) -> List[Entity]:
         """Convert LangExtract results to MoRAG Entity objects with normalization."""
         entities = []
@@ -539,6 +578,11 @@ class EntityExtractor:
                 else:
                     entity_name = original_name
                     attributes = extraction.attributes or {}
+
+                # Skip entities with generic names
+                if self._is_generic_entity_name(entity_name):
+                    self.logger.debug(f"Skipping entity with generic name: '{entity_name}'")
+                    continue
 
                 # Create Entity object
                 entity = Entity(
@@ -635,7 +679,7 @@ class EntityExtractor:
                     matches = re.finditer(pattern, text)
                     for match in matches:
                         entity_name = match.group().strip()
-                        if len(entity_name) > 2:  # Skip very short matches
+                        if len(entity_name) > 2 and not self._is_generic_entity_name(entity_name):
                             entity = Entity(
                                 name=entity_name,
                                 type=entity_type,
@@ -703,17 +747,18 @@ class EntityExtractor:
 
             # Create entities from unique capitalized words
             for word in unique_words[:10]:  # Limit to 10
-                entity = Entity(
-                    name=word,
-                    type="UNKNOWN",
-                    confidence=0.1,  # Very low confidence
-                    source_doc_id=source_doc_id,
-                    attributes={
-                        "extraction_method": "minimal_fallback",
-                        "note": "Extracted from capitalized words"
-                    }
-                )
-                entities.append(entity)
+                if not self._is_generic_entity_name(word):
+                    entity = Entity(
+                        name=word,
+                        type="UNKNOWN",
+                        confidence=0.1,  # Very low confidence
+                        source_doc_id=source_doc_id,
+                        attributes={
+                            "extraction_method": "minimal_fallback",
+                            "note": "Extracted from capitalized words"
+                        }
+                    )
+                    entities.append(entity)
 
             self.logger.info(
                 "Created minimal entities from capitalized words",

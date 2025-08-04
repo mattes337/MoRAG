@@ -16,6 +16,45 @@ logger = logging.getLogger(__name__)
 class EntityOperations(BaseOperations):
     """Handles entity storage, retrieval, and management operations."""
     
+    def _is_generic_entity_name(self, name: str) -> bool:
+        """Check if entity name is generic and should be avoided.
+
+        Args:
+            name: Entity name to check
+
+        Returns:
+            True if the name is generic and should be avoided
+        """
+        if not name or len(name.strip()) < 2:
+            return True
+
+        name_lower = name.lower().strip()
+
+        # Check for exact generic names
+        if name_lower in ['entity', 'unknown', 'placeholder']:
+            return True
+
+        # Generic patterns to avoid
+        generic_patterns = [
+            'entity_',
+            'entity ',
+            'unknown',
+            'placeholder',
+            'temp_',
+            'auto_',
+            'generated_'
+        ]
+
+        for pattern in generic_patterns:
+            if name_lower.startswith(pattern):
+                return True
+
+        # Check if it's just "Entity" followed by an ID or hash
+        if name_lower.startswith('entity') and ('_' in name or name.isdigit()):
+            return True
+
+        return False
+
     async def store_entity(self, entity: Entity) -> EntityId:
         """Store an entity in Neo4J.
 
@@ -29,6 +68,10 @@ class EntityOperations(BaseOperations):
         Returns:
             Entity ID
         """
+        # Skip entities with generic names
+        if self._is_generic_entity_name(entity.name):
+            logger.warning(f"Skipping entity with generic name: '{entity.name}'")
+            return entity.id
         # Validate entity ID format
         try:
             IDValidator.validate_entity_id(entity.id)
@@ -90,8 +133,12 @@ class EntityOperations(BaseOperations):
             entity_name: Name of the entity
 
         Returns:
-            Entity ID (properly formatted)
+            Entity ID (properly formatted), or None if entity should not be created
         """
+        # Don't create entities with generic names
+        if self._is_generic_entity_name(entity_name):
+            logger.warning(f"Refusing to create entity with generic name: '{entity_name}'")
+            return None
         # Check if the provided entity_id is in valid format
         try:
             IDValidator.validate_entity_id(entity_id)
