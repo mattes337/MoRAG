@@ -383,11 +383,23 @@ class RelationExtractor:
         if not result or not hasattr(result, 'extractions'):
             return relations
         
-        # Create entity lookup for ID resolution
+        # Create comprehensive entity lookup for ID resolution
+        # Include both normalized names and original names to handle entity normalization
         entity_lookup = {}
         if entities:
             for entity in entities:
+                # Add normalized name (current entity.name)
                 entity_lookup[entity.name.lower()] = entity.id
+
+                # Add original name if available from normalization
+                if hasattr(entity, 'attributes') and entity.attributes:
+                    original_name = entity.attributes.get('original_name')
+                    if original_name and original_name.lower() != entity.name.lower():
+                        entity_lookup[original_name.lower()] = entity.id
+                        self.logger.debug(
+                            f"Added entity lookup mapping: '{original_name}' -> '{entity.name}' (ID: {entity.id})",
+                            component="langextract_relation_extractor"
+                        )
         
         for extraction in result.extractions:
             try:
@@ -408,13 +420,17 @@ class RelationExtractor:
                 # Create relations for all combinations of source and target entities
                 for source_name in source_entities:
                     for target_name in target_entities:
-                        # Try to resolve entity IDs
-                        source_entity_id = entity_lookup.get(source_name.lower())
-                        target_entity_id = entity_lookup.get(target_name.lower())
+                        # Try to resolve entity IDs with multiple strategies
+                        source_entity_id = self._resolve_entity_id(source_name, entity_lookup)
+                        target_entity_id = self._resolve_entity_id(target_name, entity_lookup)
 
                         # Skip relation if we can't resolve entity IDs properly
                         if not source_entity_id or not target_entity_id:
-                            self.logger.debug(f"Skipping relation - could not resolve entity IDs for '{source_name}' -> '{target_name}'")
+                            self.logger.debug(
+                                f"Skipping relation - could not resolve entity IDs for '{source_name}' -> '{target_name}'",
+                                available_entities=list(entity_lookup.keys())[:10],  # Show first 10 for debugging
+                                component="langextract_relation_extractor"
+                            )
                             continue
 
                         # Create updated attributes for this specific relation
@@ -443,6 +459,58 @@ class RelationExtractor:
                 continue
         
         return relations
+
+    def _resolve_entity_id(self, entity_name: str, entity_lookup: Dict[str, str]) -> Optional[str]:
+        """Resolve entity ID with multiple strategies to handle normalization."""
+        if not entity_name:
+            return None
+
+        # Strategy 1: Direct lookup (exact match)
+        entity_id = entity_lookup.get(entity_name.lower())
+        if entity_id:
+            return entity_id
+
+        # Strategy 2: Try basic normalization (remove common words, trim)
+        normalized_name = self._basic_normalize_entity_name(entity_name)
+        entity_id = entity_lookup.get(normalized_name.lower())
+        if entity_id:
+            self.logger.debug(
+                f"Resolved entity via basic normalization: '{entity_name}' -> '{normalized_name}'",
+                component="langextract_relation_extractor"
+            )
+            return entity_id
+
+        # Strategy 3: Partial matching (contains or is contained)
+        entity_name_lower = entity_name.lower()
+        for lookup_name, lookup_id in entity_lookup.items():
+            # Check if entity name is contained in lookup name or vice versa
+            if (entity_name_lower in lookup_name and len(entity_name_lower) > 3) or \
+               (lookup_name in entity_name_lower and len(lookup_name) > 3):
+                self.logger.debug(
+                    f"Resolved entity via partial matching: '{entity_name}' -> '{lookup_name}'",
+                    component="langextract_relation_extractor"
+                )
+                return lookup_id
+
+        return None
+
+    def _basic_normalize_entity_name(self, entity_name: str) -> str:
+        """Apply basic normalization to entity name for matching."""
+        normalized = entity_name.strip()
+
+        # Remove common German/English words that might cause mismatches
+        words_to_remove = [
+            'sich', 'zu', 'der', 'die', 'das', 'den', 'dem', 'des',
+            'the', 'a', 'an', 'to', 'of', 'for', 'with', 'by'
+        ]
+
+        words = normalized.split()
+        filtered_words = [word for word in words if word.lower() not in words_to_remove]
+
+        if filtered_words:
+            normalized = ' '.join(filtered_words)
+
+        return normalized
 
     def _split_entity_names(self, entity_name: str) -> List[str]:
         """Split comma-separated entity names into individual entities.
