@@ -167,7 +167,7 @@ class IngestionCoordinator:
                    effective_language=effective_language,
                    source_path=source_path)
 
-        # Step 5: Extract entities and relations for graph databases
+        # Step 5: Extract facts and relationships for graph databases
         # Use the same chunk settings as embeddings to ensure consistency
         effective_chunk_size = embeddings_data['chunk_size']
         effective_chunk_overlap = embeddings_data['chunk_overlap']
@@ -213,8 +213,8 @@ class IngestionCoordinator:
                    source_path=source_path,
                    databases_used=len(database_configs),
                    chunks_created=len(embeddings_data.get('chunks', [])),
-                   entities_extracted=len(graph_data.get('entities', [])),
-                   relations_extracted=len(graph_data.get('relations', [])),
+                   facts_extracted=len(graph_data.get('facts', [])),
+                   relationships_extracted=len(graph_data.get('relationships', [])),
                    result_file=result_file_path)
         
         return ingest_result
@@ -941,33 +941,11 @@ class IngestionCoordinator:
             },
             'graph_data': {
                 'language': language,  # Add language information to graph data
-                'entities_count': len(graph_data['entities']),
-                'relations_count': len(graph_data['relations']),
-                'entities': [
-                    {
-                        'id': entity.id,
-                        'name': entity.name,
-                        'type': entity.type.value if hasattr(entity.type, 'value') else str(entity.type),
-                        'description': getattr(entity, 'description', ''),
-                        'attributes': entity.attributes,
-                        'confidence': entity.confidence,
-                        'embedding': getattr(entity, 'embedding', None)
-                    }
-                    for entity in graph_data['entities']
-                ],
-                'relations': [
-                    {
-                        'id': relation.id,
-                        'source_entity_id': relation.source_entity_id,
-                        'target_entity_id': relation.target_entity_id,
-                        'relation_type': relation.type.value if hasattr(relation.type, 'value') else str(relation.type),
-                        'description': getattr(relation, 'description', ''),
-                        'context': getattr(relation, 'context', ''),
-                        'attributes': relation.attributes,
-                        'confidence': relation.confidence
-                    }
-                    for relation in graph_data['relations']
-                ],
+                'facts_count': len(graph_data.get('facts', [])),
+                'relationships_count': len(graph_data.get('relationships', [])),
+                'facts': graph_data.get('facts', []),
+                'relationships': graph_data.get('relationships', []),
+                'chunk_fact_mapping': graph_data.get('chunk_fact_mapping', {}),
                 'extraction_metadata': graph_data['extraction_metadata']
             },
             'metadata': metadata,

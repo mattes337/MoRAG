@@ -50,7 +50,8 @@ try:
     from morag_document import DocumentProcessor, DocumentService
     from morag_core.interfaces.processor import ProcessingConfig
     from morag_core.interfaces.service import ServiceConfig
-    from morag_services import QdrantVectorStorage, GeminiEmbeddingService
+    from morag_services import QdrantVectorStorage
+    from morag_embedding import GeminiEmbeddingService
     from morag_core.models import Document, DocumentChunk
 except ImportError as e:
     print(f"[FAIL] Import error: {e}")
@@ -452,8 +453,8 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
         print_result("Processing Time", f"{ingestion_result['processing_time']:.2f} seconds")
         print_result("Chunks Created", str(ingestion_result['embeddings_data']['chunk_count']))
-        print_result("Entities Extracted", str(ingestion_result['graph_data']['entities_count']))
-        print_result("Relations Extracted", str(ingestion_result['graph_data']['relations_count']))
+        print_result("Facts Extracted", str(ingestion_result['graph_data']['facts_count']))
+        print_result("Relationships Extracted", str(ingestion_result['graph_data']['relationships_count']))
 
         # Show database results
         if 'database_results' in ingestion_result:

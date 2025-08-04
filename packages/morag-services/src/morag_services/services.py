@@ -22,7 +22,7 @@ from morag_document.service import DocumentService
 from morag_audio.service import AudioService
 from morag_video.service import VideoService
 from morag_image.service import ImageService
-from morag_embedding import EmbeddingService
+from morag_embedding import GeminiEmbeddingService
 from morag_web.service import WebService
 from morag_youtube.service import YouTubeService
 
@@ -98,7 +98,7 @@ class MoRAGServices:
 
         self.video_service = VideoService()
         self.image_service = ImageService()
-        self.embedding_service = EmbeddingService()
+        self.embedding_service = GeminiEmbeddingService()
         self.web_service = WebService()
         self.youtube_service = YouTubeService()
         

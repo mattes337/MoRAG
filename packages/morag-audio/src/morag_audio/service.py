@@ -8,7 +8,7 @@ import structlog
 
 from morag_core.exceptions import ProcessingError as ServiceError
 from morag_core.utils import ensure_directory as ensure_directory_exists
-from morag_embedding import EmbeddingService
+from morag_embedding import GeminiEmbeddingService
 
 from morag_audio.processor import AudioProcessor, AudioConfig, AudioProcessingResult, AudioProcessingError
 from morag_audio.converters import AudioConverter, AudioConversionOptions
@@ -30,7 +30,7 @@ class AudioService:
 
     def __init__(self, 
                  config: Optional[AudioConfig] = None,
-                 embedding_service: Optional[EmbeddingService] = None,
+                 embedding_service: Optional[GeminiEmbeddingService] = None,
                  output_dir: Optional[Union[str, Path]] = None):
         """Initialize the audio service.
         
