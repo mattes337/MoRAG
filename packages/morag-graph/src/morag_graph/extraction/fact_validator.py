@@ -183,7 +183,28 @@ class FactValidator:
             'method', 'technique', 'approach', 'procedure', 'process',
             'algorithm', 'formula', 'equation', 'model', 'framework',
             'system', 'tool', 'software', 'hardware', 'device', 'network',
-            'learning', 'training', 'classification', 'recognition', 'detection'
+            'learning', 'training', 'classification', 'recognition', 'detection',
+            # Medical/Health terms
+            'treatment', 'therapy', 'medication', 'dosage', 'dose', 'intake',
+            'administration', 'prescription', 'supplement', 'extract', 'compound',
+            'concentration', 'mg', 'gram', 'daily', 'twice', 'morning', 'evening',
+            'before', 'after', 'meals', 'empty stomach', 'with food',
+            # Herbal/Natural terms
+            'herb', 'plant', 'botanical', 'natural', 'organic', 'standardized',
+            'tincture', 'capsule', 'tablet', 'tea', 'infusion', 'decoction',
+            'preparation', 'formulation', 'blend', 'mixture', 'combination',
+            # Action/Effect terms
+            'improves', 'supports', 'helps', 'assists', 'promotes', 'enhances',
+            'reduces', 'decreases', 'increases', 'boosts', 'strengthens',
+            'calms', 'soothes', 'relieves', 'alleviates', 'prevents',
+            # Measurement terms
+            'study', 'research', 'clinical', 'trial', 'evidence', 'shown',
+            'demonstrated', 'proven', 'effective', 'beneficial', 'safe',
+            # German medical terms (for multilingual support)
+            'behandlung', 'therapie', 'medikament', 'dosierung', 'einnahme',
+            'anwendung', 'extrakt', 'standardisiert', 'täglich', 'morgens',
+            'abends', 'vor', 'nach', 'mahlzeiten', 'verbessert', 'unterstützt',
+            'hilft', 'reduziert', 'erhöht', 'stärkt', 'beruhigt', 'lindert'
         ]
         
         combined_text = f"{fact.object}"

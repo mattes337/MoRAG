@@ -103,7 +103,7 @@ class FactExtractor:
             
             # Extract fact candidates using LLM
             fact_candidates = await self._extract_fact_candidates(processed_text, extraction_context)
-            
+
             if not fact_candidates:
                 self.logger.warning(
                     "No fact candidates extracted",
@@ -111,7 +111,16 @@ class FactExtractor:
                     text_length=len(chunk_text)
                 )
                 return []
-            
+
+            # Debug: Log what we got from LLM
+            self.logger.debug(
+                "Fact candidates extracted",
+                chunk_id=chunk_id,
+                candidates_count=len(fact_candidates),
+                candidates_types=[type(c).__name__ for c in fact_candidates],
+                first_candidate_preview=str(fact_candidates[0])[:100] if fact_candidates else "None"
+            )
+
             # Structure facts from candidates
             facts = self._structure_facts(fact_candidates, chunk_id, document_id, extraction_context)
             
@@ -149,6 +158,13 @@ class FactExtractor:
                 chunk_id=chunk_id,
                 error=str(e),
                 error_type=type(e).__name__
+            )
+            # Log the full stack trace for debugging
+            import traceback
+            self.logger.debug(
+                "Full fact extraction error traceback",
+                chunk_id=chunk_id,
+                traceback=traceback.format_exc()
             )
             return []
     
@@ -203,7 +219,15 @@ class FactExtractor:
         try:
             # Call LLM for extraction
             response = await self.llm_client.generate(prompt)
-            
+
+            # Debug: Log the raw LLM response
+            self.logger.debug(
+                "Raw LLM response received",
+                response_length=len(response) if response else 0,
+                response_preview=response[:300] if response else "None",
+                response_type=type(response).__name__
+            )
+
             # Parse JSON response
             fact_candidates = self._parse_llm_response(response)
             
@@ -225,37 +249,101 @@ class FactExtractor:
     
     def _parse_llm_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse LLM response to extract fact candidates.
-        
+
         Args:
             response: Raw LLM response
-            
+
         Returns:
             List of parsed fact dictionaries
         """
+        if not response or not response.strip():
+            self.logger.warning("Empty LLM response received")
+            return []
+
+        # Clean the response
+        response = response.strip()
+
+        # Log the raw response for debugging
+        self.logger.debug(
+            "Parsing LLM response",
+            response_length=len(response),
+            response_preview=response[:300]
+        )
+
         try:
-            # Try to find JSON array in response
-            json_match = re.search(r'\[.*\]', response, re.DOTALL)
+            # Clean the response - remove markdown code blocks if present
+            cleaned_response = response
+            if '```json' in response:
+                # Extract JSON from markdown code block
+                json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+                if json_match:
+                    cleaned_response = json_match.group(1).strip()
+                    self.logger.debug("Extracted JSON from markdown code block")
+            elif '```' in response:
+                # Extract from generic code block
+                json_match = re.search(r'```\s*(.*?)\s*```', response, re.DOTALL)
+                if json_match:
+                    cleaned_response = json_match.group(1).strip()
+                    self.logger.debug("Extracted JSON from generic code block")
+
+            # Try to parse the cleaned response directly as JSON
+            try:
+                candidates = json.loads(cleaned_response)
+                if isinstance(candidates, list):
+                    # Validate that each candidate is a dictionary
+                    valid_candidates = []
+                    for i, candidate in enumerate(candidates):
+                        if isinstance(candidate, dict):
+                            valid_candidates.append(candidate)
+                        else:
+                            self.logger.warning(f"Candidate {i} is not a dictionary: {type(candidate)}")
+                    return valid_candidates
+                elif isinstance(candidate, dict):
+                    return [candidates]
+            except json.JSONDecodeError:
+                pass
+
+            # Try to find JSON array in response using greedy matching
+            json_match = re.search(r'\[.*\]', cleaned_response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(0)
+                self.logger.debug("Found JSON array in response", json_preview=json_str[:200])
                 candidates = json.loads(json_str)
-                
+
                 if isinstance(candidates, list):
-                    return candidates
-            
-            # Fallback: try to parse entire response as JSON
-            candidates = json.loads(response)
-            if isinstance(candidates, list):
-                return candidates
-            elif isinstance(candidates, dict):
-                return [candidates]
-            
+                    # Validate that each candidate is a dictionary
+                    valid_candidates = []
+                    for i, candidate in enumerate(candidates):
+                        if isinstance(candidate, dict):
+                            valid_candidates.append(candidate)
+                        else:
+                            self.logger.warning(f"Candidate {i} is not a dictionary: {type(candidate)}")
+                    return valid_candidates
+
+            # Try to find JSON object in response
+            json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                self.logger.debug("Found JSON object in response", json_preview=json_str[:200])
+                candidate = json.loads(json_str)
+                if isinstance(candidate, dict):
+                    return [candidate]
+
         except json.JSONDecodeError as e:
-            self.logger.warning(
+            self.logger.error(
                 "Failed to parse LLM response as JSON",
                 error=str(e),
-                response_preview=response[:200]
+                response_preview=response[:500],
+                response_length=len(response)
             )
-        
+        except Exception as e:
+            self.logger.error(
+                "Unexpected error parsing LLM response",
+                error=str(e),
+                error_type=type(e).__name__,
+                response_preview=response[:500]
+            )
+
         return []
     
     def _structure_facts(
@@ -278,22 +366,62 @@ class FactExtractor:
         """
         facts = []
         
-        for candidate in candidates:
+        for i, candidate in enumerate(candidates):
             try:
-                # Extract required fields
-                subject = candidate.get('subject', '').strip()
-                obj = candidate.get('object', '').strip()
-                
-                if not subject or not obj:
+                # Ensure candidate is a dictionary
+                if not isinstance(candidate, dict):
+                    self.logger.warning(
+                        f"Candidate {i} is not a dictionary",
+                        candidate_type=type(candidate).__name__,
+                        candidate_value=str(candidate)[:100]
+                    )
                     continue
-                
+
+                # Extract required fields with None handling
+                subject = candidate.get('subject', '')
+                obj = candidate.get('object', '')
+
+                # Handle None values and strip strings
+                if subject is None:
+                    subject = ''
+                elif isinstance(subject, str):
+                    subject = subject.strip()
+                else:
+                    subject = str(subject).strip()
+
+                if obj is None:
+                    obj = ''
+                elif isinstance(obj, str):
+                    obj = obj.strip()
+                else:
+                    obj = str(obj).strip()
+
+                if not subject or not obj:
+                    self.logger.debug(
+                        f"Candidate {i} missing required fields",
+                        subject=subject,
+                        object=obj
+                    )
+                    continue
+
+                # Helper function to safely handle optional string fields
+                def safe_strip(value):
+                    if value is None:
+                        return None
+                    elif isinstance(value, str):
+                        stripped = value.strip()
+                        return stripped if stripped else None
+                    else:
+                        stripped = str(value).strip()
+                        return stripped if stripped else None
+
                 # Create fact with all available information
                 fact_data = {
                     'subject': subject,
                     'object': obj,
-                    'approach': candidate.get('approach', '').strip() or None,
-                    'solution': candidate.get('solution', '').strip() or None,
-                    'remarks': candidate.get('remarks', '').strip() or None,
+                    'approach': safe_strip(candidate.get('approach')),
+                    'solution': safe_strip(candidate.get('solution')),
+                    'remarks': safe_strip(candidate.get('remarks')),
                     'source_chunk_id': chunk_id,
                     'source_document_id': document_id,
                     'extraction_confidence': float(candidate.get('confidence', 0.8)),

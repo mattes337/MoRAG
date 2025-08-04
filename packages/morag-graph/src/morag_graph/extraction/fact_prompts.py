@@ -17,11 +17,11 @@ class FactExtractionPrompts:
         Returns:
             Formatted prompt for fact extraction
         """
-        return f"""You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information.
+        return """You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information.
 
 A fact should contain:
 - Subject: The main entity or concept the fact is about
-- Object: What is being described, studied, or acted upon  
+- Object: What is being described, studied, or acted upon
 - Approach: The method, technique, or way something is done (optional)
 - Solution: The result, outcome, or answer provided (optional)
 - Remarks: Important context, limitations, or qualifications (optional)
@@ -32,10 +32,10 @@ Extract only facts that are:
 3. Useful for answering questions
 4. Complete enough to stand alone
 
-Domain: {domain}
-Language: {language}
+Domain: """ + domain + """
+Language: """ + language + """
 
-Text: {{chunk_text}}
+Text: {chunk_text}
 
 Respond with JSON array of facts:
 [
@@ -43,7 +43,7 @@ Respond with JSON array of facts:
     "subject": "specific subject",
     "object": "what is being described",
     "approach": "how it's done (optional)",
-    "solution": "outcome/result (optional)", 
+    "solution": "outcome/result (optional)",
     "remarks": "context/limitations (optional)",
     "fact_type": "research|process|definition|causal|comparative|temporal|statistical|methodological",
     "confidence": 0.0-1.0,
@@ -108,11 +108,11 @@ Available fact types:
 - methodological: Methods, techniques, approaches
 
 Respond with JSON:
-{
+{{
   "fact_type": "most_appropriate_type",
   "confidence": 0.0-1.0,
   "reasoning": "explanation for the classification"
-}"""
+}}"""
 
     @staticmethod
     def get_fact_relationship_prompt() -> str:
@@ -138,13 +138,13 @@ Only create relationships that are clearly supported by the text.
 
 Respond with JSON array:
 [
-  {
+  {{
     "source_fact_id": "fact_id_1",
     "target_fact_id": "fact_id_2",
     "relation_type": "SUPPORTS|ELABORATES|CONTRADICTS|SEQUENCE|COMPARISON|CAUSATION|TEMPORAL_ORDER",
     "confidence": 0.0-1.0,
     "context": "explanation of the relationship"
-  }
+  }}
 ]"""
 
     @staticmethod
@@ -192,8 +192,7 @@ Respond with JSON:
         base_prompt = FactExtractionPrompts.get_fact_extraction_prompt(domain, language)
         
         return base_prompt.format(
-            chunk_text=chunk_text,
-            max_facts=max_facts
+            chunk_text=chunk_text
         ) + f"\n\nExtract at most {max_facts} high-quality facts from the text."
 
     @staticmethod

@@ -466,6 +466,11 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
                     elif db_type == 'neo4j':
                         if 'chunks_stored' in db_result:
                             print_result(f"  Chunks Stored", str(db_result['chunks_stored']))
+                        if 'facts_processed' in db_result:
+                            print_result(f"  Facts Processed", str(db_result['facts_processed']))
+                        if 'relationships_processed' in db_result:
+                            print_result(f"  Relationships Processed", str(db_result['relationships_processed']))
+                        # Legacy support for old entity/relation fields
                         if 'entities_stored' in db_result:
                             print_result(f"  Entities Stored", str(db_result['entities_stored']))
                         if 'relations_stored' in db_result:

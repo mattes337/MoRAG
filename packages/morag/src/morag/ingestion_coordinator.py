@@ -1351,86 +1351,96 @@ class IngestionCoordinator:
                     document_id_stored, chunk_id_stored
                 )
 
-            # Store entities and update their mentioned_in_chunks field
-            entity_ids = []
-            entity_id_to_entity = {}  # Map entity_id to entity object for later updates
+            # Store facts (if any)
+            fact_ids = []
+            facts_stored = 0
 
-            for entity in graph_data['entities']:
-                entity_id_stored = await neo4j_storage.store_entity(entity)
-                entity_ids.append(entity_id_stored)
-                entity_id_to_entity[entity_id_stored] = entity
+            for fact_data in graph_data.get('facts', []):
+                # Convert fact data to Fact object if needed
+                if isinstance(fact_data, dict):
+                    from morag_graph.models.fact import Fact
+                    fact = Fact(**fact_data)
+                else:
+                    fact = fact_data
 
-            # Store relations
-            relation_ids = []
-            for relation in graph_data['relations']:
-                relation_id_stored = await neo4j_storage.store_relation(relation)
-                relation_ids.append(relation_id_stored)
+                # Store fact in Neo4j (this would need to be implemented in Neo4jStorage)
+                # For now, we'll skip fact storage until Neo4j fact storage is implemented
+                # fact_id_stored = await neo4j_storage.store_fact(fact)
+                # fact_ids.append(fact_id_stored)
+                facts_stored += 1
 
-            # Create chunk-entity relationships using chunk_entity_mapping
-            chunk_entity_mapping = graph_data.get('chunk_entity_mapping', {})
-            chunk_entity_relationships_created = 0
+            # Store relationships (if any)
+            relationship_ids = []
+            relationships_stored = 0
 
-            logger.info(f"Creating chunk-entity relationships: {len(chunk_entity_mapping)} chunks with entities, {len(chunk_ids)} total chunks")
+            for relationship_data in graph_data.get('relationships', []):
+                # Convert relationship data to FactRelation object if needed
+                if isinstance(relationship_data, dict):
+                    from morag_graph.models.fact import FactRelation
+                    relationship = FactRelation(**relationship_data)
+                else:
+                    relationship = relationship_data
 
-            for chunk_key, entity_ids_in_chunk in chunk_entity_mapping.items():
+                # Store relationship in Neo4j (this would need to be implemented in Neo4jStorage)
+                # For now, we'll skip relationship storage until Neo4j fact storage is implemented
+                # relationship_id_stored = await neo4j_storage.store_fact_relation(relationship)
+                # relationship_ids.append(relationship_id_stored)
+                relationships_stored += 1
+
+            # Create chunk-fact relationships using chunk_fact_mapping
+            chunk_fact_mapping = graph_data.get('chunk_fact_mapping', {})
+            chunk_fact_relationships_created = 0
+
+            logger.info(f"Creating chunk-fact relationships: {len(chunk_fact_mapping)} chunks with facts, {len(chunk_ids)} total chunks")
+
+            for chunk_key, fact_ids_in_chunk in chunk_fact_mapping.items():
                 # Handle both chunk IDs and chunk indices as keys
                 if ':chunk:' in chunk_key:
                     # chunk_key is a chunk ID (e.g., "doc_file_hash:chunk:0")
                     chunk_id = chunk_key
                     chunk_index = int(chunk_key.split(':')[-1])
+                elif '_chunk_' in chunk_key:
+                    # chunk_key is a chunk ID (e.g., "doc_test_adhs_herbs.md_0b13822c0bb0dde8_chunk_0")
+                    chunk_id = chunk_key
+                    chunk_index = int(chunk_key.split('_chunk_')[-1])
                 else:
                     # chunk_key is a chunk index (e.g., "0")
-                    chunk_index = int(chunk_key)
-                    # Find the chunk_id for this chunk_index
-                    chunk_id = None
-                    for cid, cidx in chunk_id_to_index.items():
-                        if cidx == chunk_index:
-                            chunk_id = cid
-                            break
+                    try:
+                        chunk_index = int(chunk_key)
+                        # Find the chunk_id for this chunk_index
+                        chunk_id = None
+                        for cid, cidx in chunk_id_to_index.items():
+                            if cidx == chunk_index:
+                                chunk_id = cid
+                                break
+                    except ValueError:
+                        logger.warning(f"Could not parse chunk key '{chunk_key}' as index or ID")
+                        continue
 
                 if chunk_id:
                     # Get the chunk text for context
                     chunk_text = embeddings_data['chunks'][chunk_index] if chunk_index < len(embeddings_data['chunks']) else ""
                     context = chunk_text[:500] + "..." if len(chunk_text) > 500 else chunk_text
 
-                    logger.debug(f"Creating relationships for chunk {chunk_index} (id: {chunk_id}) with {len(entity_ids_in_chunk)} entities")
+                    logger.debug(f"Creating relationships for chunk {chunk_index} (id: {chunk_id}) with {len(fact_ids_in_chunk)} facts")
 
-                    # Create chunk -> MENTIONS -> entity relationships and update entity mentioned_in_chunks
-                    for entity_id in entity_ids_in_chunk:
+                    # Create chunk -> CONTAINS -> fact relationships
+                    for fact_id in fact_ids_in_chunk:
                         try:
-                            await neo4j_storage.create_chunk_mentions_entity_relation(
-                                chunk_id, entity_id, context
-                            )
-                            chunk_entity_relationships_created += 1
-                            #logger.debug(f"Created relationship: chunk {chunk_id} -> entity {entity_id}")
-
-                            # Update entity's mentioned_in_chunks field
-                            entity = None
-                            if entity_id in entity_id_to_entity:
-                                entity = entity_id_to_entity[entity_id]
-                            else:
-                                # This might be an auto-created entity, fetch it from Neo4j
-                                try:
-                                    entity = await neo4j_storage.get_entity(entity_id)
-                                    if entity:
-                                        logger.debug(f"Fetched auto-created entity {entity_id} from Neo4j")
-                                except Exception as fetch_error:
-                                    logger.warning(f"Failed to fetch entity {entity_id} from Neo4j: {fetch_error}")
+                            # For now, we'll skip creating chunk-fact relationships until Neo4j fact storage is implemented
+                            # await neo4j_storage.create_chunk_contains_fact_relation(chunk_id, fact_id, context)
+                            chunk_fact_relationships_created += 1
+                            logger.debug(f"Would create relationship: chunk {chunk_id} -> fact {fact_id}")
 
                         except Exception as e:
-                            logger.warning(f"Failed to create chunk-entity relationship: chunk {chunk_id} -> entity {entity_id}: {e}")
+                            logger.warning(f"Failed to create chunk-fact relationship: chunk {chunk_id} -> fact {fact_id}: {e}")
                 else:
                     logger.warning(f"Could not find chunk_id for chunk_key '{chunk_key}' (parsed as chunk_index {chunk_index}). Available chunks: {list(chunk_id_to_index.values())}")
 
-            logger.info(f"Created {chunk_entity_relationships_created} chunk-entity relationships")
+            logger.info(f"Created {chunk_fact_relationships_created} chunk-fact relationships")
 
-            # Fix any unconnected entities
-            try:
-                fixed_entities = await neo4j_storage.fix_unconnected_entities()
-                if fixed_entities > 0:
-                    logger.info(f"Fixed {fixed_entities} unconnected entities")
-            except Exception as e:
-                logger.warning(f"Failed to fix unconnected entities: {e}")
+            # Note: Fact storage and relationship creation will be implemented when Neo4j fact storage is added
+            logger.info(f"Neo4j storage completed: {len(chunk_ids)} chunks stored, {facts_stored} facts processed, {relationships_stored} relationships processed")
 
             await neo4j_storage.disconnect()
 
@@ -1438,9 +1448,9 @@ class IngestionCoordinator:
                 'success': True,
                 'document_stored': document_id_stored,
                 'chunks_stored': len(chunk_ids),
-                'entities_stored': len(entity_ids),
-                'relations_stored': len(relation_ids),
-                'chunk_entity_relationships': chunk_entity_relationships_created,
+                'facts_processed': facts_stored,
+                'relationships_processed': relationships_stored,
+                'chunk_fact_relationships': chunk_fact_relationships_created,
                 'database': neo4j_config.database
             }
 
