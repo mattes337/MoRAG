@@ -10,6 +10,9 @@ from ..models.fact import Fact, FactRelation
 from ..models.document_chunk import DocumentChunk
 from ..storage.neo4j_operations.fact_operations import FactOperations
 from ..storage.neo4j_storage import Neo4jStorage
+from ..storage.qdrant_operations.fact_vector_operations import FactVectorOperations
+from ..storage.qdrant_storage import QdrantStorage
+from morag_services.embedding import GeminiEmbeddingService
 
 
 class FactExtractionService:
@@ -18,27 +21,36 @@ class FactExtractionService:
     def __init__(
         self,
         neo4j_storage: Neo4jStorage,
+        qdrant_storage: Optional[QdrantStorage] = None,
+        embedding_service: Optional[GeminiEmbeddingService] = None,
         model_id: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
         min_confidence: float = 0.7,
         max_facts_per_chunk: int = 10,
-        enable_relationships: bool = True
+        enable_relationships: bool = True,
+        enable_vector_storage: bool = True
     ):
         """Initialize fact extraction service.
-        
+
         Args:
             neo4j_storage: Neo4j storage instance
+            qdrant_storage: Qdrant storage instance (optional)
+            embedding_service: Embedding service for vector generation
             model_id: LLM model for extraction
             api_key: API key for LLM service
             min_confidence: Minimum confidence threshold
             max_facts_per_chunk: Maximum facts per chunk
             enable_relationships: Whether to extract fact relationships
+            enable_vector_storage: Whether to store facts in vector database
         """
         self.neo4j_storage = neo4j_storage
+        self.qdrant_storage = qdrant_storage
+        self.embedding_service = embedding_service
         self.enable_relationships = enable_relationships
-        
+        self.enable_vector_storage = enable_vector_storage and qdrant_storage is not None
+
         self.logger = structlog.get_logger(__name__)
-        
+
         # Initialize extraction components
         self.fact_extractor = FactExtractor(
             model_id=model_id,
@@ -46,15 +58,23 @@ class FactExtractionService:
             min_confidence=min_confidence,
             max_facts_per_chunk=max_facts_per_chunk
         )
-        
+
         if enable_relationships:
             self.graph_builder = FactGraphBuilder(
                 model_id=model_id,
                 api_key=api_key
             )
-        
+
         # Initialize storage operations
         self.fact_operations = FactOperations(neo4j_storage.driver)
+
+        # Initialize vector operations if enabled
+        if self.enable_vector_storage:
+            self.fact_vector_operations = FactVectorOperations(
+                client=qdrant_storage.client,
+                collection_name=f"{qdrant_storage.collection_name}_facts",
+                embedding_service=embedding_service
+            )
     
     async def extract_facts_from_chunks(
         self,
@@ -122,8 +142,25 @@ class FactExtractionService:
             
             # Store facts in Neo4j
             stored_fact_ids = []
+            vector_point_ids = []
             if all_facts:
                 stored_fact_ids = await self.fact_operations.store_facts(all_facts)
+
+                # Store facts in vector database if enabled
+                if self.enable_vector_storage:
+                    try:
+                        vector_point_ids = await self.fact_vector_operations.store_facts_batch(all_facts)
+                        self.logger.debug(
+                            "Facts stored in vector database",
+                            num_facts=len(all_facts),
+                            num_vectors=len(vector_point_ids)
+                        )
+                    except Exception as e:
+                        self.logger.warning(
+                            "Vector storage failed for facts",
+                            error=str(e),
+                            num_facts=len(all_facts)
+                        )
             
             # Extract relationships if enabled
             relationships = []
@@ -145,7 +182,9 @@ class FactExtractionService:
                 'chunks_processed': len(chunks),
                 'facts_extracted': len(all_facts),
                 'facts_stored': len(stored_fact_ids),
-                'relationships_created': len(relationships)
+                'facts_vectorized': len(vector_point_ids),
+                'relationships_created': len(relationships),
+                'vector_storage_enabled': self.enable_vector_storage
             }
             
             self.logger.info(
@@ -182,11 +221,21 @@ class FactExtractionService:
             List of extracted facts
         """
         try:
+            # Merge chunk metadata with extraction context
+            enhanced_context = {
+                **context,
+                **chunk.metadata,  # Include all chunk metadata
+                'source_text_excerpt': chunk.text[:500] + "..." if len(chunk.text) > 500 else chunk.text,  # Truncated excerpt
+                'chunk_type': chunk.chunk_type,
+                'start_position': chunk.start_position,
+                'end_position': chunk.end_position
+            }
+
             facts = await self.fact_extractor.extract_facts(
-                chunk_text=chunk.content,
+                chunk_text=chunk.text,
                 chunk_id=chunk.id,
                 document_id=chunk.document_id,
-                context=context
+                context=enhanced_context
             )
             
             self.logger.debug(

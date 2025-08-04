@@ -25,10 +25,11 @@ from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
 from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
 from morag_graph.models.entity import Entity
 from morag_graph.models.relation import Relation
+from morag_graph.models.fact import Fact, FactRelation
 from morag_graph.models.document import Document
 from morag_graph.models.document_chunk import DocumentChunk
 from morag_graph.models.database_config import DatabaseConfig, DatabaseType
-from .graph_extractor_wrapper import GraphExtractor
+from morag_graph.services.fact_extraction_service import FactExtractionService
 from morag_graph.utils.id_generation import UnifiedIDGenerator
 
 import structlog
@@ -43,7 +44,7 @@ class IngestionCoordinator:
         """Initialize the ingestion coordinator."""
         self.embedding_service = None
         self.vector_storage = None
-        self.graph_extractor = None
+        self.fact_extractor = None
         
     async def initialize(self):
         """Initialize all services."""
@@ -93,8 +94,9 @@ class IngestionCoordinator:
         # Initialize vector storage connection and ensure collection exists
         await self.vector_storage.initialize()
 
-        # Initialize graph extractor
-        self.graph_extractor = GraphExtractor()
+        # Initialize fact extractor service
+        # We'll create a simple wrapper that mimics the old interface
+        self.fact_extractor = FactExtractionWrapper()
         
     async def ingest_content(
         self,
@@ -582,208 +584,116 @@ class IngestionCoordinator:
         chunk_overlap: int = 200,
         language: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Extract entities and relations for graph databases using chunk-based approach."""
+        """Extract facts and relationships for graph databases using chunk-based approach."""
         try:
-            logger.info(f"Extracting graph data from chunks ({len(content)} chars)")
+            logger.info(f"Extracting fact data from chunks ({len(content)} chars)")
 
             # Create chunks using the same logic as embeddings
             content_type = metadata.get('content_type', 'document')
             chunks = self._create_chunks(content, chunk_size, chunk_overlap, content_type, metadata)
 
-            logger.info(f"Processing {len(chunks)} chunks for entity and relation extraction")
+            logger.info(f"Processing {len(chunks)} chunks for fact extraction")
 
-            all_entities = []
-            all_relations = []
-            chunk_entity_mapping = {}
+            all_facts = []
+            all_relationships = []
+            chunk_fact_mapping = {}
 
-            # Process each chunk individually for entity and relation extraction
+            # Process each chunk individually for fact extraction
             for i, chunk_content in enumerate(chunks):
                 try:
-                    logger.debug(f"Processing chunk {i+1}/{len(chunks)} for entity extraction")
+                    logger.debug(f"Processing chunk {i+1}/{len(chunks)} for fact extraction")
 
-                    # Extract entities and relations from this chunk
-                    chunk_extraction_result = await self.graph_extractor.extract_entities_and_relations(
-                        chunk_content, source_path, language
+                    # Create document chunk with metadata
+                    chunk_id = f"{document_id}_chunk_{i}"
+                    chunk_metadata = {
+                        'source_file_path': source_path,
+                        'source_file_name': Path(source_path).name if source_path else None,
+                        'chunk_index': i,
+                        'content_type': content_type,
+                        **metadata  # Include all original metadata
+                    }
+
+                    # Extract facts from this chunk using fact extractor
+                    chunk_facts, chunk_relationships = await self.fact_extractor.extract_facts_and_relationships(
+                        text=chunk_content,
+                        doc_id=document_id,
+                        domain=metadata.get('domain', 'general'),
+                        context={
+                            'language': language or 'en',
+                            'chunk_index': i,
+                            **chunk_metadata
+                        }
                     )
 
-                    chunk_entities = []
-                    chunk_relations = []
+                    # Process facts from this chunk
+                    if chunk_facts:
+                        for fact in chunk_facts:
+                            # Convert fact to dictionary format for storage
+                            fact_dict = fact.to_dict()
 
-                    # Process entities from this chunk
-                    if chunk_extraction_result and chunk_extraction_result.get('entities'):
-                        for entity_data in chunk_extraction_result['entities']:
-                            # Clean up attributes - remove duplicate description/context fields
-                            entity_attributes = entity_data.get('attributes', {}).copy()
+                            # Add chunk-specific metadata
+                            fact_dict['chunk_index'] = i
+                            fact_dict['chunk_id'] = chunk_id
 
-                            # Remove duplicate fields - keep only essential attributes
-                            entity_attributes.pop('description', None)  # Remove duplicate description
-                            entity_attributes.pop('context', None)      # Remove duplicate context
+                            all_facts.append(fact_dict)
 
-                            # Keep only meaningful attributes (positions, metadata, etc.)
-                            cleaned_attributes = {}
-                            for key, value in entity_attributes.items():
-                                if key not in ['description', 'context'] and value is not None:
-                                    cleaned_attributes[key] = value
+                            # Track facts by chunk for mapping
+                            if chunk_id not in chunk_fact_mapping:
+                                chunk_fact_mapping[chunk_id] = []
+                            chunk_fact_mapping[chunk_id].append(fact.id)
 
-                            # Add chunk metadata
-                            cleaned_attributes['chunk_index'] = i
-                            # Remove chunk_content_preview as it contains source-specific text
-                            # Entities should be generic without relation to source files
+                    # Process relationships from this chunk
+                    if chunk_relationships:
+                        for relationship in chunk_relationships:
+                            # Convert relationship to dictionary format for storage
+                            relationship_dict = {
+                                'id': relationship.id,
+                                'source_fact_id': relationship.source_fact_id,
+                                'target_fact_id': relationship.target_fact_id,
+                                'relationship_type': relationship.relationship_type,
+                                'confidence': relationship.confidence,
+                                'description': relationship.description,
+                                'created_at': relationship.created_at.isoformat(),
+                                'chunk_index': i,
+                                'chunk_id': chunk_id
+                            }
+                            all_relationships.append(relationship_dict)
 
-                            entity = Entity(
-                                # Let Entity model generate unified ID automatically
-                                name=entity_data['name'],
-                                type=entity_data.get('type', 'UNKNOWN'),
-                                description=entity_data.get('description', ''),
-                                attributes=cleaned_attributes,
-                                source_doc_id=source_path,
-                                confidence=entity_data.get('confidence', 0.8)
-                            )
-                            chunk_entities.append(entity)
-
-                    # Process relations from this chunk
-                    if chunk_extraction_result and chunk_extraction_result.get('relations'):
-                        for relation_data in chunk_extraction_result['relations']:
-                            # Clean up attributes - remove duplicate description/context fields
-                            relation_attributes = relation_data.get('attributes', {}).copy()
-
-                            # Remove duplicate fields from attributes
-                            relation_attributes.pop('description', None)  # Remove duplicate description
-                            relation_attributes.pop('context', None)      # Remove duplicate context
-
-                            # Keep only meaningful attributes (metadata, etc.)
-                            cleaned_attributes = {}
-                            for key, value in relation_attributes.items():
-                                if key not in ['description', 'context'] and value is not None:
-                                    cleaned_attributes[key] = value
-
-                            # Add chunk metadata
-                            cleaned_attributes['chunk_index'] = i
-
-                            # Extract description and context as separate fields
-                            description = relation_data.get('description', '')
-                            context = relation_attributes.get('context', description)  # Use description as fallback for context
-
-                            # Context should contain only relevant untransformed text from source file
-                            # Remove verbose "Found in chunk xx" prefixes as they are not required
-
-                            relation = Relation(
-                                # Let Relation model generate unified ID automatically
-                                source_entity_id=relation_data['source_entity_id'],
-                                target_entity_id=relation_data['target_entity_id'],
-                                type=relation_data['relation_type'],
-                                description=description,
-                                context=context,
-                                attributes=cleaned_attributes,
-                                source_doc_id=source_path,
-                                confidence=relation_data.get('confidence', 0.8)
-                            )
-                            chunk_relations.append(relation)
-
-                    # Add entities and relations to global lists
-                    all_entities.extend(chunk_entities)
-                    all_relations.extend(chunk_relations)
-
-                    # Create chunk-entity mapping for this chunk
-                    chunk_id = f"{document_id}:chunk:{i}"
-                    chunk_entity_mapping[chunk_id] = [entity.id for entity in chunk_entities]
-
-                    logger.debug(f"Chunk {i+1} processed: {len(chunk_entities)} entities, {len(chunk_relations)} relations")
+                    logger.debug(f"Chunk {i+1} processed: {len(chunk_facts)} facts, {len(chunk_relationships)} relationships")
 
                 except Exception as e:
-                    logger.warning(f"Failed to process chunk {i+1} for entity extraction", error=str(e))
+                    logger.warning(f"Failed to process chunk {i+1} for fact extraction", error=str(e))
                     # Continue with other chunks
                     continue
 
-            # Deduplicate entities across chunks (entities with same name should be merged)
-            all_entities = self._deduplicate_entities_across_chunks(all_entities)
-
-            # Update chunk-entity mapping after deduplication
-            chunk_entity_mapping = self._update_chunk_mapping_after_deduplication(chunk_entity_mapping, all_entities)
-
-            logger.info(f"Extracted {len(all_entities)} entities and {len(all_relations)} relations from {len(chunks)} chunks")
-            logger.info(f"Created chunk-entity mapping: {len(chunk_entity_mapping)} chunks with entities")
+            logger.info(f"Extracted {len(all_facts)} facts and {len(all_relationships)} relationships from {len(chunks)} chunks")
+            logger.info(f"Created chunk-fact mapping: {len(chunk_fact_mapping)} chunks with facts")
 
             return {
-                'entities': all_entities,
-                'relations': all_relations,
-                'chunk_entity_mapping': chunk_entity_mapping,
+                'facts': all_facts,
+                'relationships': all_relationships,
+                'chunk_fact_mapping': chunk_fact_mapping,
                 'extraction_metadata': {
-                    'total_entities': len(all_entities),
-                    'total_relations': len(all_relations),
-                    'extraction_method': 'chunk_based',
+                    'total_facts': len(all_facts),
+                    'total_relationships': len(all_relationships),
+                    'extraction_method': 'chunk_based_facts',
                     'chunks_processed': len(chunks),
-                    'chunks_with_entities': len(chunk_entity_mapping)
+                    'chunks_with_facts': len(chunk_fact_mapping)
                 }
             }
 
         except Exception as e:
-            logger.warning("Failed to extract graph data", error=str(e))
+            logger.warning("Failed to extract fact data", error=str(e))
             return {
-                'entities': [],
-                'relations': [],
-                'chunk_entity_mapping': {},
+                'facts': [],
+                'relationships': [],
+                'chunk_fact_mapping': {},
                 'extraction_metadata': {'error': str(e)}
             }
 
-    def _deduplicate_entities_across_chunks(self, entities: List[Entity]) -> List[Entity]:
-        """Deduplicate entities across chunks by merging entities with the same name."""
-        entity_map = {}
 
-        for entity in entities:
-            # Use normalized name as key for deduplication
-            key = entity.name.lower().strip()
 
-            if key in entity_map:
-                # Merge with existing entity - keep highest confidence
-                existing = entity_map[key]
-                if entity.confidence > existing.confidence:
-                    # Update with higher confidence entity but merge chunk info
-                    chunk_indices = set()
-                    if 'chunk_index' in existing.attributes:
-                        chunk_indices.add(existing.attributes['chunk_index'])
-                    if 'chunk_index' in entity.attributes:
-                        chunk_indices.add(entity.attributes['chunk_index'])
 
-                    entity.attributes['chunk_indices'] = list(chunk_indices)
-                    entity_map[key] = entity
-                else:
-                    # Keep existing but add chunk info
-                    chunk_indices = set()
-                    if 'chunk_index' in existing.attributes:
-                        chunk_indices.add(existing.attributes['chunk_index'])
-                    if 'chunk_index' in entity.attributes:
-                        chunk_indices.add(entity.attributes['chunk_index'])
-
-                    existing.attributes['chunk_indices'] = list(chunk_indices)
-            else:
-                entity_map[key] = entity
-
-        return list(entity_map.values())
-
-    def _update_chunk_mapping_after_deduplication(self, chunk_entity_mapping: Dict[str, List[str]], entities: List[Entity]) -> Dict[str, List[str]]:
-        """Update chunk-entity mapping after entity deduplication."""
-        # Create a mapping from old entity IDs to new deduplicated entity IDs
-        entity_name_to_id = {entity.name.lower().strip(): entity.id for entity in entities}
-
-        updated_mapping = {}
-        for chunk_id, entity_ids in chunk_entity_mapping.items():
-            updated_entity_ids = []
-            for old_entity_id in entity_ids:
-                # Find the entity by ID and get its deduplicated version
-                for entity in entities:
-                    if entity.id == old_entity_id:
-                        # Check if this entity appears in this chunk
-                        chunk_indices = entity.attributes.get('chunk_indices', [entity.attributes.get('chunk_index')])
-                        chunk_index = int(chunk_id.split(':')[-1])
-                        if chunk_index in chunk_indices:
-                            updated_entity_ids.append(entity.id)
-                        break
-
-            if updated_entity_ids:
-                updated_mapping[chunk_id] = list(set(updated_entity_ids))  # Remove duplicates
-
-        return updated_mapping
 
     def _create_chunk_entity_mapping(
         self,
@@ -1125,30 +1035,10 @@ class IngestionCoordinator:
                 ]
             },
             'graph_data': {
-                'entities': [
-                    {
-                        'id': entity.id,
-                        'name': entity.name,
-                        'type': entity.type.value if hasattr(entity.type, 'value') else str(entity.type),
-                        'attributes': entity.attributes,
-                        'confidence': entity.confidence,
-                        'source_doc_id': getattr(entity, 'source_doc_id', document_id)
-                    }
-                    for entity in graph_data['entities']
-                ],
-                'relations': [
-                    {
-                        'id': relation.id,
-                        'source_entity_id': relation.source_entity_id,
-                        'target_entity_id': relation.target_entity_id,
-                        'relation_type': relation.type.value if hasattr(relation.type, 'value') else str(relation.type),
-                        'attributes': relation.attributes,
-                        'confidence': relation.confidence,
-                        'source_doc_id': getattr(relation, 'source_doc_id', document_id)
-                    }
-                    for relation in graph_data['relations']
-                ],
-                'chunk_entity_mapping': graph_data.get('chunk_entity_mapping', {})
+                'facts': graph_data.get('facts', []),
+                'relationships': graph_data.get('relationships', []),
+                'chunk_fact_mapping': graph_data.get('chunk_fact_mapping', {}),
+                'extraction_metadata': graph_data.get('extraction_metadata', {})
             }
         }
 
@@ -1888,3 +1778,75 @@ class IngestionCoordinator:
             additional_meta['location_type'] = 'chunk_index'
 
         return additional_meta
+
+
+class FactExtractionWrapper:
+    """Wrapper to provide the old graph extractor interface using fact extraction."""
+
+    def __init__(self):
+        """Initialize the wrapper."""
+        self.fact_extractor_service = None
+
+    async def extract_facts_and_relationships(
+        self,
+        text: str,
+        doc_id: str,
+        domain: str = "general",
+        context: Optional[Dict[str, Any]] = None
+    ) -> Tuple[List[Fact], List[FactRelation]]:
+        """Extract facts and relationships from text.
+
+        Args:
+            text: Text content to analyze
+            doc_id: Document identifier
+            domain: Domain context for extraction
+            context: Additional context for extraction
+
+        Returns:
+            Tuple of (facts, relationships)
+        """
+        # Initialize fact extractor service if needed
+        if self.fact_extractor_service is None:
+            from morag_graph.extraction.fact_extractor import FactExtractor
+            from morag_graph.extraction.fact_graph_builder import FactGraphBuilder
+
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                logger.warning("No GEMINI_API_KEY found, fact extraction will fail")
+                return [], []
+
+            self.fact_extractor = FactExtractor(
+                model_id="gemini-2.0-flash",
+                api_key=api_key,
+                domain=domain
+            )
+
+            self.graph_builder = FactGraphBuilder(
+                model_id="gemini-2.0-flash",
+                api_key=api_key
+            )
+
+        try:
+            # Extract facts
+            facts = await self.fact_extractor.extract_facts(
+                chunk_text=text,
+                chunk_id=f"{doc_id}_chunk",
+                document_id=doc_id,
+                context=context or {}
+            )
+
+            # Extract relationships if we have multiple facts
+            relationships = []
+            if len(facts) > 1:
+                try:
+                    fact_graph = await self.graph_builder.build_fact_graph(facts)
+                    if hasattr(fact_graph, 'relationships'):
+                        relationships = fact_graph.relationships
+                except Exception as e:
+                    logger.warning("Failed to extract fact relationships", error=str(e))
+
+            return facts, relationships
+
+        except Exception as e:
+            logger.warning("Fact extraction failed", error=str(e))
+            return [], []

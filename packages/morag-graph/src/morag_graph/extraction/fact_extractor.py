@@ -300,7 +300,19 @@ class FactExtractor:
                     'fact_type': candidate.get('fact_type', FactType.DEFINITION),
                     'domain': context.get('domain'),
                     'language': context.get('language', 'en'),
-                    'keywords': candidate.get('keywords', [])
+                    'keywords': candidate.get('keywords', []),
+                    # Detailed source metadata from context
+                    'source_file_path': context.get('source_file_path'),
+                    'source_file_name': context.get('source_file_name'),
+                    'page_number': context.get('page_number'),
+                    'chapter_title': context.get('chapter_title'),
+                    'chapter_index': context.get('chapter_index'),
+                    'paragraph_index': context.get('paragraph_index'),
+                    'timestamp_start': context.get('timestamp_start'),
+                    'timestamp_end': context.get('timestamp_end'),
+                    'topic_header': context.get('topic_header'),
+                    'speaker_label': context.get('speaker_label'),
+                    'source_text_excerpt': context.get('source_text_excerpt')
                 }
                 
                 # Validate fact type

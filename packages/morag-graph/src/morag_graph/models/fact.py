@@ -2,6 +2,7 @@
 
 import hashlib
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List, Dict, Any, ClassVar
 from pydantic import BaseModel, Field
 
@@ -43,12 +44,25 @@ class Fact(BaseModel):
     source_chunk_id: str = Field(..., description="Source document chunk ID")
     source_document_id: str = Field(..., description="Source document ID")
     extraction_confidence: float = Field(ge=0.0, le=1.0, description="Confidence in extraction")
-    
+
+    # Detailed source metadata for reconstruction and citation
+    source_file_path: Optional[str] = Field(default=None, description="Original file path")
+    source_file_name: Optional[str] = Field(default=None, description="Original file name")
+    page_number: Optional[int] = Field(default=None, description="Page number in document")
+    chapter_title: Optional[str] = Field(default=None, description="Chapter or section title")
+    chapter_index: Optional[int] = Field(default=None, description="Chapter or section index")
+    paragraph_index: Optional[int] = Field(default=None, description="Paragraph index within chunk")
+    timestamp_start: Optional[float] = Field(default=None, description="Start timestamp for audio/video (seconds)")
+    timestamp_end: Optional[float] = Field(default=None, description="End timestamp for audio/video (seconds)")
+    topic_header: Optional[str] = Field(default=None, description="Topic header for audio/video content")
+    speaker_label: Optional[str] = Field(default=None, description="Speaker label for audio/video content")
+    source_text_excerpt: Optional[str] = Field(default=None, description="Exact text excerpt from source")
+
     # Classification
     fact_type: str = Field(..., description="Type of fact (research, process, definition, etc.)")
     domain: Optional[str] = Field(default=None, description="Domain/topic area")
     keywords: List[str] = Field(default_factory=list, description="Key terms for indexing")
-    
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Extraction timestamp")
     language: str = Field(default="en", description="Language of the fact")
@@ -67,7 +81,7 @@ class Fact(BaseModel):
     
     def get_neo4j_properties(self) -> Dict[str, Any]:
         """Get properties for Neo4j storage.
-        
+
         Returns:
             Dictionary of properties suitable for Neo4j node creation
         """
@@ -85,12 +99,24 @@ class Fact(BaseModel):
             "created_at": self.created_at.isoformat(),
             "keywords": ",".join(self.keywords) if self.keywords else "",
             "source_chunk_id": self.source_chunk_id,
-            "source_document_id": self.source_document_id
+            "source_document_id": self.source_document_id,
+            # Detailed source metadata
+            "source_file_path": self.source_file_path,
+            "source_file_name": self.source_file_name,
+            "page_number": self.page_number,
+            "chapter_title": self.chapter_title,
+            "chapter_index": self.chapter_index,
+            "paragraph_index": self.paragraph_index,
+            "timestamp_start": self.timestamp_start,
+            "timestamp_end": self.timestamp_end,
+            "topic_header": self.topic_header,
+            "speaker_label": self.speaker_label,
+            "source_text_excerpt": self.source_text_excerpt
         }
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert fact to dictionary representation.
-        
+
         Returns:
             Dictionary representation of the fact
         """
@@ -108,7 +134,19 @@ class Fact(BaseModel):
             "domain": self.domain,
             "keywords": self.keywords,
             "created_at": self.created_at.isoformat(),
-            "language": self.language
+            "language": self.language,
+            # Detailed source metadata
+            "source_file_path": self.source_file_path,
+            "source_file_name": self.source_file_name,
+            "page_number": self.page_number,
+            "chapter_title": self.chapter_title,
+            "chapter_index": self.chapter_index,
+            "paragraph_index": self.paragraph_index,
+            "timestamp_start": self.timestamp_start,
+            "timestamp_end": self.timestamp_end,
+            "topic_header": self.topic_header,
+            "speaker_label": self.speaker_label,
+            "source_text_excerpt": self.source_text_excerpt
         }
     
     @classmethod
@@ -174,6 +212,90 @@ class Fact(BaseModel):
             components.extend(self.keywords)
             
         return " ".join(components)
+
+    def get_citation(self) -> str:
+        """Generate a citation string for this fact.
+
+        Returns:
+            Formatted citation string with source attribution
+        """
+        citation_parts = []
+
+        # Add file name if available
+        if self.source_file_name:
+            citation_parts.append(self.source_file_name)
+        elif self.source_file_path:
+            citation_parts.append(Path(self.source_file_path).name)
+
+        # Add page number if available
+        if self.page_number:
+            citation_parts.append(f"page {self.page_number}")
+
+        # Add chapter if available
+        if self.chapter_title:
+            citation_parts.append(f"chapter '{self.chapter_title}'")
+        elif self.chapter_index is not None:
+            citation_parts.append(f"chapter {self.chapter_index}")
+
+        # Add timestamp for audio/video
+        if self.timestamp_start is not None:
+            if self.timestamp_end is not None:
+                citation_parts.append(f"timestamp {self.timestamp_start:.1f}-{self.timestamp_end:.1f}s")
+            else:
+                citation_parts.append(f"timestamp {self.timestamp_start:.1f}s")
+
+        # Add topic header for audio/video
+        if self.topic_header:
+            citation_parts.append(f"topic '{self.topic_header}'")
+
+        # Add speaker if available
+        if self.speaker_label:
+            citation_parts.append(f"speaker {self.speaker_label}")
+
+        # Add chunk reference as fallback
+        if not citation_parts:
+            citation_parts.append(f"chunk {self.source_chunk_id}")
+
+        return " | ".join(citation_parts)
+
+    def get_machine_readable_source(self) -> str:
+        """Generate machine-readable source format for API responses.
+
+        Returns:
+            Machine-readable source string in format [filename:chunk_index:topic]
+        """
+        parts = []
+
+        # File name
+        if self.source_file_name:
+            parts.append(self.source_file_name)
+        elif self.source_file_path:
+            parts.append(Path(self.source_file_path).name)
+        else:
+            parts.append(self.source_document_id)
+
+        # Chunk or page reference
+        if self.page_number:
+            parts.append(f"page_{self.page_number}")
+        elif self.chapter_index is not None:
+            parts.append(f"chapter_{self.chapter_index}")
+        else:
+            # Extract chunk index from chunk_id if possible
+            chunk_parts = self.source_chunk_id.split('_')
+            if len(chunk_parts) > 1 and chunk_parts[-1].isdigit():
+                parts.append(f"chunk_{chunk_parts[-1]}")
+            else:
+                parts.append("chunk_0")
+
+        # Topic or timestamp
+        if self.topic_header:
+            parts.append(self.topic_header.replace(':', '_').replace(' ', '_'))
+        elif self.timestamp_start is not None:
+            parts.append(f"t_{int(self.timestamp_start)}")
+        else:
+            parts.append("content")
+
+        return "[" + ":".join(parts) + "]"
 
 
 class FactRelation(BaseModel):
