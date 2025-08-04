@@ -82,32 +82,28 @@ class FactValidator:
     
     def _check_completeness(self, fact: Fact) -> List[str]:
         """Check if fact has required components.
-        
+
         Args:
             fact: Fact to check
-            
+
         Returns:
             List of completeness issues
         """
         issues = []
-        
+
         if not fact.subject or not fact.subject.strip():
             issues.append("Missing or empty subject")
-        
+
         if not fact.object or not fact.object.strip():
             issues.append("Missing or empty object")
-        
-        # Require at least one of approach or solution for actionability
-        if not fact.approach and not fact.solution:
-            issues.append("Missing both approach and solution - fact lacks actionable information")
-        
+
         # Check minimum length requirements
         if fact.subject and len(fact.subject.strip()) < 3:
             issues.append("Subject too short (minimum 3 characters)")
-        
+
         if fact.object and len(fact.object.strip()) < 3:
             issues.append("Object too short (minimum 3 characters)")
-        
+
         return issues
     
     def _check_specificity(self, fact: Fact) -> List[str]:
@@ -207,20 +203,31 @@ class FactValidator:
             'hilft', 'reduziert', 'erhöht', 'stärkt', 'beruhigt', 'lindert'
         ]
         
-        combined_text = f"{fact.object}"
+        # Combine all text fields for checking
+        combined_text = f"{fact.subject} {fact.object}"
         if fact.approach:
             combined_text += f" {fact.approach}"
         if fact.solution:
             combined_text += f" {fact.solution}"
-        
+        if fact.remarks:
+            combined_text += f" {fact.remarks}"
+
         combined_lower = combined_text.lower()
+
+        # Check for actionable content - be more lenient
         has_actionable_content = any(
             indicator in combined_lower for indicator in actionable_indicators
         )
-        
-        if not has_actionable_content:
-            issues.append("Lacks actionable content - no clear methods, results, or procedures")
-        
+
+        # Also check if the fact has approach or solution fields filled
+        has_approach_or_solution = bool(fact.approach and fact.approach.strip()) or bool(fact.solution and fact.solution.strip())
+
+        # Accept fact if it has either actionable indicators OR approach/solution fields
+        if not has_actionable_content and not has_approach_or_solution:
+            # Only fail if the fact is very generic
+            if len(combined_text.strip()) < 30:
+                issues.append("Fact too brief and lacks actionable content")
+
         return issues
     
     def _check_meta_commentary(self, fact: Fact) -> List[str]:

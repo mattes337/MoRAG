@@ -1351,10 +1351,13 @@ class IngestionCoordinator:
                     document_id_stored, chunk_id_stored
                 )
 
-            # Store facts (if any)
+            # Store facts and create entities from them
             fact_ids = []
             facts_stored = 0
+            entities_from_facts = []
+            relations_from_facts = []
 
+            facts_to_process = []
             for fact_data in graph_data.get('facts', []):
                 # Convert fact data to Fact object if needed
                 if isinstance(fact_data, dict):
@@ -1362,17 +1365,41 @@ class IngestionCoordinator:
                     fact = Fact(**fact_data)
                 else:
                     fact = fact_data
+                facts_to_process.append(fact)
 
-                # Store fact in Neo4j (this would need to be implemented in Neo4jStorage)
-                # For now, we'll skip fact storage until Neo4j fact storage is implemented
-                # fact_id_stored = await neo4j_storage.store_fact(fact)
-                # fact_ids.append(fact_id_stored)
-                facts_stored += 1
+            if facts_to_process:
+                # Convert facts to entities and relationships
+                from morag_graph.extraction.fact_entity_converter import FactEntityConverter
+                converter = FactEntityConverter(domain=document_metadata.get('domain', 'general') if document_metadata else 'general')
+                entities_from_facts, relations_from_facts = converter.convert_facts_to_entities(facts_to_process)
 
-            # Store relationships (if any)
+                logger.info(f"Converted {len(facts_to_process)} facts to {len(entities_from_facts)} entities and {len(relations_from_facts)} relations")
+
+                # Store facts using FactOperations
+                from morag_graph.storage.neo4j_operations.fact_operations import FactOperations
+                fact_operations = FactOperations(neo4j_storage.driver, neo4j_storage.config.database)
+                fact_ids = await fact_operations.store_facts(facts_to_process)
+                facts_stored = len(fact_ids)
+
+                # Store entities from facts
+                if entities_from_facts:
+                    from morag_graph.operations.crud import GraphCRUD
+                    crud = GraphCRUD(neo4j_storage)
+                    await crud.bulk_create_entities(entities_from_facts)
+                    logger.info(f"Stored {len(entities_from_facts)} entities derived from facts")
+
+                # Store relations from facts
+                if relations_from_facts:
+                    from morag_graph.storage.neo4j_operations.relation_operations import RelationOperations
+                    relation_operations = RelationOperations(neo4j_storage.driver, neo4j_storage.config.database)
+                    await relation_operations.store_relations(relations_from_facts)
+                    logger.info(f"Stored {len(relations_from_facts)} relations derived from facts")
+
+            # Store fact relationships (if any)
             relationship_ids = []
             relationships_stored = 0
 
+            fact_relationships = []
             for relationship_data in graph_data.get('relationships', []):
                 # Convert relationship data to FactRelation object if needed
                 if isinstance(relationship_data, dict):
@@ -1380,12 +1407,15 @@ class IngestionCoordinator:
                     relationship = FactRelation(**relationship_data)
                 else:
                     relationship = relationship_data
+                fact_relationships.append(relationship)
 
-                # Store relationship in Neo4j (this would need to be implemented in Neo4jStorage)
-                # For now, we'll skip relationship storage until Neo4j fact storage is implemented
-                # relationship_id_stored = await neo4j_storage.store_fact_relation(relationship)
-                # relationship_ids.append(relationship_id_stored)
-                relationships_stored += 1
+            if fact_relationships:
+                # Store fact relationships using FactOperations
+                from morag_graph.storage.neo4j_operations.fact_operations import FactOperations
+                fact_operations = FactOperations(neo4j_storage.driver, neo4j_storage.config.database)
+                relationship_ids = await fact_operations.store_fact_relations(fact_relationships)
+                relationships_stored = len(relationship_ids)
+                logger.info(f"Stored {relationships_stored} fact relationships")
 
             # Create chunk-fact relationships using chunk_fact_mapping
             chunk_fact_mapping = graph_data.get('chunk_fact_mapping', {})

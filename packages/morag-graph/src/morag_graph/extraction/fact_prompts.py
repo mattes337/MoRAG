@@ -17,20 +17,23 @@ class FactExtractionPrompts:
         Returns:
             Formatted prompt for fact extraction
         """
-        return """You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information.
+        return """You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information that can be used independently to answer questions or solve problems.
 
 A fact should contain:
-- Subject: The main entity or concept the fact is about
-- Object: What is being described, studied, or acted upon
-- Approach: The method, technique, or way something is done (optional)
-- Solution: The result, outcome, or answer provided (optional)
-- Remarks: Important context, limitations, or qualifications (optional)
+- Subject: The main entity, substance, or concept the fact is about
+- Object: The specific condition, problem, or target being addressed
+- Approach: The specific method, dosage, technique, or procedure (include exact amounts, frequencies, durations)
+- Solution: The expected outcome, benefit, or result
+- Remarks: Important context, contraindications, warnings, or qualifications
 
-Extract only facts that are:
-1. Specific and actionable (not generic statements)
-2. Verifiable from the text
-3. Useful for answering questions
-4. Complete enough to stand alone
+FOCUS ON EXTRACTING:
+- Specific dosages, amounts, and frequencies (e.g., "120-240mg daily", "3-6 grams twice daily")
+- Exact procedures and methods (e.g., "standardized extract with 24% flavonglycosides")
+- Specific conditions and their treatments
+- Contraindications and safety warnings
+- Quality specifications and requirements
+
+Each fact must be SELF-CONTAINED and provide enough information to be actionable without needing the original text.
 
 Domain: """ + domain + """
 Language: """ + language + """
@@ -40,22 +43,23 @@ Text: {chunk_text}
 Respond with JSON array of facts:
 [
   {{
-    "subject": "specific subject",
-    "object": "what is being described",
-    "approach": "how it's done (optional)",
-    "solution": "outcome/result (optional)",
-    "remarks": "context/limitations (optional)",
-    "fact_type": "research|process|definition|causal|comparative|temporal|statistical|methodological",
+    "subject": "specific substance/entity",
+    "object": "specific condition/problem/target",
+    "approach": "exact method/dosage/procedure with specific details",
+    "solution": "specific outcome/benefit/result",
+    "remarks": "safety warnings/contraindications/context",
+    "fact_type": "process|definition|causal|methodological|safety",
     "confidence": 0.0-1.0,
-    "keywords": ["key", "terms"]
+    "keywords": ["domain-specific", "technical", "terms"]
   }}
 ]
 
 Important guidelines:
-- Only extract facts that are explicitly stated in the text
-- Do not infer or hallucinate information
-- Each fact must be self-contained and understandable without external context
-- Focus on actionable knowledge rather than generic descriptions
+- Prioritize facts with specific dosages, procedures, and actionable instructions
+- Include exact measurements, frequencies, and specifications
+- Extract safety warnings and contraindications as separate facts
+- Each fact should be usable as standalone guidance
+- Keywords should be domain-specific technical terms, not just words from subject/object
 - Ensure high confidence (>0.7) for extracted facts"""
 
     @staticmethod
@@ -150,25 +154,28 @@ Respond with JSON array:
     @staticmethod
     def get_keyword_extraction_prompt() -> str:
         """Get prompt for extracting keywords from facts.
-        
+
         Returns:
             Prompt for keyword extraction
         """
-        return """Extract relevant keywords from this fact for indexing and search:
+        return """Extract domain-specific technical keywords from this fact for indexing and search:
 
 Fact: {fact_json}
 
 Extract keywords that are:
-1. Specific and meaningful (not generic words)
-2. Useful for search and retrieval
-3. Representative of the fact's content
-4. Include technical terms, proper nouns, and key concepts
+1. Technical terms and scientific names (e.g., "ginsenosides", "flavonglycosides", "terpenlactones")
+2. Medical/therapeutic terms (e.g., "adaptogenic", "nootropic", "bioavailability")
+3. Measurement units and specifications (e.g., "standardized extract", "mg/kg", "bioactive compounds")
+4. Condition-specific terminology (e.g., "cognitive enhancement", "neuroprotective", "anxiolytic")
+5. NOT simple words from subject/object (avoid duplicating basic terms)
+
+Focus on terms that would help someone search for similar information or related facts.
 
 Respond with JSON:
 {
-  "keywords": ["keyword1", "keyword2", "keyword3"],
-  "primary_keywords": ["most_important", "keywords"],
-  "domain_keywords": ["domain_specific", "terms"]
+  "keywords": ["technical_term1", "scientific_name2", "therapeutic_class3"],
+  "primary_keywords": ["most_important", "for_search"],
+  "domain_keywords": ["highly_specific", "technical_terms"]
 }"""
 
     @staticmethod

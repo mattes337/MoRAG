@@ -82,8 +82,17 @@ class FactExtractor:
             return []
         
         # Update context from parameters
+        base_domain = context.get('domain', self.domain) if context else self.domain
+
+        # Infer domain from text if not explicitly provided or if it's 'general'
+        if base_domain == 'general':
+            inferred_domain = self._infer_domain_from_text(chunk_text)
+            if inferred_domain != 'general':
+                base_domain = inferred_domain
+                self.logger.info(f"Inferred domain '{inferred_domain}' from text content")
+
         extraction_context = {
-            'domain': context.get('domain', self.domain) if context else self.domain,
+            'domain': base_domain,
             'language': context.get('language', self.language) if context else self.language,
             'chunk_id': chunk_id,
             'document_id': document_id
@@ -190,7 +199,80 @@ class FactExtractor:
         text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', text)  # Images
         
         return text.strip()
-    
+
+    def _infer_domain_from_text(self, text: str) -> str:
+        """Infer domain from text content using keyword analysis.
+
+        Args:
+            text: Text to analyze for domain inference
+
+        Returns:
+            Inferred domain string
+        """
+        text_lower = text.lower()
+
+        # Medical/health keywords (English and German)
+        medical_keywords = [
+            # English terms
+            'patient', 'doctor', 'medical', 'health', 'disease', 'treatment', 'medication',
+            'symptom', 'diagnosis', 'therapy', 'clinical', 'hospital', 'medicine',
+            'toxin', 'detox', 'vitamin', 'mineral', 'supplement', 'enzyme', 'hormone',
+            'thyroid', 'mercury', 'aluminum', 'heavy metal', 'herb', 'herbal',
+            'adhd', 'attention', 'hyperactivity', 'concentration', 'focus',
+            'ginkgo', 'biloba', 'ginseng', 'rhodiola', 'chlorella', 'extract',
+            'dosage', 'standardized', 'bioavailability', 'cognitive', 'neurotransmitter',
+
+            # German terms
+            'patient', 'arzt', 'medizinisch', 'gesundheit', 'krankheit', 'behandlung', 'medikament',
+            'symptom', 'diagnose', 'therapie', 'klinisch', 'krankenhaus', 'medizin',
+            'toxin', 'entgiftung', 'vitamin', 'mineral', 'nahrungsergänzung', 'enzym', 'hormon',
+            'schilddrüse', 'quecksilber', 'aluminium', 'schwermetall', 'kraut', 'kräuter', 'pflanzlich',
+            'adhs', 'aufmerksamkeit', 'hyperaktivität', 'konzentration', 'fokus',
+            'ginkgo', 'biloba', 'ginseng', 'rhodiola', 'chlorella', 'extrakt',
+            'dosierung', 'standardisiert', 'bioverfügbarkeit', 'kognitiv', 'neurotransmitter',
+            'aufmerksamkeitsdefizit', 'hyperaktivitätsstörung', 'durchblutung', 'gehirn',
+            'flavonglykoside', 'terpenlactone', 'ginsenoside', 'adaptogen', 'beruhigend',
+            'nebenwirkungen', 'wechselwirkungen', 'kontraindikation', 'sicherheit'
+        ]
+
+        # Technical keywords
+        technical_keywords = [
+            'system', 'software', 'database', 'server', 'network', 'algorithm',
+            'programming', 'code', 'api', 'framework', 'technology', 'computer'
+        ]
+
+        # Legal keywords
+        legal_keywords = [
+            'law', 'legal', 'court', 'judge', 'lawyer', 'attorney', 'contract',
+            'agreement', 'regulation', 'compliance', 'statute', 'jurisdiction'
+        ]
+
+        # Business keywords
+        business_keywords = [
+            'business', 'company', 'corporation', 'market', 'sales', 'revenue',
+            'profit', 'customer', 'client', 'strategy', 'management', 'finance'
+        ]
+
+        # Count keyword matches
+        medical_score = sum(1 for keyword in medical_keywords if keyword in text_lower)
+        technical_score = sum(1 for keyword in technical_keywords if keyword in text_lower)
+        legal_score = sum(1 for keyword in legal_keywords if keyword in text_lower)
+        business_score = sum(1 for keyword in business_keywords if keyword in text_lower)
+
+        # Determine domain based on highest score
+        scores = {
+            'medical': medical_score,
+            'technical': technical_score,
+            'legal': legal_score,
+            'business': business_score
+        }
+
+        max_score = max(scores.values())
+        if max_score >= 3:  # Minimum threshold for domain inference
+            return max(scores, key=scores.get)
+
+        return 'general'  # Default to general if no clear domain
+
     async def _extract_fact_candidates(self, text: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Use LLM to extract fact candidates from text.
         

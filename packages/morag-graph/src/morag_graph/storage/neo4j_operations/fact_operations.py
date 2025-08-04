@@ -5,92 +5,93 @@ import structlog
 from neo4j import AsyncDriver
 
 from ...models.fact import Fact, FactRelation
+from .base_operations import BaseOperations
 
 
-class FactOperations:
+class FactOperations(BaseOperations):
     """Neo4j operations for fact management."""
-    
-    def __init__(self, driver: AsyncDriver):
-        """Initialize with Neo4j driver.
-        
+
+    def __init__(self, driver: AsyncDriver, database: str):
+        """Initialize with Neo4j driver and database.
+
         Args:
             driver: Neo4j async driver instance
+            database: Database name
         """
-        self.driver = driver
+        super().__init__(driver, database)
         self.logger = structlog.get_logger(__name__)
     
     async def store_fact(self, fact: Fact) -> str:
         """Store a fact in Neo4j.
-        
+
         Args:
             fact: Fact to store
-            
+
         Returns:
             Fact ID
         """
-        async with self.driver.session() as session:
-            query = """
-            MERGE (f:Fact {id: $id})
-            SET f += $properties
-            RETURN f.id as fact_id
-            """
-            
-            result = await session.run(
-                query,
-                id=fact.id,
-                properties=fact.get_neo4j_properties()
+        query = """
+        MERGE (f:Fact {id: $id})
+        SET f += $properties
+        RETURN f.id as fact_id
+        """
+
+        results = await self._execute_query(
+            query,
+            {
+                "id": fact.id,
+                "properties": fact.get_neo4j_properties()
+            }
+        )
+
+        if results:
+            self.logger.debug(
+                "Fact stored successfully",
+                fact_id=fact.id,
+                subject=fact.subject[:50] + "..." if len(fact.subject) > 50 else fact.subject
             )
-            
-            record = await result.single()
-            if record:
-                self.logger.debug(
-                    "Fact stored successfully",
-                    fact_id=fact.id,
-                    subject=fact.subject[:50] + "..." if len(fact.subject) > 50 else fact.subject
-                )
-                return record["fact_id"]
-            
-            raise RuntimeError(f"Failed to store fact {fact.id}")
+            return results[0]["fact_id"]
+
+        raise RuntimeError(f"Failed to store fact {fact.id}")
     
     async def store_facts(self, facts: List[Fact]) -> List[str]:
         """Store multiple facts in Neo4j.
-        
+
         Args:
             facts: List of facts to store
-            
+
         Returns:
             List of fact IDs
         """
         if not facts:
             return []
-        
-        async with self.driver.session() as session:
-            # Prepare batch data
-            fact_data = [
-                {
-                    'id': fact.id,
-                    'properties': fact.get_neo4j_properties()
-                }
-                for fact in facts
-            ]
-            
-            query = """
-            UNWIND $facts as fact_data
-            MERGE (f:Fact {id: fact_data.id})
-            SET f += fact_data.properties
-            RETURN f.id as fact_id
-            """
-            
-            result = await session.run(query, facts=fact_data)
-            fact_ids = [record["fact_id"] async for record in result]
-            
-            self.logger.info(
-                "Facts stored successfully",
-                num_facts=len(facts),
-                stored_ids=len(fact_ids)
-            )
-            
-            return fact_ids
+
+        # Prepare batch data
+        fact_data = [
+            {
+                'id': fact.id,
+                'properties': fact.get_neo4j_properties()
+            }
+            for fact in facts
+        ]
+
+        query = """
+        UNWIND $facts as fact_data
+        MERGE (f:Fact {id: fact_data.id})
+        SET f += fact_data.properties
+        RETURN f.id as fact_id
+        """
+
+        results = await self._execute_query(query, {"facts": fact_data})
+        fact_ids = [record["fact_id"] for record in results]
+
+        self.logger.info(
+            "Facts stored successfully",
+            num_facts=len(facts),
+            stored_ids=len(fact_ids)
+        )
+
+        return fact_ids
     
     async def store_fact_relation(self, relation: FactRelation) -> str:
         """Store a fact relationship in Neo4j.

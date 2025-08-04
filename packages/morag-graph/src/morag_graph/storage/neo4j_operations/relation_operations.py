@@ -25,9 +25,9 @@ class RelationOperations(BaseOperations):
         Returns:
             Relation ID
         """
-        # First ensure both entities exist
-        source_exists_query = "MATCH (e:Entity {id: $entity_id}) RETURN count(e) as count"
-        target_exists_query = "MATCH (e:Entity {id: $entity_id}) RETURN count(e) as count"
+        # First ensure both entities exist (match any label, not just Entity)
+        source_exists_query = "MATCH (e {id: $entity_id}) RETURN count(e) as count"
+        target_exists_query = "MATCH (e {id: $entity_id}) RETURN count(e) as count"
         
         source_result = await self._execute_query(source_exists_query, {"entity_id": relation.source_entity_id})
         target_result = await self._execute_query(target_exists_query, {"entity_id": relation.target_entity_id})
@@ -120,25 +120,10 @@ class RelationOperations(BaseOperations):
             attributes={"auto_created": True, "created_at": datetime.now().isoformat()}
         )
 
-        # Store the entity using a simple query
-        query = """
-        MERGE (e:Entity {id: $id})
-        SET e.name = $name,
-            e.type = $type,
-            e.confidence = $confidence,
-            e.metadata = $metadata,
-            e.created_at = coalesce(e.created_at, datetime()),
-            e.updated_at = datetime()
-        RETURN e.id as id
-        """
-
-        await self._execute_query(query, {
-            "id": entity.id,
-            "name": entity.name,
-            "type": entity.type,
-            "confidence": entity.confidence,
-            "metadata": json.dumps(entity.attributes) if entity.attributes else "{}"
-        })
+        # Store the entity using proper entity operations
+        from .entity_operations import EntityOperations
+        entity_ops = EntityOperations(self.driver, self.database)
+        await entity_ops.store_entity(entity)
 
         logger.info(f"Created missing entity: {entity.id} (name: {entity_name})")
         return entity.id  # Return the valid entity ID, not the original invalid one
@@ -168,7 +153,7 @@ class RelationOperations(BaseOperations):
             Relation or None if not found
         """
         query = """
-        MATCH (source:Entity)-[r:RELATION {id: $relation_id}]->(target:Entity)
+        MATCH (source)-[r:RELATION {id: $relation_id}]->(target)
         RETURN r, source.id as source_id, target.id as target_id
         """
         
@@ -207,7 +192,7 @@ class RelationOperations(BaseOperations):
             return []
         
         query = """
-        MATCH (source:Entity)-[r:RELATION]->(target:Entity)
+        MATCH (source)-[r:RELATION]->(target)
         WHERE r.id IN $relation_ids
         RETURN r, source.id as source_id, target.id as target_id
         """
@@ -256,13 +241,13 @@ class RelationOperations(BaseOperations):
         """
         # Build query based on direction
         if direction == "outgoing":
-            match_pattern = "(e:Entity {id: $entity_id})-[r:RELATION]->(target:Entity)"
+            match_pattern = "(e {id: $entity_id})-[r:RELATION]->(target)"
             return_pattern = "r, e.id as source_id, target.id as target_id"
         elif direction == "incoming":
-            match_pattern = "(source:Entity)-[r:RELATION]->(e:Entity {id: $entity_id})"
+            match_pattern = "(source)-[r:RELATION]->(e {id: $entity_id})"
             return_pattern = "r, source.id as source_id, e.id as target_id"
         else:  # both
-            match_pattern = "(e:Entity {id: $entity_id})-[r:RELATION]-(other:Entity)"
+            match_pattern = "(e {id: $entity_id})-[r:RELATION]-(other)"
             return_pattern = """r, 
                 CASE WHEN startNode(r).id = $entity_id 
                      THEN e.id 
@@ -315,7 +300,7 @@ class RelationOperations(BaseOperations):
             List of all relations
         """
         query = """
-        MATCH (source:Entity)-[r:RELATION]->(target:Entity)
+        MATCH (source)-[r:RELATION]->(target)
         RETURN r, source.id as source_id, target.id as target_id
         """
         
