@@ -18,18 +18,7 @@ try:
             """Placeholder BaseExtractor."""
             pass
 
-    # Placeholder classes for compatibility
-    class HybridRetrievalCoordinator:
-        """Placeholder for hybrid retrieval coordinator."""
-        pass
 
-    class ContextExpansionEngine:
-        """Placeholder for context expansion engine."""
-        pass
-
-    class QueryEntityExtractor:
-        """Placeholder for query entity extractor."""
-        pass
 
     __all__ = [
         "BaseExtractor",

@@ -139,33 +139,13 @@ class LLMEntityNormalizer:
         """Apply basic rule-based normalization."""
         normalized = entity_name.strip()
         
-        # Remove common prefixes and suffixes (language-agnostic)
-        prefixes_to_remove = [
-            # German
-            "normalem ", "reinem ", "natürlichem ", "synthetischem ",
-            "organischem ", "anorganischem ", "kolloidalem ",
-            # English
-            "normal ", "pure ", "natural ", "synthetic ",
-            "organic ", "inorganic ", "colloidal ",
-            # Common
-            "the ", "a ", "an "
-        ]
+        # Apply minimal normalization to preserve entity integrity
+        # Remove only basic articles that are clearly not part of entity names
+        basic_prefixes = ["the ", "a ", "an "]
 
-        suffixes_to_remove = [
-            " Pur", " Plus", " Extra", " Premium", " Pro", " Advanced",
-            " Pure", " Natural", " Organic", " Synthetic"
-        ]
-        
-        # Remove prefixes
-        for prefix in prefixes_to_remove:
+        for prefix in basic_prefixes:
             if normalized.lower().startswith(prefix.lower()):
                 normalized = normalized[len(prefix):].strip()
-                break
-        
-        # Remove suffixes
-        for suffix in suffixes_to_remove:
-            if normalized.lower().endswith(suffix.lower()):
-                normalized = normalized[:-len(suffix)].strip()
                 break
         
         # Capitalize first letter

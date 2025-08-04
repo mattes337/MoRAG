@@ -13,7 +13,6 @@ except ImportError:
     lx = None
 
 from ..models import Entity, Relation
-from .langextract_examples import LangExtractExamples, DomainRelationTypes
 from ..utils.retry_utils import retry_with_exponential_backoff
 from ..utils.quota_retry import never_fail_extraction, retry_with_quota_handling
 
@@ -79,10 +78,15 @@ class RelationExtractor:
     
     def _get_domain_relation_types(self, domain: str) -> Dict[str, str]:
         """Get relation types for the specified domain."""
-        domain_upper = domain.upper()
-        if hasattr(DomainRelationTypes, domain_upper):
-            return getattr(DomainRelationTypes, domain_upper)
-        return DomainRelationTypes.GENERAL
+        # Return generic relation types to avoid domain-specific bias
+        return {
+            "works_at": "Employment or affiliation relationship",
+            "located_in": "Geographic or spatial relationship",
+            "part_of": "Membership or component relationship",
+            "related_to": "General association or connection",
+            "created_by": "Authorship or creation relationship",
+            "used_for": "Purpose or function relationship"
+        }
     
     def _create_relation_prompt(self) -> str:
         """Create prompt for relation extraction."""
@@ -117,23 +121,23 @@ class RelationExtractor:
     
     def _create_relation_examples(self) -> List[Any]:
         """Create few-shot examples for relation extraction."""
-        try:
-            return LangExtractExamples.get_relation_examples(self.domain)
-        except Exception:
-            # Fallback to basic examples if domain examples fail
-            return [
-                lx.data.ExampleData(
-                    text="Dr. Sarah Johnson works as a researcher at Google in Mountain View, California.",
-                    extractions=[
-                        lx.data.Extraction(
-                            extraction_class="employment",
-                            extraction_text="Dr. Sarah Johnson works as a researcher at Google",
-                            attributes={
-                                "source_entity": "Dr. Sarah Johnson",
-                                "target_entity": "Google",
-                                "relationship_type": "WORKS_FOR",
-                                "role": "researcher"
-                            }
+        # Use minimal generic examples to avoid domain-specific bias
+        if not LANGEXTRACT_AVAILABLE:
+            return []
+
+        return [
+            lx.data.ExampleData(
+                text="The person works at the organization in the city.",
+                extractions=[
+                    lx.data.Extraction(
+                        extraction_class="employment",
+                        extraction_text="person works at organization",
+                        attributes={
+                            "source_entity": "person",
+                            "target_entity": "organization",
+                            "relationship_type": "WORKS_AT",
+                            "role": "employee"
+                        }
                         ),
                     ]
                 )
@@ -498,14 +502,10 @@ class RelationExtractor:
         """Apply basic normalization to entity name for matching."""
         normalized = entity_name.strip()
 
-        # Remove common German/English words that might cause mismatches
-        words_to_remove = [
-            'sich', 'zu', 'der', 'die', 'das', 'den', 'dem', 'des',
-            'the', 'a', 'an', 'to', 'of', 'for', 'with', 'by'
-        ]
-
+        # Use simple word splitting without language-specific filtering
+        # This avoids hardcoded language assumptions and preserves entity integrity
         words = normalized.split()
-        filtered_words = [word for word in words if word.lower() not in words_to_remove]
+        filtered_words = words
 
         if filtered_words:
             normalized = ' '.join(filtered_words)

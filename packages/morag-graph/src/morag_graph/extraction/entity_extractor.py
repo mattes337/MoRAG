@@ -13,7 +13,6 @@ except ImportError:
     lx = None
 
 from ..models import Entity
-from .langextract_examples import LangExtractExamples, DomainEntityTypes
 from .entity_normalizer import LLMEntityNormalizer
 from ..utils.retry_utils import retry_with_exponential_backoff
 from ..utils.quota_retry import never_fail_extraction, retry_with_quota_handling
@@ -88,10 +87,15 @@ class EntityExtractor:
     
     def _get_domain_entity_types(self, domain: str) -> Dict[str, str]:
         """Get entity types for the specified domain."""
-        domain_upper = domain.upper()
-        if hasattr(DomainEntityTypes, domain_upper):
-            return getattr(DomainEntityTypes, domain_upper)
-        return DomainEntityTypes.GENERAL
+        # Return generic entity types to avoid domain-specific bias
+        return {
+            "person": "Individual person or character",
+            "organization": "Company, institution, or group",
+            "location": "Place, city, country, or geographic location",
+            "concept": "Abstract idea, theory, or principle",
+            "object": "Physical item, tool, or artifact",
+            "event": "Occurrence, happening, or activity"
+        }
     
     def _create_entity_prompt(self) -> str:
         """Create prompt for entity extraction."""
@@ -126,32 +130,32 @@ class EntityExtractor:
     
     def _create_entity_examples(self) -> List[Any]:
         """Create few-shot examples for entity extraction."""
-        try:
-            return LangExtractExamples.get_entity_examples(self.domain)
-        except Exception:
-            # Fallback to basic examples if domain examples fail
-            return [
-                lx.data.ExampleData(
-                    text="Dr. Sarah Johnson works as a researcher at Google in Mountain View, California.",
-                    extractions=[
-                        lx.data.Extraction(
-                            extraction_class="person",
-                            extraction_text="Dr. Sarah Johnson",
-                            attributes={"title": "Dr.", "role": "researcher"}
-                        ),
-                        lx.data.Extraction(
-                            extraction_class="organization",
-                            extraction_text="Google",
-                            attributes={"type": "technology_company"}
-                        ),
-                        lx.data.Extraction(
-                            extraction_class="location",
-                            extraction_text="Mountain View",
-                            attributes={"type": "city", "state": "California"}
-                        ),
-                    ]
-                )
-            ]
+        # Use minimal generic examples to avoid domain-specific bias
+        if not LANGEXTRACT_AVAILABLE:
+            return []
+
+        return [
+            lx.data.ExampleData(
+                text="The researcher works at the organization in the city.",
+                extractions=[
+                    lx.data.Extraction(
+                        extraction_class="person",
+                        extraction_text="researcher",
+                        attributes={"role": "professional"}
+                    ),
+                    lx.data.Extraction(
+                        extraction_class="organization",
+                        extraction_text="organization",
+                        attributes={"type": "entity"}
+                    ),
+                    lx.data.Extraction(
+                        extraction_class="location",
+                        extraction_text="city",
+                        attributes={"type": "place"}
+                    ),
+                ]
+            )
+        ]
     
     async def extract(
         self,

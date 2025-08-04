@@ -205,33 +205,33 @@ class EnhancedDocumentProcessor:
 
 ## Implementation Examples
 
-### Example 1: Medical Document Analysis
+### Example 1: Generic Document Analysis
 ```python
-# LangExtract configuration for medical documents
-medical_examples = [
+# LangExtract configuration for generic documents
+generic_examples = [
     lx.data.ExampleData(
-        text="Patient presents with hypertension. Prescribed lisinopril 10mg daily.",
+        text="The person works at the organization in the city.",
         extractions=[
             lx.data.Extraction(
-                extraction_class="condition",
-                extraction_text="hypertension",
-                attributes={"severity": "unspecified", "status": "active"}
+                extraction_class="person",
+                extraction_text="person",
+                attributes={"role": "individual"}
             ),
             lx.data.Extraction(
-                extraction_class="medication",
-                extraction_text="lisinopril",
-                attributes={"dosage": "10mg", "frequency": "daily", "route": "oral"}
+                extraction_class="organization",
+                extraction_text="organization",
+                attributes={"type": "entity"}
             ),
             lx.data.Extraction(
-                extraction_class="treatment_relationship",
-                extraction_text="Prescribed lisinopril for hypertension",
-                attributes={"relationship_type": "treats", "confidence": "high"}
+                extraction_class="location",
+                extraction_text="city",
+                attributes={"type": "place"}
             )
         ]
     )
 ]
 
-class MedicalDocumentProcessor:
+class GenericDocumentProcessor:
     async def process(self, content: str) -> Dict[str, Any]:
         # Use LangExtract for rich medical entity extraction
         result = lx.extract(

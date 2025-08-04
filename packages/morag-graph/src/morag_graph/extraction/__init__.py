@@ -10,11 +10,3 @@ except ImportError:
     from .base import BaseExtractor, Entity, Relation, DummyExtractor
 
     __all__ = ["BaseExtractor", "Entity", "Relation", "DummyExtractor"]
-
-# All extraction is now handled by LangExtract
-# Old systems (OpenIE, SpaCy, Pattern Matching, Hybrid) have been removed
-
-__all__ = [
-    "EntityExtractor",
-    "RelationExtractor",
-]
