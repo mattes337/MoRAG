@@ -25,6 +25,8 @@ from .enhanced_query import (
     GraphPath,
     GraphTraversalResponse,
     GraphAnalyticsRequest,
+    FactInfo,
+    TraversalStepInfo,
 )
 
 
@@ -58,6 +60,8 @@ __all__ = [
     "GraphPath",
     "GraphTraversalResponse",
     "GraphAnalyticsRequest",
+    "FactInfo",
+    "TraversalStepInfo",
     # Legacy models temporarily removed
     # "LegacyQueryRequest",
     # "LegacyQueryResponse",

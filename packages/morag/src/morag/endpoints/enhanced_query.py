@@ -11,11 +11,13 @@ import structlog
 
 from morag.models.enhanced_query import (
     EnhancedQueryRequest, EnhancedQueryResponse, EntityQueryRequest,
-    GraphTraversalRequest, GraphTraversalResponse, GraphAnalyticsRequest
+    GraphTraversalRequest, GraphTraversalResponse, GraphAnalyticsRequest,
+    FactInfo, TraversalStepInfo, GraphContext
 )
 from morag.dependencies import (
     get_hybrid_retrieval_coordinator, get_graph_engine,
-    create_dynamic_graph_engine, create_dynamic_hybrid_retrieval_coordinator
+    create_dynamic_graph_engine, create_dynamic_hybrid_retrieval_coordinator,
+    get_recursive_fact_retrieval_service
 )
 from morag.utils.response_builder import EnhancedResponseBuilder
 from morag.utils.query_validator import QueryValidator
@@ -24,8 +26,139 @@ from morag.database_factory import (
     get_default_neo4j_storage, get_default_qdrant_storage
 )
 
+# Try to import fact retrieval models
+try:
+    from morag_reasoning import RecursiveFactRetrievalRequest
+    FACT_RETRIEVAL_AVAILABLE = True
+except ImportError:
+    FACT_RETRIEVAL_AVAILABLE = False
+    RecursiveFactRetrievalRequest = None
+
 router = APIRouter(prefix="/api/v2", tags=["enhanced-query"])
 logger = structlog.get_logger(__name__)
+
+
+async def _handle_fact_based_query(
+    request: EnhancedQueryRequest,
+    query_id: str,
+    start_time: datetime,
+    background_tasks: BackgroundTasks
+) -> EnhancedQueryResponse:
+    """Handle fact-based query using RecursiveFactRetrievalService."""
+    logger.info("Processing fact-based query",
+               query_id=query_id,
+               query=request.query[:100])
+
+    # Get fact retrieval service
+    fact_service = await get_recursive_fact_retrieval_service()
+    if not fact_service:
+        raise HTTPException(
+            status_code=503,
+            detail="Fact retrieval service not available"
+        )
+
+    # Create fact retrieval request
+    fact_request = RecursiveFactRetrievalRequest(
+        user_query=request.query,
+        max_depth=request.max_depth,
+        decay_rate=request.decay_rate,
+        max_facts_per_node=request.max_facts_per_node,
+        min_fact_score=request.min_fact_score,
+        max_total_facts=request.max_total_facts,
+        facts_only=request.facts_only,
+        skip_fact_evaluation=request.skip_fact_evaluation,
+        language=request.language
+    )
+
+    # Execute fact retrieval with timeout
+    try:
+        fact_response = await asyncio.wait_for(
+            fact_service.retrieve_facts_recursively(fact_request),
+            timeout=request.timeout_seconds
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=408,
+            detail=f"Query timeout after {request.timeout_seconds} seconds"
+        )
+
+    # Convert facts to FactInfo objects
+    facts = []
+    for fact in fact_response.final_facts:
+        fact_info = FactInfo(
+            fact_text=fact.fact_text,
+            source_node_id=fact.source_node_id,
+            source_property=fact.source_property,
+            source_qdrant_chunk_id=fact.source_qdrant_chunk_id,
+            source_metadata=fact.source_metadata,
+            extracted_from_depth=fact.extracted_from_depth,
+            score=fact.score,
+            final_decayed_score=fact.final_decayed_score,
+            source_description=fact.source_description
+        )
+        facts.append(fact_info)
+
+    # Convert traversal steps
+    traversal_steps = []
+    for step in fact_response.traversal_steps:
+        step_info = TraversalStepInfo(
+            node_id=step.node_id,
+            node_name=step.node_name,
+            depth=step.depth,
+            facts_extracted=step.facts_extracted,
+            next_nodes_decision=step.next_nodes_decision,
+            reasoning=step.reasoning
+        )
+        traversal_steps.append(step_info)
+
+    # Calculate processing time
+    processing_time = (datetime.now() - start_time).total_seconds() * 1000
+
+    # Create enhanced response with fact-based data
+    response = EnhancedQueryResponse(
+        query_id=query_id,
+        query=request.query,
+        results=[],  # Empty for fact-based queries
+        graph_context=GraphContext(
+            entities={},
+            relations=[],
+            expansion_path=[],
+            reasoning_steps=None
+        ),
+        total_results=len(facts),
+        processing_time_ms=processing_time,
+        fusion_strategy_used=request.fusion_strategy,
+        expansion_strategy_used=request.expansion_strategy,
+        confidence_score=fact_response.confidence_score,
+        completeness_score=0.8,  # Default completeness score
+        facts=facts,
+        final_answer=fact_response.final_answer,
+        initial_entities=fact_response.initial_entities,
+        total_nodes_explored=fact_response.total_nodes_explored,
+        max_depth_reached=fact_response.max_depth_reached,
+        traversal_steps=traversal_steps,
+        total_raw_facts=fact_response.total_raw_facts,
+        total_scored_facts=fact_response.total_scored_facts,
+        gta_llm_calls=fact_response.gta_llm_calls,
+        fca_llm_calls=fact_response.fca_llm_calls,
+        final_llm_calls=fact_response.final_llm_calls
+    )
+
+    # Log query for analytics (background task)
+    background_tasks.add_task(
+        log_query_analytics,
+        query_id=query_id,
+        request=request,
+        response=response,
+        processing_time=response.processing_time_ms
+    )
+
+    logger.info("Fact-based query completed",
+               query_id=query_id,
+               fact_count=len(facts),
+               processing_time_ms=processing_time)
+
+    return response
 
 
 @router.post("/query", response_model=EnhancedQueryResponse)
@@ -37,8 +170,12 @@ async def enhanced_query(
     """Enhanced query endpoint with graph-augmented retrieval."""
     query_id = str(uuid.uuid4())
     start_time = datetime.now()
-    
+
     try:
+        # Check if fact-based retrieval is requested and available
+        if request.use_fact_retrieval and FACT_RETRIEVAL_AVAILABLE:
+            return await _handle_fact_based_query(request, query_id, start_time, background_tasks)
+
         # Use dynamic database connections if provided
         if request.database_servers:
             hybrid_system = create_dynamic_hybrid_retrieval_coordinator(request.database_servers)
@@ -63,7 +200,7 @@ async def enhanced_query(
                    query_id=query_id,
                    query=request.query[:100],
                    query_type=request.query_type)
-        
+
         # Execute retrieval with timeout
         try:
             retrieval_result = await asyncio.wait_for(
@@ -78,18 +215,18 @@ async def enhanced_query(
                 status_code=408,
                 detail=f"Query timeout after {request.timeout_seconds} seconds"
             )
-        
+
         # Build response
         response_builder = EnhancedResponseBuilder()
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
-        
+
         response = await response_builder.build_response(
             query_id=query_id,
             request=request,
             retrieval_result=retrieval_result,
             processing_time=processing_time
         )
-        
+
         # Log query for analytics (background task)
         background_tasks.add_task(
             log_query_analytics,
@@ -98,19 +235,19 @@ async def enhanced_query(
             response=response,
             processing_time=response.processing_time_ms
         )
-        
-        logger.info("Enhanced query completed", 
+
+        logger.info("Enhanced query completed",
                    query_id=query_id,
                    result_count=len(response.results),
                    processing_time_ms=response.processing_time_ms)
-        
+
         return response
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error processing enhanced query", 
-                    query_id=query_id, 
+        logger.error("Error processing enhanced query",
+                    query_id=query_id,
                     error=str(e))
         raise HTTPException(
             status_code=500,

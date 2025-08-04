@@ -49,7 +49,8 @@ try:
     from morag.database_factory import get_default_neo4j_storage, get_default_qdrant_storage
     from morag_reasoning import (
         ReasoningStrategy, PathSelectionAgent, ReasoningPathFinder,
-        IterativeRetriever, LLMClient, LLMConfig
+        IterativeRetriever, LLMClient, LLMConfig,
+        RecursiveFactRetrievalService, RecursiveFactRetrievalRequest
     )
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
@@ -183,6 +184,125 @@ async def test_database_connections(args) -> tuple[Optional[Neo4jStorage], Optio
             print(f"[FAIL] Qdrant connection failed: {e}")
     
     return neo4j_storage, qdrant_storage
+
+
+async def execute_prompt_with_fact_retrieval(
+    prompt: str,
+    neo4j_storage: Optional[Neo4jStorage],
+    qdrant_storage: Optional[QdrantStorage],
+    args,
+    logger: PromptLogger
+) -> Dict[str, Any]:
+    """Execute prompt using the new fact-based retrieval system."""
+
+    results = {
+        "prompt": prompt,
+        "timestamp": datetime.now().isoformat(),
+        "method": "fact_retrieval",
+        "final_result": None,
+        "performance": {},
+        "facts": [],
+        "traversal_steps": [],
+        "metadata": {}
+    }
+
+    start_time = time.time()
+
+    # Initialize LLM client with logging
+    model = args.model or os.getenv("MORAG_GEMINI_MODEL", "gemini-2.5-flash")
+    llm_config = LLMConfig(
+        provider="gemini",
+        api_key=os.getenv("GEMINI_API_KEY"),
+        model=model,
+        temperature=0.1,
+        max_tokens=args.max_tokens
+    )
+
+    llm_client = LoggingLLMClient(llm_config, logger)
+
+    try:
+        logger.log_step("Fact-Based Retrieval", "Using RecursiveFactRetrievalService for comprehensive fact extraction")
+
+        # Create fact retrieval service
+        fact_service = RecursiveFactRetrievalService(
+            llm_client=llm_client,
+            neo4j_storage=neo4j_storage,
+            qdrant_storage=qdrant_storage,
+            stronger_llm_client=llm_client  # Use same client for now
+        )
+
+        # Create fact retrieval request
+        fact_request = RecursiveFactRetrievalRequest(
+            user_query=prompt,
+            max_depth=3,
+            decay_rate=0.2,
+            max_facts_per_node=5,
+            min_fact_score=0.1,
+            max_total_facts=50,
+            facts_only=False,  # Generate final answer
+            skip_fact_evaluation=False,
+            language="en"
+        )
+
+        # Execute fact retrieval
+        fact_response = await fact_service.retrieve_facts_recursively(fact_request)
+
+        # Process results
+        results["facts"] = [
+            {
+                "text": fact.fact_text,
+                "source_node": fact.source_node_id,
+                "source_property": fact.source_property,
+                "depth": fact.extracted_from_depth,
+                "score": fact.score,
+                "final_score": fact.final_decayed_score,
+                "source_description": fact.source_description,
+                "metadata": fact.source_metadata
+            }
+            for fact in fact_response.final_facts
+        ]
+
+        results["traversal_steps"] = [
+            {
+                "node_id": step.node_id,
+                "node_name": step.node_name,
+                "depth": step.depth,
+                "facts_extracted": step.facts_extracted,
+                "decision": step.next_nodes_decision,
+                "reasoning": step.reasoning
+            }
+            for step in fact_response.traversal_steps
+        ]
+
+        results["final_result"] = fact_response.final_answer
+        results["metadata"] = {
+            "query_id": fact_response.query_id,
+            "initial_entities": fact_response.initial_entities,
+            "total_nodes_explored": fact_response.total_nodes_explored,
+            "max_depth_reached": fact_response.max_depth_reached,
+            "total_raw_facts": fact_response.total_raw_facts,
+            "total_scored_facts": fact_response.total_scored_facts,
+            "confidence_score": fact_response.confidence_score,
+            "gta_llm_calls": fact_response.gta_llm_calls,
+            "fca_llm_calls": fact_response.fca_llm_calls,
+            "final_llm_calls": fact_response.final_llm_calls
+        }
+
+        # Calculate performance metrics
+        end_time = time.time()
+        results["performance"] = {
+            "total_time_seconds": end_time - start_time,
+            "processing_time_ms": fact_response.processing_time_ms,
+            "total_llm_calls": fact_response.gta_llm_calls + fact_response.fca_llm_calls + fact_response.final_llm_calls
+        }
+
+        return results
+
+    except Exception as e:
+        logger.log_step("Error", f"Fact retrieval failed: {str(e)}")
+        results["final_result"] = f"Error: {str(e)}"
+        results["performance"]["total_time_seconds"] = time.time() - start_time
+        return results
 
 
 async def execute_prompt_with_reasoning(
@@ -429,6 +549,7 @@ async def main():
         epilog="""Examples:
   python test-prompt.py --neo4j --qdrant "mit welchen lebensmitteln kann ich ADHS eindämmen?"
   python test-prompt.py --neo4j --enable-multi-hop --max-tokens 4000 "How are Apple's AI efforts connected to universities?"
+  python test-prompt.py --neo4j --qdrant --use-fact-retrieval "What are the latest developments in machine learning?"
   python test-prompt.py --qdrant --verbose --max-tokens 12000 "What are the latest developments in machine learning?"
   python test-prompt.py --neo4j --qdrant --model gemini-1.5-pro "Analyze complex relationships in the data"
 """
@@ -440,6 +561,7 @@ async def main():
     
     # Reasoning options
     parser.add_argument("--enable-multi-hop", action="store_true", help="Enable multi-hop reasoning")
+    parser.add_argument("--use-fact-retrieval", action="store_true", help="Use new fact-based retrieval system")
 
     # LLM options
     parser.add_argument("--model", type=str, help="LLM model to use (default: from MORAG_GEMINI_MODEL env var or gemini-2.5-flash)")
@@ -465,6 +587,7 @@ async def main():
     print(f"🚀 Testing prompt: '{args.prompt}'")
     print(f"📊 Databases: Neo4j={args.neo4j}, Qdrant={args.qdrant}")
     print(f"🧠 Multi-hop reasoning: {args.enable_multi_hop}")
+    print(f"🔬 Fact-based retrieval: {args.use_fact_retrieval}")
     print(f"🤖 Model: {args.model or os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.5-flash')}")
     print(f"🎯 Max tokens: {args.max_tokens}")
     
@@ -480,9 +603,17 @@ async def main():
     
     # Execute the prompt
     try:
-        results = await execute_prompt_with_reasoning(
-            args.prompt, neo4j_storage, qdrant_storage, args, logger
-        )
+        if args.use_fact_retrieval:
+            if not neo4j_storage or not qdrant_storage:
+                print("[FAIL] Fact-based retrieval requires both Neo4j and Qdrant connections")
+                return 1
+            results = await execute_prompt_with_fact_retrieval(
+                args.prompt, neo4j_storage, qdrant_storage, args, logger
+            )
+        else:
+            results = await execute_prompt_with_reasoning(
+                args.prompt, neo4j_storage, qdrant_storage, args, logger
+            )
         
         # Show final result
         print(f"\n{'='*80}")
@@ -498,7 +629,20 @@ async def main():
         print(f"\n📊 EXECUTION SUMMARY")
         print(f"   Total LLM interactions: {summary['total_prompts']}")
         print(f"   Processing time: {results.get('performance', {}).get('total_time_seconds', 0):.2f}s")
-        print(f"   Steps completed: {len(results.get('steps', []))}")
+
+        if args.use_fact_retrieval:
+            metadata = results.get('metadata', {})
+            print(f"   Method: Fact-based retrieval")
+            print(f"   Facts extracted: {len(results.get('facts', []))}")
+            print(f"   Nodes explored: {metadata.get('total_nodes_explored', 0)}")
+            print(f"   Max depth reached: {metadata.get('max_depth_reached', 0)}")
+            print(f"   Confidence score: {metadata.get('confidence_score', 0):.2f}")
+            print(f"   GTA LLM calls: {metadata.get('gta_llm_calls', 0)}")
+            print(f"   FCA LLM calls: {metadata.get('fca_llm_calls', 0)}")
+            print(f"   Final LLM calls: {metadata.get('final_llm_calls', 0)}")
+        else:
+            print(f"   Method: Traditional multi-hop reasoning")
+            print(f"   Steps completed: {len(results.get('steps', []))}")
         
         # Save results if requested
         if args.output:

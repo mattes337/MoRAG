@@ -10,8 +10,17 @@ import structlog
 
 from morag.dependencies import (
     get_reasoning_path_finder, get_iterative_retriever, get_llm_client,
-    REASONING_AVAILABLE, create_dynamic_graph_engine
+    REASONING_AVAILABLE, create_dynamic_graph_engine, get_recursive_fact_retrieval_service
 )
+
+# Try to import fact retrieval models
+try:
+    from morag_reasoning import RecursiveFactRetrievalRequest, RecursiveFactRetrievalResponse
+    FACT_RETRIEVAL_AVAILABLE = True
+except ImportError:
+    FACT_RETRIEVAL_AVAILABLE = False
+    RecursiveFactRetrievalRequest = None
+    RecursiveFactRetrievalResponse = None
 
 logger = structlog.get_logger(__name__)
 
@@ -277,3 +286,120 @@ async def get_reasoning_strategies():
     }
     
     return {"strategies": strategies}
+
+
+@router.post("/query/facts", response_model=RecursiveFactRetrievalResponse)
+async def fact_based_reasoning(
+    request: RecursiveFactRetrievalRequest
+):
+    """Perform fact-based multi-hop reasoning using the new graph structure.
+
+    This endpoint uses the RecursiveFactRetrievalService to:
+    1. Extract entities from the user query
+    2. Perform recursive graph traversal with fact extraction
+    3. Score and filter facts based on relevance
+    4. Generate a final synthesized answer
+    5. Return structured facts with source attribution
+    """
+    if not FACT_RETRIEVAL_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Fact-based reasoning not available. Please check fact retrieval components."
+        )
+
+    try:
+        logger.info("Starting fact-based reasoning",
+                   query=request.user_query,
+                   max_depth=request.max_depth)
+
+        # Get fact retrieval service
+        service = await get_recursive_fact_retrieval_service()
+        if not service:
+            raise HTTPException(
+                status_code=503,
+                detail="Recursive fact retrieval service not available"
+            )
+
+        # Perform fact-based reasoning
+        response = await service.retrieve_facts_recursively(request)
+
+        logger.info("Fact-based reasoning completed",
+                   query_id=response.query_id,
+                   total_facts=len(response.final_facts),
+                   processing_time_ms=response.processing_time_ms)
+
+        return response
+
+    except Exception as e:
+        logger.error("Fact-based reasoning failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    query=request.user_query)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Fact-based reasoning failed: {str(e)}"
+        )
+
+
+class FactBasedQuery(BaseModel):
+    """Simplified fact-based reasoning query request."""
+    query: str = Field(..., description="The query to answer using fact-based reasoning")
+    max_depth: int = Field(3, ge=1, le=10, description="Maximum traversal depth")
+    max_facts: int = Field(50, ge=1, le=500, description="Maximum total facts to collect")
+    facts_only: bool = Field(False, description="Return only facts without final answer synthesis")
+    language: str = Field("en", description="Language for fact extraction and processing")
+
+
+@router.post("/query/facts/simple")
+async def simple_fact_based_reasoning(
+    request: FactBasedQuery
+):
+    """Simplified fact-based reasoning endpoint with fewer parameters.
+
+    This is a convenience endpoint that uses sensible defaults for most parameters.
+    """
+    if not FACT_RETRIEVAL_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Fact-based reasoning not available. Please check fact retrieval components."
+        )
+
+    try:
+        # Convert to full fact retrieval request
+        fact_request = RecursiveFactRetrievalRequest(
+            user_query=request.query,
+            max_depth=request.max_depth,
+            decay_rate=0.2,
+            max_facts_per_node=5,
+            min_fact_score=0.1,
+            max_total_facts=request.max_facts,
+            facts_only=request.facts_only,
+            skip_fact_evaluation=False,
+            language=request.language
+        )
+
+        # Get fact retrieval service
+        service = await get_recursive_fact_retrieval_service()
+        if not service:
+            raise HTTPException(
+                status_code=503,
+                detail="Recursive fact retrieval service not available"
+            )
+
+        # Perform fact-based reasoning
+        response = await service.retrieve_facts_recursively(fact_request)
+
+        logger.info("Simple fact-based reasoning completed",
+                   query_id=response.query_id,
+                   total_facts=len(response.final_facts))
+
+        return response
+
+    except Exception as e:
+        logger.error("Simple fact-based reasoning failed",
+                    error=str(e),
+                    query=request.query)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Simple fact-based reasoning failed: {str(e)}"
+        )
