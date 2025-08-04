@@ -173,6 +173,34 @@ class FactOperations(BaseOperations):
             )
             
             return relation_ids
+
+    async def create_chunk_contains_fact_relation(self, chunk_id: str, fact_id: str, context: str = "") -> None:
+        """Create a CONTAINS relationship between a chunk and a fact.
+
+        Args:
+            chunk_id: ID of the chunk
+            fact_id: ID of the fact
+            context: Context in which the fact appears in the chunk
+        """
+        query = """
+        MATCH (c:DocumentChunk {id: $chunk_id}), (f:Fact {id: $fact_id})
+        MERGE (c)-[r:CONTAINS]->(f)
+        SET r.context = $context,
+            r.created_at = coalesce(r.created_at, datetime()),
+            r.updated_at = datetime()
+        RETURN c.id as chunk_id, f.id as fact_id
+        """
+
+        result = await self._execute_query(query, {
+            "chunk_id": chunk_id,
+            "fact_id": fact_id,
+            "context": context
+        })
+
+        if not result:
+            self.logger.warning(f"Failed to create chunk-fact relationship: chunk {chunk_id} or fact {fact_id} not found")
+        else:
+            self.logger.debug(f"Created CONTAINS relationship: chunk {chunk_id} -> fact {fact_id}")
     
     async def get_fact_by_id(self, fact_id: str) -> Optional[Fact]:
         """Retrieve a fact by ID.

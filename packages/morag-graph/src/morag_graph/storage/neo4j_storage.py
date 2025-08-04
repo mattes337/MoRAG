@@ -16,6 +16,7 @@ from .neo4j_operations import (
     DocumentOperations,
     EntityOperations,
     RelationOperations,
+    FactOperations,
     GraphOperations,
     QueryOperations
 )
@@ -60,6 +61,7 @@ class Neo4jStorage(BaseStorage):
         self._document_ops: Optional[DocumentOperations] = None
         self._entity_ops: Optional[EntityOperations] = None
         self._relation_ops: Optional[RelationOperations] = None
+        self._fact_ops: Optional[FactOperations] = None
         self._graph_ops: Optional[GraphOperations] = None
         self._query_ops: Optional[QueryOperations] = None
 
@@ -77,6 +79,7 @@ class Neo4jStorage(BaseStorage):
         self._document_ops = DocumentOperations(self.driver, self.config.database)
         self._entity_ops = EntityOperations(self.driver, self.config.database)
         self._relation_ops = RelationOperations(self.driver, self.config.database)
+        self._fact_ops = FactOperations(self.driver, self.config.database)
         self._graph_ops = GraphOperations(self.driver, self.config.database)
         self._query_ops = QueryOperations(self.driver, self.config.database)
 
@@ -93,6 +96,7 @@ class Neo4jStorage(BaseStorage):
             self._document_ops = None
             self._entity_ops = None
             self._relation_ops = None
+            self._fact_ops = None
             self._graph_ops = None
             self._query_ops = None
 
@@ -260,6 +264,12 @@ class Neo4jStorage(BaseStorage):
         if not self._entity_ops:
             raise RuntimeError("Connection not initialized")
         return await self._entity_ops.create_chunk_mentions_entity_relation(chunk_id, entity_id, context)
+
+    async def create_chunk_contains_fact_relation(self, chunk_id: str, fact_id: str, context: str = "") -> None:
+        """Create a CONTAINS relationship between a chunk and a fact."""
+        if not self._fact_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._fact_ops.create_chunk_contains_fact_relation(chunk_id, fact_id, context)
     
     async def fix_unconnected_entities(self) -> int:
         """DEPRECATED: Find and fix entities that are not connected to any chunks."""

@@ -603,8 +603,9 @@ class IngestionCoordinator:
                 try:
                     logger.debug(f"Processing chunk {i+1}/{len(chunks)} for fact extraction")
 
-                    # Create document chunk with metadata
-                    chunk_id = f"{document_id}_chunk_{i}"
+                    # Create document chunk with metadata using unified ID generator
+                    from morag_graph.utils.id_generation import UnifiedIDGenerator
+                    chunk_id = UnifiedIDGenerator.generate_chunk_id(document_id, i)
                     chunk_metadata = {
                         'source_file_path': source_path,
                         'source_file_name': Path(source_path).name if source_path else None,
@@ -1457,10 +1458,9 @@ class IngestionCoordinator:
                     # Create chunk -> CONTAINS -> fact relationships
                     for fact_id in fact_ids_in_chunk:
                         try:
-                            # For now, we'll skip creating chunk-fact relationships until Neo4j fact storage is implemented
-                            # await neo4j_storage.create_chunk_contains_fact_relation(chunk_id, fact_id, context)
+                            await neo4j_storage.create_chunk_contains_fact_relation(chunk_id, fact_id, context)
                             chunk_fact_relationships_created += 1
-                            logger.debug(f"Would create relationship: chunk {chunk_id} -> fact {fact_id}")
+                            logger.debug(f"Created relationship: chunk {chunk_id} -> fact {fact_id}")
 
                         except Exception as e:
                             logger.warning(f"Failed to create chunk-fact relationship: chunk {chunk_id} -> fact {fact_id}: {e}")
