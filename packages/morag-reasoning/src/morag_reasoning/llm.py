@@ -102,30 +102,47 @@ class LLMClient:
             return self.config.model
 
     async def generate(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         **kwargs
     ) -> str:
-        """Generate text from a prompt.
-        
+        """Generate text from a prompt with quota-aware retry.
+
         Args:
             prompt: Input prompt
             max_tokens: Maximum tokens to generate (overrides config)
             temperature: Temperature for generation (overrides config)
             **kwargs: Additional generation parameters
-            
+
         Returns:
             Generated text
-            
+
         Raises:
-            Exception: If generation fails
+            Exception: If generation fails after all retries
         """
-        messages = [{"role": "user", "content": prompt}]
-        return await self.generate_from_messages(
-            messages, max_tokens=max_tokens, temperature=temperature, **kwargs
-        )
+        try:
+            from morag_graph.utils.quota_retry import retry_with_quota_handling
+
+            async def generate_with_retry():
+                messages = [{"role": "user", "content": prompt}]
+                return await self.generate_from_messages(
+                    messages, max_tokens=max_tokens, temperature=temperature, **kwargs
+                )
+
+            return await retry_with_quota_handling(
+                generate_with_retry,
+                max_retries=15,
+                operation_name="text generation"
+            )
+
+        except ImportError:
+            # Fallback to original behavior if quota_retry is not available
+            messages = [{"role": "user", "content": prompt}]
+            return await self.generate_from_messages(
+                messages, max_tokens=max_tokens, temperature=temperature, **kwargs
+            )
     
     async def generate_from_messages(
         self,
@@ -620,7 +637,7 @@ RESPONSE 2:
             logger.info("LLM batching disabled, processing prompts individually")
             results = []
             for prompt in prompts:
-                response = await self.generate_text(prompt, max_tokens, temperature)
+                response = await self.generate(prompt, max_tokens, temperature)
                 results.append(response)
             return results
 
@@ -631,17 +648,27 @@ RESPONSE 2:
 
         all_results = []
 
-        # Process prompts in batches
+        # Process prompts in batches with quota-aware retry
         for i in range(0, len(prompts), effective_batch_size):
             batch_prompts = prompts[i:i + effective_batch_size]
+            batch_num = i//effective_batch_size + 1
 
             try:
-                batch_results = await self._process_batch(
-                    batch_prompts, max_tokens, temperature
+                # Use quota-aware retry for batch processing
+                from morag_graph.utils.quota_retry import retry_with_quota_handling
+
+                async def process_this_batch():
+                    return await self._process_batch(batch_prompts, max_tokens, temperature)
+
+                batch_results = await retry_with_quota_handling(
+                    process_this_batch,
+                    max_retries=15,  # More retries for quota issues
+                    operation_name=f"batch processing (batch {batch_num})"
                 )
+
                 all_results.extend(batch_results)
 
-                logger.debug(f"Processed batch {i//effective_batch_size + 1}, "
+                logger.debug(f"Processed batch {batch_num}, "
                            f"completed {len(all_results)}/{len(prompts)} prompts")
 
                 # Add delay between batches if not the last batch
@@ -649,14 +676,23 @@ RESPONSE 2:
                     await asyncio.sleep(self.config.batch_delay)
 
             except Exception as e:
-                logger.error(f"Batch processing failed for batch starting at index {i}: {str(e)}")
-                # Fall back to individual processing for this batch
-                for prompt in batch_prompts:
+                logger.error(f"Batch processing failed for batch {batch_num} after retries: {str(e)}")
+
+                # Fall back to individual processing with quota handling for this batch
+                for j, prompt in enumerate(batch_prompts):
                     try:
-                        response = await self.generate_text(prompt, max_tokens, temperature)
+                        async def process_individual():
+                            return await self.generate(prompt, max_tokens, temperature)
+
+                        response = await retry_with_quota_handling(
+                            process_individual,
+                            max_retries=10,
+                            operation_name=f"individual prompt (batch {batch_num}, item {j+1})"
+                        )
                         all_results.append(response)
+
                     except Exception as individual_error:
-                        logger.error(f"Individual prompt processing failed: {str(individual_error)}")
+                        logger.error(f"Individual prompt processing failed after retries: {str(individual_error)}")
                         all_results.append(f"Error: {str(individual_error)}")
 
         return all_results

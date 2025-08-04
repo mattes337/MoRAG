@@ -15,6 +15,7 @@ except ImportError:
 from ..models import Entity, Relation
 from .langextract_examples import LangExtractExamples, DomainRelationTypes
 from ..utils.retry_utils import retry_with_exponential_backoff
+from ..utils.quota_retry import never_fail_extraction, retry_with_quota_handling
 
 logger = structlog.get_logger(__name__)
 
@@ -162,28 +163,39 @@ class RelationExtractor:
             self.logger.warning("No API key found for LangExtract. Set LANGEXTRACT_API_KEY or GOOGLE_API_KEY.")
             return []
         
+        # Define the main extraction function
+        async def main_extraction():
+            return await asyncio.get_event_loop().run_in_executor(
+                self._executor,
+                self._extract_sync,
+                text,
+                source_doc_id
+            )
+
+        # Define fallback strategies that don't require API calls
+        fallback_strategies = [
+            lambda: self._create_basic_relations_from_entities(entities, text, source_doc_id),
+            lambda: self._create_minimal_relations_from_text(text, entities, source_doc_id)
+        ]
+
         try:
-            # Get retry configuration from settings
-            from morag_core.config import settings
-
-            # Define the extraction function with retry logic
-            async def extract_with_retry():
-                return await asyncio.get_event_loop().run_in_executor(
-                    self._executor,
-                    self._extract_sync,
-                    text,
-                    source_doc_id
-                )
-
-            # Run LangExtract with retry logic for API errors
-            result = await retry_with_exponential_backoff(
-                extract_with_retry,
-                max_retries=settings.entity_extraction_max_retries,
-                base_delay=settings.entity_extraction_retry_base_delay,
-                max_delay=settings.entity_extraction_retry_max_delay,
-                jitter=settings.retry_jitter,
+            # Use never-fail extraction with quota handling
+            result = await never_fail_extraction(
+                main_extraction,
+                fallback_strategies,
                 operation_name="relation extraction"
             )
+
+            # Handle empty result case
+            if not result or not hasattr(result, 'extractions'):
+                self.logger.warning(
+                    "Relation extraction returned empty result, using fallback relations",
+                    text_length=len(text),
+                    num_entities=len(entities) if entities else 0,
+                    source_doc_id=source_doc_id
+                )
+                # Return basic relations from entities
+                return self._create_basic_relations_from_entities(entities, text, source_doc_id)
 
             # Convert LangExtract results to MoRAG Relation objects
             relations = self._convert_to_relations(result, entities, source_doc_id)
@@ -204,15 +216,17 @@ class RelationExtractor:
             return relations
 
         except Exception as e:
+            # This should never happen with never_fail_extraction, but just in case
             self.logger.error(
-                "Relation extraction failed",
+                "Relation extraction failed completely, using emergency fallback",
                 error=str(e),
                 error_type=type(e).__name__,
                 text_length=len(text),
                 domain=self.domain,
                 component="langextract_relation_extractor"
             )
-            raise
+            # Return basic relations as last resort
+            return self._create_basic_relations_from_entities(entities, text, source_doc_id)
     
     def _extract_sync(self, text: str, source_doc_id: Optional[str]) -> Any:
         """Synchronous extraction using LangExtract with robust error handling."""
@@ -455,6 +469,152 @@ class RelationExtractor:
             entities = [entity_name.strip()]
 
         return entities
+
+    def _create_basic_relations_from_entities(
+        self,
+        entities: Optional[List[Entity]],
+        text: str,
+        source_doc_id: Optional[str]
+    ) -> List[Relation]:
+        """Create basic relations from entities using simple patterns (no API calls).
+
+        This is a fallback method that creates relations using basic patterns
+        when API calls fail due to quota exhaustion.
+        """
+        relations = []
+
+        if not entities or len(entities) < 2:
+            return relations
+
+        try:
+            import re
+
+            # Basic relation patterns
+            relation_patterns = [
+                (r'(\w+(?:\s+\w+)*)\s+(?:works?\s+(?:at|for)|is\s+employed\s+by)\s+(\w+(?:\s+\w+)*)', 'WORKS_FOR'),
+                (r'(\w+(?:\s+\w+)*)\s+(?:founded|established|created)\s+(\w+(?:\s+\w+)*)', 'FOUNDED'),
+                (r'(\w+(?:\s+\w+)*)\s+(?:owns|possesses)\s+(\w+(?:\s+\w+)*)', 'OWNS'),
+                (r'(\w+(?:\s+\w+)*)\s+(?:manages|leads|heads)\s+(\w+(?:\s+\w+)*)', 'MANAGES'),
+                (r'(\w+(?:\s+\w+)*)\s+(?:is\s+located\s+in|is\s+based\s+in)\s+(\w+(?:\s+\w+)*)', 'LOCATED_IN'),
+                (r'(\w+(?:\s+\w+)*)\s+(?:collaborates?\s+with|partners?\s+with)\s+(\w+(?:\s+\w+)*)', 'COLLABORATES_WITH'),
+            ]
+
+            # Create entity name lookup
+            entity_names = {entity.name.lower(): entity for entity in entities}
+
+            for pattern, relation_type in relation_patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    source_name = match.group(1).strip()
+                    target_name = match.group(2).strip()
+
+                    # Check if both entities exist in our entity list
+                    source_entity = entity_names.get(source_name.lower())
+                    target_entity = entity_names.get(target_name.lower())
+
+                    if source_entity and target_entity:
+                        relation = Relation(
+                            source_entity_id=source_entity.id,
+                            target_entity_id=target_entity.id,
+                            type=relation_type,
+                            context=match.group(0),
+                            confidence=0.3,  # Low confidence for pattern-based extraction
+                            source_doc_id=source_doc_id,
+                            attributes={
+                                "extraction_method": "pattern_fallback",
+                                "pattern": pattern,
+                                "position": match.start()
+                            }
+                        )
+                        relations.append(relation)
+
+            # If no pattern-based relations found, create proximity-based relations
+            if not relations and len(entities) >= 2:
+                # Create relations between entities that appear close to each other
+                for i, entity1 in enumerate(entities[:5]):  # Limit to first 5 entities
+                    for entity2 in entities[i+1:i+3]:  # Connect to next 2 entities
+                        relation = Relation(
+                            source_entity_id=entity1.id,
+                            target_entity_id=entity2.id,
+                            type="MENTIONED_WITH",
+                            context=f"{entity1.name} and {entity2.name} mentioned together",
+                            confidence=0.2,  # Very low confidence
+                            source_doc_id=source_doc_id,
+                            attributes={
+                                "extraction_method": "proximity_fallback",
+                                "note": "Entities mentioned in proximity"
+                            }
+                        )
+                        relations.append(relation)
+
+            self.logger.info(
+                "Created basic relations using pattern matching",
+                relations_found=len(relations),
+                num_entities=len(entities),
+                text_length=len(text),
+                source_doc_id=source_doc_id
+            )
+
+            return relations[:10]  # Limit to 10 relations
+
+        except Exception as e:
+            self.logger.warning(
+                "Pattern-based relation extraction failed",
+                error=str(e),
+                text_length=len(text)
+            )
+            return []
+
+    def _create_minimal_relations_from_text(
+        self,
+        text: str,
+        entities: Optional[List[Entity]],
+        source_doc_id: Optional[str]
+    ) -> List[Relation]:
+        """Create minimal relations from text (absolute fallback).
+
+        This is the most basic fallback that creates simple co-occurrence relations.
+        """
+        relations = []
+
+        if not entities or len(entities) < 2:
+            return relations
+
+        try:
+            # Create simple co-occurrence relations between first few entities
+            for i, entity1 in enumerate(entities[:3]):  # Limit to first 3 entities
+                for entity2 in entities[i+1:i+2]:  # Connect to next entity only
+                    relation = Relation(
+                        source_entity_id=entity1.id,
+                        target_entity_id=entity2.id,
+                        type="CO_OCCURS_WITH",
+                        context=f"Co-occurrence in document",
+                        confidence=0.1,  # Very low confidence
+                        source_doc_id=source_doc_id,
+                        attributes={
+                            "extraction_method": "minimal_fallback",
+                            "note": "Basic co-occurrence relation"
+                        }
+                    )
+                    relations.append(relation)
+
+            self.logger.info(
+                "Created minimal co-occurrence relations",
+                relations_found=len(relations),
+                num_entities=len(entities),
+                text_length=len(text),
+                source_doc_id=source_doc_id
+            )
+
+            return relations
+
+        except Exception as e:
+            self.logger.warning(
+                "Minimal relation extraction failed",
+                error=str(e),
+                text_length=len(text)
+            )
+            return []
 
 
     def get_system_prompt(self) -> str:

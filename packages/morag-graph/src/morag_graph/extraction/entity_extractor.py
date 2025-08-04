@@ -16,6 +16,7 @@ from ..models import Entity
 from .langextract_examples import LangExtractExamples, DomainEntityTypes
 from .entity_normalizer import LLMEntityNormalizer
 from ..utils.retry_utils import retry_with_exponential_backoff
+from ..utils.quota_retry import never_fail_extraction, retry_with_quota_handling
 
 logger = structlog.get_logger(__name__)
 
@@ -184,28 +185,38 @@ class EntityExtractor:
                 current_domain = inferred_domain
                 self.logger.info(f"Inferred domain '{inferred_domain}' from text content")
 
+        # Define the main extraction function
+        async def main_extraction():
+            return await asyncio.get_event_loop().run_in_executor(
+                self._executor,
+                self._extract_sync,
+                text,
+                source_doc_id
+            )
+
+        # Define fallback strategies that don't require API calls
+        fallback_strategies = [
+            lambda: self._create_basic_entities_from_text(text, source_doc_id),
+            lambda: self._create_minimal_entities_from_text(text, source_doc_id)
+        ]
+
         try:
-            # Get retry configuration from settings
-            from morag_core.config import settings
-
-            # Define the extraction function with retry logic
-            async def extract_with_retry():
-                return await asyncio.get_event_loop().run_in_executor(
-                    self._executor,
-                    self._extract_sync,
-                    text,
-                    source_doc_id
-                )
-
-            # Run LangExtract with retry logic for API errors
-            result = await retry_with_exponential_backoff(
-                extract_with_retry,
-                max_retries=settings.entity_extraction_max_retries,
-                base_delay=settings.entity_extraction_retry_base_delay,
-                max_delay=settings.entity_extraction_retry_max_delay,
-                jitter=settings.retry_jitter,
+            # Use never-fail extraction with quota handling
+            result = await never_fail_extraction(
+                main_extraction,
+                fallback_strategies,
                 operation_name="entity extraction"
             )
+
+            # Handle empty result case
+            if not result or not hasattr(result, 'extractions'):
+                self.logger.warning(
+                    "Entity extraction returned empty result, using fallback entities",
+                    text_length=len(text),
+                    source_doc_id=source_doc_id
+                )
+                # Return basic entities extracted from text patterns
+                return self._create_basic_entities_from_text(text, source_doc_id)
 
             # Convert LangExtract results to MoRAG Entity objects
             entities = await self._convert_to_entities_async(result, source_doc_id)
@@ -225,15 +236,17 @@ class EntityExtractor:
             return entities
 
         except Exception as e:
+            # This should never happen with never_fail_extraction, but just in case
             self.logger.error(
-                "Entity extraction failed",
+                "Entity extraction failed completely, using emergency fallback",
                 error=str(e),
                 error_type=type(e).__name__,
                 text_length=len(text),
                 domain=self.domain,
                 component="langextract_entity_extractor"
             )
-            raise
+            # Return basic entities as last resort
+            return self._create_basic_entities_from_text(text, source_doc_id)
     
     def _extract_sync(self, text: str, source_doc_id: Optional[str]) -> Any:
         """Synchronous extraction using LangExtract with robust error handling."""
@@ -581,6 +594,143 @@ class EntityExtractor:
         """Legacy method for compatibility - LangExtract handles normalization internally."""
         # LangExtract handles normalization internally, so just return entities as-is
         return entities
+
+    def _create_basic_entities_from_text(self, text: str, source_doc_id: Optional[str]) -> List[Entity]:
+        """Create basic entities using simple text patterns (no API calls).
+
+        This is a fallback method that extracts entities using basic patterns
+        when API calls fail due to quota exhaustion.
+        """
+        entities = []
+
+        try:
+            import re
+
+            # Basic patterns for common entity types
+            patterns = {
+                "PERSON": [
+                    r'\b[A-Z][a-z]+ [A-Z][a-z]+\b',  # First Last
+                    r'\bDr\. [A-Z][a-z]+ [A-Z][a-z]+\b',  # Dr. First Last
+                    r'\bProf\. [A-Z][a-z]+ [A-Z][a-z]+\b',  # Prof. First Last
+                ],
+                "ORGANIZATION": [
+                    r'\b[A-Z][a-z]+ Inc\.\b',  # Company Inc.
+                    r'\b[A-Z][a-z]+ Corp\.\b',  # Company Corp.
+                    r'\b[A-Z][a-z]+ Ltd\.\b',  # Company Ltd.
+                    r'\b[A-Z][a-z]+ GmbH\b',  # Company GmbH
+                    r'\b[A-Z][a-z]+ AG\b',  # Company AG
+                ],
+                "LOCATION": [
+                    r'\b[A-Z][a-z]+, [A-Z][a-z]+\b',  # City, State
+                    r'\b[A-Z][a-z]+ University\b',  # University names
+                ],
+                "CONCEPT": [
+                    r'\b[A-Z]{2,}\b',  # Acronyms
+                    r'\b[A-Z][a-z]+ [A-Z][a-z]+ [A-Z][a-z]+\b',  # Three-word concepts
+                ]
+            }
+
+            for entity_type, type_patterns in patterns.items():
+                for pattern in type_patterns:
+                    matches = re.finditer(pattern, text)
+                    for match in matches:
+                        entity_name = match.group().strip()
+                        if len(entity_name) > 2:  # Skip very short matches
+                            entity = Entity(
+                                name=entity_name,
+                                type=entity_type,
+                                confidence=0.3,  # Low confidence for pattern-based extraction
+                                source_doc_id=source_doc_id,
+                                attributes={
+                                    "extraction_method": "pattern_fallback",
+                                    "pattern": pattern,
+                                    "position": match.start()
+                                }
+                            )
+                            entities.append(entity)
+
+            # Remove duplicates
+            seen_names = set()
+            unique_entities = []
+            for entity in entities:
+                if entity.name not in seen_names:
+                    seen_names.add(entity.name)
+                    unique_entities.append(entity)
+
+            self.logger.info(
+                "Created basic entities using pattern matching",
+                entities_found=len(unique_entities),
+                text_length=len(text),
+                source_doc_id=source_doc_id
+            )
+
+            return unique_entities[:20]  # Limit to 20 entities
+
+        except Exception as e:
+            self.logger.warning(
+                "Pattern-based entity extraction failed",
+                error=str(e),
+                text_length=len(text)
+            )
+            return []
+
+    def _create_minimal_entities_from_text(self, text: str, source_doc_id: Optional[str]) -> List[Entity]:
+        """Create minimal entities from capitalized words (absolute fallback).
+
+        This is the most basic fallback that just extracts capitalized words.
+        """
+        entities = []
+
+        try:
+            import re
+
+            # Extract capitalized words (potential proper nouns)
+            capitalized_words = re.findall(r'\b[A-Z][a-z]{2,}\b', text)
+
+            # Filter out common words
+            common_words = {
+                'The', 'This', 'That', 'These', 'Those', 'And', 'But', 'Or', 'So',
+                'When', 'Where', 'Why', 'How', 'What', 'Who', 'Which', 'While',
+                'After', 'Before', 'During', 'Since', 'Until', 'Because', 'Although'
+            }
+
+            unique_words = []
+            seen = set()
+            for word in capitalized_words:
+                if word not in common_words and word not in seen and len(word) > 2:
+                    seen.add(word)
+                    unique_words.append(word)
+
+            # Create entities from unique capitalized words
+            for word in unique_words[:10]:  # Limit to 10
+                entity = Entity(
+                    name=word,
+                    type="UNKNOWN",
+                    confidence=0.1,  # Very low confidence
+                    source_doc_id=source_doc_id,
+                    attributes={
+                        "extraction_method": "minimal_fallback",
+                        "note": "Extracted from capitalized words"
+                    }
+                )
+                entities.append(entity)
+
+            self.logger.info(
+                "Created minimal entities from capitalized words",
+                entities_found=len(entities),
+                text_length=len(text),
+                source_doc_id=source_doc_id
+            )
+
+            return entities
+
+        except Exception as e:
+            self.logger.warning(
+                "Minimal entity extraction failed",
+                error=str(e),
+                text_length=len(text)
+            )
+            return []
     
     async def __aenter__(self):
         """Async context manager entry."""
