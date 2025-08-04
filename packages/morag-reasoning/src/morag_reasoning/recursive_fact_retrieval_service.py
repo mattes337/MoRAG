@@ -15,8 +15,10 @@ from morag_reasoning.recursive_fact_models import (
 from morag_reasoning.graph_traversal_agent import GraphTraversalAgent
 from morag_reasoning.fact_critic_agent import FactCriticAgent
 from morag_reasoning.entity_identification import EntityIdentificationService
+from morag_reasoning.enhanced_fact_extraction import EnhancedFactExtractionService
 from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_graph.storage.qdrant_storage import QdrantStorage
+from morag_services.embedding import GeminiEmbeddingService
 
 
 class RecursiveFactRetrievalService:
@@ -27,19 +29,22 @@ class RecursiveFactRetrievalService:
         llm_client: LLMClient,
         neo4j_storage: Neo4jStorage,
         qdrant_storage: QdrantStorage,
+        embedding_service: Optional[GeminiEmbeddingService] = None,
         stronger_llm_client: Optional[LLMClient] = None
     ):
         """Initialize the recursive fact retrieval service.
-        
+
         Args:
             llm_client: LLM client for GTA and FCA operations
             neo4j_storage: Neo4j storage for graph operations
             qdrant_storage: Qdrant storage for vector operations
+            embedding_service: Embedding service for vector similarity search
             stronger_llm_client: Optional stronger LLM for final synthesis
         """
         self.llm_client = llm_client
         self.neo4j_storage = neo4j_storage
         self.qdrant_storage = qdrant_storage
+        self.embedding_service = embedding_service
         self.stronger_llm_client = stronger_llm_client or llm_client
         self.logger = structlog.get_logger(__name__)
         
@@ -78,10 +83,11 @@ class RecursiveFactRetrievalService:
         )
         
         try:
-            # Initialize request-specific services with language parameter
+            # Initialize request-specific services with language parameter and embedding support
             self.entity_service = EntityIdentificationService(
                 llm_client=self.llm_client,
                 graph_storage=self.neo4j_storage,
+                embedding_service=self.embedding_service,
                 min_confidence=0.2,
                 max_entities=20,
                 language=request.language
@@ -91,7 +97,15 @@ class RecursiveFactRetrievalService:
                 llm_client=self.llm_client,
                 neo4j_storage=self.neo4j_storage,
                 qdrant_storage=self.qdrant_storage,
+                embedding_service=self.embedding_service,
                 max_facts_per_node=request.max_facts_per_node
+            )
+
+            # Initialize enhanced fact extraction service
+            self.enhanced_fact_service = EnhancedFactExtractionService(
+                llm_client=self.llm_client,
+                neo4j_storage=self.neo4j_storage,
+                embedding_service=self.embedding_service
             )
 
             # Step 1: Extract initial entities from user query
@@ -276,7 +290,15 @@ class RecursiveFactRetrievalService:
             max_depth_reached = max(max_depth_reached, current_depth)
 
             try:
-                # Extract facts from DocumentChunks related to these entities
+                # Extract facts using enhanced fact extraction (combines graph + vector search)
+                enhanced_facts = await self.enhanced_fact_service.extract_facts_for_query(
+                    user_query=request.user_query,
+                    entity_names=new_entities,
+                    max_facts=request.max_facts_per_node,
+                    language=request.language
+                )
+
+                # Also extract facts from DocumentChunks (existing approach) for comparison
                 gta_response = await self.graph_traversal_agent.extract_facts_from_entity_chunks(
                     user_query=request.user_query,
                     entity_names=new_entities,
@@ -284,19 +306,22 @@ class RecursiveFactRetrievalService:
                     language=request.language
                 )
 
+                # Combine enhanced facts with GTA facts
+                combined_facts = enhanced_facts + gta_response.extracted_facts
+
                 # Record traversal step
                 step = TraversalStep(
                     node_id=f"entities_depth_{current_depth}",  # Use a descriptive ID
                     node_name=f"Entities: {', '.join(new_entities[:3])}{'...' if len(new_entities) > 3 else ''}",
                     depth=current_depth,
-                    facts_extracted=len(gta_response.extracted_facts),
+                    facts_extracted=len(combined_facts),
                     next_nodes_decision=gta_response.next_nodes_to_explore,
-                    reasoning=gta_response.reasoning
+                    reasoning=f"Enhanced extraction: {len(enhanced_facts)} facts, GTA: {len(gta_response.extracted_facts)} facts. {gta_response.reasoning}"
                 )
                 traversal_steps.append(step)
 
                 # Collect facts
-                all_raw_facts.extend(gta_response.extracted_facts)
+                all_raw_facts.extend(combined_facts)
 
                 # Plan next traversal - parse entity names from response
                 if gta_response.next_nodes_to_explore not in ["STOP_TRAVERSAL", "NONE"]:

@@ -10,6 +10,7 @@ from morag_reasoning.llm import LLMClient
 from morag_reasoning.recursive_fact_models import RawFact, GTAResponse
 from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_graph.storage.qdrant_storage import QdrantStorage
+from morag_services.embedding import GeminiEmbeddingService
 
 
 class NodeContext(BaseModel):
@@ -28,19 +29,22 @@ class GraphTraversalAgent:
         llm_client: LLMClient,
         neo4j_storage: Neo4jStorage,
         qdrant_storage: QdrantStorage,
+        embedding_service: Optional[GeminiEmbeddingService] = None,
         max_facts_per_node: int = 5
     ):
         """Initialize the GraphTraversalAgent.
-        
+
         Args:
             llm_client: LLM client for AI operations
             neo4j_storage: Neo4j storage for graph operations
             qdrant_storage: Qdrant storage for vector operations
+            embedding_service: Embedding service for vector similarity search
             max_facts_per_node: Maximum facts to extract per node
         """
         self.llm_client = llm_client
         self.neo4j_storage = neo4j_storage
         self.qdrant_storage = qdrant_storage
+        self.embedding_service = embedding_service
         self.max_facts_per_node = max_facts_per_node
         self.logger = structlog.get_logger(__name__)
         
@@ -124,7 +128,7 @@ Be generous in extracting information - anything related to the user's query is 
             return []
 
     async def _get_related_entity_names(self, entity_names: List[str]) -> List[str]:
-        """Get names of entities related to the given entities through graph relationships.
+        """Get names of entities related to the given entities using both graph relationships and vector similarity.
 
         Args:
             entity_names: List of entity names to find related entities for
@@ -133,8 +137,7 @@ Be generous in extracting information - anything related to the user's query is 
             List of related entity names
         """
         try:
-            # Don't filter by static types - let LLM decide which paths to follow
-            # Find all entities connected to our target entities through any relationship
+            # First, find entities connected through graph relationships
             query = """
             MATCH (e1)-[r]-(e2)
             WHERE e1.name IN $entity_names
@@ -145,10 +148,25 @@ Be generous in extracting information - anything related to the user's query is 
             """
 
             result = await self.neo4j_storage._execute_query(query, {"entity_names": entity_names})
-            related_names = [record["related_entity_name"] for record in result]
+            graph_related_names = [record["related_entity_name"] for record in result]
 
-            self.logger.debug(f"Found {len(related_names)} related entities for: {entity_names}")
-            return related_names
+            # If we have embedding service, also find semantically similar entities
+            vector_related_names = []
+            if self.embedding_service:
+                vector_related_names = await self._find_vector_related_entities(entity_names)
+
+            # Combine and deduplicate results
+            all_related_names = list(set(graph_related_names + vector_related_names))
+
+            self.logger.debug(
+                "Found related entities",
+                entity_names=entity_names,
+                graph_related=len(graph_related_names),
+                vector_related=len(vector_related_names),
+                total_unique=len(all_related_names)
+            )
+
+            return all_related_names
 
         except Exception as e:
             self.logger.error("Failed to get related entity names",
@@ -422,3 +440,60 @@ Remember: Extract EVERYTHING useful - the more facts the better!"""
             prompt += f"\n\nIMPORTANT: Extract facts in {language_name} ({language}). All fact text must be in {language_name}."
 
         return prompt
+
+    async def _find_vector_related_entities(self, entity_names: List[str]) -> List[str]:
+        """Find entities related through vector similarity.
+
+        Args:
+            entity_names: List of entity names to find similar entities for
+
+        Returns:
+            List of related entity names found through vector similarity
+        """
+        if not self.embedding_service:
+            return []
+
+        try:
+            from morag_graph.services.entity_embedding_service import EntityEmbeddingService
+
+            entity_embedding_service = EntityEmbeddingService(
+                self.neo4j_storage, self.embedding_service
+            )
+
+            all_similar_names = []
+
+            # For each entity, find similar entities
+            for entity_name in entity_names:
+                # Generate embedding for the entity
+                query_embedding = await self.embedding_service.generate_embedding(
+                    entity_name, task_type="retrieval_query"
+                )
+
+                # Find similar entities
+                similar_entities = await entity_embedding_service.search_similar_entities(
+                    query_embedding, limit=10, similarity_threshold=0.3
+                )
+
+                # Extract names, excluding the original entity
+                for similar in similar_entities:
+                    if similar['name'] not in entity_names:
+                        all_similar_names.append(similar['name'])
+
+            # Remove duplicates and return
+            unique_similar_names = list(set(all_similar_names))
+
+            self.logger.debug(
+                "Vector similarity found related entities",
+                original_entities=entity_names,
+                similar_entities_count=len(unique_similar_names)
+            )
+
+            return unique_similar_names
+
+        except Exception as e:
+            self.logger.warning(
+                "Vector similarity search for related entities failed",
+                entity_names=entity_names,
+                error=str(e)
+            )
+            return []

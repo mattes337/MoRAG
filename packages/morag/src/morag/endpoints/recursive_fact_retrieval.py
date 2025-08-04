@@ -68,10 +68,25 @@ async def get_recursive_fact_retrieval_service(
             collection=request.qdrant_collection
         )
     
+    # Initialize embedding service for enhanced retrieval
+    embedding_service = None
+    try:
+        from morag_services.embedding import GeminiEmbeddingService
+        import os
+        api_key = os.getenv('GEMINI_API_KEY')
+        if api_key:
+            embedding_service = GeminiEmbeddingService(api_key=api_key)
+            logger.info("Embedding service initialized for enhanced retrieval")
+        else:
+            logger.warning("GEMINI_API_KEY not found - enhanced retrieval disabled")
+    except Exception as e:
+        logger.warning("Failed to initialize embedding service", error=str(e))
+
     return RecursiveFactRetrievalService(
         llm_client=llm_client,
         neo4j_storage=neo4j_storage,
         qdrant_storage=qdrant_storage,
+        embedding_service=embedding_service,
         stronger_llm_client=stronger_llm_client
     )
 
