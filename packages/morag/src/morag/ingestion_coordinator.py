@@ -1493,11 +1493,9 @@ class IngestionCoordinator:
                 'relationships': graph_data.get('relationships', []),
                 'chunk_fact_mapping': graph_data.get('chunk_fact_mapping', {}),
                 'extraction_metadata': graph_data.get('extraction_metadata', {}),
-                'enhanced_processing': graph_data.get('enhanced_processing', {}),
+                'enhanced_processing': self._serialize_enhanced_processing(graph_data.get('enhanced_processing', {})),
                 'entity_embeddings': graph_data.get('entity_embeddings', {}),
-                'fact_embeddings': graph_data.get('fact_embeddings', {}),
-                'entities': [entity.to_dict() if hasattr(entity, 'to_dict') else entity for entity in graph_data.get('enhanced_processing', {}).get('entities', [])],
-                'entity_fact_relations': graph_data.get('enhanced_processing', {}).get('relations', [])
+                'fact_embeddings': graph_data.get('fact_embeddings', {})
             }
         }
 
@@ -1605,6 +1603,65 @@ class IngestionCoordinator:
                    uri=neo4j_config.uri)
 
         await neo4j_storage.disconnect()
+
+    def _serialize_enhanced_processing(self, enhanced_processing: Dict[str, Any]) -> Dict[str, Any]:
+        """Serialize enhanced processing data to be JSON-compatible.
+
+        Converts Entity objects and other non-serializable objects to dictionaries.
+        """
+        if not enhanced_processing:
+            return {}
+
+        serialized = {}
+
+        for key, value in enhanced_processing.items():
+            if key == 'entities' and isinstance(value, list):
+                # Convert Entity objects to dictionaries
+                serialized[key] = []
+                for entity in value:
+                    if hasattr(entity, 'to_dict'):
+                        serialized[key].append(entity.to_dict())
+                    elif hasattr(entity, '__dict__'):
+                        # Fallback: convert object attributes to dict
+                        entity_dict = {}
+                        for attr_name, attr_value in entity.__dict__.items():
+                            if not attr_name.startswith('_'):  # Skip private attributes
+                                try:
+                                    # Test if the value is JSON serializable
+                                    import json
+                                    json.dumps(attr_value)
+                                    entity_dict[attr_name] = attr_value
+                                except (TypeError, ValueError):
+                                    # Skip non-serializable values
+                                    continue
+                        serialized[key].append(entity_dict)
+                    elif isinstance(entity, dict):
+                        serialized[key].append(entity)
+                    else:
+                        # Skip non-serializable entities
+                        continue
+            elif key == 'relations' and isinstance(value, list):
+                # Convert Relation objects to dictionaries
+                serialized[key] = []
+                for relation in value:
+                    if hasattr(relation, 'to_dict'):
+                        serialized[key].append(relation.to_dict())
+                    elif isinstance(relation, dict):
+                        serialized[key].append(relation)
+                    else:
+                        # Skip non-serializable relations
+                        continue
+            else:
+                # For other values, try to serialize directly
+                try:
+                    import json
+                    json.dumps(value)
+                    serialized[key] = value
+                except (TypeError, ValueError):
+                    # Skip non-serializable values
+                    continue
+
+        return serialized
 
     async def _store_enhanced_processing_data(
         self,

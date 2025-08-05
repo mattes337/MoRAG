@@ -43,41 +43,56 @@ class FactEmbeddingService:
         approach = fact.get('approach', '')
         object_text = fact.get('object', '')
         solution = fact.get('solution', '')
-        
+        condition = fact.get('condition', '')
+        remarks = fact.get('remarks', '')
+
         # Create structured fact text
         text_parts = []
-        
+
         if subject:
             text_parts.append(f"Subject: {subject}")
-        
+
         if approach:
             text_parts.append(f"Approach: {approach}")
-        
+
         if object_text:
             text_parts.append(f"Object: {object_text}")
-        
+
         if solution:
             text_parts.append(f"Solution: {solution}")
-        
+
+        if condition:
+            text_parts.append(f"Condition: {condition}")
+
+        if remarks:
+            text_parts.append(f"Remarks: {remarks}")
+
         # Add keywords if available
         keywords = fact.get('keywords', '')
         if keywords:
             text_parts.append(f"Keywords: {keywords}")
-        
+
         # Add domain context
         domain = fact.get('domain', '')
         if domain and domain != 'general':
             text_parts.append(f"Domain: {domain}")
-        
+
+        # Add fact type for context
+        fact_type = fact.get('fact_type', '')
+        if fact_type:
+            text_parts.append(f"Type: {fact_type}")
+
         # Join all parts
         fact_text = ". ".join(text_parts)
-        
-        # Fallback to any available text field if structured approach fails
+
+        # Fallback to subject and object if structured approach fails
         if not fact_text.strip():
-            for field in ['fact_text', 'text', 'description']:
-                if fact.get(field):
-                    fact_text = fact[field]
-                    break
+            if subject and object_text:
+                fact_text = f"{subject}: {object_text}"
+            elif subject:
+                fact_text = subject
+            elif object_text:
+                fact_text = object_text
         
         return fact_text
     
@@ -91,13 +106,17 @@ class FactEmbeddingService:
             Embedding vector or None if failed
         """
         try:
-            # Get fact data
+            # Get fact data - use COALESCE to handle missing optional properties
             query = """
             MATCH (f:Fact {id: $fact_id})
-            RETURN f.id as id, f.subject as subject, f.approach as approach, 
-                   f.object as object, f.solution as solution, f.keywords as keywords,
-                   f.domain as domain, f.fact_text as fact_text, f.text as text,
-                   f.description as description
+            RETURN f.id as id, f.subject as subject, f.object as object,
+                   COALESCE(f.approach, '') as approach,
+                   COALESCE(f.solution, '') as solution,
+                   COALESCE(f.keywords, '') as keywords,
+                   COALESCE(f.domain, '') as domain,
+                   COALESCE(f.fact_type, '') as fact_type,
+                   COALESCE(f.remarks, '') as remarks,
+                   COALESCE(f.condition, '') as condition
             """
             
             results = await self.neo4j_storage._connection_ops._execute_query(
