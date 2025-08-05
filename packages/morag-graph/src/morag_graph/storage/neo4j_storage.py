@@ -7,7 +7,7 @@ from datetime import datetime
 from neo4j import AsyncGraphDatabase, AsyncDriver, AsyncSession
 from pydantic import BaseModel
 
-from ..models import Entity, Relation, Graph, Document, DocumentChunk
+from ..models import Entity, Relation, Graph, Document, DocumentChunk, Fact
 from ..models.types import EntityId, RelationId
 from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 from .base import BaseStorage
@@ -270,7 +270,20 @@ class Neo4jStorage(BaseStorage):
         if not self._fact_ops:
             raise RuntimeError("Connection not initialized")
         return await self._fact_ops.create_chunk_contains_fact_relation(chunk_id, fact_id, context)
-    
+
+    # Fact operations delegation
+    async def store_fact(self, fact: Fact) -> str:
+        """Store a fact in Neo4J."""
+        if not self._fact_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._fact_ops.store_fact(fact)
+
+    async def store_facts(self, facts: List[Fact]) -> List[str]:
+        """Store multiple facts in Neo4J."""
+        if not self._fact_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._fact_ops.store_facts(facts)
+
     async def fix_unconnected_entities(self) -> int:
         """DEPRECATED: Find and fix entities that are not connected to any chunks."""
         if not self._entity_ops:

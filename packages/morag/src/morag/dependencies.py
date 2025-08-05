@@ -13,7 +13,9 @@ logger = structlog.get_logger(__name__)
 
 # Try to import graph components, but handle gracefully if not available
 try:
-    from morag_graph import HybridRetrievalCoordinator, ContextExpansionEngine, QueryEntityExtractor
+    # Import components directly to avoid circular import issues
+    from morag_graph.retrieval import HybridRetrievalCoordinator, ContextExpansionEngine
+    from morag_graph.query import QueryEntityExtractor
     from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
     from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
     GRAPH_AVAILABLE = True
@@ -517,7 +519,7 @@ def create_dynamic_graph_engine(database_servers: Optional[List[Dict[str, Any]]]
                     self.available = True
                     # Initialize components with custom storage
                     try:
-                        from morag_graph import GraphCRUD, GraphTraversal, GraphAnalytics
+                        from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
                         self.crud = GraphCRUD(storage)
                         self.traversal = GraphTraversal(storage)
                         self.analytics = GraphAnalytics(storage)

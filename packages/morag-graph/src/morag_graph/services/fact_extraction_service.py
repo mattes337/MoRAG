@@ -28,7 +28,8 @@ class FactExtractionService:
         min_confidence: float = 0.7,
         max_facts_per_chunk: int = 10,
         enable_relationships: bool = True,
-        enable_vector_storage: bool = True
+        enable_vector_storage: bool = True,
+        language: str = "en"
     ):
         """Initialize fact extraction service.
 
@@ -42,12 +43,14 @@ class FactExtractionService:
             max_facts_per_chunk: Maximum facts per chunk
             enable_relationships: Whether to extract fact relationships
             enable_vector_storage: Whether to store facts in vector database
+            language: Language for fact extraction
         """
         self.neo4j_storage = neo4j_storage
         self.qdrant_storage = qdrant_storage
         self.embedding_service = embedding_service
         self.enable_relationships = enable_relationships
         self.enable_vector_storage = enable_vector_storage and qdrant_storage is not None
+        self.language = language
 
         self.logger = structlog.get_logger(__name__)
 
@@ -56,13 +59,15 @@ class FactExtractionService:
             model_id=model_id,
             api_key=api_key,
             min_confidence=min_confidence,
-            max_facts_per_chunk=max_facts_per_chunk
+            max_facts_per_chunk=max_facts_per_chunk,
+            language=language
         )
 
         if enable_relationships:
             self.graph_builder = FactGraphBuilder(
                 model_id=model_id,
-                api_key=api_key
+                api_key=api_key,
+                language=language
             )
 
         # Initialize storage operations

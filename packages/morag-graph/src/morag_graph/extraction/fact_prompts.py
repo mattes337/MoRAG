@@ -8,45 +8,108 @@ class FactExtractionPrompts:
     
     @staticmethod
     def get_fact_extraction_prompt(domain: str = "general", language: str = "en") -> str:
-        """Get the main fact extraction prompt.
-        
+        """Get the enhanced fact extraction prompt with few-shot examples.
+
         Args:
             domain: Domain context for extraction
             language: Language of the text
-            
+
         Returns:
             Formatted prompt for fact extraction
         """
-        return """You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information that can be used independently to answer questions or solve problems.
+        # Create language-specific instruction
+        language_names = {
+            'en': 'English',
+            'de': 'German',
+            'fr': 'French',
+            'es': 'Spanish',
+            'it': 'Italian',
+            'pt': 'Portuguese',
+            'nl': 'Dutch',
+            'ru': 'Russian',
+            'zh': 'Chinese',
+            'ja': 'Japanese',
+            'ko': 'Korean'
+        }
+        language_name = language_names.get(language, language)
 
+        language_instruction = f"""
+CRITICAL LANGUAGE REQUIREMENT:
+You MUST extract and write ALL fact content (subject, object, approach, solution, condition, remarks, keywords) in {language_name} ({language}).
+Do NOT translate to English or any other language.
+The extracted facts must be in the SAME language as the input text.
+If the input text is in {language_name}, your response must be entirely in {language_name}.
+"""
+
+        return language_instruction + """
+You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information that can be used independently to answer questions or solve problems.
+
+ENHANCED FACT STRUCTURE:
 A fact should contain:
 - Subject: The main entity, substance, or concept the fact is about
 - Object: The specific condition, problem, or target being addressed
 - Approach: The specific method, dosage, technique, or procedure (include exact amounts, frequencies, durations)
 - Solution: The expected outcome, benefit, or result
+- Condition: The question/precondition/situation when this fact applies (NEW FIELD)
 - Remarks: Important context, contraindications, warnings, or qualifications
+- Keywords: Domain-specific technical terms that should become separate entities
 
-FOCUS ON EXTRACTING:
-- Specific dosages, amounts, and frequencies (e.g., "120-240mg daily", "3-6 grams twice daily")
-- Exact procedures and methods (e.g., "standardized extract with 24% flavonglycosides")
-- Specific conditions and their treatments
-- Contraindications and safety warnings
-- Quality specifications and requirements
+QUALITY REQUIREMENTS:
+- Facts must be ACTIONABLE and SPECIFIC, not generic or trivial
+- Include exact dosages, measurements, frequencies, and durations
+- Each fact must be SELF-CONTAINED and usable without the original text
+- Avoid generic advice like "consult a doctor" unless it specifies a specialist type
+- Focus on domain-specific knowledge that is not commonly known
 
-Each fact must be SELF-CONTAINED and provide enough information to be actionable without needing the original text.
+FEW-SHOT EXAMPLES:
 
-Domain: """ + domain + """
-Language: """ + language + """
+Example 1 (Herbal Medicine):
+Text: "For chronic stress and anxiety, use 300-600mg of standardized Ashwagandha extract (containing 5% withanolides) twice daily with meals. Treatment should be continued for 8-12 weeks for optimal results. Do not exceed 2 weeks without a break."
 
-Text: {chunk_text}
+Extracted Fact:
+{{
+  "subject": "Ashwagandha extract (5% withanolides)",
+  "object": "chronic stress and anxiety",
+  "approach": "300-600mg standardized extract twice daily with meals for 8-12 weeks",
+  "solution": "reduction of chronic stress and anxiety symptoms",
+  "condition": "To manage chronic stress and anxiety with herbal medicine",
+  "remarks": "Do not exceed 2 weeks without a break. Requires standardized extract with 5% withanolides",
+  "fact_type": "methodological",
+  "confidence": 0.9,
+  "keywords": ["ashwagandha", "withanolides", "adaptogen", "chronic stress", "anxiety management"]
+}}
 
-Respond with JSON array of facts:
+Example 2 (Technical Process):
+Text: "When preparing DMSO-based herbal extractions for topical pain relief, combine 100g dried herb with 500ml DMSO, macerate for 14 days at room temperature, strain, and apply 5ml to affected area 3 times daily. Maximum treatment duration is 2 weeks."
+
+Extracted Fact:
+{{
+  "subject": "DMSO herbal extraction",
+  "object": "topical pain relief",
+  "approach": "100g dried herb + 500ml DMSO, macerate 14 days, apply 5ml 3x daily",
+  "solution": "effective topical pain relief",
+  "condition": "To prepare herbal DMSO extractions for pain management",
+  "remarks": "Maximum treatment duration 2 weeks. Room temperature maceration required",
+  "fact_type": "process",
+  "confidence": 0.95,
+  "keywords": ["DMSO", "herbal extraction", "maceration", "topical application", "pain relief"]
+}}
+
+Domain: """ + domain + f"""
+Target Language: {language_name} ({language})
+
+REMEMBER: Extract ALL content in {language_name}. Do NOT use English or any other language.
+
+Text: {{chunk_text}}
+
+Respond with JSON array of facts in {language_name}:
 [
   {{
     "subject": "specific substance/entity",
     "object": "specific condition/problem/target",
     "approach": "exact method/dosage/procedure with specific details",
     "solution": "specific outcome/benefit/result",
+    "condition": "question/precondition/situation when this applies",
     "remarks": "safety warnings/contraindications/context",
     "fact_type": "process|definition|causal|methodological|safety",
     "confidence": 0.0-1.0,
@@ -54,13 +117,14 @@ Respond with JSON array of facts:
   }}
 ]
 
-Important guidelines:
-- Prioritize facts with specific dosages, procedures, and actionable instructions
+CRITICAL GUIDELINES:
+- LANGUAGE: Extract ALL content in """ + language_name + f""" ({language}). Never use English or other languages.
+- Only extract facts with high practical value and specificity
 - Include exact measurements, frequencies, and specifications
-- Extract safety warnings and contraindications as separate facts
-- Each fact should be usable as standalone guidance
-- Keywords should be domain-specific technical terms, not just words from subject/object
-- Ensure high confidence (>0.7) for extracted facts"""
+- The "condition" field should describe when/why to use this fact
+- Keywords should become separate entities in the knowledge graph
+- Ensure confidence >0.7 for all extracted facts
+- Avoid trivial or commonly known information"""
 
     @staticmethod
     def get_fact_validation_prompt() -> str:
@@ -119,13 +183,39 @@ Respond with JSON:
 }}"""
 
     @staticmethod
-    def get_fact_relationship_prompt() -> str:
+    def get_fact_relationship_prompt(language: str = "en") -> str:
         """Get prompt for identifying relationships between facts.
-        
+
+        Args:
+            language: Language for the response
+
         Returns:
             Prompt for fact relationship extraction
         """
-        return """Given these facts from the same document, identify semantic relationships:
+        # Create language-specific instruction
+        language_names = {
+            'en': 'English',
+            'de': 'German',
+            'fr': 'French',
+            'es': 'Spanish',
+            'it': 'Italian',
+            'pt': 'Portuguese',
+            'nl': 'Dutch',
+            'ru': 'Russian',
+            'zh': 'Chinese',
+            'ja': 'Japanese',
+            'ko': 'Korean'
+        }
+        language_name = language_names.get(language, language)
+
+        language_instruction = f"""
+CRITICAL LANGUAGE REQUIREMENT:
+You MUST write ALL relationship context and explanations in {language_name} ({language}).
+Do NOT use English or any other language. The response must be in {language_name}.
+"""
+
+        return language_instruction + """
+Given these facts from the same document, identify semantic relationships:
 
 Facts: {facts_list}
 
@@ -219,18 +309,19 @@ Respond with JSON:
         )
 
     @staticmethod
-    def create_relationship_prompt(facts: List[Dict[str, Any]]) -> str:
+    def create_relationship_prompt(facts: List[Dict[str, Any]], language: str = "en") -> str:
         """Create a relationship extraction prompt for multiple facts.
-        
+
         Args:
             facts: List of fact dictionaries
-            
+            language: Language for the response
+
         Returns:
             Complete relationship extraction prompt
         """
         import json
         facts_json = json.dumps(facts, indent=2)
-        return FactExtractionPrompts.get_fact_relationship_prompt().format(
+        return FactExtractionPrompts.get_fact_relationship_prompt(language).format(
             facts_list=facts_json
         )
 

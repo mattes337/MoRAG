@@ -10,7 +10,6 @@ from packages.morag_graph.src.morag_graph.normalizers.entity_deduplicator import
 from packages.morag_graph.src.morag_graph.storage.neo4j_storage import Neo4jStorage
 from packages.morag_graph.src.morag_graph.storage.neo4j_operations.config import Neo4jConfig
 from packages.morag_graph.src.morag_graph.models import Entity
-from packages.morag_graph.src.morag_graph.models.types import EntityType
 
 
 @pytest.fixture
@@ -46,55 +45,55 @@ def sample_entities():
     return [
         Entity(
             name="artificial intelligence",
-            type=EntityType.TECHNOLOGY,
+            type="TECHNOLOGY",
             confidence=0.9,
             source_doc_id="doc1"
         ),
         Entity(
             name="AI",
-            type=EntityType.TECHNOLOGY,
+            type="TECHNOLOGY",
             confidence=0.8,
             source_doc_id="doc1"
         ),
         Entity(
             name="A.I.",
-            type=EntityType.TECHNOLOGY,
+            type="TECHNOLOGY",
             confidence=0.7,
             source_doc_id="doc2"
         ),
         Entity(
             name="machine learning",
-            type=EntityType.TECHNOLOGY,
+            type="TECHNOLOGY",
             confidence=0.9,
             source_doc_id="doc1"
         ),
         Entity(
             name="ML",
-            type=EntityType.TECHNOLOGY,
+            type="TECHNOLOGY",
             confidence=0.8,
             source_doc_id="doc2"
         ),
         Entity(
             name="John Smith",
-            type=EntityType.PERSON,
+            type="PERSON",
             confidence=0.9,
             source_doc_id="doc1"
         ),
         Entity(
             name="Smith, John",
-            type=EntityType.PERSON,
+            type="PERSON",
             confidence=0.8,
             source_doc_id="doc2"
         ),
         Entity(
             name="Google Inc.",
-            type=EntityType.ORGANIZATION,
+            type="ORGANIZATION",
             confidence=0.9,
             source_doc_id="doc1"
         ),
         Entity(
             name="Google",
-            type=EntityType.ORGANIZATION,
+            type="ORGANIZATION",
             confidence=0.8,
             source_doc_id="doc2"
         )
@@ -161,13 +160,13 @@ class TestEntityDeduplicationIntegration:
         """Test deduplication for specific collection."""
         # Create entities with different collections
         entities_collection1 = [
-            Entity(name="AI", type=EntityType.TECHNOLOGY, confidence=0.9, source_doc_id="doc1"),
-            Entity(name="artificial intelligence", type=EntityType.TECHNOLOGY, confidence=0.8, source_doc_id="doc1")
+            Entity(name="AI", type="TECHNOLOGY", confidence=0.9, source_doc_id="doc1"),
+            Entity(name="artificial intelligence", type="TECHNOLOGY", confidence=0.8, source_doc_id="doc1")
         ]
-        
+
         entities_collection2 = [
-            Entity(name="ML", type=EntityType.TECHNOLOGY, confidence=0.9, source_doc_id="doc2"),
-            Entity(name="machine learning", type=EntityType.TECHNOLOGY, confidence=0.8, source_doc_id="doc2")
+            Entity(name="ML", type="TECHNOLOGY", confidence=0.9, source_doc_id="doc2"),
+            Entity(name="machine learning", type="TECHNOLOGY", confidence=0.8, source_doc_id="doc2")
         ]
         
         # Store entities
@@ -189,8 +188,8 @@ class TestEntityDeduplicationIntegration:
         """Test actual entity merging (not dry run)."""
         # Create similar entities that should be merged
         entities = [
-            Entity(name="artificial intelligence", type=EntityType.TECHNOLOGY, confidence=0.9, source_doc_id="doc1"),
-            Entity(name="Artificial Intelligence", type=EntityType.TECHNOLOGY, confidence=0.8, source_doc_id="doc2")
+            Entity(name="artificial intelligence", type="TECHNOLOGY", confidence=0.9, source_doc_id="doc1"),
+            Entity(name="Artificial Intelligence", type="TECHNOLOGY", confidence=0.8, source_doc_id="doc2")
         ]
         
         # Store entities
@@ -238,7 +237,7 @@ class TestEntityDeduplicationIntegration:
         for i in range(50):
             entity = Entity(
                 name=f"entity_{i}",
-                type=EntityType.CUSTOM,
+                type="CUSTOM",
                 confidence=0.8,
                 source_doc_id=f"doc_{i % 10}"
             )
@@ -246,9 +245,9 @@ class TestEntityDeduplicationIntegration:
         
         # Add some similar entities
         similar_entities = [
-            Entity(name="test entity", type=EntityType.CUSTOM, confidence=0.9, source_doc_id="doc_test"),
-            Entity(name="Test Entity", type=EntityType.CUSTOM, confidence=0.8, source_doc_id="doc_test"),
-            Entity(name="TEST ENTITY", type=EntityType.CUSTOM, confidence=0.7, source_doc_id="doc_test")
+            Entity(name="test entity", type="CUSTOM", confidence=0.9, source_doc_id="doc_test"),
+            Entity(name="Test Entity", type="CUSTOM", confidence=0.8, source_doc_id="doc_test"),
+            Entity(name="TEST ENTITY", type="CUSTOM", confidence=0.7, source_doc_id="doc_test")
         ]
         large_entity_set.extend(similar_entities)
         
@@ -367,7 +366,7 @@ class TestEntityDeduplicationConfiguration:
         """Test deduplication with different batch sizes."""
         # Create entities
         entities = [
-            Entity(name=f"entity_{i}", type=EntityType.CUSTOM, confidence=0.8, source_doc_id="doc1")
+            Entity(name=f"entity_{i}", type="CUSTOM", confidence=0.8, source_doc_id="doc1")
             for i in range(25)
         ]
         

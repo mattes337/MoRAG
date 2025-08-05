@@ -38,6 +38,7 @@ class Fact(BaseModel):
     object: str = Field(..., description="What is being described or acted upon")
     approach: Optional[str] = Field(default=None, description="How something is done/achieved")
     solution: Optional[str] = Field(default=None, description="What solves a problem/achieves goal")
+    condition: Optional[str] = Field(default=None, description="Question/precondition/situation when this fact applies")
     remarks: Optional[str] = Field(default=None, description="Additional context/qualifications")
     
     # Provenance
@@ -91,6 +92,7 @@ class Fact(BaseModel):
             "object": self.object,
             "approach": self.approach,
             "solution": self.solution,
+            "condition": self.condition,
             "remarks": self.remarks,
             "fact_type": self.fact_type,
             "domain": self.domain,

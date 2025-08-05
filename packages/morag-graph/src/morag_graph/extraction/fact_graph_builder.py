@@ -19,20 +19,23 @@ class FactGraphBuilder:
         model_id: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
         min_relation_confidence: float = 0.6,
-        max_relations_per_fact: int = 5
+        max_relations_per_fact: int = 5,
+        language: str = "en"
     ):
         """Initialize fact graph builder.
-        
+
         Args:
             model_id: LLM model for relationship extraction
             api_key: API key for LLM service
             min_relation_confidence: Minimum confidence for relationships
             max_relations_per_fact: Maximum relationships per fact
+            language: Language for relationship extraction
         """
         self.model_id = model_id
         self.api_key = api_key
         self.min_relation_confidence = min_relation_confidence
         self.max_relations_per_fact = max_relations_per_fact
+        self.language = language
         
         self.logger = structlog.get_logger(__name__)
         
@@ -142,7 +145,7 @@ class FactGraphBuilder:
             fact_dicts = [self._fact_to_prompt_dict(fact) for fact in facts]
             
             # Create relationship extraction prompt
-            prompt = FactExtractionPrompts.create_relationship_prompt(fact_dicts)
+            prompt = FactExtractionPrompts.create_relationship_prompt(fact_dicts, self.language)
             
             # Get relationships from LLM
             response = await self.llm_client.generate(prompt)

@@ -11,6 +11,8 @@ from morag_reasoning.llm import LLMClient
 from ..models.fact import Fact, FactType
 from .fact_prompts import FactExtractionPrompts, FactPromptTemplates
 from .fact_validator import FactValidator
+from .fact_filter import FactFilter, DomainFilterConfig
+from .fact_filter_config import create_domain_configs_for_language
 
 
 class FactExtractor:
@@ -47,8 +49,11 @@ class FactExtractor:
         
         self.logger = structlog.get_logger(__name__)
         self.validator = FactValidator(min_confidence=min_confidence)
+        # Initialize fact filter with domain-specific configurations
+        domain_configs = self._create_domain_filter_configs()
+        self.fact_filter = FactFilter(domain_configs)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
-        
+
         # Initialize LLM client
         from morag_reasoning.llm import LLMConfig
         llm_config = LLMConfig(
@@ -150,16 +155,31 @@ class FactExtractor:
             for fact in validated_facts:
                 if not fact.keywords:
                     fact.keywords = self._generate_fact_keywords(fact)
-            
+
+            # Filter facts for domain relevance
+            domain_for_filtering = self._determine_filter_domain(extraction_context.get('domain', 'general'))
+            document_context = {
+                'topics': extraction_context.get('topics', []),
+                'domain': extraction_context.get('domain'),
+                'source_file_name': extraction_context.get('source_file_name', '')
+            }
+
+            filtered_facts = self.fact_filter.filter_facts(
+                validated_facts,
+                domain=domain_for_filtering,
+                document_context=document_context
+            )
+
             self.logger.info(
                 "Fact extraction completed",
                 chunk_id=chunk_id,
                 candidates_found=len(fact_candidates),
                 facts_structured=len(facts),
-                facts_validated=len(validated_facts)
+                facts_validated=len(validated_facts),
+                facts_filtered=len(filtered_facts)
             )
-            
-            return validated_facts
+
+            return filtered_facts
             
         except Exception as e:
             self.logger.error(
@@ -503,6 +523,7 @@ class FactExtractor:
                     'object': obj,
                     'approach': safe_strip(candidate.get('approach')),
                     'solution': safe_strip(candidate.get('solution')),
+                    'condition': safe_strip(candidate.get('condition')),
                     'remarks': safe_strip(candidate.get('remarks')),
                     'source_chunk_id': chunk_id,
                     'source_document_id': document_id,
@@ -541,7 +562,37 @@ class FactExtractor:
                 continue
         
         return facts
-    
+
+    def _create_domain_filter_configs(self) -> Dict[str, DomainFilterConfig]:
+        """Create domain filter configurations based on extraction context.
+
+        Returns:
+            Dictionary of domain filter configurations
+        """
+        # Create standard configurations for the extractor's language
+        return create_domain_configs_for_language(self.language)
+
+    def _determine_filter_domain(self, extraction_domain: str) -> str:
+        """Determine the appropriate domain for fact filtering.
+
+        Args:
+            extraction_domain: Domain used for extraction
+
+        Returns:
+            Domain key for filtering configuration
+        """
+        # Map extraction domains to filter domains
+        domain_mapping = {
+            'medical': 'medical',
+            'herbal': 'adhd_herbal',
+            'adhd': 'adhd_herbal',
+            'research': 'medical',
+            'technical': 'general',
+            'general': 'general'
+        }
+
+        return domain_mapping.get(extraction_domain, 'general')
+
     def _generate_fact_keywords(self, fact: Fact) -> List[str]:
         """Generate keywords for fact indexing.
         
@@ -557,6 +608,8 @@ class FactExtractor:
             text_parts.append(fact.approach)
         if fact.solution:
             text_parts.append(fact.solution)
+        if fact.condition:
+            text_parts.append(fact.condition)
         if fact.remarks:
             text_parts.append(fact.remarks)
         

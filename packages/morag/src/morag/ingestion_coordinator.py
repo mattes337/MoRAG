@@ -30,6 +30,7 @@ from morag_graph.models.document import Document
 from morag_graph.models.document_chunk import DocumentChunk
 from morag_graph.models.database_config import DatabaseConfig, DatabaseType
 from morag_graph.services.fact_extraction_service import FactExtractionService
+from morag_graph.services.enhanced_fact_processing_service import EnhancedFactProcessingService
 from morag_graph.utils.id_generation import UnifiedIDGenerator
 
 import structlog
@@ -39,12 +40,13 @@ logger = structlog.get_logger(__name__)
 
 class IngestionCoordinator:
     """Coordinates the complete ingestion process across multiple databases."""
-    
+
     def __init__(self):
         """Initialize the ingestion coordinator."""
         self.embedding_service = None
         self.vector_storage = None
         self.fact_extractor = None
+        self.logger = logger  # Initialize logger attribute
         
     async def initialize(self):
         """Initialize all services."""
@@ -670,16 +672,32 @@ class IngestionCoordinator:
             logger.info(f"Extracted {len(all_facts)} facts and {len(all_relationships)} relationships from {len(chunks)} chunks")
             logger.info(f"Created chunk-fact mapping: {len(chunk_fact_mapping)} chunks with facts")
 
+            # Step: Enhanced fact processing - create entities and relationships
+            enhanced_processing_result = await self._process_facts_with_enhanced_processing(all_facts)
+
+            # Step: Generate embeddings for entities and facts
+            entity_embeddings, fact_embeddings = await self._generate_entity_and_fact_embeddings(
+                all_facts, all_relationships
+            )
+
             return {
                 'facts': all_facts,
                 'relationships': all_relationships,
                 'chunk_fact_mapping': chunk_fact_mapping,
+                'entity_embeddings': entity_embeddings,
+                'fact_embeddings': fact_embeddings,
+                'enhanced_processing': enhanced_processing_result,
                 'extraction_metadata': {
                     'total_facts': len(all_facts),
                     'total_relationships': len(all_relationships),
                     'extraction_method': 'chunk_based_facts',
                     'chunks_processed': len(chunks),
-                    'chunks_with_facts': len(chunk_fact_mapping)
+                    'chunks_with_facts': len(chunk_fact_mapping),
+                    'entities_with_embeddings': len(entity_embeddings),
+                    'facts_with_embeddings': len(fact_embeddings),
+                    'entities_from_facts': enhanced_processing_result.get('entities_created', 0),
+                    'keyword_entities_created': enhanced_processing_result.get('keyword_entities_created', 0),
+                    'fact_entity_relations': enhanced_processing_result.get('relations_created', 0)
                 }
             }
 
@@ -690,6 +708,401 @@ class IngestionCoordinator:
                 'relationships': [],
                 'chunk_fact_mapping': {},
                 'extraction_metadata': {'error': str(e)}
+            }
+
+    async def _generate_entity_and_fact_embeddings(
+        self,
+        facts: List[Dict[str, Any]],
+        relationships: List[Dict[str, Any]]
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Generate embeddings for entities and facts extracted during ingestion.
+
+        Args:
+            facts: List of extracted facts
+            relationships: List of extracted relationships
+
+        Returns:
+            Tuple of (entity_embeddings, fact_embeddings) dictionaries
+        """
+        entity_embeddings = {}
+        fact_embeddings = {}
+
+        try:
+            # Extract unique entities from facts
+            unique_entities = {}
+
+            # Collect entities from facts (subjects, objects, keywords)
+            for fact in facts:
+                # Add subject entity
+                if fact.get('subject'):
+                    entity_key = f"subject_{fact['subject']}"
+                    if entity_key not in unique_entities:
+                        unique_entities[entity_key] = {
+                            'name': fact['subject'],
+                            'type': 'SUBJECT',
+                            'context': f"Subject entity from fact domain: {fact.get('domain', 'general')}"
+                        }
+
+                # Add object entity
+                if fact.get('object'):
+                    entity_key = f"object_{fact['object']}"
+                    if entity_key not in unique_entities:
+                        unique_entities[entity_key] = {
+                            'name': fact['object'],
+                            'type': 'OBJECT',
+                            'context': f"Object entity from fact domain: {fact.get('domain', 'general')}"
+                        }
+
+                # Add keyword entities
+                if fact.get('keywords'):
+                    keywords = fact['keywords'].split(',') if isinstance(fact['keywords'], str) else fact['keywords']
+                    if isinstance(keywords, list):
+                        for keyword in keywords:
+                            keyword = keyword.strip()
+                            if keyword:
+                                entity_key = f"keyword_{keyword}"
+                                if entity_key not in unique_entities:
+                                    unique_entities[entity_key] = {
+                                        'name': keyword,
+                                        'type': 'KEYWORD',
+                                        'context': f"Keyword entity from fact domain: {fact.get('domain', 'general')}"
+                                    }
+
+            logger.info(f"Found {len(unique_entities)} unique entities for embedding generation")
+
+            # Generate embeddings for entities in batches
+            if unique_entities:
+                entity_embeddings = await self._generate_entity_embeddings_batch(unique_entities)
+
+            # Generate embeddings for facts in batches
+            if facts:
+                fact_embeddings = await self._generate_fact_embeddings_batch(facts)
+
+            logger.info(f"Generated embeddings: {len(entity_embeddings)} entities, {len(fact_embeddings)} facts")
+
+            return entity_embeddings, fact_embeddings
+
+        except Exception as e:
+            logger.error(f"Failed to generate entity and fact embeddings: {e}")
+            return {}, {}
+
+    async def _generate_entity_embeddings_batch(
+        self,
+        entities: Dict[str, Dict[str, Any]],
+        batch_size: int = 50
+    ) -> Dict[str, Any]:
+        """Generate embeddings for entities in batches.
+
+        Args:
+            entities: Dictionary of entities to generate embeddings for
+            batch_size: Number of entities to process in each batch
+
+        Returns:
+            Dictionary mapping entity keys to embedding data
+        """
+        entity_embeddings = {}
+        entity_list = list(entities.items())
+
+        try:
+            for i in range(0, len(entity_list), batch_size):
+                batch = entity_list[i:i + batch_size]
+                logger.info(f"Processing entity embedding batch {i//batch_size + 1}: {len(batch)} entities")
+
+                # Prepare texts for batch embedding
+                batch_texts = []
+                batch_keys = []
+
+                for entity_key, entity_data in batch:
+                    # Create entity text for embedding
+                    entity_text = f"{entity_data['name']} ({entity_data['type']})"
+                    if entity_data.get('context'):
+                        entity_text += f" - {entity_data['context']}"
+
+                    batch_texts.append(entity_text)
+                    batch_keys.append(entity_key)
+
+                # Generate embeddings for the batch
+                try:
+                    batch_embeddings = await self.embedding_service.generate_embeddings_batch(
+                        batch_texts, task_type="retrieval_document"
+                    )
+
+                    # Store embeddings with metadata
+                    for j, (entity_key, entity_data) in enumerate(batch):
+                        if j < len(batch_embeddings):
+                            entity_embeddings[entity_key] = {
+                                'name': entity_data['name'],
+                                'type': entity_data['type'],
+                                'embedding': batch_embeddings[j],
+                                'embedding_model': 'text-embedding-004',
+                                'embedding_dimensions': len(batch_embeddings[j]),
+                                'context': entity_data.get('context', '')
+                            }
+
+                except Exception as e:
+                    logger.warning(f"Failed to generate embeddings for entity batch {i//batch_size + 1}: {e}")
+                    # Try individual embeddings as fallback
+                    for entity_key, entity_data in batch:
+                        try:
+                            entity_text = f"{entity_data['name']} ({entity_data['type']})"
+                            if entity_data.get('context'):
+                                entity_text += f" - {entity_data['context']}"
+
+                            embedding = await self.embedding_service.generate_embedding(
+                                entity_text, task_type="retrieval_document"
+                            )
+
+                            entity_embeddings[entity_key] = {
+                                'name': entity_data['name'],
+                                'type': entity_data['type'],
+                                'embedding': embedding,
+                                'embedding_model': 'text-embedding-004',
+                                'embedding_dimensions': len(embedding),
+                                'context': entity_data.get('context', '')
+                            }
+
+                        except Exception as individual_e:
+                            logger.warning(f"Failed to generate embedding for entity {entity_key}: {individual_e}")
+
+                # Small delay between batches to avoid rate limiting
+                if i + batch_size < len(entity_list):
+                    await asyncio.sleep(0.1)
+
+            return entity_embeddings
+
+        except Exception as e:
+            logger.error(f"Failed to generate entity embeddings in batches: {e}")
+            return {}
+
+    async def _generate_fact_embeddings_batch(
+        self,
+        facts: List[Dict[str, Any]],
+        batch_size: int = 50
+    ) -> Dict[str, Any]:
+        """Generate embeddings for facts in batches.
+
+        Args:
+            facts: List of facts to generate embeddings for
+            batch_size: Number of facts to process in each batch
+
+        Returns:
+            Dictionary mapping fact IDs to embedding data
+        """
+        fact_embeddings = {}
+
+        try:
+            for i in range(0, len(facts), batch_size):
+                batch = facts[i:i + batch_size]
+                logger.info(f"Processing fact embedding batch {i//batch_size + 1}: {len(batch)} facts")
+
+                # Prepare texts for batch embedding
+                batch_texts = []
+                batch_ids = []
+
+                for fact in batch:
+                    # Create structured fact text for embedding
+                    fact_text = self._create_fact_text_for_embedding(fact)
+                    batch_texts.append(fact_text)
+                    batch_ids.append(fact['id'])
+
+                # Generate embeddings for the batch
+                try:
+                    batch_embeddings = await self.embedding_service.generate_embeddings_batch(
+                        batch_texts, task_type="retrieval_document"
+                    )
+
+                    # Store embeddings with metadata
+                    for j, fact in enumerate(batch):
+                        if j < len(batch_embeddings):
+                            fact_embeddings[fact['id']] = {
+                                'fact_id': fact['id'],
+                                'embedding': batch_embeddings[j],
+                                'embedding_model': 'text-embedding-004',
+                                'embedding_dimensions': len(batch_embeddings[j]),
+                                'fact_text': batch_texts[j],
+                                'subject': fact.get('subject'),
+                                'approach': fact.get('approach'),
+                                'object': fact.get('object'),
+                                'solution': fact.get('solution'),
+                                'domain': fact.get('domain')
+                            }
+
+                except Exception as e:
+                    logger.warning(f"Failed to generate embeddings for fact batch {i//batch_size + 1}: {e}")
+                    # Try individual embeddings as fallback
+                    for fact in batch:
+                        try:
+                            fact_text = self._create_fact_text_for_embedding(fact)
+                            embedding = await self.embedding_service.generate_embedding(
+                                fact_text, task_type="retrieval_document"
+                            )
+
+                            fact_embeddings[fact['id']] = {
+                                'fact_id': fact['id'],
+                                'embedding': embedding,
+                                'embedding_model': 'text-embedding-004',
+                                'embedding_dimensions': len(embedding),
+                                'fact_text': fact_text,
+                                'subject': fact.get('subject'),
+                                'approach': fact.get('approach'),
+                                'object': fact.get('object'),
+                                'solution': fact.get('solution'),
+                                'domain': fact.get('domain')
+                            }
+
+                        except Exception as individual_e:
+                            logger.warning(f"Failed to generate embedding for fact {fact['id']}: {individual_e}")
+
+                # Small delay between batches to avoid rate limiting
+                if i + batch_size < len(facts):
+                    await asyncio.sleep(0.1)
+
+            return fact_embeddings
+
+        except Exception as e:
+            logger.error(f"Failed to generate fact embeddings in batches: {e}")
+            return {}
+
+    def _create_fact_text_for_embedding(self, fact: Dict[str, Any]) -> str:
+        """Create text representation of fact for embedding generation.
+
+        Args:
+            fact: Fact dictionary
+
+        Returns:
+            Formatted fact text for embedding
+        """
+        # Create structured fact text similar to the FactEmbeddingService
+        text_parts = []
+
+        if fact.get('subject'):
+            text_parts.append(f"Subject: {fact['subject']}")
+
+        if fact.get('approach'):
+            text_parts.append(f"Approach: {fact['approach']}")
+
+        if fact.get('object'):
+            text_parts.append(f"Object: {fact['object']}")
+
+        if fact.get('solution'):
+            text_parts.append(f"Solution: {fact['solution']}")
+
+        # Add keywords if available
+        if fact.get('keywords'):
+            text_parts.append(f"Keywords: {fact['keywords']}")
+
+        # Add domain context
+        domain = fact.get('domain', '')
+        if domain and domain != 'general':
+            text_parts.append(f"Domain: {domain}")
+
+        # Join all parts
+        fact_text = ". ".join(text_parts)
+
+        # Fallback to any available text field if structured approach fails
+        if not fact_text.strip():
+            for field in ['fact_text', 'text', 'description']:
+                if fact.get(field):
+                    fact_text = fact[field]
+                    break
+
+        return fact_text or "No fact text available"
+
+    async def _process_facts_with_enhanced_processing(self, facts: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Process facts with enhanced entity creation and relationship management.
+
+        Args:
+            facts: List of fact dictionaries
+
+        Returns:
+            Enhanced processing results
+        """
+        if not facts:
+            return {
+                'facts_processed': 0,
+                'entities_created': 0,
+                'keyword_entities_created': 0,
+                'relations_created': 0
+            }
+
+        try:
+            # Convert fact dictionaries to Fact objects
+            fact_objects = []
+            for fact_dict in facts:
+                try:
+                    # Create Fact object from dictionary
+                    fact = Fact(
+                        subject=fact_dict.get('subject', ''),
+                        object=fact_dict.get('object', ''),
+                        approach=fact_dict.get('approach'),
+                        solution=fact_dict.get('solution'),
+                        condition=fact_dict.get('condition'),
+                        remarks=fact_dict.get('remarks'),
+                        source_chunk_id=fact_dict.get('chunk_id', ''),
+                        source_document_id=fact_dict.get('document_id', ''),
+                        extraction_confidence=fact_dict.get('confidence', 0.8),
+                        fact_type=fact_dict.get('fact_type', 'definition'),
+                        domain=fact_dict.get('domain', 'general'),
+                        language=fact_dict.get('language', 'en'),
+                        keywords=fact_dict.get('keywords', [])
+                    )
+                    fact_objects.append(fact)
+                except Exception as e:
+                    self.logger.warning(f"Failed to convert fact dictionary to object: {e}")
+                    continue
+
+            if not fact_objects:
+                self.logger.warning("No valid fact objects created from dictionaries")
+                return {
+                    'facts_processed': 0,
+                    'entities_created': 0,
+                    'keyword_entities_created': 0,
+                    'relations_created': 0
+                }
+
+            # Initialize enhanced fact processing service
+            from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
+            import os
+
+            # Create Neo4j storage for enhanced processing
+            neo4j_config = Neo4jConfig(
+                uri=os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
+                username=os.getenv('NEO4J_USERNAME', 'neo4j'),
+                password=os.getenv('NEO4J_PASSWORD', 'password'),
+                database=os.getenv('NEO4J_DATABASE', 'neo4j')
+            )
+            neo4j_storage = Neo4jStorage(neo4j_config)
+            await neo4j_storage.connect()
+
+            enhanced_processor = EnhancedFactProcessingService(neo4j_storage)
+
+            # Process facts with entity creation and relationship management
+            result = await enhanced_processor.process_facts_with_entities(
+                fact_objects,
+                create_keyword_entities=True,
+                create_mandatory_relations=True
+            )
+
+            await neo4j_storage.disconnect()
+
+            self.logger.info(
+                "Enhanced fact processing completed",
+                facts_processed=result['facts_processed'],
+                entities_created=result['entities_created'],
+                keyword_entities=result['keyword_entities_created'],
+                relations_created=result['relations_created']
+            )
+
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Enhanced fact processing failed: {e}")
+            return {
+                'facts_processed': 0,
+                'entities_created': 0,
+                'keyword_entities_created': 0,
+                'relations_created': 0,
+                'error': str(e)
             }
 
 
@@ -1843,7 +2256,8 @@ class FactExtractionWrapper:
 
             self.graph_builder = FactGraphBuilder(
                 model_id="gemini-2.0-flash",
-                api_key=api_key
+                api_key=api_key,
+                language=context.get('language', 'en')
             )
 
             self._initialized = True

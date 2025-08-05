@@ -14,11 +14,11 @@ from pydantic import BaseModel
 logger = structlog.get_logger(__name__)
 
 try:
-    from morag_graph import (
-        EntityExtractor, RelationExtractor, Neo4jStorage, QdrantStorage,
-        Neo4jConfig, QdrantConfig, DatabaseType, DatabaseConfig, DatabaseResult,
-        Entity, Relation
-    )
+    # Import components directly to avoid circular import issues
+    from morag_graph.extraction import EntityExtractor, RelationExtractor
+    from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
+    from morag_graph.models.database_config import DatabaseType, DatabaseConfig, DatabaseResult
+    from morag_graph.models import Entity, Relation
     # Import LLMConfig and batch processing from morag-reasoning package
     try:
         from morag_reasoning.llm import LLMConfig, LLMClient
