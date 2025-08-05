@@ -830,12 +830,24 @@ class IngestionCoordinator:
                     # Store embeddings with metadata
                     for j, (entity_key, entity_data) in enumerate(batch):
                         if j < len(batch_embeddings):
+                            embedding = batch_embeddings[j]
+                            # Handle different embedding result types
+                            if hasattr(embedding, 'embedding'):
+                                # EmbeddingResult object
+                                embedding_vector = embedding.embedding
+                            elif isinstance(embedding, list):
+                                # Direct list of floats
+                                embedding_vector = embedding
+                            else:
+                                logger.warning(f"Unexpected embedding type: {type(embedding)}")
+                                continue
+
                             entity_embeddings[entity_key] = {
                                 'name': entity_data['name'],
                                 'type': entity_data['type'],
-                                'embedding': batch_embeddings[j],
+                                'embedding': embedding_vector,
                                 'embedding_model': 'text-embedding-004',
-                                'embedding_dimensions': len(batch_embeddings[j]),
+                                'embedding_dimensions': len(embedding_vector),
                                 'context': entity_data.get('context', '')
                             }
 
@@ -852,12 +864,23 @@ class IngestionCoordinator:
                                 entity_text, task_type="retrieval_document"
                             )
 
+                            # Handle different embedding result types
+                            if hasattr(embedding, 'embedding'):
+                                # EmbeddingResult object
+                                embedding_vector = embedding.embedding
+                            elif isinstance(embedding, list):
+                                # Direct list of floats
+                                embedding_vector = embedding
+                            else:
+                                logger.warning(f"Unexpected embedding type: {type(embedding)}")
+                                continue
+
                             entity_embeddings[entity_key] = {
                                 'name': entity_data['name'],
                                 'type': entity_data['type'],
-                                'embedding': embedding,
+                                'embedding': embedding_vector,
                                 'embedding_model': 'text-embedding-004',
-                                'embedding_dimensions': len(embedding),
+                                'embedding_dimensions': len(embedding_vector),
                                 'context': entity_data.get('context', '')
                             }
 
@@ -914,11 +937,23 @@ class IngestionCoordinator:
                     # Store embeddings with metadata
                     for j, fact in enumerate(batch):
                         if j < len(batch_embeddings):
+                            embedding = batch_embeddings[j]
+                            # Handle different embedding result types
+                            if hasattr(embedding, 'embedding'):
+                                # EmbeddingResult object
+                                embedding_vector = embedding.embedding
+                            elif isinstance(embedding, list):
+                                # Direct list of floats
+                                embedding_vector = embedding
+                            else:
+                                logger.warning(f"Unexpected embedding type: {type(embedding)}")
+                                continue
+
                             fact_embeddings[fact['id']] = {
                                 'fact_id': fact['id'],
-                                'embedding': batch_embeddings[j],
+                                'embedding': embedding_vector,
                                 'embedding_model': 'text-embedding-004',
-                                'embedding_dimensions': len(batch_embeddings[j]),
+                                'embedding_dimensions': len(embedding_vector),
                                 'fact_text': batch_texts[j],
                                 'subject': fact.get('subject'),
                                 'approach': fact.get('approach'),
@@ -937,11 +972,22 @@ class IngestionCoordinator:
                                 fact_text, task_type="retrieval_document"
                             )
 
+                            # Handle different embedding result types
+                            if hasattr(embedding, 'embedding'):
+                                # EmbeddingResult object
+                                embedding_vector = embedding.embedding
+                            elif isinstance(embedding, list):
+                                # Direct list of floats
+                                embedding_vector = embedding
+                            else:
+                                logger.warning(f"Unexpected embedding type: {type(embedding)}")
+                                continue
+
                             fact_embeddings[fact['id']] = {
                                 'fact_id': fact['id'],
-                                'embedding': embedding,
+                                'embedding': embedding_vector,
                                 'embedding_model': 'text-embedding-004',
-                                'embedding_dimensions': len(embedding),
+                                'embedding_dimensions': len(embedding_vector),
                                 'fact_text': fact_text,
                                 'subject': fact.get('subject'),
                                 'approach': fact.get('approach'),
@@ -2257,7 +2303,7 @@ class FactExtractionWrapper:
             self.graph_builder = FactGraphBuilder(
                 model_id="gemini-2.0-flash",
                 api_key=api_key,
-                language=context.get('language', 'en')
+                language=context.get('language', 'en') if context else 'en'
             )
 
             self._initialized = True

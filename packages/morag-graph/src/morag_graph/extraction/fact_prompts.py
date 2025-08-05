@@ -41,7 +41,7 @@ The extracted facts must be in the SAME language as the input text.
 If the input text is in {language_name}, your response must be entirely in {language_name}.
 """
 
-        return language_instruction + """
+        return language_instruction + f"""
 You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information that can be used independently to answer questions or solve problems.
 
 ENHANCED FACT STRUCTURE:
@@ -58,12 +58,15 @@ QUALITY REQUIREMENTS:
 - Facts must be ACTIONABLE and SPECIFIC, not generic or trivial
 - Include exact dosages, measurements, frequencies, and durations
 - Each fact must be SELF-CONTAINED and usable without the original text
-- Avoid generic advice like "consult a doctor" unless it specifies a specialist type
-- Focus on domain-specific knowledge that is not commonly known
+- STRICTLY AVOID generic advice like "take a break", "consult a doctor", "eat healthy", "exercise regularly"
+- Focus ONLY on domain-specific knowledge that is not commonly known
+- REJECT facts that could apply to any domain or are general life advice
+- ONLY extract facts that contain specific substances, techniques, measurements, or procedures
+- If no domain-specific facts are found, return an empty array []
 
 FEW-SHOT EXAMPLES:
 
-Example 1 (Herbal Medicine):
+Example 1 (Medical/Herbal):
 Text: "For chronic stress and anxiety, use 300-600mg of standardized Ashwagandha extract (containing 5% withanolides) twice daily with meals. Treatment should be continued for 8-12 weeks for optimal results. Do not exceed 2 weeks without a break."
 
 Extracted Fact:
@@ -79,32 +82,64 @@ Extracted Fact:
   "keywords": ["ashwagandha", "withanolides", "adaptogen", "chronic stress", "anxiety management"]
 }}
 
-Example 2 (Technical Process):
-Text: "When preparing DMSO-based herbal extractions for topical pain relief, combine 100g dried herb with 500ml DMSO, macerate for 14 days at room temperature, strain, and apply 5ml to affected area 3 times daily. Maximum treatment duration is 2 weeks."
+Example 2 (Technical/Engineering):
+Text: "To optimize PostgreSQL query performance, create a B-tree index on frequently queried columns using CREATE INDEX idx_name ON table_name (column_name). For composite queries, use multi-column indexes with the most selective column first. Rebuild indexes monthly using REINDEX."
 
 Extracted Fact:
 {{
-  "subject": "DMSO herbal extraction",
-  "object": "topical pain relief",
-  "approach": "100g dried herb + 500ml DMSO, macerate 14 days, apply 5ml 3x daily",
-  "solution": "effective topical pain relief",
-  "condition": "To prepare herbal DMSO extractions for pain management",
-  "remarks": "Maximum treatment duration 2 weeks. Room temperature maceration required",
-  "fact_type": "process",
+  "subject": "PostgreSQL B-tree index",
+  "object": "query performance optimization",
+  "approach": "CREATE INDEX on frequently queried columns, most selective column first for composite indexes, monthly REINDEX",
+  "solution": "improved query execution speed and database performance",
+  "condition": "To optimize database query performance in PostgreSQL",
+  "remarks": "Requires monthly maintenance with REINDEX. Column selectivity order matters for composite indexes",
+  "fact_type": "methodological",
   "confidence": 0.95,
-  "keywords": ["DMSO", "herbal extraction", "maceration", "topical application", "pain relief"]
+  "keywords": ["PostgreSQL", "B-tree index", "query optimization", "database performance", "REINDEX"]
 }}
 
-Domain: """ + domain + f"""
+Example 3 (Business/Finance):
+Text: "For small business cash flow management, maintain 3-6 months of operating expenses in reserve. Use the 50/30/20 rule: 50% for essential expenses, 30% for growth investments, 20% for emergency fund. Review monthly and adjust based on seasonal patterns."
+
+Extracted Fact:
+{{
+  "subject": "50/30/20 cash flow rule",
+  "object": "small business financial stability",
+  "approach": "50% essential expenses, 30% growth investments, 20% emergency fund, monthly review with seasonal adjustments",
+  "solution": "improved cash flow management and financial stability",
+  "condition": "To manage cash flow for small business operations",
+  "remarks": "Requires 3-6 months operating expenses in reserve. Monthly review essential for seasonal adjustments",
+  "fact_type": "methodological",
+  "confidence": 0.85,
+  "keywords": ["cash flow management", "50/30/20 rule", "small business", "financial planning", "emergency fund"]
+}}
+
+Example 4 (Legal/Compliance):
+Text: "Under GDPR Article 17, individuals have the right to erasure (right to be forgotten) within 30 days of request. Organizations must delete personal data unless legal obligations require retention. Document all deletion requests and maintain audit logs for compliance verification."
+
+Extracted Fact:
+{{
+  "subject": "GDPR Article 17 right to erasure",
+  "object": "personal data deletion compliance",
+  "approach": "Delete personal data within 30 days of request, maintain audit logs, document all requests",
+  "solution": "GDPR compliance and individual privacy protection",
+  "condition": "To comply with GDPR data erasure requirements",
+  "remarks": "Exceptions apply for legal obligations. Audit logs required for compliance verification",
+  "fact_type": "regulatory",
+  "confidence": 0.95,
+  "keywords": ["GDPR", "right to erasure", "data deletion", "compliance", "audit logs"]
+}}
+
+Domain: {domain}
 Target Language: {language_name} ({language})
 
 REMEMBER: Extract ALL content in {language_name}. Do NOT use English or any other language.
 
-Text: {{chunk_text}}
+Text: {{{{chunk_text}}}}
 
 Respond with JSON array of facts in {language_name}:
 [
-  {{
+  {{{{
     "subject": "specific substance/entity",
     "object": "specific condition/problem/target",
     "approach": "exact method/dosage/procedure with specific details",
@@ -114,17 +149,44 @@ Respond with JSON array of facts in {language_name}:
     "fact_type": "process|definition|causal|methodological|safety",
     "confidence": 0.0-1.0,
     "keywords": ["domain-specific", "technical", "terms"]
-  }}
+  }}}}
 ]
 
 CRITICAL GUIDELINES:
-- LANGUAGE: Extract ALL content in """ + language_name + f""" ({language}). Never use English or other languages.
+- LANGUAGE: Extract ALL content in {language_name} ({language}). Never use English or other languages.
 - Only extract facts with high practical value and specificity
 - Include exact measurements, frequencies, and specifications
 - The "condition" field should describe when/why to use this fact
 - Keywords should become separate entities in the knowledge graph
 - Ensure confidence >0.7 for all extracted facts
-- Avoid trivial or commonly known information"""
+- Avoid trivial or commonly known information
+
+STRICT FILTERING RULES:
+- REJECT any fact that mentions generic advice like "take breaks", "rest", "relax", "exercise"
+- REJECT any fact about general lifestyle recommendations
+- REJECT any fact that doesn't mention specific substances, dosages, techniques, or procedures
+- ACCEPT only facts that contain domain-specific knowledge with measurable parameters
+- ACCEPT only facts that mention specific plants, compounds, techniques, or medical procedures
+- If the text contains only general advice, return an empty array: []
+
+EXAMPLES OF INVALID FACTS TO REJECT:
+- "Take regular breaks to reduce stress" (generic advice)
+- "Exercise helps with ADHD" (no specific measurements)
+- "Healthy diet is important" (vague recommendation)
+- "Get enough sleep" (no specific guidance)
+- "Consult your doctor" (generic referral)
+- "Use best practices" (no specific practices mentioned)
+- "Follow industry standards" (no specific standards)
+- "Implement proper security" (no specific measures)
+
+EXAMPLES OF VALID FACTS TO EXTRACT:
+- "Ginkgo biloba 120mg twice daily improves concentration in ADHD patients" (specific dosage, frequency, condition)
+- "PostgreSQL connection pooling with 20 max connections reduces response time by 40%" (specific configuration, measurable outcome)
+- "GDPR requires data breach notification within 72 hours to supervisory authorities" (specific timeframe, legal requirement)
+- "React useEffect with empty dependency array runs only on component mount" (specific technical behavior)
+- "Compound annual growth rate (CAGR) formula: (Ending Value/Beginning Value)^(1/years) - 1" (specific calculation method)
+
+Remember: If no specific, measurable, domain-relevant facts are found, return []"""
 
     @staticmethod
     def get_fact_validation_prompt() -> str:
@@ -176,11 +238,11 @@ Available fact types:
 - methodological: Methods, techniques, approaches
 
 Respond with JSON:
-{{
+{
   "fact_type": "most_appropriate_type",
   "confidence": 0.0-1.0,
   "reasoning": "explanation for the classification"
-}}"""
+}"""
 
     @staticmethod
     def get_fact_relationship_prompt(language: str = "en") -> str:
@@ -232,13 +294,13 @@ Only create relationships that are clearly supported by the text.
 
 Respond with JSON array:
 [
-  {{
+  {
     "source_fact_id": "fact_id_1",
     "target_fact_id": "fact_id_2",
     "relation_type": "SUPPORTS|ELABORATES|CONTRADICTS|SEQUENCE|COMPARISON|CAUSATION|TEMPORAL_ORDER",
     "confidence": 0.0-1.0,
     "context": "explanation of the relationship"
-  }}
+  }
 ]"""
 
     @staticmethod
@@ -276,21 +338,29 @@ Respond with JSON:
         max_facts: int = 10
     ) -> str:
         """Create a complete extraction prompt with text.
-        
+
         Args:
             chunk_text: Text to extract facts from
             domain: Domain context
             language: Language of the text
             max_facts: Maximum number of facts to extract
-            
+
         Returns:
             Complete prompt ready for LLM
         """
         base_prompt = FactExtractionPrompts.get_fact_extraction_prompt(domain, language)
-        
-        return base_prompt.format(
-            chunk_text=chunk_text
-        ) + f"\n\nExtract at most {max_facts} high-quality facts from the text."
+
+        # Replace the placeholder with actual text
+        complete_prompt = base_prompt.replace("{{chunk_text}}", chunk_text)
+
+        # Debug: Log the prompt replacement
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Prompt replacement debug - chunk_text length: {len(chunk_text)}")
+        logger.debug(f"Base prompt contains {{{{chunk_text}}}}: {'{{chunk_text}}' in base_prompt}")
+        logger.debug(f"Complete prompt contains chunk text: {chunk_text[:100] in complete_prompt if len(chunk_text) > 100 else chunk_text in complete_prompt}")
+
+        return complete_prompt + f"\n\nExtract at most {max_facts} high-quality facts from the text."
 
     @staticmethod
     def create_validation_prompt(fact_dict: Dict[str, Any]) -> str:

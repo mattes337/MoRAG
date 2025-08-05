@@ -153,11 +153,22 @@ class FactEmbeddingService:
             RETURN f.id as id
             """
             
+            # Handle different embedding result types
+            if hasattr(embedding, 'embedding'):
+                # EmbeddingResult object
+                embedding_vector = embedding.embedding
+            elif isinstance(embedding, list):
+                # Direct list of floats
+                embedding_vector = embedding
+            else:
+                self.logger.error(f"Unexpected embedding type: {type(embedding)}")
+                return False
+
             results = await self.neo4j_storage._connection_ops._execute_query(query, {
                 "fact_id": fact_id,
-                "embedding": embedding,
+                "embedding": embedding_vector,
                 "model": "text-embedding-004",
-                "dimensions": len(embedding),
+                "dimensions": len(embedding_vector),
                 "created_at": datetime.utcnow().isoformat()
             })
             

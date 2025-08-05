@@ -59,13 +59,21 @@ class EnhancedFactProcessingService:
             
             # Step 4: Store all facts
             stored_facts = await self._store_facts(facts)
-            
+
+            # Step 5: Create chunk-entity relationships
+            chunk_entity_relations = 0
+            if created_entities or keyword_entities:
+                chunk_entity_relations = await self._create_chunk_entity_relations(
+                    facts, created_entities + keyword_entities
+                )
+
             result = {
                 'facts_processed': len(facts),
                 'facts_stored': len(stored_facts),
                 'entities_created': len(created_entities),
                 'keyword_entities_created': len(keyword_entities),
                 'relations_created': len(created_relations),
+                'chunk_entity_relations': chunk_entity_relations,
                 'entities': created_entities + keyword_entities,
                 'relations': created_relations
             }
@@ -243,23 +251,23 @@ class EnhancedFactProcessingService:
                     subject_normalized = fact.subject.lower().strip()
                     if subject_normalized in entity_lookup:
                         subject_entity = entity_lookup[subject_normalized]
-                        relation = await self._create_fact_entity_relation(
+                        success = await self._create_fact_entity_relation(
                             fact, subject_entity, "ABOUT_SUBJECT"
                         )
-                        if relation:
-                            created_relations.append(relation)
-                
+                        if success:
+                            created_relations.append(f"fact_{fact.id}_to_{subject_entity.id}_ABOUT_SUBJECT")
+
                 # Create relation from fact to object entity
                 if fact.object and fact.object.strip():
                     object_normalized = fact.object.lower().strip()
                     if object_normalized in entity_lookup:
                         object_entity = entity_lookup[object_normalized]
-                        relation = await self._create_fact_entity_relation(
+                        success = await self._create_fact_entity_relation(
                             fact, object_entity, "ADDRESSES_OBJECT"
                         )
-                        if relation:
-                            created_relations.append(relation)
-                
+                        if success:
+                            created_relations.append(f"fact_{fact.id}_to_{object_entity.id}_ADDRESSES_OBJECT")
+
                 # Create relations from fact to keyword entities
                 if fact.keywords:
                     for keyword in fact.keywords:
@@ -267,11 +275,11 @@ class EnhancedFactProcessingService:
                             keyword_normalized = keyword.lower().strip()
                             if keyword_normalized in entity_lookup:
                                 keyword_entity = entity_lookup[keyword_normalized]
-                                relation = await self._create_fact_entity_relation(
+                                success = await self._create_fact_entity_relation(
                                     fact, keyword_entity, "TAGGED_WITH"
                                 )
-                                if relation:
-                                    created_relations.append(relation)
+                                if success:
+                                    created_relations.append(f"fact_{fact.id}_to_{keyword_entity.id}_TAGGED_WITH")
                 
             except Exception as e:
                 self.logger.warning(f"Failed to create relations for fact {fact.id}: {e}")
@@ -285,39 +293,130 @@ class EnhancedFactProcessingService:
         fact: Fact,
         entity: Entity,
         relation_type: str
-    ) -> Relation:
-        """Create a single fact-entity relation.
-        
+    ) -> bool:
+        """Create a direct relationship between a fact and an entity in Neo4j.
+
         Args:
             fact: Source fact
             entity: Target entity
             relation_type: Type of relation
-            
+
         Returns:
-            Created relation or None if failed
+            True if relation was created successfully, False otherwise
         """
         try:
-            relation = Relation(
-                source_entity_id=f"fact_{fact.id}",  # Treat fact as source entity
-                target_entity_id=entity.id,
-                relation_type=relation_type,
-                confidence=min(fact.extraction_confidence, entity.confidence),
-                attributes={
-                    'fact_id': fact.id,
-                    'entity_name': entity.name,
-                    'created_from': 'enhanced_fact_processing',
-                    'domain': fact.domain
-                }
-            )
-            
-            # Store relation
-            await self.neo4j_storage.store_relation(relation)
-            return relation
-            
+            # Create direct relationship between Fact node and Entity node
+            query = """
+            MATCH (f:Fact {id: $fact_id})
+            MATCH (e:Entity {id: $entity_id})
+            MERGE (f)-[r:RELATES_TO {type: $relation_type}]->(e)
+            SET r.confidence = $confidence,
+                r.created_from = 'enhanced_fact_processing',
+                r.domain = $domain,
+                r.created_at = datetime()
+            RETURN r
+            """
+
+            result = await self.neo4j_storage._connection_ops._execute_query(query, {
+                'fact_id': fact.id,
+                'entity_id': entity.id,
+                'relation_type': relation_type,
+                'confidence': min(fact.extraction_confidence or 0.8, entity.confidence or 0.8),
+                'domain': fact.domain or 'general'
+            })
+
+            if result and len(result) > 0:
+                self.logger.debug(f"Created {relation_type} relation between fact {fact.id} and entity {entity.id}")
+                return True
+            else:
+                self.logger.warning(f"Failed to create relation between fact {fact.id} and entity {entity.id}")
+                return False
+
         except Exception as e:
             self.logger.warning(f"Failed to create fact-entity relation: {e}")
-            return None
-    
+            return False
+
+    async def _create_chunk_entity_relations(self, facts: List[Fact], entities: List[Entity]) -> int:
+        """Create relationships between document chunks and entities derived from facts.
+
+        Args:
+            facts: List of facts with source chunk information
+            entities: List of entities to relate to chunks
+
+        Returns:
+            Number of chunk-entity relations created
+        """
+        created_relations = 0
+
+        # Create entity name lookup for faster matching
+        entity_lookup = {}
+        for entity in entities:
+            normalized_name = entity.name.lower().strip()
+            entity_lookup[normalized_name] = entity
+
+        # Group facts by source chunk
+        chunk_facts = {}
+        for fact in facts:
+            chunk_id = fact.source_chunk_id
+            if chunk_id:
+                if chunk_id not in chunk_facts:
+                    chunk_facts[chunk_id] = []
+                chunk_facts[chunk_id].append(fact)
+
+        # Create chunk-entity relationships
+        for chunk_id, chunk_fact_list in chunk_facts.items():
+            try:
+                # Collect all entities mentioned in this chunk's facts
+                chunk_entities = set()
+
+                for fact in chunk_fact_list:
+                    # Add subject entity
+                    if fact.subject and fact.subject.strip():
+                        subject_normalized = fact.subject.lower().strip()
+                        if subject_normalized in entity_lookup:
+                            chunk_entities.add(entity_lookup[subject_normalized])
+
+                    # Add object entity
+                    if fact.object and fact.object.strip():
+                        object_normalized = fact.object.lower().strip()
+                        if object_normalized in entity_lookup:
+                            chunk_entities.add(entity_lookup[object_normalized])
+
+                    # Add keyword entities
+                    if fact.keywords:
+                        for keyword in fact.keywords:
+                            if keyword and keyword.strip():
+                                keyword_normalized = keyword.lower().strip()
+                                if keyword_normalized in entity_lookup:
+                                    chunk_entities.add(entity_lookup[keyword_normalized])
+
+                # Create relationships between chunk and entities
+                for entity in chunk_entities:
+                    query = """
+                    MATCH (c:DocumentChunk {id: $chunk_id})
+                    MATCH (e:Entity {id: $entity_id})
+                    MERGE (c)-[r:MENTIONS]->(e)
+                    SET r.created_from = 'enhanced_fact_processing',
+                        r.created_at = datetime()
+                    RETURN r
+                    """
+
+                    result = await self.neo4j_storage._connection_ops._execute_query(query, {
+                        'chunk_id': chunk_id,
+                        'entity_id': entity.id
+                    })
+
+                    if result and len(result) > 0:
+                        created_relations += 1
+                        self.logger.debug(f"Created MENTIONS relation between chunk {chunk_id} and entity {entity.id}")
+
+            except Exception as e:
+                self.logger.warning(f"Failed to create chunk-entity relations for chunk {chunk_id}: {e}")
+                continue
+
+        self.logger.info(f"Created {created_relations} chunk-entity relations")
+        return created_relations
+
     async def _store_facts(self, facts: List[Fact]) -> List[Fact]:
         """Store facts in the database.
         
