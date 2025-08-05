@@ -273,9 +273,18 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                 # This is ingest_result.json format
                 graph_data_section = ingestion_data.get('graph_data', {})
 
-            entities_data = graph_data_section.get('entities', [])
+            # Check for enhanced processing data first (preferred)
+            enhanced_processing = graph_data_section.get('enhanced_processing', {})
+            if enhanced_processing and enhanced_processing.get('entities'):
+                entities_data = enhanced_processing.get('entities', [])
+                print(f"🔍 DEBUG: Found {len(entities_data)} entities from enhanced processing")
+            else:
+                # Fallback to basic entities data
+                entities_data = graph_data_section.get('entities', [])
+                print(f"🔍 DEBUG: Found {len(entities_data)} entities from basic graph_data")
+
             relations_data = graph_data_section.get('relations', [])
-            print(f"🔍 DEBUG: Found {len(entities_data)} entities and {len(relations_data)} relations in graph_data")
+            print(f"🔍 DEBUG: Found {len(relations_data)} relations in graph_data")
 
             # Check if chunk_entity_mapping exists, if not, create it
             chunk_entity_mapping = graph_data_section.get('chunk_entity_mapping', {})
@@ -331,13 +340,31 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                     print(f"[WARN]  Warning: Failed to create relation {relation_dict.get('id', 'unknown')}: {e}")
                     continue
 
+            # Include enhanced processing data and embeddings
             graph_data = {
                 'entities': entities,
-                'relations': relations
+                'relations': relations,
+                'facts': graph_data_section.get('facts', []),
+                'relationships': graph_data_section.get('relationships', []),
+                'chunk_fact_mapping': graph_data_section.get('chunk_fact_mapping', {}),
+                'enhanced_processing': enhanced_processing,
+                'entity_embeddings': graph_data_section.get('entity_embeddings', {}),
+                'fact_embeddings': graph_data_section.get('fact_embeddings', {}),
+                'extraction_metadata': graph_data_section.get('extraction_metadata', {})
             }
         else:
             # No graph data available
-            graph_data = {'entities': [], 'relations': []}
+            graph_data = {
+                'entities': [],
+                'relations': [],
+                'facts': [],
+                'relationships': [],
+                'chunk_fact_mapping': {},
+                'enhanced_processing': {},
+                'entity_embeddings': {},
+                'fact_embeddings': {},
+                'extraction_metadata': {}
+            }
 
         # Add the recreated chunk_entity_mapping to graph_data if it was created
         if 'chunk_entity_mapping' in locals() and chunk_entity_mapping:

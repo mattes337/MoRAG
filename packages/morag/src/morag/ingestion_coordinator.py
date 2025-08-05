@@ -1492,7 +1492,12 @@ class IngestionCoordinator:
                 'facts': graph_data.get('facts', []),
                 'relationships': graph_data.get('relationships', []),
                 'chunk_fact_mapping': graph_data.get('chunk_fact_mapping', {}),
-                'extraction_metadata': graph_data.get('extraction_metadata', {})
+                'extraction_metadata': graph_data.get('extraction_metadata', {}),
+                'enhanced_processing': graph_data.get('enhanced_processing', {}),
+                'entity_embeddings': graph_data.get('entity_embeddings', {}),
+                'fact_embeddings': graph_data.get('fact_embeddings', {}),
+                'entities': [entity.to_dict() if hasattr(entity, 'to_dict') else entity for entity in graph_data.get('enhanced_processing', {}).get('entities', [])],
+                'entity_fact_relations': graph_data.get('enhanced_processing', {}).get('relations', [])
             }
         }
 
@@ -1600,6 +1605,81 @@ class IngestionCoordinator:
                    uri=neo4j_config.uri)
 
         await neo4j_storage.disconnect()
+
+    async def _store_enhanced_processing_data(
+        self,
+        neo4j_storage,
+        graph_data: Dict[str, Any],
+        facts: List
+    ):
+        """Store pre-computed entities and embeddings from enhanced processing data."""
+        try:
+            enhanced_processing = graph_data.get('enhanced_processing', {})
+            entity_embeddings = graph_data.get('entity_embeddings', {})
+            fact_embeddings = graph_data.get('fact_embeddings', {})
+
+            # Store facts first
+            if facts:
+                from morag_graph.storage.neo4j_operations.fact_operations import FactOperations
+                fact_operations = FactOperations(neo4j_storage.driver, neo4j_storage.config.database)
+
+                for fact in facts:
+                    await fact_operations.store_fact(fact)
+
+                logger.info(f"Stored {len(facts)} facts from enhanced processing data")
+
+            # Store entities from enhanced processing
+            entities = enhanced_processing.get('entities', [])
+            if entities:
+                from morag_graph.models.entity import Entity
+                from morag_graph.storage.neo4j_operations.entity_operations import EntityOperations
+                entity_operations = EntityOperations(neo4j_storage.driver, neo4j_storage.config.database)
+
+                for entity_data in entities:
+                    if isinstance(entity_data, dict):
+                        entity = Entity(**entity_data)
+                    else:
+                        entity = entity_data
+                    await entity_operations.store_entity(entity)
+
+                logger.info(f"Stored {len(entities)} entities from enhanced processing data")
+
+            # Store entity embeddings
+            if entity_embeddings:
+                from morag_graph.services.entity_embedding_service import EntityEmbeddingService
+                from morag_services.embedding import GeminiEmbeddingService
+                import os
+
+                api_key = os.getenv('GEMINI_API_KEY')
+                if api_key:
+                    gemini_service = GeminiEmbeddingService(api_key=api_key)
+                    entity_embedding_service = EntityEmbeddingService(neo4j_storage, gemini_service)
+
+                    for entity_id, embedding in entity_embeddings.items():
+                        await entity_embedding_service.store_entity_embedding(entity_id, embedding)
+
+                    logger.info(f"Stored {len(entity_embeddings)} entity embeddings")
+
+            # Store fact embeddings
+            if fact_embeddings:
+                from morag_graph.services.fact_embedding_service import FactEmbeddingService
+                from morag_services.embedding import GeminiEmbeddingService
+                import os
+
+                api_key = os.getenv('GEMINI_API_KEY')
+                if api_key:
+                    gemini_service = GeminiEmbeddingService(api_key=api_key)
+                    fact_embedding_service = FactEmbeddingService(neo4j_storage, gemini_service)
+
+                    for fact_id, embedding in fact_embeddings.items():
+                        await fact_embedding_service.store_fact_embedding(fact_id, embedding)
+
+                    logger.info(f"Stored {len(fact_embeddings)} fact embeddings")
+
+        except Exception as e:
+            logger.error(f"Failed to store enhanced processing data: {e}")
+            import traceback
+            traceback.print_exc()
 
     async def _write_to_databases(
         self,
@@ -1843,7 +1923,15 @@ class IngestionCoordinator:
                     fact = fact_data
                 facts_to_process.append(fact)
 
-            if facts_to_process:
+            # Check if enhanced processing has already been done
+            enhanced_processing = graph_data.get('enhanced_processing', {})
+            has_enhanced_data = (
+                enhanced_processing and
+                enhanced_processing.get('entities_created', 0) > 0 and
+                enhanced_processing.get('relations_created', 0) > 0
+            )
+
+            if facts_to_process and not has_enhanced_data:
                 # Use enhanced fact processing service for entity creation and relationships
                 from morag_graph.services.enhanced_fact_processing_service import EnhancedFactProcessingService
                 from morag_graph.extraction.entity_normalizer import LLMEntityNormalizer
@@ -1874,6 +1962,15 @@ class IngestionCoordinator:
 
                 # Facts, entities, and relationships are already stored by the enhanced processor
                 facts_stored = result['facts_stored']
+            elif has_enhanced_data:
+                logger.info(f"Enhanced processing already completed - using existing data: {enhanced_processing.get('entities_created', 0)} entities, {enhanced_processing.get('relations_created', 0)} relations")
+
+                # Store the pre-computed entities and embeddings from enhanced processing
+                await self._store_enhanced_processing_data(neo4j_storage, graph_data, facts_to_process)
+
+                facts_stored = len(facts_to_process)
+            else:
+                facts_stored = 0
 
             # Store fact relationships (if any)
             relationship_ids = []

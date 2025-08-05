@@ -119,13 +119,13 @@ class Entity(BaseModel):
     def get_neo4j_label(self) -> str:
         """Get the Neo4j label for this entity.
 
-        All entities use the generic 'ENTITY' label for unified querying.
+        All entities use the generic 'Entity' label for unified querying.
         The specific type is stored in the 'type' property.
 
         Returns:
-            Always returns 'ENTITY' for unified entity handling
+            Always returns 'Entity' for unified entity handling
         """
-        return "ENTITY"
+        return "Entity"
 
     @field_validator('confidence')
     @classmethod

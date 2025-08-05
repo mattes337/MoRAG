@@ -69,12 +69,17 @@ class EnhancedFactProcessingService:
             # Step 4: Store all facts
             stored_facts = await self._store_facts(facts)
 
-            # Step 5: Create chunk-entity relationships
+            # Step 6: Create chunk-entity relationships
             chunk_entity_relations = 0
             if created_entities or keyword_entities:
                 chunk_entity_relations = await self._create_chunk_entity_relations(
                     facts, created_entities + keyword_entities
                 )
+
+            # Step 7: Generate and store embeddings for entities and facts
+            embeddings_stored = await self._generate_and_store_embeddings(
+                facts, created_entities + keyword_entities
+            )
 
             result = {
                 'facts_processed': len(facts),
@@ -84,6 +89,7 @@ class EnhancedFactProcessingService:
                 'relations_created': len(created_relations),
                 'chunk_relations_created': chunk_relations_created,
                 'chunk_entity_relations': chunk_entity_relations,
+                'embeddings_stored': embeddings_stored,
                 'entities': created_entities + keyword_entities,
                 'relations': created_relations
             }
@@ -518,6 +524,67 @@ class EnhancedFactProcessingService:
 
         self.logger.info(f"Created {created_relations} fact-chunk relations")
         return created_relations
+
+    async def _generate_and_store_embeddings(self, facts: List[Fact], entities: List[Entity]) -> dict:
+        """Generate and store embeddings for facts and entities in Neo4j.
+
+        Args:
+            facts: List of facts to generate embeddings for
+            entities: List of entities to generate embeddings for
+
+        Returns:
+            Dictionary with embedding statistics
+        """
+        try:
+            from morag_graph.services.entity_embedding_service import EntityEmbeddingService
+            from morag_graph.services.fact_embedding_service import FactEmbeddingService
+            from morag_services.embedding import GeminiEmbeddingService
+            import os
+
+            # Initialize embedding services
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                self.logger.warning("GEMINI_API_KEY not found - skipping embedding generation")
+                return {'entities_embedded': 0, 'facts_embedded': 0}
+
+            gemini_service = GeminiEmbeddingService(api_key=api_key)
+            entity_embedding_service = EntityEmbeddingService(self.neo4j_storage, gemini_service)
+            fact_embedding_service = FactEmbeddingService(self.neo4j_storage, gemini_service)
+
+            # Generate and store entity embeddings
+            entities_embedded = 0
+            for entity in entities:
+                try:
+                    embedding = await entity_embedding_service.generate_entity_embedding(entity.id)
+                    if embedding:
+                        success = await entity_embedding_service.store_entity_embedding(entity.id, embedding)
+                        if success:
+                            entities_embedded += 1
+                            self.logger.debug(f"Stored embedding for entity {entity.id}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to generate/store embedding for entity {entity.id}: {e}")
+                    continue
+
+            # Generate and store fact embeddings
+            facts_embedded = 0
+            for fact in facts:
+                try:
+                    embedding = await fact_embedding_service.generate_fact_embedding(fact.id)
+                    if embedding:
+                        success = await fact_embedding_service.store_fact_embedding(fact.id, embedding)
+                        if success:
+                            facts_embedded += 1
+                            self.logger.debug(f"Stored embedding for fact {fact.id}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to generate/store embedding for fact {fact.id}: {e}")
+                    continue
+
+            self.logger.info(f"Generated and stored embeddings: {entities_embedded} entities, {facts_embedded} facts")
+            return {'entities_embedded': entities_embedded, 'facts_embedded': facts_embedded}
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate embeddings: {e}")
+            return {'entities_embedded': 0, 'facts_embedded': 0}
     
     async def _create_fact_entity_relation(
         self,
@@ -537,10 +604,11 @@ class EnhancedFactProcessingService:
         """
         try:
             # Create direct relationship between Fact node and Entity node
-            query = """
-            MATCH (f:Fact {id: $fact_id})
-            MATCH (e:ENTITY {id: $entity_id})
-            MERGE (f)-[r:RELATES_TO {type: $relation_type}]->(e)
+            # Use the dynamic relation_type as the actual relationship type
+            query = f"""
+            MATCH (f:Fact {{id: $fact_id}})
+            MATCH (e:Entity {{id: $entity_id}})
+            MERGE (f)-[r:{relation_type}]->(e)
             SET r.confidence = $confidence,
                 r.created_from = 'enhanced_fact_processing',
                 r.domain = $domain,
@@ -551,7 +619,6 @@ class EnhancedFactProcessingService:
             result = await self.neo4j_storage._connection_ops._execute_query(query, {
                 'fact_id': fact.id,
                 'entity_id': entity.id,
-                'relation_type': relation_type,
                 'confidence': min(fact.extraction_confidence or 0.8, entity.confidence or 0.8),
                 'domain': fact.domain or 'general'
             })
@@ -625,7 +692,7 @@ class EnhancedFactProcessingService:
                 for entity in chunk_entities:
                     query = """
                     MATCH (c:DocumentChunk {id: $chunk_id})
-                    MATCH (e:ENTITY {id: $entity_id})
+                    MATCH (e:Entity {id: $entity_id})
                     MERGE (c)-[r:MENTIONS]->(e)
                     SET r.created_from = 'enhanced_fact_processing',
                         r.created_at = datetime()
