@@ -110,7 +110,7 @@ Be generous in extracting information - anything related to the user's query is 
             return "Unknown Entity"
     
     async def _get_document_chunks_for_entities(self, entity_names: List[str]) -> List[Dict[str, Any]]:
-        """Get DocumentChunk nodes for specific entity names.
+        """Get DocumentChunk nodes for specific entity names using multiple methods.
 
         Args:
             entity_names: List of entity names to get chunks for
@@ -119,12 +119,84 @@ Be generous in extracting information - anything related to the user's query is 
             List of chunk data with full metadata
         """
         try:
+            # Method 1: Direct Neo4j lookup
             chunks = await self.neo4j_storage.get_document_chunks_by_entity_names(entity_names)
+
+            # Method 2: Vector search if we have few or no chunks
+            if len(chunks) < 5 and hasattr(self, 'qdrant_storage') and self.qdrant_storage:
+                vector_chunks = await self._get_chunks_via_vector_search(entity_names)
+                chunks.extend(vector_chunks)
+
+                # Remove duplicates
+                seen_chunk_ids = set()
+                unique_chunks = []
+                for chunk in chunks:
+                    if chunk["chunk_id"] not in seen_chunk_ids:
+                        unique_chunks.append(chunk)
+                        seen_chunk_ids.add(chunk["chunk_id"])
+                chunks = unique_chunks
+
             self.logger.debug(f"Found {len(chunks)} chunks for entities: {entity_names}")
             return chunks
         except Exception as e:
             self.logger.error("Failed to get document chunks for entities",
                             entity_names=entity_names, error=str(e))
+            return []
+
+    async def _get_chunks_via_vector_search(self, entity_names: List[str]) -> List[Dict[str, Any]]:
+        """Get chunks using vector similarity search.
+
+        Args:
+            entity_names: List of entity names to search for
+
+        Returns:
+            List of chunk data from vector search
+        """
+        try:
+            # Create search query from entity names
+            search_query = " ".join(entity_names)
+
+            # Generate embedding for the search query
+            if hasattr(self, 'embedding_service') and self.embedding_service:
+                embedding_result = await self.embedding_service.generate_embedding(
+                    search_query, task_type="retrieval_query"
+                )
+
+                # Handle both direct list return and EmbeddingResult object
+                if isinstance(embedding_result, list):
+                    query_embedding = embedding_result
+                else:
+                    query_embedding = embedding_result.embedding
+            else:
+                self.logger.warning("No embedding service available for vector search")
+                return []
+
+            # Search for similar chunks
+            search_results = await self.qdrant_storage.search_similar(
+                query_vector=query_embedding,
+                limit=10,
+                score_threshold=0.6
+            )
+
+            # Convert Qdrant results to chunk format
+            chunks = []
+            for result in search_results:
+                metadata = result.get("metadata", {})
+                chunk_data = {
+                    "chunk_id": result["id"],
+                    "document_id": metadata.get("document_id", ""),
+                    "chunk_index": metadata.get("chunk_index", 0),
+                    "content": metadata.get("text", ""),
+                    "metadata": metadata,
+                    "vector_score": result["score"]
+                }
+                chunks.append(chunk_data)
+
+            self.logger.debug(f"Vector search found {len(chunks)} chunks for entities: {entity_names}")
+            return chunks
+
+        except Exception as e:
+            self.logger.warning(f"Vector search failed: {e}")
             return []
 
     async def _get_related_entity_names(self, entity_names: List[str]) -> List[str]:
@@ -465,9 +537,15 @@ Remember: Extract EVERYTHING useful - the more facts the better!"""
             # For each entity, find similar entities
             for entity_name in entity_names:
                 # Generate embedding for the entity
-                query_embedding = await self.embedding_service.generate_embedding(
+                embedding_result = await self.embedding_service.generate_embedding(
                     entity_name, task_type="retrieval_query"
                 )
+
+                # Handle both direct list return and EmbeddingResult object
+                if isinstance(embedding_result, list):
+                    query_embedding = embedding_result
+                else:
+                    query_embedding = embedding_result.embedding
 
                 # Find similar entities
                 similar_entities = await entity_embedding_service.search_similar_entities(

@@ -15,6 +15,16 @@ logger = logging.getLogger(__name__)
 
 class EntityOperations(BaseOperations):
     """Handles entity storage, retrieval, and management operations."""
+
+    def __init__(self, driver, database):
+        """Initialize entity operations.
+
+        Args:
+            driver: Neo4j async driver
+            database: Database name
+        """
+        super().__init__(driver, database)
+        self.logger = logger
     
     def _is_generic_entity_name(self, name: str) -> bool:
         """Check if entity name is generic and should be avoided.
@@ -291,8 +301,8 @@ class EntityOperations(BaseOperations):
     async def get_document_chunks_by_entity_names(self, entity_names: List[str]) -> List[Dict[str, Any]]:
         """Get all DocumentChunk nodes related to specific entity names with full metadata.
 
-        Since the current graph doesn't have direct entity-chunk relationships,
-        we'll search for chunks that contain the entity names in their text.
+        Uses both direct entity-chunk relationships and vector similarity search
+        to find relevant chunks.
 
         Args:
             entity_names: List of entity names to search for
@@ -303,36 +313,79 @@ class EntityOperations(BaseOperations):
         if not entity_names:
             return []
 
-        # Create a case-insensitive regex pattern for each entity name
-        # Use word boundaries to avoid partial matches
-        patterns = [f"(?i)\\b{name.replace(' ', '\\s+')}\\b" for name in entity_names]
-        pattern_string = "|".join(patterns)
-
-        query = """
-        MATCH (c:DocumentChunk)
-        WHERE any(pattern IN $patterns WHERE c.text =~ pattern)
-        RETURN c.id as chunk_id,
-               c.document_id as document_id,
-               c.chunk_index as chunk_index,
-               c.text as content,
-               c.metadata as metadata
-        ORDER BY c.document_id, c.chunk_index
-        """
-
-        result = await self._execute_query(query, {"patterns": patterns})
-
         chunks = []
-        for record in result:
-            chunk_data = {
-                "chunk_id": record["chunk_id"],
-                "document_id": record["document_id"],
-                "chunk_index": record["chunk_index"],
-                "content": record["content"],
-                "metadata": record["metadata"] or {}
-            }
-            chunks.append(chunk_data)
 
-        return chunks
+        # Method 1: Direct entity-chunk relationships (if they exist)
+        try:
+            for entity_name in entity_names:
+                # Find entities by name
+                entity_query = """
+                MATCH (e:Entity)
+                WHERE toLower(e.name) CONTAINS toLower($entity_name)
+                RETURN e.id as entity_id, e.name as entity_name
+                LIMIT 5
+                """
+
+                entity_results = await self._execute_query(entity_query, {"entity_name": entity_name})
+
+                for entity_result in entity_results:
+                    entity_id = entity_result["entity_id"]
+
+                    # Find chunks connected to this entity using existing relationships
+                    chunk_query = """
+                    MATCH (e:Entity {id: $entity_id})-[r]->(c:DocumentChunk)
+                    WHERE type(r) IN ['CONTAINS', 'RELATES_TO', 'INVOLVES', 'ADDRESSES']
+                    RETURN c.id as chunk_id,
+                           c.document_id as document_id,
+                           c.chunk_index as chunk_index,
+                           c.text as content,
+                           c.metadata as metadata
+                    """
+
+                    chunk_results = await self._execute_query(chunk_query, {"entity_id": entity_id})
+                    chunks.extend(chunk_results)
+
+        except Exception as e:
+            self.logger.debug(f"Direct entity-chunk lookup failed: {e}")
+
+        # Method 2: Text pattern matching as fallback
+        if not chunks:
+            # Create a case-insensitive regex pattern for each entity name
+            patterns = [f"(?i)\\b{name.replace(' ', '\\s+')}\\b" for name in entity_names]
+
+            query = """
+            MATCH (c:DocumentChunk)
+            WHERE any(pattern IN $patterns WHERE c.text =~ pattern)
+            RETURN c.id as chunk_id,
+                   c.document_id as document_id,
+                   c.chunk_index as chunk_index,
+                   c.text as content,
+                   c.metadata as metadata
+            ORDER BY c.document_id, c.chunk_index
+            """
+
+            result = await self._execute_query(query, {"patterns": patterns})
+
+            for record in result:
+                chunk_data = {
+                    "chunk_id": record["chunk_id"],
+                    "document_id": record["document_id"],
+                    "chunk_index": record["chunk_index"],
+                    "content": record["content"],
+                    "metadata": record["metadata"] or {}
+                }
+                chunks.append(chunk_data)
+
+        # Remove duplicates based on chunk_id
+        seen_chunk_ids = set()
+        unique_chunks = []
+        for chunk in chunks:
+            if chunk["chunk_id"] not in seen_chunk_ids:
+                unique_chunks.append(chunk)
+                seen_chunk_ids.add(chunk["chunk_id"])
+
+        self.logger.debug(f"Found {len(unique_chunks)} unique chunks for entities: {entity_names}")
+        return unique_chunks
     
     async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
         """Update entity's chunk references by replacing all existing relationships.

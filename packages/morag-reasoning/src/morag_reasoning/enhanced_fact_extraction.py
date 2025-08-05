@@ -121,23 +121,37 @@ class EnhancedFactExtractionService:
             facts = []
             for record in result:
                 fact_text = self._create_fact_text(record)
+
+                # Get source document information
+                source_info = await self._get_source_document_info(record["fact_id"])
+
+                # Only include facts with proper document sources
+                if not source_info.get("source_file") and not source_info.get("title"):
+                    self.logger.warning(f"Skipping fact {record['fact_id']} - no document source found")
+                    continue
+
                 fact = RawFact(
                     fact_text=fact_text,
                     source_node_id=record["fact_id"],
                     extracted_from_depth=0,  # Graph facts are at depth 0
                     source_metadata=SourceMetadata(
-                        source_type="fact_node",
-                        source_id=record["fact_id"],
-                        document_id="",
-                        chunk_id="",
-                        metadata={
+                        document_name=source_info.get("title", source_info.get("source_file", "")),
+                        chunk_index=source_info.get("chunk_index", 0),
+                        page_number=source_info.get("page_number"),
+                        section=source_info.get("section"),
+                        timestamp=source_info.get("timestamp"),
+                        additional_metadata={
                             "subject": record["subject"],
                             "approach": record["approach"],
                             "object": record["object"],
                             "solution": record["solution"],
                             "keywords": record["keywords"],
                             "domain": record["domain"],
-                            "extraction_method": "graph_traversal"
+                            "extraction_method": "graph_traversal",
+                            "source_file": source_info.get("source_file", ""),
+                            "title": source_info.get("title", ""),
+                            "chapter": source_info.get("chapter"),
+                            "fact_id": record["fact_id"]
                         }
                     )
                 )
@@ -194,22 +208,35 @@ class EnhancedFactExtractionService:
             for fact_data in similar_facts:
                 fact_text = self._create_fact_text(fact_data)
 
+                # Get source document information
+                source_info = await self._get_source_document_info(fact_data["id"])
+
+                # Only include facts with proper document sources
+                if not source_info.get("source_file") and not source_info.get("title"):
+                    self.logger.warning(f"Skipping fact {fact_data['id']} - no document source found")
+                    continue
+
                 fact = RawFact(
                     fact_text=fact_text,
                     source_node_id=fact_data["id"],
                     extracted_from_depth=0,  # Vector facts are at depth 0
                     source_metadata=SourceMetadata(
-                        source_type="fact_vector",
-                        source_id=fact_data["id"],
-                        document_id="",
-                        chunk_id="",
-                        metadata={
+                        document_name=source_info.get("title", source_info.get("source_file", "")),
+                        chunk_index=source_info.get("chunk_index", 0),
+                        page_number=source_info.get("page_number"),
+                        section=source_info.get("section"),
+                        timestamp=source_info.get("timestamp"),
+                        additional_metadata={
                             "subject": fact_data.get("subject"),
                             "approach": fact_data.get("approach"),
                             "object": fact_data.get("object"),
                             "solution": fact_data.get("solution"),
                             "similarity_score": fact_data["similarity"],
-                            "extraction_method": "vector_search"
+                            "extraction_method": "vector_search",
+                            "source_file": source_info.get("source_file", ""),
+                            "title": source_info.get("title", ""),
+                            "chapter": source_info.get("chapter"),
+                            "fact_id": fact_data["id"]
                         }
                     )
                 )
@@ -283,3 +310,79 @@ class EnhancedFactExtractionService:
                 seen_ids.add(fact.source_node_id)
 
         return combined_facts
+
+    async def _get_source_document_info(self, fact_id: str) -> Dict[str, Any]:
+        """Get source document information for a fact.
+
+        Args:
+            fact_id: Fact ID to get source info for
+
+        Returns:
+            Dictionary with source document metadata
+        """
+        try:
+            # Try multiple approaches to find the document chunk for this fact
+
+            # Approach 1: Using source_chunk_id
+            query1 = """
+            MATCH (f:Fact {id: $fact_id})
+            OPTIONAL MATCH (c:DocumentChunk {id: f.source_chunk_id})
+            OPTIONAL MATCH (d:Document {id: c.document_id})
+            RETURN d.source_file as source_file,
+                   d.name as title,
+                   c.chunk_index as chunk_index,
+                   c.metadata as chunk_metadata,
+                   d.metadata as document_metadata
+            LIMIT 1
+            """
+
+            result = await self.neo4j_storage._connection_ops._execute_query(query1, {"fact_id": fact_id})
+
+            # If no result, try approach 2: Find any related chunk
+            if not result or not result[0].get("source_file"):
+                query2 = """
+                MATCH (f:Fact {id: $fact_id})-[r]-(c:DocumentChunk)
+                OPTIONAL MATCH (d:Document {id: c.document_id})
+                RETURN d.source_file as source_file,
+                       d.name as title,
+                       c.chunk_index as chunk_index,
+                       c.metadata as chunk_metadata,
+                       d.metadata as document_metadata
+                LIMIT 1
+                """
+                result = await self.neo4j_storage._connection_ops._execute_query(query2, {"fact_id": fact_id})
+
+            if result and result[0].get("source_file"):
+                record = result[0]
+                chunk_metadata_str = record.get("chunk_metadata", "{}")
+                doc_metadata_str = record.get("document_metadata", "{}")
+
+                # Parse JSON metadata
+                import json
+                try:
+                    chunk_metadata = json.loads(chunk_metadata_str) if chunk_metadata_str else {}
+                except:
+                    chunk_metadata = {}
+
+                try:
+                    doc_metadata = json.loads(doc_metadata_str) if doc_metadata_str else {}
+                except:
+                    doc_metadata = {}
+
+                return {
+                    "source_file": record.get("source_file", ""),
+                    "title": record.get("title", ""),
+                    "chunk_index": record.get("chunk_index", 0),
+                    "page_number": chunk_metadata.get("page_number"),
+                    "section": chunk_metadata.get("section_title"),
+                    "timestamp": chunk_metadata.get("timestamp"),
+                    "chapter": chunk_metadata.get("chapter"),
+                    "metadata": {**chunk_metadata, **doc_metadata}
+                }
+            else:
+                self.logger.debug(f"No document source found for fact {fact_id}")
+                return {}
+
+        except Exception as e:
+            self.logger.warning(f"Failed to get source document info for fact {fact_id}: {e}")
+            return {}

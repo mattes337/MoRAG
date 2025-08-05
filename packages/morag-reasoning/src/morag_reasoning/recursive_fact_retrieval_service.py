@@ -426,6 +426,41 @@ class RecursiveFactRetrievalService:
             language_name = language_names.get(language, language)
             language_instruction = f"\n\nIMPORTANT: Please respond in {language_name} ({language}). The entire response must be in {language_name}."
 
+        # Create references list
+        references = []
+        seen_sources = set()
+        ref_counter = 1
+
+        for fact in final_facts:
+            source_key = f"{fact.source_metadata.document_name}_{fact.source_metadata.chunk_index}"
+            if source_key not in seen_sources:
+                seen_sources.add(source_key)
+
+                # Build reference entry
+                ref_parts = []
+                if fact.source_metadata.document_name:
+                    ref_parts.append(fact.source_metadata.document_name)
+
+                if fact.source_metadata.page_number:
+                    ref_parts.append(f"p. {fact.source_metadata.page_number}")
+                elif fact.source_metadata.chunk_index is not None:
+                    ref_parts.append(f"chunk {fact.source_metadata.chunk_index}")
+
+                if fact.source_metadata.section:
+                    ref_parts.append(f"section '{fact.source_metadata.section}'")
+
+                if fact.source_metadata.timestamp:
+                    ref_parts.append(f"at {fact.source_metadata.timestamp}")
+
+                if fact.source_metadata.additional_metadata.get("chapter"):
+                    ref_parts.append(f"chapter '{fact.source_metadata.additional_metadata['chapter']}'")
+
+                if ref_parts:
+                    references.append(f"[{ref_counter}] {', '.join(ref_parts)}")
+                    ref_counter += 1
+
+        references_section = "\n\n**References:**\n" + "\n".join(references) if references else ""
+
         prompt = f"""Based on the following facts extracted from a knowledge graph, please provide a comprehensive answer to the user's question.
 
 User Question: "{user_query}"
@@ -433,7 +468,10 @@ User Question: "{user_query}"
 Relevant Facts:
 {context}
 
-Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from the facts. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}"""
+Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from the facts. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}
+
+IMPORTANT: Your answer must end with a references section listing all source documents. Include the references section exactly as provided below:
+{references_section}"""
         
         try:
             # Use the stronger LLM for final synthesis

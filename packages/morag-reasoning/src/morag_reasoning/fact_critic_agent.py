@@ -115,9 +115,10 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
                 source_node_id=raw_fact.source_node_id,
                 source_property=raw_fact.source_property,
                 source_qdrant_chunk_id=raw_fact.source_qdrant_chunk_id,
+                source_metadata=raw_fact.source_metadata,
                 extracted_from_depth=raw_fact.extracted_from_depth,
                 score=0.1,  # Low score for error cases
-                source_description="Error evaluating fact from knowledge graph entity"
+                source_description=f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}"
             )
     
     def _create_evaluation_prompt(self, user_query: str, raw_fact: RawFact, language: Optional[str] = None) -> str:
@@ -149,16 +150,12 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
         if raw_fact.source_metadata.timestamp:
             metadata_info.append(f"Timestamp: {raw_fact.source_metadata.timestamp}")
 
-        # Create user-friendly source context using entity name when available
-        if entity_name:
-            source_context = f"Entity '{entity_name}'"
-        else:
-            source_context = "Knowledge graph entity"
-
-        if source_info:
-            source_context += f" ({', '.join(source_info)})"
+        # Create user-friendly source context - only use document information
         if metadata_info:
-            source_context += f" - {', '.join(metadata_info)}"
+            source_context = ", ".join(metadata_info)
+        else:
+            # If no document metadata, this fact should be filtered out
+            source_context = "No document source available"
         
         prompt = f"""FACT EVALUATION TASK
 
@@ -258,9 +255,10 @@ Return the fact with an assigned score and source description."""
                         source_node_id=fact.source_node_id,
                         source_property=fact.source_property,
                         source_qdrant_chunk_id=fact.source_qdrant_chunk_id,
+                        source_metadata=fact.source_metadata,
                         extracted_from_depth=fact.extracted_from_depth,
                         score=0.1,
-                        source_description="Batch evaluation error for knowledge graph entity"
+                        source_description=f"Document: {fact.source_metadata.document_name or 'Unknown'}, Chunk: {fact.source_metadata.chunk_index or 0}"
                     ))
             
             scored_facts.extend(batch_results)

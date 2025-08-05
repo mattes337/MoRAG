@@ -290,9 +290,15 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
             if entity.context:
                 entity_text += f" - {entity.context}"
 
-            query_embedding = await self.embedding_service.generate_embedding(
+            embedding_result = await self.embedding_service.generate_embedding(
                 entity_text, task_type="retrieval_query"
             )
+
+            # Handle both direct list return and EmbeddingResult object
+            if isinstance(embedding_result, list):
+                query_embedding = embedding_result
+            else:
+                query_embedding = embedding_result.embedding
 
             # Search for similar entities in Neo4j using vector similarity
             # This requires the EntityEmbeddingService functionality

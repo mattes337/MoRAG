@@ -25,6 +25,7 @@ else:
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-vector" / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src"))
 
 from morag_reasoning import (
     RecursiveFactRetrievalService,
@@ -34,7 +35,8 @@ from morag_reasoning import (
     LLMConfig
 )
 from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
-from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
+from morag_services.storage import QdrantVectorStorage
+from morag_services.embedding import GeminiEmbeddingService
 
 # Configure logging
 structlog.configure(
@@ -152,22 +154,28 @@ class RecursiveFactRetrievalTester:
             await neo4j_storage.connect()
 
             # Initialize Qdrant storage
-            qdrant_config = QdrantConfig(
+            qdrant_storage = QdrantVectorStorage(
                 host=self.qdrant_host,
                 port=self.qdrant_port,
                 collection_name=self.qdrant_collection,
                 api_key=os.getenv("QDRANT_API_KEY"),
-                use_ssl=self.qdrant_use_ssl
+                verify_ssl=self.qdrant_use_ssl
             )
-            qdrant_storage = QdrantStorage(qdrant_config)
             await qdrant_storage.connect()
+
+            # Initialize embedding service
+            embedding_service = GeminiEmbeddingService(
+                api_key=os.getenv("GEMINI_API_KEY"),
+                embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
+            )
 
             # Initialize recursive fact retrieval service
             self.service = RecursiveFactRetrievalService(
                 llm_client=llm_client,
                 neo4j_storage=neo4j_storage,
                 qdrant_storage=qdrant_storage,
-                stronger_llm_client=stronger_llm_client
+                stronger_llm_client=stronger_llm_client,
+                embedding_service=embedding_service
             )
 
             logger.info("Recursive fact retrieval service initialized successfully")
