@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 from morag_reasoning.llm import LLMClient
-from morag_reasoning.recursive_fact_models import RawFact
+from morag_reasoning.recursive_fact_models import RawFact, SourceMetadata
 from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_services.embedding import GeminiEmbeddingService
 
@@ -116,25 +116,30 @@ class EnhancedFactExtractionService:
             LIMIT 50
             """
             
-            result = await self.neo4j_storage._execute_query(query, {"entity_names": entity_names})
+            result = await self.neo4j_storage._connection_ops._execute_query(query, {"entity_names": entity_names})
             
             facts = []
             for record in result:
+                fact_text = self._create_fact_text(record)
                 fact = RawFact(
-                    id=record["fact_id"],
-                    text=self._create_fact_text(record),
-                    source_type="graph_relationship",
-                    source_id=record["fact_id"],
-                    metadata={
-                        "subject": record["subject"],
-                        "approach": record["approach"],
-                        "object": record["object"],
-                        "solution": record["solution"],
-                        "keywords": record["keywords"],
-                        "domain": record["domain"],
-                        "extraction_method": "graph_traversal"
-                    },
-                    extracted_at=datetime.utcnow()
+                    fact_text=fact_text,
+                    source_node_id=record["fact_id"],
+                    extracted_from_depth=0,  # Graph facts are at depth 0
+                    source_metadata=SourceMetadata(
+                        source_type="fact_node",
+                        source_id=record["fact_id"],
+                        document_id="",
+                        chunk_id="",
+                        metadata={
+                            "subject": record["subject"],
+                            "approach": record["approach"],
+                            "object": record["object"],
+                            "solution": record["solution"],
+                            "keywords": record["keywords"],
+                            "domain": record["domain"],
+                            "extraction_method": "graph_traversal"
+                        }
+                    )
                 )
                 facts.append(fact)
             
@@ -188,21 +193,25 @@ class EnhancedFactExtractionService:
             facts = []
             for fact_data in similar_facts:
                 fact_text = self._create_fact_text(fact_data)
-                
+
                 fact = RawFact(
-                    id=fact_data["id"],
-                    text=fact_text,
-                    source_type="vector_similarity",
-                    source_id=fact_data["id"],
-                    metadata={
-                        "subject": fact_data.get("subject"),
-                        "approach": fact_data.get("approach"),
-                        "object": fact_data.get("object"),
-                        "solution": fact_data.get("solution"),
-                        "similarity_score": fact_data["similarity"],
-                        "extraction_method": "vector_search"
-                    },
-                    extracted_at=datetime.utcnow()
+                    fact_text=fact_text,
+                    source_node_id=fact_data["id"],
+                    extracted_from_depth=0,  # Vector facts are at depth 0
+                    source_metadata=SourceMetadata(
+                        source_type="fact_vector",
+                        source_id=fact_data["id"],
+                        document_id="",
+                        chunk_id="",
+                        metadata={
+                            "subject": fact_data.get("subject"),
+                            "approach": fact_data.get("approach"),
+                            "object": fact_data.get("object"),
+                            "solution": fact_data.get("solution"),
+                            "similarity_score": fact_data["similarity"],
+                            "extraction_method": "vector_search"
+                        }
+                    )
                 )
                 facts.append(fact)
             
@@ -249,28 +258,28 @@ class EnhancedFactExtractionService:
         vector_facts: List[RawFact]
     ) -> List[RawFact]:
         """Combine facts from different sources and remove duplicates.
-        
+
         Args:
             graph_facts: Facts from graph traversal
             vector_facts: Facts from vector search
-            
+
         Returns:
             Combined and deduplicated list of facts
         """
-        # Use fact ID for deduplication
+        # Use source_node_id for deduplication since RawFact doesn't have id field
         seen_ids = set()
         combined_facts = []
-        
+
         # Add graph facts first (they have higher priority)
         for fact in graph_facts:
-            if fact.id not in seen_ids:
+            if fact.source_node_id not in seen_ids:
                 combined_facts.append(fact)
-                seen_ids.add(fact.id)
-        
+                seen_ids.add(fact.source_node_id)
+
         # Add vector facts if not already present
         for fact in vector_facts:
-            if fact.id not in seen_ids:
+            if fact.source_node_id not in seen_ids:
                 combined_facts.append(fact)
-                seen_ids.add(fact.id)
-        
+                seen_ids.add(fact.source_node_id)
+
         return combined_facts

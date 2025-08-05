@@ -310,13 +310,11 @@ class EntityOperations(BaseOperations):
 
         query = """
         MATCH (c:DocumentChunk)
-        WHERE any(pattern IN $patterns WHERE c.content =~ pattern)
+        WHERE any(pattern IN $patterns WHERE c.text =~ pattern)
         RETURN c.id as chunk_id,
                c.document_id as document_id,
                c.chunk_index as chunk_index,
-               c.content as content,
-               c.start_char as start_char,
-               c.end_char as end_char,
+               c.text as content,
                c.metadata as metadata
         ORDER BY c.document_id, c.chunk_index
         """
@@ -330,8 +328,6 @@ class EntityOperations(BaseOperations):
                 "document_id": record["document_id"],
                 "chunk_index": record["chunk_index"],
                 "content": record["content"],
-                "start_char": record["start_char"],
-                "end_char": record["end_char"],
                 "metadata": record["metadata"] or {}
             }
             chunks.append(chunk_data)

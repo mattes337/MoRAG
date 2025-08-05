@@ -21,26 +21,79 @@ async def check_neo4j():
     storage = Neo4jStorage(config)
     await storage.connect()
     
-    # Check entities
-    query = 'MATCH (e:Entity) RETURN count(e) as entity_count'
-    result = await storage._execute_query(query)
-    print(f'Total entities: {result[0]["entity_count"]}')
-    
-    # Check relations
-    query = 'MATCH ()-[r]->() RETURN type(r) as rel_type, count(r) as count ORDER BY count DESC'
-    result = await storage._execute_query(query)
-    print('Relation types:')
-    for record in result:
-        print(f'  {record["rel_type"]}: {record["count"]}')
-    
-    # Check specific entity IDs
-    query = 'MATCH (e:Entity) RETURN e.id LIMIT 10'
-    result = await storage._execute_query(query)
-    print('Sample entity IDs:')
-    for record in result:
-        print(f'  {record["e.id"]}')
-    
-    await storage.disconnect()
+    try:
+        # Check database schema
+        print("=== Neo4j Database Schema ===")
+
+        # Get all node labels
+        query = "CALL db.labels()"
+        result = await storage._connection_ops._execute_query(query)
+        print(f"Node labels: {[r['label'] for r in result]}")
+
+        # Get all relationship types
+        query = "CALL db.relationshipTypes()"
+        result = await storage._connection_ops._execute_query(query)
+        print(f"Relationship types: {[r['relationshipType'] for r in result]}")
+
+        # Get property keys
+        query = "CALL db.propertyKeys()"
+        result = await storage._connection_ops._execute_query(query)
+        print(f"Property keys: {[r['propertyKey'] for r in result]}")
+
+        # Check DocumentChunk structure
+        print("\n=== DocumentChunk Structure ===")
+        query = "MATCH (d:DocumentChunk) RETURN d LIMIT 1"
+        result = await storage._connection_ops._execute_query(query)
+        if result:
+            chunk = result[0]['d']
+            print(f"DocumentChunk properties: {list(chunk.keys())}")
+            print(f"Sample chunk: {chunk}")
+        else:
+            print("No DocumentChunk nodes found")
+
+        # Check Entity structure
+        print("\n=== Entity Structure ===")
+        query = "MATCH (e:Entity) RETURN e LIMIT 1"
+        result = await storage._connection_ops._execute_query(query)
+        if result:
+            entity = result[0]['e']
+            print(f"Entity properties: {list(entity.keys())}")
+            print(f"Sample entity: {entity}")
+        else:
+            print("No Entity nodes found")
+
+        # Check Fact structure
+        print("\n=== Fact Structure ===")
+        query = "MATCH (f:Fact) RETURN f LIMIT 1"
+        result = await storage._connection_ops._execute_query(query)
+        if result:
+            fact = result[0]['f']
+            print(f"Fact properties: {list(fact.keys())}")
+            print(f"Sample fact: {fact}")
+        else:
+            print("No Fact nodes found")
+
+        # Count nodes
+        print("\n=== Node Counts ===")
+        for label in ["DocumentChunk", "Entity", "Fact", "Document"]:
+            query = f"MATCH (n:{label}) RETURN count(n) as count"
+            result = await storage._connection_ops._execute_query(query)
+            count = result[0]['count'] if result else 0
+            print(f"{label}: {count}")
+
+        # Check for German content
+        print("\n=== German Content Check ===")
+        query = "MATCH (e:Entity) WHERE e.name =~ '(?i).*(ADHS|Schwermetall|Blei|Quecksilber|Cadmium).*' RETURN e.name LIMIT 10"
+        result = await storage._connection_ops._execute_query(query)
+        if result:
+            print("German entities found:")
+            for record in result:
+                print(f"  {record['e.name']}")
+        else:
+            print("No German entities found")
+
+    finally:
+        await storage.disconnect()
 
 if __name__ == "__main__":
     asyncio.run(check_neo4j())

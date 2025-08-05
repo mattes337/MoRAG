@@ -153,9 +153,7 @@ class DocumentOperations(BaseOperations):
                 id=chunk_data['id'],
                 document_id=chunk_data['document_id'],
                 chunk_index=chunk_data['chunk_index'],
-                content=chunk_data['content'],
-                start_char=chunk_data['start_char'],
-                end_char=chunk_data['end_char'],
+                text=chunk_data['text'],
                 metadata=chunk_data['metadata']
             ))
         

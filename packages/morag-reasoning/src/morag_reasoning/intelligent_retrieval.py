@@ -265,7 +265,7 @@ class IntelligentRetrievalService:
                         try:
                             # First, get the actual chunk content from Neo4j
                             query = "MATCH (c:DocumentChunk {id: $chunk_id}) RETURN c.text as text, c.document_id as document_id"
-                            neo4j_result = await self.neo4j_storage._execute_query(query, {"chunk_id": chunk_id})
+                            neo4j_result = await self.neo4j_storage._connection_ops._execute_query(query, {"chunk_id": chunk_id})
 
                             if neo4j_result:
                                 chunk_data = neo4j_result[0]
