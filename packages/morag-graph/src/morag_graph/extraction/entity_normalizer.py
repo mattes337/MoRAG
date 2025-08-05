@@ -136,23 +136,81 @@ class LLMEntityNormalizer:
         return result
     
     def _apply_basic_normalization(self, entity_name: str) -> str:
-        """Apply basic rule-based normalization."""
+        """Apply comprehensive rule-based normalization to create canonical forms."""
         normalized = entity_name.strip()
-        
-        # Apply minimal normalization to preserve entity integrity
-        # Remove only basic articles that are clearly not part of entity names
-        basic_prefixes = ["the ", "a ", "an "]
 
+        # Remove basic articles that are clearly not part of entity names
+        basic_prefixes = ["the ", "a ", "an ", "der ", "die ", "das ", "le ", "la ", "les "]
         for prefix in basic_prefixes:
             if normalized.lower().startswith(prefix.lower()):
                 normalized = normalized[len(prefix):].strip()
                 break
-        
-        # Capitalize first letter
-        if normalized:
-            normalized = normalized[0].upper() + normalized[1:]
-        
+
+        # Remove content in parentheses (e.g., "Engelwurz (Wurzel)" -> "Engelwurz")
+        import re
+        normalized = re.sub(r'\s*\([^)]*\)', '', normalized).strip()
+
+        # Remove common adjectives and qualifiers
+        qualifiers_to_remove = [
+            'pure', 'natural', 'organic', 'fresh', 'raw', 'whole', 'complete',
+            'pur', 'natürlich', 'organisch', 'frisch', 'roh', 'ganz', 'komplett',
+            'normal', 'regular', 'standard', 'basic', 'simple', 'plain'
+        ]
+
+        words = normalized.split()
+        filtered_words = []
+        for word in words:
+            if word.lower() not in qualifiers_to_remove:
+                filtered_words.append(word)
+
+        if filtered_words:
+            normalized = ' '.join(filtered_words)
+
+        # Convert to singular form (basic rules)
+        normalized = self._to_singular(normalized)
+
+        # Capitalize first letter of each word (proper case)
+        normalized = ' '.join(word.capitalize() for word in normalized.split())
+
         return normalized
+
+    def _to_singular(self, text: str) -> str:
+        """Convert plural forms to singular (basic rules)."""
+        words = text.split()
+        singular_words = []
+
+        for word in words:
+            word_lower = word.lower()
+
+            # German plural rules
+            if word_lower.endswith('e') and len(word) > 3:
+                # Remove 'e' ending for many German plurals
+                singular = word[:-1]
+            elif word_lower.endswith('en') and len(word) > 4:
+                # Remove 'en' ending
+                singular = word[:-2]
+            elif word_lower.endswith('er') and len(word) > 4:
+                # Remove 'er' ending
+                singular = word[:-2]
+            # English plural rules
+            elif word_lower.endswith('ies') and len(word) > 4:
+                # "berries" -> "berry"
+                singular = word[:-3] + 'y'
+            elif word_lower.endswith('ves') and len(word) > 4:
+                # "leaves" -> "leaf"
+                singular = word[:-3] + 'f'
+            elif word_lower.endswith('ses') and len(word) > 4:
+                # "glasses" -> "glass"
+                singular = word[:-2]
+            elif word_lower.endswith('s') and len(word) > 3 and not word_lower.endswith('ss'):
+                # General 's' removal, but not for words ending in 'ss'
+                singular = word[:-1]
+            else:
+                singular = word
+
+            singular_words.append(singular)
+
+        return ' '.join(singular_words)
     
     async def _llm_normalize(self, entity_name: str, entity_type: Optional[str] = None) -> Tuple[str, float, str]:
         """Use LLM to normalize entity name."""
@@ -203,13 +261,15 @@ class LLMEntityNormalizer:
         type_context = f" (Type: {entity_type})" if entity_type else ""
         
         return f"""
-Normalize the following entity name to its canonical form. Focus on:
+Normalize the following entity name to its canonical form. Follow these STRICT rules:
 
-1. Remove unnecessary adjectives, qualifiers, and brand suffixes
-2. Convert to singular form if plural
-3. Use the base term without modifiers
-4. Maintain the core meaning and identity
-5. Use proper capitalization for the detected language
+1. Remove ALL adjectives, qualifiers, brand names, and descriptive modifiers
+2. Convert to SINGULAR form (no plurals)
+3. Remove content in parentheses like "Engelwurz (Wurzel)" → "Engelwurz"
+4. Use the base, canonical term without any additions
+5. Remove gender-specific forms (use base form)
+6. Use proper capitalization for the detected language
+7. Keep only the core entity identity
 
 Entity: "{entity_name}"{type_context}
 Language: {self.language}
@@ -217,9 +277,17 @@ Language: {self.language}
 Examples:
 - "Silizium Pur" → "Silizium"
 - "normalem Siliziumdioxid" → "Siliziumdioxid"
-- "natural vitamins" → "vitamin"
-- "heavy metals" → "heavy metal"
-- "pure water" → "water"
+- "natural vitamins" → "Vitamin"
+- "heavy metals" → "Metal"
+- "pure water" → "Wasser"
+- "Engelwurz (Wurzel)" → "Engelwurz"
+- "fresh herbs" → "Herb"
+- "organic compounds" → "Compound"
+- "männliche Hormone" → "Hormon"
+- "weibliche Geschlechtshormone" → "Geschlechtshormon"
+
+CRITICAL: The result must be a single canonical entity that can be used globally across all documents.
+Multiple facts about the same entity should all reference the same normalized name.
 
 Respond with JSON:
 {{

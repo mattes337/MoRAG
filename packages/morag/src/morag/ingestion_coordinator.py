@@ -1120,7 +1120,23 @@ class IngestionCoordinator:
             neo4j_storage = Neo4jStorage(neo4j_config)
             await neo4j_storage.connect()
 
-            enhanced_processor = EnhancedFactProcessingService(neo4j_storage)
+            # Initialize entity normalizer for enhanced processing
+            from morag_graph.extraction.entity_normalizer import LLMEntityNormalizer
+
+            # Get API key from environment
+            import os
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                entity_normalizer = LLMEntityNormalizer(
+                    model_name="gemini-2.0-flash",
+                    api_key=api_key,
+                    language='de'  # Use German for this document
+                )
+            else:
+                entity_normalizer = None
+                logger.warning("GEMINI_API_KEY not found - entity normalization disabled")
+
+            enhanced_processor = EnhancedFactProcessingService(neo4j_storage, entity_normalizer)
 
             # Process facts with entity creation and relationship management
             result = await enhanced_processor.process_facts_with_entities(
@@ -1828,32 +1844,36 @@ class IngestionCoordinator:
                 facts_to_process.append(fact)
 
             if facts_to_process:
-                # Convert facts to entities and relationships
-                from morag_graph.extraction.fact_entity_converter import FactEntityConverter
-                converter = FactEntityConverter(domain=document_metadata.get('domain', 'general') if document_metadata else 'general')
-                entities_from_facts, relations_from_facts = converter.convert_facts_to_entities(facts_to_process)
+                # Use enhanced fact processing service for entity creation and relationships
+                from morag_graph.services.enhanced_fact_processing_service import EnhancedFactProcessingService
+                from morag_graph.extraction.entity_normalizer import LLMEntityNormalizer
 
-                logger.info(f"Converted {len(facts_to_process)} facts to {len(entities_from_facts)} entities and {len(relations_from_facts)} relations")
+                # Initialize entity normalizer
+                import os
+                api_key = os.getenv('GEMINI_API_KEY')
+                if api_key:
+                    entity_normalizer = LLMEntityNormalizer(
+                        model_name="gemini-2.0-flash",
+                        api_key=api_key,
+                        language='de'  # Use German for this document
+                    )
+                else:
+                    entity_normalizer = None
+                    logger.warning("GEMINI_API_KEY not found - entity normalization disabled")
 
-                # Store facts using FactOperations
-                from morag_graph.storage.neo4j_operations.fact_operations import FactOperations
-                fact_operations = FactOperations(neo4j_storage.driver, neo4j_storage.config.database)
-                fact_ids = await fact_operations.store_facts(facts_to_process)
-                facts_stored = len(fact_ids)
+                enhanced_processor = EnhancedFactProcessingService(neo4j_storage, entity_normalizer)
 
-                # Store entities from facts
-                if entities_from_facts:
-                    from morag_graph.operations.crud import GraphCRUD
-                    crud = GraphCRUD(neo4j_storage)
-                    await crud.bulk_create_entities(entities_from_facts)
-                    logger.info(f"Stored {len(entities_from_facts)} entities derived from facts")
+                # Process facts with entity creation and relationship management
+                result = await enhanced_processor.process_facts_with_entities(
+                    facts_to_process,
+                    create_keyword_entities=True,
+                    create_mandatory_relations=True
+                )
 
-                # Store relations from facts
-                if relations_from_facts:
-                    from morag_graph.storage.neo4j_operations.relation_operations import RelationOperations
-                    relation_operations = RelationOperations(neo4j_storage.driver, neo4j_storage.config.database)
-                    await relation_operations.store_relations(relations_from_facts)
-                    logger.info(f"Stored {len(relations_from_facts)} relations derived from facts")
+                logger.info(f"Enhanced processing: {result['facts_processed']} facts, {result['entities_created']} entities, {result['relations_created']} relations")
+
+                # Facts, entities, and relationships are already stored by the enhanced processor
+                facts_stored = result['facts_stored']
 
             # Store fact relationships (if any)
             relationship_ids = []
