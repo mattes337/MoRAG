@@ -480,7 +480,16 @@ Be generous in extracting information - anything related to the user's query is 
 
         # Get entities mentioned in chunks
         for chunk in chunks:
-            all_related_entities.update(chunk['related_entity_names'])
+            # Safely get related entity names with fallback
+            related_entities = chunk.get('related_entity_names', [])
+            if isinstance(related_entities, list):
+                all_related_entities.update(related_entities)
+            else:
+                self.logger.debug(
+                    "Invalid related_entity_names format in chunk",
+                    chunk_id=chunk.get('chunk_id', 'unknown'),
+                    type=type(related_entities).__name__
+                )
 
         # Add entities from graph relationships
         if related_entities_from_graph:

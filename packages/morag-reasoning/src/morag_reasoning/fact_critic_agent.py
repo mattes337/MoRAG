@@ -86,23 +86,39 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
         try:
             # Create evaluation prompt
             prompt = self._create_evaluation_prompt(user_query, raw_fact, language)
-            
-            # Call LLM for fact evaluation
-            result = await self.agent.run(prompt)
-            response = result.data
-            
-            # Create scored fact
-            scored_fact = response.scored_fact
-            
-            self.logger.debug(
-                "Fact evaluation completed",
-                fact=raw_fact.fact_text[:100],
-                score=scored_fact.score,
-                source=scored_fact.source_description
-            )
-            
-            return scored_fact
-            
+
+            # Call LLM for fact evaluation with retry logic for malformed function calls
+            try:
+                result = await self.agent.run(prompt)
+                response = result.data
+
+                # Create scored fact
+                scored_fact = response.scored_fact
+
+                self.logger.debug(
+                    "Fact evaluation completed",
+                    fact=raw_fact.fact_text[:100],
+                    score=scored_fact.score,
+                    source=scored_fact.source_description
+                )
+
+                return scored_fact
+
+            except Exception as agent_error:
+                # Check if this is a malformed function call error
+                error_str = str(agent_error)
+                if "MALFORMED_FUNCTION_CALL" in error_str or "Content field missing" in error_str:
+                    self.logger.warning(
+                        "PydanticAI agent failed with malformed function call, using fallback evaluation",
+                        fact=raw_fact.fact_text[:100],
+                        error=error_str
+                    )
+                    # Use fallback evaluation method
+                    return await self._fallback_evaluation(user_query, raw_fact, language)
+                else:
+                    # Re-raise other errors
+                    raise agent_error
+
         except Exception as e:
             self.logger.error(
                 "Error evaluating fact",
@@ -321,5 +337,105 @@ Return the fact with an assigned score and source description."""
             "Relevance decay applied",
             facts_processed=len(final_facts)
         )
-        
+
         return final_facts
+
+    async def _fallback_evaluation(
+        self,
+        user_query: str,
+        raw_fact: RawFact,
+        language: Optional[str] = None
+    ) -> ScoredFact:
+        """Fallback evaluation method when PydanticAI agent fails.
+
+        This method uses the direct LLM client to get a simple text response
+        and parses it manually to extract score and source description.
+
+        Args:
+            user_query: Original user query
+            raw_fact: Raw fact to evaluate
+            language: Optional language specification
+
+        Returns:
+            ScoredFact with relevance score and source description
+        """
+        try:
+            # Create a simpler prompt for direct text response
+            prompt = f"""Evaluate the relevance of this fact to the user query and provide a score and source description.
+
+USER QUERY: {user_query}
+
+FACT TO EVALUATE: {raw_fact.fact_text}
+
+SOURCE CONTEXT:
+- Document: {raw_fact.source_metadata.document_name or 'Unknown'}
+- Chunk: {raw_fact.source_metadata.chunk_index or 0}
+- Property: {raw_fact.source_property or 'content'}
+
+Please respond with exactly this format:
+SCORE: [number between 0.0 and 1.0]
+SOURCE: [user-friendly description of the source]
+
+Example:
+SCORE: 0.8
+SOURCE: Document 'Medical Guide', Chapter 3, Page 45"""
+
+            # Use direct LLM call instead of PydanticAI agent
+            response_text = await self.llm_client.generate(
+                prompt,
+                max_tokens=200,
+                temperature=0.1
+            )
+
+            # Parse the response
+            score = 0.5  # Default score
+            source_description = f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}"
+
+            lines = response_text.strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('SCORE:'):
+                    try:
+                        score_str = line.replace('SCORE:', '').strip()
+                        score = float(score_str)
+                        score = max(0.0, min(1.0, score))  # Clamp to valid range
+                    except ValueError:
+                        self.logger.warning(f"Could not parse score from: {line}")
+                elif line.startswith('SOURCE:'):
+                    source_description = line.replace('SOURCE:', '').strip()
+
+            self.logger.debug(
+                "Fallback fact evaluation completed",
+                fact=raw_fact.fact_text[:100],
+                score=score,
+                source=source_description
+            )
+
+            return ScoredFact(
+                fact_text=raw_fact.fact_text,
+                source_node_id=raw_fact.source_node_id,
+                source_property=raw_fact.source_property,
+                source_qdrant_chunk_id=raw_fact.source_qdrant_chunk_id,
+                source_metadata=raw_fact.source_metadata,
+                extracted_from_depth=raw_fact.extracted_from_depth,
+                score=score,
+                source_description=source_description
+            )
+
+        except Exception as e:
+            self.logger.error(
+                "Fallback evaluation also failed",
+                fact=raw_fact.fact_text[:100],
+                error=str(e)
+            )
+            # Return with default low score
+            return ScoredFact(
+                fact_text=raw_fact.fact_text,
+                source_node_id=raw_fact.source_node_id,
+                source_property=raw_fact.source_property,
+                source_qdrant_chunk_id=raw_fact.source_qdrant_chunk_id,
+                source_metadata=raw_fact.source_metadata,
+                extracted_from_depth=raw_fact.extracted_from_depth,
+                score=0.1,
+                source_description=f"Document: {raw_fact.source_metadata.document_name or 'Unknown'}, Chunk: {raw_fact.source_metadata.chunk_index or 0}"
+            )

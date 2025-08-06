@@ -244,33 +244,12 @@ class EntityEmbeddingService:
             List of similar entities with similarity scores
         """
         try:
-            # Try using Neo4j's vector similarity (if available)
-            query = """
-            MATCH (e)
-            WHERE (e:SUBJECT OR e:OBJECT OR e:Entity) 
-            AND e.embedding_vector IS NOT NULL
-            WITH e, gds.similarity.cosine(e.embedding_vector, $query_embedding) AS similarity
-            WHERE similarity >= $threshold
-            RETURN e.id as id, e.name as name, e.type as type, similarity
-            ORDER BY similarity DESC
-            LIMIT $limit
-            """
-            
-            try:
-                results = await self.neo4j_storage._connection_ops._execute_query(query, {
-                    "query_embedding": query_embedding,
-                    "threshold": similarity_threshold,
-                    "limit": limit
-                })
-                
-                return results
-                
-            except Exception as e:
-                # Fallback to manual similarity calculation
-                self.logger.warning(f"GDS similarity failed, using manual calculation: {e}")
-                return await self._manual_similarity_search(
-                    query_embedding, limit, similarity_threshold
-                )
+            # Use manual similarity calculation since GDS cosine function is not available
+            # as a direct function in this Neo4j/GDS version
+            self.logger.debug("Using manual similarity calculation for entity search")
+            return await self._manual_similarity_search(
+                query_embedding, limit, similarity_threshold
+            )
                 
         except Exception as e:
             self.logger.error(f"Entity similarity search failed: {e}")

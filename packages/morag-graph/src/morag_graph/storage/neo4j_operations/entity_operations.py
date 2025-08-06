@@ -346,15 +346,36 @@ class EntityOperations(BaseOperations):
                     chunk_query = """
                     MATCH (e:Entity {id: $entity_id})-[r]->(c:DocumentChunk)
                     WHERE type(r) IN ['CONTAINS', 'RELATES_TO', 'INVOLVES', 'ADDRESSES']
+                    OPTIONAL MATCH (c)-[:MENTIONS]->(related_entity:Entity)
+                    OPTIONAL MATCH (c)<-[:HAS_CHUNK]-(d:Document)
+                    WITH c, d, collect(DISTINCT related_entity.name) as related_entity_names
                     RETURN c.id as chunk_id,
                            c.document_id as document_id,
                            c.chunk_index as chunk_index,
                            c.text as content,
-                           c.metadata as metadata
+                           c.metadata as metadata,
+                           d.file_name as document_name,
+                           related_entity_names
                     """
 
                     chunk_results = await self._execute_query(chunk_query, {"entity_id": entity_id})
-                    chunks.extend(chunk_results)
+
+                    # Process chunk results to include related entity names
+                    for chunk_result in chunk_results:
+                        # Safely get related entity names and filter out null values
+                        related_entities = [name for name in (chunk_result.get("related_entity_names") or []) if name]
+
+                        chunk_data = {
+                            "chunk_id": chunk_result["chunk_id"],
+                            "document_id": chunk_result["document_id"],
+                            "chunk_index": chunk_result["chunk_index"],
+                            "text": chunk_result["content"],
+                            "content": chunk_result["content"],  # Alias for compatibility
+                            "chunk_metadata": chunk_result["metadata"] or {},
+                            "document_name": chunk_result.get("document_name") or "Unknown Document",
+                            "related_entity_names": related_entities
+                        }
+                        chunks.append(chunk_data)
 
         except Exception as e:
             self.logger.debug(f"Direct entity-chunk lookup failed: {e}")
@@ -367,23 +388,34 @@ class EntityOperations(BaseOperations):
             query = """
             MATCH (c:DocumentChunk)
             WHERE any(pattern IN $patterns WHERE c.text =~ pattern)
+            OPTIONAL MATCH (c)-[:MENTIONS]->(related_entity:Entity)
+            OPTIONAL MATCH (c)<-[:HAS_CHUNK]-(d:Document)
+            WITH c, d, collect(DISTINCT related_entity.name) as related_entity_names
             RETURN c.id as chunk_id,
                    c.document_id as document_id,
                    c.chunk_index as chunk_index,
                    c.text as content,
-                   c.metadata as metadata
+                   c.metadata as metadata,
+                   d.file_name as document_name,
+                   related_entity_names
             ORDER BY c.document_id, c.chunk_index
             """
 
             result = await self._execute_query(query, {"patterns": patterns})
 
             for record in result:
+                # Safely get related entity names and filter out null values
+                related_entities = [name for name in (record.get("related_entity_names") or []) if name]
+
                 chunk_data = {
                     "chunk_id": record["chunk_id"],
                     "document_id": record["document_id"],
                     "chunk_index": record["chunk_index"],
-                    "content": record["content"],
-                    "metadata": record["metadata"] or {}
+                    "text": record["content"],
+                    "content": record["content"],  # Alias for compatibility
+                    "chunk_metadata": record["metadata"] or {},
+                    "document_name": record.get("document_name") or "Unknown Document",
+                    "related_entity_names": related_entities
                 }
                 chunks.append(chunk_data)
 

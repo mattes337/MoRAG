@@ -291,34 +291,12 @@ class FactEmbeddingService:
             List of similar facts with similarity scores
         """
         try:
-            # Try using Neo4j's vector similarity (if available)
-            query = """
-            MATCH (f:Fact)
-            WHERE f.embedding_vector IS NOT NULL
-            WITH f, gds.similarity.cosine(f.embedding_vector, $query_embedding) AS similarity
-            WHERE similarity >= $threshold
-            RETURN f.id as id, f.subject as subject, f.approach as approach,
-                   f.object as object, f.solution as solution, similarity
-            ORDER BY similarity DESC
-            LIMIT $limit
-            """
-            
-            try:
-                results = await self.neo4j_storage._connection_ops._execute_query(query, {
-                    "query_embedding": query_embedding,
-                    "threshold": similarity_threshold,
-                    "limit": limit
-                })
-                
-                return results
-                
-            except Exception as e:
-                # Fallback to manual similarity calculation
-                self.logger.warning(f"GDS similarity failed, using manual calculation: {e}")
-                return await self._manual_similarity_search(
-                    query_embedding, limit, similarity_threshold
-                )
-                
+            # Use manual similarity calculation since GDS cosine function is not available
+            # as a direct function in this Neo4j/GDS version
+            self.logger.debug("Using manual similarity calculation for fact search")
+            return await self._manual_similarity_search(
+                query_embedding, limit, similarity_threshold
+            )
         except Exception as e:
             self.logger.error(f"Fact similarity search failed: {e}")
             return []
