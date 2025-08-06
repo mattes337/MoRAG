@@ -672,8 +672,7 @@ class IngestionCoordinator:
             logger.info(f"Extracted {len(all_facts)} facts and {len(all_relationships)} relationships from {len(chunks)} chunks")
             logger.info(f"Created chunk-fact mapping: {len(chunk_fact_mapping)} chunks with facts")
 
-            # Step: Enhanced fact processing - create entities and relationships
-            enhanced_processing_result = await self._process_facts_with_enhanced_processing(all_facts)
+            # Note: Enhanced fact processing will be done later in _write_to_neo4j when database connection is available
 
             # Step: Generate embeddings for entities and facts
             entity_embeddings, fact_embeddings = await self._generate_entity_and_fact_embeddings(
@@ -686,7 +685,7 @@ class IngestionCoordinator:
                 'chunk_fact_mapping': chunk_fact_mapping,
                 'entity_embeddings': entity_embeddings,
                 'fact_embeddings': fact_embeddings,
-                'enhanced_processing': enhanced_processing_result,
+                'enhanced_processing': None,  # Will be done in _write_to_neo4j
                 'extraction_metadata': {
                     'total_facts': len(all_facts),
                     'total_relationships': len(all_relationships),
@@ -2037,15 +2036,8 @@ class IngestionCoordinator:
                     fact = fact_data
                 facts_to_process.append(fact)
 
-            # Check if enhanced processing has already been done
-            enhanced_processing = graph_data.get('enhanced_processing', {})
-            has_enhanced_data = (
-                enhanced_processing and
-                enhanced_processing.get('entities_created', 0) > 0 and
-                enhanced_processing.get('relations_created', 0) > 0
-            )
-
-            if facts_to_process and not has_enhanced_data:
+            # Always run enhanced processing in Neo4j since it wasn't done earlier
+            if facts_to_process:
                 # Use enhanced fact processing service for entity creation and relationships
                 from morag_graph.services.enhanced_fact_processing_service import EnhancedFactProcessingService
                 from morag_graph.extraction.entity_normalizer import LLMEntityNormalizer
@@ -2054,10 +2046,12 @@ class IngestionCoordinator:
                 import os
                 api_key = os.getenv('GEMINI_API_KEY')
                 if api_key:
+                    # Get language from first fact, default to 'en'
+                    language = facts_to_process[0].language if facts_to_process and hasattr(facts_to_process[0], 'language') else 'en'
                     entity_normalizer = LLMEntityNormalizer(
                         model_name="gemini-2.0-flash",
                         api_key=api_key,
-                        language='de'  # Use German for this document
+                        language=language
                     )
                 else:
                     entity_normalizer = None
@@ -2076,13 +2070,6 @@ class IngestionCoordinator:
 
                 # Facts, entities, and relationships are already stored by the enhanced processor
                 facts_stored = result['facts_stored']
-            elif has_enhanced_data:
-                logger.info(f"Enhanced processing already completed - using existing data: {enhanced_processing.get('entities_created', 0)} entities, {enhanced_processing.get('relations_created', 0)} relations")
-
-                # Store the pre-computed entities and embeddings from enhanced processing
-                await self._store_enhanced_processing_data(neo4j_storage, graph_data, facts_to_process)
-
-                facts_stored = len(facts_to_process)
             else:
                 facts_stored = 0
 
