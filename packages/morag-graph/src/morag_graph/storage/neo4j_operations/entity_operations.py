@@ -68,8 +68,8 @@ class EntityOperations(BaseOperations):
     async def store_entity(self, entity: Entity) -> EntityId:
         """Store an entity in Neo4J.
 
-        Uses MERGE based on name only to prevent duplicate entities.
-        If an entity with the same name exists, it will be updated with the
+        Uses MERGE based on case-insensitive normalized name to prevent duplicate entities.
+        If an entity with the same normalized name exists, it will be updated with the
         highest confidence score and most recent type.
 
         Args:
@@ -94,17 +94,25 @@ class EntityOperations(BaseOperations):
         # Get the normalized Neo4j label from the entity type
         neo4j_label = entity.get_neo4j_label()
 
-        # Create dynamic query with the specific entity type as label
+        # Create normalized name for case-insensitive deduplication
+        normalized_name = entity.name.lower().strip()
+
+        # Create dynamic query with case-insensitive normalized name for deduplication
         query = f"""
-        MERGE (e:{neo4j_label} {{name: $name}})
+        MERGE (e:{neo4j_label} {{normalized_name: $normalized_name}})
         ON CREATE SET
             e.id = $id,
+            e.name = $name,
             e.type = $type,
             e.confidence = $confidence,
             e.metadata = $metadata,
             e.created_at = datetime(),
             e.updated_at = datetime()
         ON MATCH SET
+            e.name = CASE
+                WHEN $confidence > coalesce(e.confidence, 0.0) THEN $name
+                ELSE e.name
+            END,
             e.type = CASE
                 WHEN $confidence > coalesce(e.confidence, 0.0) THEN $type
                 ELSE e.type
@@ -115,7 +123,7 @@ class EntityOperations(BaseOperations):
             END,
             e.metadata = $metadata,
             e.updated_at = datetime()
-        RETURN e.id as id, e.type as final_type
+        RETURN e.id as id, e.type as final_type, e.name as final_name
         """
 
         properties = entity.attributes.copy() if entity.attributes else {}
@@ -123,15 +131,18 @@ class EntityOperations(BaseOperations):
         result = await self._execute_query(query, {
             "id": entity.id,
             "name": entity.name,
+            "normalized_name": normalized_name,
             "type": entity.type,
             "confidence": entity.confidence,
             "metadata": json.dumps(properties) if properties else "{}"
         })
 
         if result:
-            if result[0].get('final_type') != entity.type:
-                logger.debug(f"Entity {entity.name} type updated from {entity.type} to {result[0].get('final_type')} "
-                        f"due to higher confidence score. Entity ID: {result[0].get('entity_id')}")
+            final_name = result[0].get('final_name', entity.name)
+            final_type = result[0].get('final_type', entity.type)
+            if final_name != entity.name or final_type != entity.type:
+                logger.debug(f"Entity merged: '{entity.name}' -> '{final_name}' (type: {entity.type} -> {final_type}) "
+                        f"due to case-insensitive deduplication. Entity ID: {result[0].get('id')}")
             return result[0]["id"]
         return entity.id
 

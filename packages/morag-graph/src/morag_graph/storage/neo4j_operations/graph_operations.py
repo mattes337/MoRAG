@@ -37,17 +37,25 @@ class GraphOperations(BaseOperations):
         # Get the normalized Neo4j label from the entity type
         neo4j_label = entity.get_neo4j_label()
 
-        # Create dynamic query with the specific entity type as label
+        # Create normalized name for case-insensitive deduplication
+        normalized_name = entity.name.lower().strip()
+
+        # Create dynamic query with case-insensitive normalized name for deduplication
         query = f"""
-        MERGE (e:{neo4j_label} {{name: $name}})
+        MERGE (e:{neo4j_label} {{normalized_name: $normalized_name}})
         ON CREATE SET
             e.id = $id,
+            e.name = $name,
             e.type = $type,
             e.confidence = $confidence,
             e.metadata = $metadata,
             e.created_at = datetime(),
             e.updated_at = datetime()
         ON MATCH SET
+            e.name = CASE
+                WHEN $confidence > coalesce(e.confidence, 0.0) THEN $name
+                ELSE e.name
+            END,
             e.type = CASE
                 WHEN $confidence > coalesce(e.confidence, 0.0) THEN $type
                 ELSE e.type
@@ -62,10 +70,11 @@ class GraphOperations(BaseOperations):
         """
 
         properties = entity.metadata.copy() if entity.metadata else {}
-        
+
         result = await self._execute_query(query, {
             "id": entity.id,
             "name": entity.name,
+            "normalized_name": normalized_name,
             "type": entity.type,
             "confidence": entity.confidence,
             "metadata": properties
