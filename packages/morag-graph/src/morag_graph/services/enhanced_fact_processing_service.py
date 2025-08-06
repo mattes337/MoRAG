@@ -58,10 +58,19 @@ class EnhancedFactProcessingService:
             if create_keyword_entities:
                 keyword_entities = await self._create_keyword_entities(facts)
             
-            # Step 3: Store facts in Neo4j first
-            await self._store_facts(facts)
+            # Step 3: Check which facts already exist and only store new ones
+            existing_facts, new_facts = await self._identify_existing_and_new_facts(facts)
+            stored_facts = []
 
-            # Step 4: Create fact-chunk relationships
+            if new_facts:
+                stored_facts = await self._store_facts(new_facts)
+                self.logger.info(f"Stored {len(stored_facts)} new facts, {len(existing_facts)} facts already existed")
+            else:
+                self.logger.info(f"All {len(existing_facts)} facts already exist in database")
+                stored_facts = [f.id for f in existing_facts]
+
+            # Step 4: Create fact-chunk relationships for ALL facts (existing and new)
+            # This ensures that facts connected to entities also get connected to chunks
             chunk_relations_created = await self._create_fact_chunk_relations(facts)
 
             # Step 5: Create mandatory relationships between facts and entities
@@ -70,9 +79,6 @@ class EnhancedFactProcessingService:
                 created_relations = await self._create_fact_entity_relations(
                     facts, created_entities + keyword_entities
                 )
-            
-            # Step 4: Store all facts
-            stored_facts = await self._store_facts(facts)
 
             # Step 6: Create chunk-entity relationships
             chunk_entity_relations = 0
@@ -548,16 +554,53 @@ Return only the relationship type in uppercase, no explanation."""
         self.logger.info(f"Stored {len(stored_fact_ids)} facts in Neo4j")
         return stored_fact_ids
 
+    async def _identify_existing_and_new_facts(self, facts: List[Fact]) -> tuple[List[Fact], List[Fact]]:
+        """Identify which facts already exist in the database and which are new.
+
+        Args:
+            facts: List of facts to check
+
+        Returns:
+            Tuple of (existing_facts, new_facts)
+        """
+        existing_facts = []
+        new_facts = []
+
+        for fact in facts:
+            try:
+                # Check if fact exists in Neo4j
+                query = "MATCH (f:Fact {id: $fact_id}) RETURN f.id as id LIMIT 1"
+                result = await self.neo4j_storage._connection_ops._execute_query(
+                    query, {"fact_id": fact.id}
+                )
+
+                if result:
+                    existing_facts.append(fact)
+                    self.logger.debug(f"Fact {fact.id} already exists in database")
+                else:
+                    new_facts.append(fact)
+                    self.logger.debug(f"Fact {fact.id} is new and will be stored")
+
+            except Exception as e:
+                self.logger.warning(f"Error checking existence of fact {fact.id}: {e}")
+                # If we can't check, assume it's new to be safe
+                new_facts.append(fact)
+
+        self.logger.info(f"Fact analysis: {len(existing_facts)} existing, {len(new_facts)} new")
+        return existing_facts, new_facts
+
     async def _create_fact_chunk_relations(self, facts: List[Fact]) -> int:
         """Create relationships between facts and their source chunks.
+
+        Uses MERGE to ensure no duplicate relationships are created.
 
         Args:
             facts: List of facts with source chunk information
 
         Returns:
-            Number of fact-chunk relations created
+            Number of fact-chunk relations processed (created or already existing)
         """
-        created_relations = 0
+        processed_relations = 0
 
         for fact in facts:
             if not fact.source_chunk_id:
@@ -565,21 +608,21 @@ Return only the relationship type in uppercase, no explanation."""
                 continue
 
             try:
-                # Create CONTAINS relationship: chunk -> fact
+                # Create CONTAINS relationship: chunk -> fact (uses MERGE internally)
                 await self.neo4j_storage.create_chunk_contains_fact_relation(
                     fact.source_chunk_id,
                     fact.id,
                     context=f"Fact extracted from chunk content"
                 )
-                created_relations += 1
-                self.logger.debug(f"Created chunk-fact relation: {fact.source_chunk_id} -> {fact.id}")
+                processed_relations += 1
+                self.logger.debug(f"Processed chunk-fact relation: {fact.source_chunk_id} -> {fact.id}")
 
             except Exception as e:
                 self.logger.warning(f"Failed to create chunk-fact relation for fact {fact.id}: {e}")
                 continue
 
-        self.logger.info(f"Created {created_relations} fact-chunk relations")
-        return created_relations
+        self.logger.info(f"Processed {processed_relations} fact-chunk relations (created or updated)")
+        return processed_relations
 
     async def _generate_and_store_embeddings(self, facts: List[Fact], entities: List[Entity]) -> dict:
         """Generate and store embeddings for facts and entities in Neo4j.
