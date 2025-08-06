@@ -234,7 +234,7 @@ class EntityOperations(BaseOperations):
         return entity_id
     
     async def _create_entity_chunk_relationship(self, entity_id: EntityId, chunk_id: str) -> None:
-        """Create MENTIONED_IN relationship between entity and chunk.
+        """Create MENTIONS relationship between chunk and entity (chunk -> entity).
 
         Args:
             entity_id: Entity ID
@@ -242,7 +242,7 @@ class EntityOperations(BaseOperations):
         """
         query = """
         MATCH (e:Entity {id: $entity_id}), (c:DocumentChunk {id: $chunk_id})
-        MERGE (e)-[:MENTIONED_IN]->(c)
+        MERGE (c)-[:MENTIONS]->(e)
         RETURN e.id as entity_id, c.id as chunk_id
         """
 
@@ -252,9 +252,9 @@ class EntityOperations(BaseOperations):
         })
 
         if not result:
-            logger.warning(f"Failed to create entity-chunk relationship: entity {entity_id} or chunk {chunk_id} not found")
+            logger.warning(f"Failed to create chunk-entity relationship: entity {entity_id} or chunk {chunk_id} not found")
         else:
-            logger.debug(f"Created MENTIONED_IN relationship: entity {entity_id} -> chunk {chunk_id}")
+            logger.debug(f"Created MENTIONS relationship: chunk {chunk_id} -> entity {entity_id}")
 
     async def fix_unconnected_entities(self) -> int:
         """DEPRECATED: Find and fix entities that are not connected to any chunks.
@@ -270,25 +270,25 @@ class EntityOperations(BaseOperations):
     
     async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
         """Get all entities mentioned in a specific chunk.
-        
+
         Args:
             chunk_id: Chunk ID
-            
+
         Returns:
             List of entities mentioned in the chunk
         """
         query = """
-        MATCH (e:Entity)-[:MENTIONED_IN]->(c:DocumentChunk {id: $chunk_id})
+        MATCH (c:DocumentChunk {id: $chunk_id})-[:MENTIONS]->(e:Entity)
         RETURN e
         """
-        
+
         result = await self._execute_query(query, {"chunk_id": chunk_id})
-        
+
         entities = []
         for record in result:
             entity_data = dict(record['e'])
             entities.append(Entity.from_neo4j_node(entity_data))
-        
+
         return entities
     
     async def get_chunks_by_entity_id(self, entity_id: EntityId) -> List[str]:
@@ -301,7 +301,7 @@ class EntityOperations(BaseOperations):
             List of chunk IDs
         """
         query = """
-        MATCH (e:Entity {id: $entity_id})-[:MENTIONED_IN]->(c:DocumentChunk)
+        MATCH (c:DocumentChunk)-[:MENTIONS]->(e:Entity {id: $entity_id})
         RETURN c.id as chunk_id
         """
 
@@ -405,9 +405,9 @@ class EntityOperations(BaseOperations):
             entity_id: Entity ID
             chunk_ids: New list of chunk IDs
         """
-        # First remove all existing MENTIONED_IN relationships
+        # First remove all existing MENTIONS relationships
         delete_query = """
-        MATCH (e:Entity {id: $entity_id})-[r:MENTIONED_IN]->()
+        MATCH ()-[r:MENTIONS]->(e:Entity {id: $entity_id})
         DELETE r
         """
         await self._execute_query(delete_query, {"entity_id": entity_id})
@@ -601,7 +601,7 @@ class EntityOperations(BaseOperations):
             List of entities found in the document
         """
         query = """
-        MATCH (e:Entity)-[:MENTIONED_IN]->(c:DocumentChunk {document_id: $document_id})
+        MATCH (c:DocumentChunk {document_id: $document_id})-[:MENTIONS]->(e:Entity)
         RETURN DISTINCT e
         ORDER BY e.name
         """

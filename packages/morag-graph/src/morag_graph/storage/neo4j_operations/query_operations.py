@@ -54,10 +54,15 @@ class QueryOperations(BaseOperations):
         neighbors = []
         for record in result:
             try:
-                neighbors.append(Entity.from_neo4j_node(record["neighbor"]))
+                neighbor_data = dict(record["neighbor"])
+                # Only process if it has the required fields for an Entity
+                if 'name' in neighbor_data and neighbor_data['name']:
+                    neighbors.append(Entity.from_neo4j_node(neighbor_data))
+                else:
+                    logger.debug(f"Skipping non-entity node: {neighbor_data}")
             except Exception as e:
                 logger.warning(f"Failed to parse neighbor entity: {e}")
-        
+
         return neighbors
     
     async def find_path(

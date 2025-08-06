@@ -259,9 +259,12 @@ class Fact(BaseModel):
         if self.speaker_label:
             citation_parts.append(f"speaker {self.speaker_label}")
 
-        # Add chunk reference as fallback
+        # Add document reference as fallback (without chunk)
         if not citation_parts:
-            citation_parts.append(f"chunk {self.source_chunk_id}")
+            if self.source_file_name:
+                citation_parts.append(self.source_file_name)
+            else:
+                citation_parts.append("source document")
 
         return " | ".join(citation_parts)
 

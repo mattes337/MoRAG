@@ -315,11 +315,12 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
             # Convert to the expected format (simplified for now)
             candidates = []
             for similar in similar_entities:
-                # Create a simple candidate object
+                # Create a simple candidate object with both 'type' and 'entity_type' attributes
                 candidate = type('Candidate', (), {
                     'id': similar['id'],
                     'name': similar['name'],
-                    'entity_type': similar.get('type', 'Unknown'),
+                    'type': similar.get('type', 'Unknown'),  # Add 'type' attribute
+                    'entity_type': similar.get('type', 'Unknown'),  # Keep 'entity_type' for compatibility
                     'similarity_score': similar['similarity']
                 })()
                 candidates.append(candidate)

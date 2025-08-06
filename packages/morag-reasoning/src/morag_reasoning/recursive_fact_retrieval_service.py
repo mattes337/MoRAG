@@ -387,12 +387,10 @@ class RecursiveFactRetrievalService:
         # Prepare context for final LLM
         formatted_facts = []
         for fact in final_facts:
-            # Create detailed source information
+            # Create detailed source information (without chunk references)
             source_details = fact.source_description
             if fact.source_metadata.document_name:
                 source_parts = [fact.source_metadata.document_name]
-                if fact.source_metadata.chunk_index is not None:
-                    source_parts.append(f"chunk {fact.source_metadata.chunk_index}")
                 if fact.source_metadata.page_number:
                     source_parts.append(f"page {fact.source_metadata.page_number}")
                 if fact.source_metadata.section:
@@ -436,15 +434,13 @@ class RecursiveFactRetrievalService:
             if source_key not in seen_sources:
                 seen_sources.add(source_key)
 
-                # Build reference entry
+                # Build reference entry (without chunk references)
                 ref_parts = []
                 if fact.source_metadata.document_name:
                     ref_parts.append(fact.source_metadata.document_name)
 
                 if fact.source_metadata.page_number:
                     ref_parts.append(f"p. {fact.source_metadata.page_number}")
-                elif fact.source_metadata.chunk_index is not None:
-                    ref_parts.append(f"chunk {fact.source_metadata.chunk_index}")
 
                 if fact.source_metadata.section:
                     ref_parts.append(f"section '{fact.source_metadata.section}'")

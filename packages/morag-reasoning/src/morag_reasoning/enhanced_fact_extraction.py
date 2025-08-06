@@ -312,6 +312,48 @@ class EnhancedFactExtractionService:
 
         return combined_facts
 
+    def _extract_timestamp_from_text(self, text: str) -> Optional[str]:
+        """Extract timestamp from video/audio text content."""
+        import re
+
+        # Look for timestamp patterns like [28:14], [28:15 - 28:16], [31:09 - 31:13]
+        timestamp_patterns = [
+            r'\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]',  # [28:15 - 28:16]
+            r'\[(\d{1,2}:\d{2})\]',  # [28:14]
+            r'\[(\d{1,2}:\d{2}:\d{2})\s*-\s*(\d{1,2}:\d{2}:\d{2})\]',  # [01:28:15 - 01:28:16]
+            r'\[(\d{1,2}:\d{2}:\d{2})\]',  # [01:28:14]
+        ]
+
+        for pattern in timestamp_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                if isinstance(matches[0], tuple):
+                    # Range pattern - return the start time
+                    return matches[0][0]
+                else:
+                    # Single timestamp
+                    return matches[0]
+
+        return None
+
+    def _extract_section_from_text(self, text: str, chunk_metadata: Dict[str, Any]) -> Optional[str]:
+        """Extract section information from text or metadata."""
+        # Check metadata first
+        if chunk_metadata.get("section_title"):
+            return chunk_metadata["section_title"]
+
+        # For video content, try to extract topic from the beginning of the text
+        lines = text.strip().split('\n')
+        if lines:
+            first_line = lines[0].strip()
+            # Remove timestamp if present
+            import re
+            first_line = re.sub(r'\[\d{1,2}:\d{2}(?::\d{2})?\s*(?:-\s*\d{1,2}:\d{2}(?::\d{2})?)?\]', '', first_line).strip()
+            if first_line and len(first_line) < 100:  # Reasonable section title length
+                return first_line
+
+        return None
+
     async def _get_source_document_info(self, fact_id: str) -> Dict[str, Any]:
         """Get source document information for a fact.
 
@@ -333,6 +375,7 @@ class EnhancedFactExtractionService:
                    d.name as title,
                    c.chunk_index as chunk_index,
                    c.metadata as chunk_metadata,
+                   c.text as chunk_text,
                    d.metadata as document_metadata
             LIMIT 1
             """
@@ -348,6 +391,7 @@ class EnhancedFactExtractionService:
                        d.name as title,
                        c.chunk_index as chunk_index,
                        c.metadata as chunk_metadata,
+                       c.text as chunk_text,
                        d.metadata as document_metadata
                 LIMIT 1
                 """
@@ -357,6 +401,7 @@ class EnhancedFactExtractionService:
                 record = result[0]
                 chunk_metadata_str = record.get("chunk_metadata", "{}")
                 doc_metadata_str = record.get("document_metadata", "{}")
+                chunk_text = record.get("chunk_text", "")
 
                 # Parse JSON metadata
                 import json
@@ -370,13 +415,23 @@ class EnhancedFactExtractionService:
                 except:
                     doc_metadata = {}
 
+                # Extract timestamp from text content for video/audio files
+                timestamp = chunk_metadata.get("timestamp")
+                if not timestamp and chunk_text:
+                    timestamp = self._extract_timestamp_from_text(chunk_text)
+
+                # Extract section information
+                section = chunk_metadata.get("section_title")
+                if not section and chunk_text:
+                    section = self._extract_section_from_text(chunk_text, chunk_metadata)
+
                 return {
                     "source_file": record.get("source_file", ""),
                     "title": record.get("title", ""),
                     "chunk_index": record.get("chunk_index", 0),
                     "page_number": chunk_metadata.get("page_number"),
-                    "section": chunk_metadata.get("section_title"),
-                    "timestamp": chunk_metadata.get("timestamp"),
+                    "section": section,
+                    "timestamp": timestamp,
                     "chapter": chunk_metadata.get("chapter"),
                     "metadata": {**chunk_metadata, **doc_metadata}
                 }

@@ -354,25 +354,25 @@ class CitationManager:
             return self._generate_simple_citation(sources)
     
     def _generate_simple_citation(self, sources: List[SourceReference]) -> str:
-        """Generate simple citation format."""
+        """Generate simple citation format (without chunk references)."""
         citations = []
         for i, source in enumerate(sources, 1):
             citation_parts = []
-            
+
             if source.document_title:
                 citation_parts.append(source.document_title)
-            
+
             if source.page_number:
                 citation_parts.append(f"p. {source.page_number}")
-            
+
             if source.timestamp:
                 citation_parts.append(f"at {source.timestamp}")
-            
+
             if citation_parts:
                 citations.append(f"[{i}] {', '.join(citation_parts)}")
             else:
                 citations.append(f"[{i}] {source.document_id}")
-        
+
         return "; ".join(citations)
     
     def _generate_json_citation(self, sources: List[SourceReference]) -> str:

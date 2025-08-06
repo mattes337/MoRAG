@@ -47,14 +47,56 @@ class GraphTraversalAgent:
         self.embedding_service = embedding_service
         self.max_facts_per_node = max_facts_per_node
         self.logger = structlog.get_logger(__name__)
-        
+
         # Create PydanticAI agent for graph traversal decisions
         self.agent = Agent(
             model=llm_client.get_model(),
             result_type=GTAResponse,
             system_prompt=self._get_system_prompt()
         )
-    
+
+    def _extract_timestamp_from_text(self, text: str) -> Optional[str]:
+        """Extract timestamp from video/audio text content."""
+        import re
+
+        # Look for timestamp patterns like [28:14], [28:15 - 28:16], [31:09 - 31:13]
+        timestamp_patterns = [
+            r'\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]',  # [28:15 - 28:16]
+            r'\[(\d{1,2}:\d{2})\]',  # [28:14]
+            r'\[(\d{1,2}:\d{2}:\d{2})\s*-\s*(\d{1,2}:\d{2}:\d{2})\]',  # [01:28:15 - 01:28:16]
+            r'\[(\d{1,2}:\d{2}:\d{2})\]',  # [01:28:14]
+        ]
+
+        for pattern in timestamp_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                if isinstance(matches[0], tuple):
+                    # Range pattern - return the start time
+                    return matches[0][0]
+                else:
+                    # Single timestamp
+                    return matches[0]
+
+        return None
+
+    def _extract_section_from_text(self, text: str, chunk_metadata: Dict[str, Any]) -> Optional[str]:
+        """Extract section information from text or metadata."""
+        # Check metadata first
+        if chunk_metadata.get("section_title"):
+            return chunk_metadata["section_title"]
+
+        # For video content, try to extract topic from the beginning of the text
+        lines = text.strip().split('\n')
+        if lines:
+            first_line = lines[0].strip()
+            # Remove timestamp if present
+            import re
+            first_line = re.sub(r'\[\d{1,2}:\d{2}(?::\d{2})?\s*(?:-\s*\d{1,2}:\d{2}(?::\d{2})?)?\]', '', first_line).strip()
+            if first_line and len(first_line) < 100:  # Reasonable section title length
+                return first_line
+
+        return None
+
     def _get_system_prompt(self) -> str:
         """Get the system prompt for the GraphTraversalAgent."""
         return f"""You are a helpful GraphTraversalAgent that extracts useful information from document chunks.
@@ -219,7 +261,7 @@ Be generous in extracting information - anything related to the user's query is 
             LIMIT 100
             """
 
-            result = await self.neo4j_storage._execute_query(query, {"entity_names": entity_names})
+            result = await self.neo4j_storage._connection_ops._execute_query(query, {"entity_names": entity_names})
             graph_related_names = [record["related_entity_name"] for record in result]
 
             # If we have embedding service, also find semantically similar entities
@@ -336,16 +378,27 @@ Be generous in extracting information - anything related to the user's query is 
 
                             # Safely extract metadata with defaults
                             chunk_metadata = chunk.get("chunk_metadata") or {}
+                            chunk_text = chunk.get("text", chunk.get("content", ""))
                             related_entities = chunk.get("related_entity_names", [])
                             if not isinstance(related_entities, list):
                                 related_entities = []
+
+                            # Extract timestamp from text content for video/audio files
+                            timestamp = chunk_metadata.get("timestamp") if isinstance(chunk_metadata, dict) else None
+                            if not timestamp and chunk_text:
+                                timestamp = self._extract_timestamp_from_text(chunk_text)
+
+                            # Extract section information
+                            section = chunk_metadata.get("section_title") or chunk_metadata.get("section") if isinstance(chunk_metadata, dict) else None
+                            if not section and chunk_text:
+                                section = self._extract_section_from_text(chunk_text, chunk_metadata)
 
                             fact.source_metadata = SourceMetadata(
                                 document_name=chunk.get("document_name", "Unknown Document"),
                                 chunk_index=chunk.get("chunk_index", 0),
                                 page_number=chunk_metadata.get("page_number") if isinstance(chunk_metadata, dict) else None,
-                                section=chunk_metadata.get("section") if isinstance(chunk_metadata, dict) else None,
-                                timestamp=chunk_metadata.get("timestamp") if isinstance(chunk_metadata, dict) else None,
+                                section=section,
+                                timestamp=timestamp,
                                 additional_metadata={
                                     "source_file": chunk.get("source_file", ""),
                                     "document_id": chunk.get("document_id", ""),

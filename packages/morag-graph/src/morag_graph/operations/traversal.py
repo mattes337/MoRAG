@@ -121,11 +121,16 @@ class GraphTraversal:
         neighbors = []
         for record in result:
             try:
-                entity = Entity.from_neo4j_node(record["neighbor"])
-                neighbors.append(entity)
+                neighbor_data = dict(record["neighbor"])
+                # Only process if it has the required fields for an Entity
+                if 'name' in neighbor_data and neighbor_data['name']:
+                    entity = Entity.from_neo4j_node(neighbor_data)
+                    neighbors.append(entity)
+                else:
+                    self.logger.debug(f"Skipping non-entity node: {neighbor_data}")
             except Exception as e:
                 self.logger.warning(f"Failed to parse neighbor entity: {e}")
-        
+
         return neighbors
     
     async def _find_neighbors_generic(self, entity_id: Union[str, UUID], 

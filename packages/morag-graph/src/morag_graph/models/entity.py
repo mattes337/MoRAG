@@ -3,12 +3,15 @@
 import json
 import uuid
 import hashlib
+import logging
 from typing import Dict, List, Optional, Any, Union, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
 from .types import EntityId, EntityAttributes
 from ..utils.id_generation import UnifiedIDGenerator, IDValidator
+
+logger = logging.getLogger(__name__)
 
 
 class Entity(BaseModel):
@@ -199,6 +202,15 @@ class Entity(BaseModel):
         # Make a copy to avoid modifying the original
         node = node.copy()
 
+        # Validate required fields
+        if 'name' not in node or not node['name']:
+            raise ValueError(f"Entity node missing required 'name' field: {node}")
+
+        # Ensure required fields have defaults
+        node.setdefault('type', 'CUSTOM')
+        node.setdefault('confidence', 1.0)
+        node.setdefault('attributes', {})
+
         # Deserialize attributes from JSON string
         if 'attributes' in node and isinstance(node['attributes'], str):
             try:
@@ -212,11 +224,16 @@ class Entity(BaseModel):
 
         # Check if the entity ID is invalid and regenerate if needed
         entity_id = node.get('id', '')
-        if entity_id and not IDValidator.is_unified_format(entity_id):
-            # Regenerate ID using the unified generator
-            name = node.get('name', '')
-            entity_type = str(node.get('type', 'CUSTOM'))
-            source_doc_id = node.get('source_doc_id', '')
-            node['id'] = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
+        if entity_id:
+            try:
+                IDValidator.validate_entity_id(entity_id)
+            except:
+                # Regenerate ID using the unified generator if validation fails
+                name = node.get('name', '')
+                entity_type = str(node.get('type', 'CUSTOM'))
+                source_doc_id = node.get('source_doc_id', '')
+                new_id = UnifiedIDGenerator.generate_entity_id(name, entity_type, source_doc_id)
+                logger.debug(f"Regenerated invalid entity ID: {entity_id} -> {new_id}")
+                node['id'] = new_id
 
         return cls(**node)
