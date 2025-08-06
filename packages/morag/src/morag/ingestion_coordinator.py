@@ -1712,8 +1712,14 @@ class IngestionCoordinator:
                     gemini_service = GeminiEmbeddingService(api_key=api_key)
                     entity_embedding_service = EntityEmbeddingService(neo4j_storage, gemini_service)
 
-                    for entity_id, embedding in entity_embeddings.items():
-                        await entity_embedding_service.store_entity_embedding(entity_id, embedding)
+                    for entity_id, embedding_data in entity_embeddings.items():
+                        # Extract just the embedding vector from the embedding data
+                        if isinstance(embedding_data, dict) and 'embedding' in embedding_data:
+                            embedding_vector = embedding_data['embedding']
+                            await entity_embedding_service.store_entity_embedding(entity_id, embedding_vector)
+                        else:
+                            logger.warning(f"Invalid embedding data format for entity {entity_id}: {type(embedding_data)}")
+                            continue
 
                     logger.info(f"Stored {len(entity_embeddings)} entity embeddings")
 
@@ -1728,8 +1734,14 @@ class IngestionCoordinator:
                     gemini_service = GeminiEmbeddingService(api_key=api_key)
                     fact_embedding_service = FactEmbeddingService(neo4j_storage, gemini_service)
 
-                    for fact_id, embedding in fact_embeddings.items():
-                        await fact_embedding_service.store_fact_embedding(fact_id, embedding)
+                    for fact_id, embedding_data in fact_embeddings.items():
+                        # Extract just the embedding vector from the embedding data
+                        if isinstance(embedding_data, dict) and 'embedding' in embedding_data:
+                            embedding_vector = embedding_data['embedding']
+                            await fact_embedding_service.store_fact_embedding(fact_id, embedding_vector)
+                        else:
+                            logger.warning(f"Invalid embedding data format for fact {fact_id}: {type(embedding_data)}")
+                            continue
 
                     logger.info(f"Stored {len(fact_embeddings)} fact embeddings")
 

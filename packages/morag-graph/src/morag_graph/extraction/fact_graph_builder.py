@@ -1,6 +1,7 @@
 """Build knowledge graphs from extracted facts."""
 
 import json
+import re
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 import structlog
@@ -106,13 +107,39 @@ class FactGraphBuilder:
             return []
         
         relationships = []
-        
+        failed_batches = 0
+        max_failed_batches = 3  # Allow up to 3 failed batches before giving up
+
         # Process facts in batches to avoid overwhelming the LLM
         batch_size = 10
+        total_batches = (len(facts) + batch_size - 1) // batch_size
+
         for i in range(0, len(facts), batch_size):
             batch = facts[i:i + batch_size]
+            batch_num = i // batch_size + 1
+
+            self.logger.debug(f"Processing relationship batch {batch_num}/{total_batches}")
+
             batch_relationships = await self._extract_relationships_for_batch(batch)
-            relationships.extend(batch_relationships)
+
+            if not batch_relationships:
+                failed_batches += 1
+                self.logger.warning(
+                    f"Batch {batch_num} failed to extract relationships ({failed_batches}/{max_failed_batches} failures)"
+                )
+
+                # If too many batches fail, stop processing
+                if failed_batches >= max_failed_batches:
+                    self.logger.error(
+                        f"Too many failed batches ({failed_batches}), stopping relationship extraction",
+                        processed_batches=batch_num,
+                        total_batches=total_batches
+                    )
+                    break
+            else:
+                relationships.extend(batch_relationships)
+                # Reset failure counter on success
+                failed_batches = 0
         
         # Filter relationships by confidence
         filtered_relationships = [
@@ -129,42 +156,118 @@ class FactGraphBuilder:
         return filtered_relationships
     
     async def _extract_relationships_for_batch(self, facts: List[Fact]) -> List[FactRelation]:
-        """Extract relationships for a batch of facts.
-        
+        """Extract relationships for a batch of facts with retry logic.
+
         Args:
             facts: Batch of facts to analyze
-            
+
         Returns:
             List of relationships found in the batch
         """
         if len(facts) < 2:
             return []
-        
-        try:
-            # Convert facts to dictionaries for LLM prompt
-            fact_dicts = [self._fact_to_prompt_dict(fact) for fact in facts]
-            
-            # Create relationship extraction prompt
-            prompt = FactExtractionPrompts.create_relationship_prompt(fact_dicts, self.language)
-            
-            # Get relationships from LLM
-            response = await self.llm_client.generate(prompt)
-            
-            # Parse response
-            relationship_data = self._parse_relationship_response(response)
-            
-            # Convert to FactRelation objects
-            relationships = self._create_fact_relation_objects(relationship_data, facts)
-            
-            return relationships
-            
-        except Exception as e:
-            self.logger.warning(
-                "Relationship extraction failed for batch",
-                batch_size=len(facts),
-                error=str(e)
-            )
-            return []
+
+        max_retries = 3
+        retry_delay = 1.0  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                # Convert facts to dictionaries for LLM prompt
+                fact_dicts = [self._fact_to_prompt_dict(fact) for fact in facts]
+
+                self.logger.debug(
+                    f"Extracting relationships for {len(facts)} facts (attempt {attempt + 1}/{max_retries})",
+                    fact_ids=[f.id for f in facts]
+                )
+
+                # Create relationship extraction prompt
+                prompt = FactExtractionPrompts.create_relationship_prompt(fact_dicts, self.language)
+
+                # Get relationships from LLM
+                response = await self.llm_client.generate(prompt)
+
+                self.logger.debug(
+                    "LLM relationship response received",
+                    response_length=len(response),
+                    response_preview=response[:200],
+                    attempt=attempt + 1
+                )
+
+                # Parse response
+                relationship_data = self._parse_relationship_response(response)
+
+                if not relationship_data:
+                    self.logger.warning(
+                        f"No valid relationship data parsed on attempt {attempt + 1}",
+                        response_preview=response[:300]
+                    )
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    else:
+                        return []
+
+                self.logger.debug(
+                    f"Parsed {len(relationship_data)} relationship candidates",
+                    relationship_data=relationship_data,
+                    attempt=attempt + 1
+                )
+
+                # Convert to FactRelation objects
+                relationships = self._create_fact_relation_objects(relationship_data, facts)
+
+                self.logger.info(
+                    f"Successfully created {len(relationships)} fact relationships from {len(relationship_data)} candidates on attempt {attempt + 1}"
+                )
+
+                return relationships
+
+            except json.JSONDecodeError as e:
+                self.logger.warning(
+                    f"JSON parsing failed in relationship extraction (attempt {attempt + 1}/{max_retries})",
+                    batch_size=len(facts),
+                    json_error=str(e),
+                    error_position=getattr(e, 'pos', 'unknown')
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    return []
+
+            except KeyError as e:
+                self.logger.warning(
+                    f"KeyError in relationship extraction (attempt {attempt + 1}/{max_retries})",
+                    batch_size=len(facts),
+                    key_error=str(e),
+                    error_type=type(e).__name__
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    return []
+
+            except Exception as e:
+                self.logger.warning(
+                    f"Relationship extraction failed for batch (attempt {attempt + 1}/{max_retries})",
+                    batch_size=len(facts),
+                    error=str(e),
+                    error_type=type(e).__name__
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    return []
+
+        # If we get here, all retries failed
+        self.logger.error(
+            f"Relationship extraction failed after {max_retries} attempts",
+            batch_size=len(facts),
+            fact_ids=[f.id for f in facts]
+        )
+        return []
     
     def _fact_to_prompt_dict(self, fact: Fact) -> Dict[str, Any]:
         """Convert fact to dictionary for LLM prompt.
@@ -186,40 +289,141 @@ class FactGraphBuilder:
         }
     
     def _parse_relationship_response(self, response: str) -> List[Dict[str, Any]]:
-        """Parse LLM response for relationships.
-        
+        """Parse LLM response for relationships with robust error handling.
+
         Args:
             response: Raw LLM response
-            
+
         Returns:
             List of relationship dictionaries
         """
+        if not response or not response.strip():
+            return []
+
         try:
-            # Try to find JSON array in response
+            # Clean the response first
+            cleaned_response = response.strip()
+
+            # Try to find JSON array in response using multiple patterns
             import re
-            json_match = re.search(r'\[.*\]', response, re.DOTALL)
+
+            # Pattern 1: Standard JSON array
+            json_match = re.search(r'\[.*?\]', cleaned_response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(0)
-                relationships = json.loads(json_str)
-                
-                if isinstance(relationships, list):
+                try:
+                    relationships = json.loads(json_str)
+                    if isinstance(relationships, list):
+                        return self._validate_relationships(relationships)
+                except json.JSONDecodeError:
+                    pass
+
+            # Pattern 2: Try to extract JSON objects between brackets
+            json_objects = re.findall(r'\{[^{}]*\}', cleaned_response, re.DOTALL)
+            if json_objects:
+                relationships = []
+                for obj_str in json_objects:
+                    try:
+                        obj = json.loads(obj_str)
+                        if self._is_valid_relationship_object(obj):
+                            relationships.append(obj)
+                    except json.JSONDecodeError:
+                        continue
+                if relationships:
                     return relationships
-            
-            # Fallback: try to parse entire response as JSON
-            relationships = json.loads(response)
-            if isinstance(relationships, list):
-                return relationships
-            elif isinstance(relationships, dict):
-                return [relationships]
-            
-        except json.JSONDecodeError as e:
+
+            # Pattern 3: Try to parse entire response as JSON
+            try:
+                relationships = json.loads(cleaned_response)
+                if isinstance(relationships, list):
+                    return self._validate_relationships(relationships)
+                elif isinstance(relationships, dict) and self._is_valid_relationship_object(relationships):
+                    return [relationships]
+            except json.JSONDecodeError:
+                pass
+
+            # Pattern 4: Try to fix common JSON issues
+            fixed_response = self._fix_common_json_issues(cleaned_response)
+            if fixed_response != cleaned_response:
+                try:
+                    relationships = json.loads(fixed_response)
+                    if isinstance(relationships, list):
+                        return self._validate_relationships(relationships)
+                except json.JSONDecodeError:
+                    pass
+
+        except Exception as e:
             self.logger.warning(
-                "Failed to parse relationship response",
+                "Unexpected error parsing relationship response",
                 error=str(e),
                 response_preview=response[:200]
             )
-        
+
+        # Log the failure for debugging
+        self.logger.warning(
+            "Failed to parse relationship response - no valid JSON found",
+            response_preview=response[:300],
+            response_length=len(response)
+        )
+
         return []
+
+    def _fix_common_json_issues(self, response: str) -> str:
+        """Fix common JSON formatting issues in LLM responses.
+
+        Args:
+            response: Raw response string
+
+        Returns:
+            Fixed response string
+        """
+        # Remove common prefixes/suffixes
+        response = re.sub(r'^.*?(\[|\{)', r'\1', response, flags=re.DOTALL)
+        response = re.sub(r'(\]|\}).*?$', r'\1', response, flags=re.DOTALL)
+
+        # Fix trailing commas
+        response = re.sub(r',\s*(\]|\})', r'\1', response)
+
+        # Fix missing quotes around keys
+        response = re.sub(r'(\w+):', r'"\1":', response)
+
+        # Fix single quotes to double quotes
+        response = response.replace("'", '"')
+
+        return response.strip()
+
+    def _is_valid_relationship_object(self, obj: Dict[str, Any]) -> bool:
+        """Check if an object has the required relationship fields.
+
+        Args:
+            obj: Dictionary to validate
+
+        Returns:
+            True if valid relationship object
+        """
+        required_fields = ['source_fact_id', 'target_fact_id', 'relation_type']
+        return all(field in obj for field in required_fields)
+
+    def _validate_relationships(self, relationships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate and filter relationship objects.
+
+        Args:
+            relationships: List of relationship dictionaries
+
+        Returns:
+            List of valid relationship dictionaries
+        """
+        valid_relationships = []
+        for rel in relationships:
+            if isinstance(rel, dict) and self._is_valid_relationship_object(rel):
+                # Set default values for missing fields
+                rel.setdefault('confidence', 0.7)
+                rel.setdefault('context', '')
+                valid_relationships.append(rel)
+            else:
+                self.logger.debug(f"Skipping invalid relationship object: {rel}")
+
+        return valid_relationships
     
     def _create_fact_relation_objects(
         self, 
@@ -238,39 +442,92 @@ class FactGraphBuilder:
         relationships = []
         fact_ids = {fact.id for fact in facts}
         
-        for rel_data in relationship_data:
+        for i, rel_data in enumerate(relationship_data):
             try:
+                # Validate input data structure
+                if not isinstance(rel_data, dict):
+                    self.logger.warning(
+                        f"Relationship data {i} is not a dictionary",
+                        rel_data_type=type(rel_data),
+                        rel_data=str(rel_data)[:100]
+                    )
+                    continue
+
                 source_id = rel_data.get('source_fact_id', '')
                 target_id = rel_data.get('target_fact_id', '')
                 relation_type = rel_data.get('relation_type', '')
-                
+
+                # Validate required fields
+                if not source_id:
+                    self.logger.debug(f"Relationship {i} missing source_fact_id", rel_data=rel_data)
+                    continue
+                if not target_id:
+                    self.logger.debug(f"Relationship {i} missing target_fact_id", rel_data=rel_data)
+                    continue
+                if not relation_type:
+                    self.logger.debug(f"Relationship {i} missing relation_type", rel_data=rel_data)
+                    continue
+
                 # Validate fact IDs exist
-                if source_id not in fact_ids or target_id not in fact_ids:
+                if source_id not in fact_ids:
+                    self.logger.debug(
+                        f"Source fact ID not found: {source_id}",
+                        available_ids=list(fact_ids)[:5]  # Show first 5 for debugging
+                    )
                     continue
-                
+                if target_id not in fact_ids:
+                    self.logger.debug(
+                        f"Target fact ID not found: {target_id}",
+                        available_ids=list(fact_ids)[:5]  # Show first 5 for debugging
+                    )
+                    continue
+
                 # Validate relation type
-                if relation_type not in FactRelationType.all_types():
+                valid_types = FactRelationType.all_types()
+                if relation_type not in valid_types:
+                    self.logger.debug(
+                        f"Invalid relation type: {relation_type}",
+                        valid_types=valid_types
+                    )
                     continue
-                
+
                 # Avoid self-relationships
                 if source_id == target_id:
+                    self.logger.debug(f"Skipping self-relationship for fact {source_id}")
                     continue
-                
-                relationship = FactRelation(
-                    source_fact_id=source_id,
-                    target_fact_id=target_id,
-                    relation_type=relation_type,
-                    confidence=float(rel_data.get('confidence', 0.7)),
-                    context=rel_data.get('context', '')
-                )
-                
+
+                # Create relationship object with explicit parameter validation
+                try:
+                    relationship = FactRelation(
+                        source_fact_id=source_id,
+                        target_fact_id=target_id,
+                        relation_type=relation_type,
+                        confidence=float(rel_data.get('confidence', 0.7)),
+                        context=rel_data.get('context', '')
+                    )
+                except Exception as create_error:
+                    self.logger.warning(
+                        f"Failed to create FactRelation object for relationship {i}",
+                        source_fact_id=source_id,
+                        target_fact_id=target_id,
+                        relation_type=relation_type,
+                        create_error=str(create_error),
+                        create_error_type=type(create_error).__name__
+                    )
+                    continue
+
                 relationships.append(relationship)
-                
+                self.logger.debug(
+                    f"Created relationship: {source_id} --[{relation_type}]--> {target_id}"
+                )
+
             except Exception as e:
                 self.logger.warning(
                     "Failed to create relationship object",
+                    relationship_index=i,
                     rel_data=rel_data,
-                    error=str(e)
+                    error=str(e),
+                    error_type=type(e).__name__
                 )
                 continue
         

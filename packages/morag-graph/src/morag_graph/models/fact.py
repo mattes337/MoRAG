@@ -320,12 +320,35 @@ class FactRelation(BaseModel):
     
     def __init__(self, **data):
         """Initialize relation with auto-generated ID if not provided."""
-        if 'id' not in data or not data['id']:
-            # Generate deterministic ID based on content
-            content_for_hash = f"{data.get('source_fact_id', '')}{data.get('target_fact_id', '')}{data.get('relation_type', '')}"
-            content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()[:12]
-            data['id'] = f"fact_rel_{content_hash}"
-        super().__init__(**data)
+        try:
+            # Validate that data is a dictionary
+            if not isinstance(data, dict):
+                raise ValueError(f"FactRelation data must be a dictionary, got {type(data)}: {data}")
+
+            if 'id' not in data or not data['id']:
+                # Generate deterministic ID based on content
+                source_id = data.get('source_fact_id', '')
+                target_id = data.get('target_fact_id', '')
+                relation_type = data.get('relation_type', '')
+
+                content_for_hash = f"{source_id}{target_id}{relation_type}"
+                content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()[:12]
+                data['id'] = f"fact_rel_{content_hash}"
+
+            super().__init__(**data)
+
+        except Exception as e:
+            # Add detailed error information for debugging
+            import structlog
+            logger = structlog.get_logger(__name__)
+            logger.error(
+                "FactRelation initialization failed",
+                data_type=type(data),
+                data_content=str(data)[:200] if data else "None",
+                error=str(e),
+                error_type=type(e).__name__
+            )
+            raise
     
     def get_neo4j_properties(self) -> Dict[str, Any]:
         """Get properties for Neo4j relationship storage.
