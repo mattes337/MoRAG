@@ -303,37 +303,65 @@ class VideoService:
             return json_result
 
     async def _save_output_files(self,
-                               file_path: Path, 
+                               file_path: Path,
                                result: VideoProcessingResult,
                                markdown_content: Optional[str],
                                output_format: str) -> Dict[str, str]:
         """Save output files and return their paths."""
         if not self.output_dir:
             return {}
-        
+
         output_files = {}
         base_name = file_path.stem
-        
+
+        # Sanitize the base name for directory creation
+        # Remove problematic characters and limit length
+        sanitized_name = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if len(sanitized_name) > 100:  # Limit directory name length
+            sanitized_name = sanitized_name[:100].strip()
+        if not sanitized_name:  # Fallback if name becomes empty
+            sanitized_name = f"video_{hash(base_name) % 10000}"
+
         # Create a subdirectory for this file
-        file_output_dir = self.output_dir / base_name
-        ensure_directory_exists(file_output_dir)
-        
+        file_output_dir = self.output_dir / sanitized_name
+        try:
+            ensure_directory_exists(file_output_dir)
+            logger.debug("Created output directory", output_dir=str(file_output_dir))
+        except Exception as e:
+            logger.error("Failed to create output directory",
+                        output_dir=str(file_output_dir),
+                        error=str(e))
+            raise VideoServiceError(f"Failed to create output directory: {str(e)}")
+
         # Save transcript as text if available
         if result.audio_processing_result and result.audio_processing_result.transcript:
-            transcript_path = file_output_dir / f"{base_name}_transcript.txt"
-            transcript_path.write_text(result.audio_processing_result.transcript)
-            output_files["transcript"] = str(transcript_path)
+            transcript_path = file_output_dir / f"{sanitized_name}_transcript.txt"
+            try:
+                transcript_path.write_text(result.audio_processing_result.transcript, encoding='utf-8')
+                output_files["transcript"] = str(transcript_path)
+                logger.debug("Saved transcript", path=str(transcript_path))
+            except Exception as e:
+                logger.error("Failed to save transcript",
+                           path=str(transcript_path),
+                           error=str(e))
+                raise VideoServiceError(f"Failed to save transcript: {str(e)}")
         
         # Save markdown if available
         if markdown_content:
-            markdown_path = file_output_dir / f"{base_name}.md"
-            markdown_path.write_text(markdown_content)
-            output_files["markdown"] = str(markdown_path)
-        
+            markdown_path = file_output_dir / f"{sanitized_name}.md"
+            try:
+                markdown_path.write_text(markdown_content, encoding='utf-8')
+                output_files["markdown"] = str(markdown_path)
+                logger.debug("Saved markdown", path=str(markdown_path))
+            except Exception as e:
+                logger.error("Failed to save markdown",
+                           path=str(markdown_path),
+                           error=str(e))
+
         # Save segments as JSON if available
         if result.audio_processing_result and hasattr(result.audio_processing_result, 'segments') and result.audio_processing_result.segments:
             import json
-            segments_path = file_output_dir / f"{base_name}_segments.json"
+            segments_path = file_output_dir / f"{sanitized_name}_segments.json"
             segments_data = []
 
             for segment in result.audio_processing_result.segments:
@@ -348,16 +376,20 @@ class VideoService:
                 }
                 segments_data.append(segment_data)
 
-            segments_path.write_text(json.dumps(segments_data, indent=2, ensure_ascii=False))
-            output_files["segments"] = str(segments_path)
+            try:
+                segments_path.write_text(json.dumps(segments_data, indent=2, ensure_ascii=False), encoding='utf-8')
+                output_files["segments"] = str(segments_path)
+                logger.info("Saved segments file",
+                           segments_count=len(segments_data),
+                           segments_path=str(segments_path))
+            except Exception as e:
+                logger.error("Failed to save segments",
+                           path=str(segments_path),
+                           error=str(e))
 
-            logger.info("Saved segments file",
-                       segments_count=len(segments_data),
-                       segments_path=str(segments_path))
-        
         # Save metadata as JSON
         import json
-        metadata_path = file_output_dir / f"{base_name}_metadata.json"
+        metadata_path = file_output_dir / f"{sanitized_name}_metadata.json"
         metadata_dict = {
             "duration": result.metadata.duration,
             "width": result.metadata.width,
@@ -371,8 +403,14 @@ class VideoService:
             "audio_codec": result.metadata.audio_codec,
             "creation_time": result.metadata.creation_time
         }
-        metadata_path.write_text(json.dumps(metadata_dict, indent=2))
-        output_files["metadata"] = str(metadata_path)
+        try:
+            metadata_path.write_text(json.dumps(metadata_dict, indent=2), encoding='utf-8')
+            output_files["metadata"] = str(metadata_path)
+            logger.debug("Saved metadata", path=str(metadata_path))
+        except Exception as e:
+            logger.error("Failed to save metadata",
+                       path=str(metadata_path),
+                       error=str(e))
         
         # Save thumbnails
         if result.thumbnails:
@@ -402,10 +440,16 @@ class VideoService:
         
         # Save OCR results if available
         if result.ocr_results:
-            ocr_path = file_output_dir / f"{base_name}_ocr.json"
+            ocr_path = file_output_dir / f"{sanitized_name}_ocr.json"
             import json
-            ocr_path.write_text(json.dumps(result.ocr_results, indent=2))
-            output_files["ocr"] = str(ocr_path)
+            try:
+                ocr_path.write_text(json.dumps(result.ocr_results, indent=2), encoding='utf-8')
+                output_files["ocr"] = str(ocr_path)
+                logger.debug("Saved OCR results", path=str(ocr_path))
+            except Exception as e:
+                logger.error("Failed to save OCR results",
+                           path=str(ocr_path),
+                           error=str(e))
         
         logger.info("Output files saved", 
                    output_dir=str(file_output_dir),

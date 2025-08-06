@@ -399,8 +399,8 @@ async def test_video_ingestion(
             print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
             print_result("Processing Time", f"{ingestion_result['processing_time']:.2f} seconds")
             print_result("Chunks Created", str(ingestion_result['embeddings_data']['chunk_count']))
-            print_result("Entities Extracted", str(ingestion_result['graph_data']['entities_count']))
-            print_result("Relations Extracted", str(ingestion_result['graph_data']['relations_count']))
+            print_result("Entities Extracted", str(ingestion_result['graph_data'].get('entities_count', 0)))
+            print_result("Relations Extracted", str(ingestion_result['graph_data'].get('relations_count', 0)))
 
             # Show database results
             if 'database_results' in ingestion_result:

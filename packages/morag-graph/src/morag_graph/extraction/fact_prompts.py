@@ -42,27 +42,32 @@ If the input text is in {language_name}, your response must be entirely in {lang
 """
 
         return language_instruction + f"""
-You are a knowledge extraction expert. Extract structured facts from the following text that represent actionable, specific information that can be used independently to answer questions or solve problems.
+You are a knowledge extraction expert. Extract structured facts from the following text that represent specific, domain-relevant information that can be used to answer questions or understand concepts.
 
 ENHANCED FACT STRUCTURE:
 A fact should contain:
 - Subject: The main entity, substance, or concept the fact is about
 - Object: The specific condition, problem, or target being addressed
-- Approach: The specific method, dosage, technique, or procedure (include exact amounts, frequencies, durations)
-- Solution: The expected outcome, benefit, or result
+- Approach: The specific method, dosage, technique, procedure, or characteristic (include exact amounts, frequencies, durations when available)
+- Solution: The expected outcome, benefit, result, or explanation
 - Condition: The question/precondition/situation when this fact applies (NEW FIELD)
 - Remarks: Important context, contraindications, warnings, or qualifications
 - Keywords: Domain-specific technical terms that should become separate entities
 
 QUALITY REQUIREMENTS:
-- Facts must be ACTIONABLE and SPECIFIC, not generic or trivial
-- Include exact dosages, measurements, frequencies, and durations
+- Facts must be SPECIFIC and DOMAIN-RELEVANT, not overly generic
+- Include exact dosages, measurements, frequencies, and durations when mentioned
 - Each fact must be SELF-CONTAINED and usable without the original text
-- STRICTLY AVOID generic advice like "take a break", "consult a doctor", "eat healthy", "exercise regularly"
-- Focus ONLY on domain-specific knowledge that is not commonly known
-- REJECT facts that could apply to any domain or are general life advice
-- ONLY extract facts that contain specific substances, techniques, measurements, or procedures
-- If no domain-specific facts are found, return an empty array []
+- AVOID overly generic advice like "take a break", "consult a doctor", "eat healthy", "exercise regularly"
+- Focus on domain-specific knowledge including:
+  * Medical conditions, symptoms, and diagnostic criteria
+  * Treatment methods, medications, and therapeutic approaches
+  * Educational content about diseases, disorders, and health conditions
+  * Specific techniques, procedures, and interventions
+  * Characteristic features, types, and classifications
+- INCLUDE educational facts about medical conditions, symptoms, types, and characteristics
+- REJECT only facts that are completely generic life advice with no domain specificity
+- If no domain-relevant facts are found, return an empty array []
 
 FEW-SHOT EXAMPLES:
 
@@ -98,7 +103,23 @@ Extracted Fact:
   "keywords": ["PostgreSQL", "B-tree index", "query optimization", "database performance", "REINDEX"]
 }}
 
-Example 3 (Business/Finance):
+Example 3 (Medical/Educational):
+Text: "ADHS zeigt sich in drei Haupttypen: der unaufmerksame Typ mit Konzentrationsschwierigkeiten und Vergesslichkeit, der hyperaktiv-impulsive Typ mit Unruhe und spontanen Handlungen, und der Mischtyp, der beide Symptomgruppen kombiniert. Der Mischtyp hat besondere Herausforderungen im Alltag."
+
+Extracted Fact:
+{{
+  "subject": "ADHS Mischtyp",
+  "object": "Alltagsherausforderungen bei ADHS",
+  "approach": "Kombination von Unaufmerksamkeit und Hyperaktivität-Impulsivität",
+  "solution": "Verständnis der komplexen Symptomatik für bessere Behandlungsansätze",
+  "condition": "Bei der Diagnose und Behandlung von ADHS-Mischtyp",
+  "remarks": "Besondere Herausforderungen durch das Aufeinandertreffen beider Symptomgruppen",
+  "fact_type": "descriptive",
+  "confidence": 0.9,
+  "keywords": ["ADHS", "Mischtyp", "Unaufmerksamkeit", "Hyperaktivität", "Impulsivität", "Symptomatik"]
+}}
+
+Example 4 (Business/Finance):
 Text: "For small business cash flow management, maintain 3-6 months of operating expenses in reserve. Use the 50/30/20 rule: 50% for essential expenses, 30% for growth investments, 20% for emergency fund. Review monthly and adjust based on seasonal patterns."
 
 Extracted Fact:

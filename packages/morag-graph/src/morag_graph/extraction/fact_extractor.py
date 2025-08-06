@@ -199,25 +199,29 @@ class FactExtractor:
     
     def _preprocess_chunk(self, text: str) -> str:
         """Clean and prepare text for fact extraction.
-        
+
         Args:
             text: Raw text to preprocess
-            
+
         Returns:
             Cleaned text ready for extraction
         """
         # Remove excessive whitespace
         text = re.sub(r'\s+', ' ', text)
-        
+
         # Remove markdown artifacts that might confuse extraction
         text = re.sub(r'#{1,6}\s*', '', text)  # Headers
         text = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', text)  # Bold/italic
         text = re.sub(r'`([^`]+)`', r'\1', text)  # Inline code
-        
-        # Clean up common artifacts
-        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)  # Links
+
+        # Clean up common artifacts - but preserve timestamps!
+        # Only remove markdown links that have URLs (contain http or www or end with common extensions)
+        text = re.sub(r'\[([^\]]+)\]\((?:https?://|www\.|[^)]*\.[a-z]{2,4}[^)]*)\)', r'\1', text)  # Links with URLs
         text = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', text)  # Images
-        
+
+        # Preserve timestamp formats like [00:21 - 00:25] or [01:23] by not removing them
+        # The original regex was too broad and removed timestamps
+
         return text.strip()
 
     def _infer_domain_from_text(self, text: str) -> str:

@@ -316,20 +316,41 @@ class ImageService(BaseService):
         output_files = {}
         base_name = file_path.stem
 
+        # Sanitize the base name for directory creation
+        # Remove problematic characters and limit length
+        sanitized_name = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if len(sanitized_name) > 100:  # Limit directory name length
+            sanitized_name = sanitized_name[:100].strip()
+        if not sanitized_name:  # Fallback if name becomes empty
+            sanitized_name = f"image_{hash(base_name) % 10000}"
+
         # Create output directory for this file
-        file_output_dir = self.output_dir / base_name
-        file_output_dir.mkdir(exist_ok=True)
+        file_output_dir = self.output_dir / sanitized_name
+        try:
+            file_output_dir.mkdir(exist_ok=True, parents=True)
+            logger.debug("Created output directory", output_dir=str(file_output_dir))
+        except Exception as e:
+            logger.error("Failed to create output directory",
+                        output_dir=str(file_output_dir),
+                        error=str(e))
+            raise ProcessingError(f"Failed to create output directory: {str(e)}")
 
         # Save markdown content
         if output_format in ["markdown", "both"]:
-            markdown_path = file_output_dir / f"{base_name}.md"
-            with open(markdown_path, "w", encoding="utf-8") as f:
-                f.write(markdown_content)
-            output_files["markdown"] = str(markdown_path)
+            markdown_path = file_output_dir / f"{sanitized_name}.md"
+            try:
+                with open(markdown_path, "w", encoding="utf-8") as f:
+                    f.write(markdown_content)
+                output_files["markdown"] = str(markdown_path)
+                logger.debug("Saved markdown", path=str(markdown_path))
+            except Exception as e:
+                logger.error("Failed to save markdown",
+                           path=str(markdown_path),
+                           error=str(e))
 
         # Save metadata as JSON
         import json
-        metadata_path = file_output_dir / f"{base_name}_metadata.json"
+        metadata_path = file_output_dir / f"{sanitized_name}_metadata.json"
         metadata_dict = {
             "file_path": str(file_path),
             "file_size": file_path.stat().st_size,
@@ -339,8 +360,14 @@ class ImageService(BaseService):
             "confidence_scores": result.confidence_scores,
             "image_metadata": result.metadata.__dict__ if result.metadata else {}
         }
-        metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False))
-        output_files["metadata"] = str(metadata_path)
+        try:
+            metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False), encoding='utf-8')
+            output_files["metadata"] = str(metadata_path)
+            logger.debug("Saved metadata", path=str(metadata_path))
+        except Exception as e:
+            logger.error("Failed to save metadata",
+                       path=str(metadata_path),
+                       error=str(e))
 
         logger.info("Saved image output files",
                    output_dir=str(file_output_dir),
