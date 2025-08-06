@@ -236,7 +236,37 @@ class DocumentOperations(BaseOperations):
         
         result = await self._execute_query(query, parameters)
         return result[0]["id"] if result else chunk.id
-    
+
+    async def store_documents(self, documents: List[Document]) -> List[str]:
+        """Store multiple documents in Neo4J.
+
+        Args:
+            documents: List of documents to store
+
+        Returns:
+            List of document IDs
+        """
+        if not documents:
+            return []
+
+        # Use individual store_document calls for proper MERGE logic
+        return [await self.store_document(document) for document in documents]
+
+    async def store_document_chunks(self, chunks: List[DocumentChunk]) -> List[str]:
+        """Store multiple document chunks in Neo4J.
+
+        Args:
+            chunks: List of document chunks to store
+
+        Returns:
+            List of chunk IDs
+        """
+        if not chunks:
+            return []
+
+        # Use individual store_document_chunk calls for proper MERGE logic
+        return [await self.store_document_chunk(chunk) for chunk in chunks]
+
     async def create_document_contains_chunk_relation(self, document_id: str, chunk_id: str) -> None:
         """Create a CONTAINS relationship between a document and a chunk.
         

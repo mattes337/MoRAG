@@ -733,39 +733,44 @@ class IngestionCoordinator:
 
             # Collect entities from facts (subjects, objects, keywords)
             for fact in facts:
-                # Add subject entity
+                # Add subject entity - use normalized name as key
                 if fact.get('subject'):
-                    entity_key = f"subject_{fact['subject']}"
+                    entity_name = fact['subject'].strip()
+                    entity_key = entity_name.lower()  # Use normalized name as key
                     if entity_key not in unique_entities:
                         unique_entities[entity_key] = {
-                            'name': fact['subject'],
-                            'type': 'SUBJECT',
-                            'context': f"Subject entity from fact domain: {fact.get('domain', 'general')}"
+                            'name': entity_name,
+                            'type': 'ENTITY',  # Use generic ENTITY type
+                            'context': f"Subject entity from fact domain: {fact.get('domain', 'general')}",
+                            'original_type': 'SUBJECT'  # Keep original semantic type for reference
                         }
 
-                # Add object entity
+                # Add object entity - use normalized name as key
                 if fact.get('object'):
-                    entity_key = f"object_{fact['object']}"
+                    entity_name = fact['object'].strip()
+                    entity_key = entity_name.lower()  # Use normalized name as key
                     if entity_key not in unique_entities:
                         unique_entities[entity_key] = {
-                            'name': fact['object'],
-                            'type': 'OBJECT',
-                            'context': f"Object entity from fact domain: {fact.get('domain', 'general')}"
+                            'name': entity_name,
+                            'type': 'ENTITY',  # Use generic ENTITY type
+                            'context': f"Object entity from fact domain: {fact.get('domain', 'general')}",
+                            'original_type': 'OBJECT'  # Keep original semantic type for reference
                         }
 
-                # Add keyword entities
+                # Add keyword entities - use normalized name as key
                 if fact.get('keywords'):
                     keywords = fact['keywords'].split(',') if isinstance(fact['keywords'], str) else fact['keywords']
                     if isinstance(keywords, list):
                         for keyword in keywords:
                             keyword = keyword.strip()
                             if keyword:
-                                entity_key = f"keyword_{keyword}"
+                                entity_key = keyword.lower()  # Use normalized name as key
                                 if entity_key not in unique_entities:
                                     unique_entities[entity_key] = {
                                         'name': keyword,
-                                        'type': 'KEYWORD',
-                                        'context': f"Keyword entity from fact domain: {fact.get('domain', 'general')}"
+                                        'type': 'ENTITY',  # Use generic ENTITY type
+                                        'context': f"Keyword entity from fact domain: {fact.get('domain', 'general')}",
+                                        'original_type': 'KEYWORD'  # Keep original semantic type for reference
                                     }
 
             logger.info(f"Found {len(unique_entities)} unique entities for embedding generation")
@@ -1719,33 +1724,21 @@ class IngestionCoordinator:
                             entity_name = embedding_data['name']
                             entity_type = embedding_data['type']
 
-                            # Find the actual entity ID by looking up the entity by name and type
-                            # The entity_key has prefixes like "subject_", "object_", "keyword_"
-                            # but we need to find the actual entity ID from the stored entities
+                            # Find the actual entity ID by looking up the entity by name
+                            # The entity_key is now the normalized entity name (no prefixes)
                             actual_entity_id = None
 
                             # Look through the stored entities to find the matching one
-                            # Use case-insensitive comparison and flexible type matching
+                            # Use case-insensitive name comparison
                             for entity in entities:
                                 # Case-insensitive name comparison
                                 name_match = entity.name.lower() == entity_name.lower()
 
-                                # All entities are stored with type 'ENTITY', so we need flexible matching
-                                # The embedding types (SUBJECT, OBJECT, KEYWORD) are semantic categories
-                                # but all stored entities have type 'ENTITY'
+                                # All entities are stored with type 'ENTITY', so type matching is straightforward
                                 entity_type_str = str(entity.type).lower()
-                                embedding_type_str = str(entity_type).lower()
 
-                                # Accept match if:
-                                # 1. Exact type match
-                                # 2. Stored entity is 'ENTITY' (which is the default for all entities)
-                                # 3. Flexible matching for variations
-                                type_match = (
-                                    entity_type_str == embedding_type_str or
-                                    entity_type_str == 'entity' or  # All entities are stored as 'ENTITY'
-                                    entity_type_str == embedding_type_str.replace('_', '') or
-                                    entity_type_str.replace('_', '') == embedding_type_str
-                                )
+                                # Accept match if name matches and entity type is 'ENTITY'
+                                type_match = entity_type_str == 'entity'
 
                                 if name_match and type_match:
                                     actual_entity_id = entity.id

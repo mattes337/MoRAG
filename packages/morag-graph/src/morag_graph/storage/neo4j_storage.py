@@ -149,7 +149,19 @@ class Neo4jStorage(BaseStorage):
         if not self._document_ops:
             raise RuntimeError("Connection not initialized")
         return await self._document_ops.store_document_chunk(chunk)
-    
+
+    async def store_documents(self, documents: List[Document]) -> List[str]:
+        """Store multiple documents in Neo4J."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_documents(documents)
+
+    async def store_document_chunks(self, chunks: List[DocumentChunk]) -> List[str]:
+        """Store multiple document chunks in Neo4J."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_document_chunks(chunks)
+
     async def create_document_contains_chunk_relation(self, document_id: str, chunk_id: str) -> None:
         """Create a CONTAINS relationship between a document and a chunk."""
         if not self._document_ops:

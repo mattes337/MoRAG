@@ -274,14 +274,15 @@ class ChunkKeywordExtractor:
         return Entity(
             id=entity_id,
             name=keyword,
-            type="KEYWORD",
+            type="ENTITY",  # Use generic ENTITY type for consistency
             confidence=0.7,
             source_doc_id=document_id,
             attributes={
                 "keyword_type": "domain_specific",
                 "domain": domain,
                 "source_chunk_id": chunk_id,
-                "normalized_name": normalized_keyword
+                "normalized_name": normalized_keyword,
+                "original_type": "KEYWORD"  # Keep original semantic type for reference
             }
         )
     
