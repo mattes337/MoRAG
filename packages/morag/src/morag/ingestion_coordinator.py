@@ -694,9 +694,9 @@ class IngestionCoordinator:
                     'chunks_with_facts': len(chunk_fact_mapping),
                     'entities_with_embeddings': len(entity_embeddings),
                     'facts_with_embeddings': len(fact_embeddings),
-                    'entities_from_facts': enhanced_processing_result.get('entities_created', 0),
-                    'keyword_entities_created': enhanced_processing_result.get('keyword_entities_created', 0),
-                    'fact_entity_relations': enhanced_processing_result.get('relations_created', 0)
+                    'entities_from_facts': 0,  # Will be populated during Neo4j processing
+                    'keyword_entities_created': 0,  # Will be populated during Neo4j processing
+                    'fact_entity_relations': 0  # Will be populated during Neo4j processing
                 }
             }
 
