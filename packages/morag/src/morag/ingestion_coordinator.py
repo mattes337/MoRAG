@@ -1712,13 +1712,65 @@ class IngestionCoordinator:
                     gemini_service = GeminiEmbeddingService(api_key=api_key)
                     entity_embedding_service = EntityEmbeddingService(neo4j_storage, gemini_service)
 
-                    for entity_id, embedding_data in entity_embeddings.items():
+                    for entity_key, embedding_data in entity_embeddings.items():
                         # Extract just the embedding vector from the embedding data
                         if isinstance(embedding_data, dict) and 'embedding' in embedding_data:
                             embedding_vector = embedding_data['embedding']
-                            await entity_embedding_service.store_entity_embedding(entity_id, embedding_vector)
+                            entity_name = embedding_data['name']
+                            entity_type = embedding_data['type']
+
+                            # Find the actual entity ID by looking up the entity by name and type
+                            # The entity_key has prefixes like "subject_", "object_", "keyword_"
+                            # but we need to find the actual entity ID from the stored entities
+                            actual_entity_id = None
+
+                            # Look through the stored entities to find the matching one
+                            # Use case-insensitive comparison and flexible type matching
+                            for entity in entities:
+                                # Case-insensitive name comparison
+                                name_match = entity.name.lower() == entity_name.lower()
+
+                                # All entities are stored with type 'ENTITY', so we need flexible matching
+                                # The embedding types (SUBJECT, OBJECT, KEYWORD) are semantic categories
+                                # but all stored entities have type 'ENTITY'
+                                entity_type_str = str(entity.type).lower()
+                                embedding_type_str = str(entity_type).lower()
+
+                                # Accept match if:
+                                # 1. Exact type match
+                                # 2. Stored entity is 'ENTITY' (which is the default for all entities)
+                                # 3. Flexible matching for variations
+                                type_match = (
+                                    entity_type_str == embedding_type_str or
+                                    entity_type_str == 'entity' or  # All entities are stored as 'ENTITY'
+                                    entity_type_str == embedding_type_str.replace('_', '') or
+                                    entity_type_str.replace('_', '') == embedding_type_str
+                                )
+
+                                if name_match and type_match:
+                                    actual_entity_id = entity.id
+                                    logger.debug(f"Found entity match: {entity.name} ({entity.type}) -> {actual_entity_id}")
+                                    break
+
+                            if actual_entity_id:
+                                await entity_embedding_service.store_entity_embedding(actual_entity_id, embedding_vector)
+                                logger.debug(f"Stored embedding for entity {actual_entity_id} (name: {entity_name})")
+                            else:
+                                # Enhanced logging to debug the issue
+                                logger.warning(f"Could not find actual entity ID for entity key {entity_key} (name: {entity_name}, type: {entity_type})")
+
+                                # Show more entities for debugging and check for partial matches
+                                available_entities = [(e.name, str(e.type)) for e in entities[:10]]
+                                logger.debug(f"Available entities (first 10): {available_entities}")
+
+                                # Check for partial name matches to help debug
+                                partial_matches = [e.name for e in entities if entity_name.lower() in e.name.lower() or e.name.lower() in entity_name.lower()]
+                                if partial_matches:
+                                    logger.debug(f"Potential partial name matches: {partial_matches[:5]}")
+
+                                logger.debug(f"Total entities available: {len(entities)}, searching for: '{entity_name}' (type: {entity_type})")
                         else:
-                            logger.warning(f"Invalid embedding data format for entity {entity_id}: {type(embedding_data)}")
+                            logger.warning(f"Invalid embedding data format for entity {entity_key}: {type(embedding_data)}")
                             continue
 
                     logger.info(f"Stored {len(entity_embeddings)} entity embeddings")

@@ -315,13 +315,13 @@ Only create relationships that are clearly supported by the text.
 
 Respond with JSON array:
 [
-  {
+  {{
     "source_fact_id": "fact_id_1",
     "target_fact_id": "fact_id_2",
     "relation_type": "SUPPORTS|ELABORATES|CONTRADICTS|SEQUENCE|COMPARISON|CAUSATION|TEMPORAL_ORDER",
     "confidence": 0.0-1.0,
     "context": "explanation of the relationship"
-  }
+  }}
 ]"""
 
     @staticmethod

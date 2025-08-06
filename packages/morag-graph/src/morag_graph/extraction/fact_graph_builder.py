@@ -170,6 +170,10 @@ class FactGraphBuilder:
         max_retries = 3
         retry_delay = 1.0  # seconds
 
+        # Initialize variables for exception handling
+        response = None
+        relationship_data = None
+
         for attempt in range(max_retries):
             try:
                 # Convert facts to dictionaries for LLM prompt
@@ -183,28 +187,57 @@ class FactGraphBuilder:
                 # Create relationship extraction prompt
                 prompt = FactExtractionPrompts.create_relationship_prompt(fact_dicts, self.language)
 
+                self.logger.debug(f"Sending relationship extraction prompt to LLM", prompt_length=len(prompt), prompt_preview=prompt[:300])
+
                 # Get relationships from LLM
-                response = await self.llm_client.generate(prompt)
+                try:
+                    response = await self.llm_client.generate(prompt)
+                    if not response:
+                        self.logger.warning(f"LLM returned empty response for relationship extraction", attempt=attempt + 1)
+                        response = ""
+                except Exception as llm_error:
+                    self.logger.error(f"LLM call failed for relationship extraction", error=str(llm_error), attempt=attempt + 1)
+                    response = ""
 
                 self.logger.debug(
                     "LLM relationship response received",
-                    response_length=len(response),
-                    response_preview=response[:200],
+                    response_length=len(response) if response else 0,
+                    response_preview=response[:200] if response else "Empty response",
                     attempt=attempt + 1
                 )
+
+                # Handle empty response
+                if not response or len(response.strip()) == 0:
+                    self.logger.warning(f"LLM returned empty or whitespace-only response for relationship extraction", attempt=attempt + 1)
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    else:
+                        self.logger.info("No relationships found - LLM consistently returned empty responses")
+                        return []
 
                 # Parse response
                 relationship_data = self._parse_relationship_response(response)
 
+                # Check if LLM returned empty array (no relationships found)
+                if relationship_data is not None and len(relationship_data) == 0:
+                    self.logger.info(
+                        f"LLM returned empty relationship array on attempt {attempt + 1} - no relationships found between facts",
+                        response_preview=response[:300] if response else "Empty response"
+                    )
+                    return []  # This is a valid response, not an error
+
                 if not relationship_data:
                     self.logger.warning(
                         f"No valid relationship data parsed on attempt {attempt + 1}",
-                        response_preview=response[:300]
+                        response_preview=response[:300] if response else "Empty response",
+                        response_length=len(response) if response else 0
                     )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(retry_delay)
                         continue
                     else:
+                        self.logger.info("No relationships extracted after all retry attempts - this may be normal if facts are unrelated")
                         return []
 
                 self.logger.debug(
@@ -236,11 +269,25 @@ class FactGraphBuilder:
                     return []
 
             except KeyError as e:
+                # Capture the response and parsed data for debugging
+                response_preview = response[:500] if response else "No response available"
+                parsed_preview = str(relationship_data)[:200] if relationship_data is not None else "No parsed data"
+
+                # Additional debugging information
+                response_length = len(response) if response else 0
+                parsed_data_type = type(relationship_data).__name__ if relationship_data is not None else "None"
+                parsed_data_length = len(relationship_data) if relationship_data else 0
+
                 self.logger.warning(
                     f"KeyError in relationship extraction (attempt {attempt + 1}/{max_retries})",
                     batch_size=len(facts),
                     key_error=str(e),
-                    error_type=type(e).__name__
+                    error_type=type(e).__name__,
+                    llm_response_preview=response_preview,
+                    llm_response_length=response_length,
+                    parsed_data=parsed_preview,
+                    parsed_data_type=parsed_data_type,
+                    parsed_data_length=parsed_data_length
                 )
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
@@ -249,16 +296,23 @@ class FactGraphBuilder:
                     return []
 
             except Exception as e:
+                # Capture more debugging information
+                response_info = f"Response length: {len(response) if response else 0}, Type: {type(response).__name__}"
+                parsed_info = f"Parsed data: {type(relationship_data).__name__}, Length: {len(relationship_data) if relationship_data else 0}"
+
                 self.logger.warning(
                     f"Relationship extraction failed for batch (attempt {attempt + 1}/{max_retries})",
                     batch_size=len(facts),
                     error=str(e),
-                    error_type=type(e).__name__
+                    error_type=type(e).__name__,
+                    response_info=response_info,
+                    parsed_info=parsed_info
                 )
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delay)
                     continue
                 else:
+                    self.logger.info("Relationship extraction failed after all attempts - returning empty relationships")
                     return []
 
         # If we get here, all retries failed
@@ -304,6 +358,9 @@ class FactGraphBuilder:
             # Clean the response first
             cleaned_response = response.strip()
 
+            # Pre-process to fix malformed keys with newlines
+            cleaned_response = self._preprocess_malformed_keys(cleaned_response)
+
             # Try to find JSON array in response using multiple patterns
             import re
 
@@ -314,6 +371,10 @@ class FactGraphBuilder:
                 try:
                     relationships = json.loads(json_str)
                     if isinstance(relationships, list):
+                        # Handle empty array case explicitly
+                        if len(relationships) == 0:
+                            self.logger.debug("LLM returned empty JSON array - no relationships found")
+                            return []
                         return self._validate_relationships(relationships)
                 except json.JSONDecodeError:
                     pass
@@ -390,7 +451,39 @@ class FactGraphBuilder:
         # Fix single quotes to double quotes
         response = response.replace("'", '"')
 
+        # Fix keys with extra whitespace/newlines - more aggressive approach
+        response = re.sub(r'"\s*\n?\s*(\w+)\s*\n?\s*":', r'"\1":', response)
+
+        # Handle keys that start with newlines and whitespace
+        response = re.sub(r'"\s*\n\s*(\w+)":', r'"\1":', response)
+
+        # Handle keys that end with newlines and whitespace
+        response = re.sub(r'"(\w+)\s*\n\s*":', r'"\1":', response)
+
         return response.strip()
+
+    def _preprocess_malformed_keys(self, response: str) -> str:
+        """Preprocess response to fix malformed JSON keys with newlines.
+
+        Args:
+            response: Raw response string
+
+        Returns:
+            Preprocessed response string
+        """
+        import re
+
+        # Fix the specific pattern: "[\n    ]key_name" -> "key_name"
+        # This handles keys that have newlines and whitespace inside the quotes
+        response = re.sub(r'"\s*\n\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*":', r'"\1":', response)
+
+        # Fix keys that have newlines at the end: "key_name[\n    ]" -> "key_name"
+        response = re.sub(r'"([a-zA-Z_][a-zA-Z0-9_]*)\s*\n\s*":', r'"\1":', response)
+
+        # Fix keys with excessive whitespace: "   key_name   " -> "key_name"
+        response = re.sub(r'"\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*":', r'"\1":', response)
+
+        return response
 
     def _is_valid_relationship_object(self, obj: Dict[str, Any]) -> bool:
         """Check if an object has the required relationship fields.
@@ -415,30 +508,107 @@ class FactGraphBuilder:
         """
         valid_relationships = []
         for rel in relationships:
-            if isinstance(rel, dict) and self._is_valid_relationship_object(rel):
-                # Set default values for missing fields
-                rel.setdefault('confidence', 0.7)
-                rel.setdefault('context', '')
-                valid_relationships.append(rel)
+            if isinstance(rel, dict):
+                # Normalize the relationship object to handle key issues
+                normalized_rel = self._normalize_relationship_object(rel)
+                if self._is_valid_relationship_object(normalized_rel):
+                    # Set default values for missing fields
+                    normalized_rel.setdefault('confidence', 0.7)
+                    normalized_rel.setdefault('context', '')
+                    valid_relationships.append(normalized_rel)
+                else:
+                    self.logger.debug(f"Skipping invalid relationship object after normalization: {normalized_rel}")
             else:
-                self.logger.debug(f"Skipping invalid relationship object: {rel}")
+                self.logger.debug(f"Skipping non-dict relationship object: {rel}")
 
         return valid_relationships
-    
+
+    def _normalize_relationship_object(self, obj: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize relationship object keys to handle whitespace issues.
+
+        Args:
+            obj: Raw relationship object
+
+        Returns:
+            Normalized relationship object
+        """
+        normalized = {}
+
+        # Map of expected keys to handle variations
+        key_mappings = {
+            'source_fact_id': ['source_fact_id', 'sourcefactid', 'source_id'],
+            'target_fact_id': ['target_fact_id', 'targetfactid', 'target_id'],
+            'relation_type': ['relation_type', 'relationtype', 'type'],
+            'confidence': ['confidence', 'conf'],
+            'context': ['context', 'description', 'desc']
+        }
+
+        # Normalize keys by removing whitespace and converting to lowercase
+        for key, value in obj.items():
+            # Clean the key
+            clean_key = key.strip().lower().replace(' ', '').replace('\n', '').replace('\t', '')
+
+            # Find the correct standard key
+            for standard_key, variations in key_mappings.items():
+                if clean_key in [v.lower() for v in variations]:
+                    normalized[standard_key] = value
+                    break
+            else:
+                # Keep unknown keys as-is but cleaned
+                normalized[clean_key] = value
+
+        return normalized
+
+    def _safe_get_key(self, data: Dict[str, Any], key: str, default: str = '') -> str:
+        """Safely get a key from a dictionary, handling malformed keys with whitespace.
+
+        Args:
+            data: Dictionary to search
+            key: Key to find
+            default: Default value if key not found
+
+        Returns:
+            Value for the key or default
+        """
+        # First try the exact key
+        if key in data:
+            return str(data[key])
+
+        # Try to find the key with variations (whitespace, newlines, etc.)
+        for actual_key, value in data.items():
+            # Clean the actual key by removing whitespace and newlines
+            clean_key = actual_key.strip().replace('\n', '').replace('\t', '').replace(' ', '')
+            if clean_key == key:
+                return str(value)
+
+            # Also try without quotes if the key is quoted
+            if clean_key.startswith('"') and clean_key.endswith('"'):
+                clean_key = clean_key[1:-1]
+                if clean_key == key:
+                    return str(value)
+
+        # Key not found
+        return default
+
     def _create_fact_relation_objects(
-        self, 
-        relationship_data: List[Dict[str, Any]], 
+        self,
+        relationship_data: List[Dict[str, Any]],
         facts: List[Fact]
     ) -> List[FactRelation]:
         """Create FactRelation objects from parsed data.
-        
+
         Args:
             relationship_data: List of relationship dictionaries
             facts: List of facts for ID validation
-            
+
         Returns:
             List of FactRelation objects
         """
+        # Handle empty relationship data
+        if not relationship_data:
+            self.logger.debug("No relationship data to process - returning empty list")
+            return []
+
         relationships = []
         fact_ids = {fact.id for fact in facts}
         
@@ -453,9 +623,10 @@ class FactGraphBuilder:
                     )
                     continue
 
-                source_id = rel_data.get('source_fact_id', '')
-                target_id = rel_data.get('target_fact_id', '')
-                relation_type = rel_data.get('relation_type', '')
+                # Use safe key extraction to handle malformed keys
+                source_id = self._safe_get_key(rel_data, 'source_fact_id')
+                target_id = self._safe_get_key(rel_data, 'target_fact_id')
+                relation_type = self._safe_get_key(rel_data, 'relation_type')
 
                 # Validate required fields
                 if not source_id:
@@ -498,12 +669,21 @@ class FactGraphBuilder:
 
                 # Create relationship object with explicit parameter validation
                 try:
+                    # Use safe key extraction for confidence and context too
+                    confidence_str = self._safe_get_key(rel_data, 'confidence', '0.7')
+                    context_str = self._safe_get_key(rel_data, 'context', '')
+
+                    try:
+                        confidence = float(confidence_str)
+                    except (ValueError, TypeError):
+                        confidence = 0.7
+
                     relationship = FactRelation(
                         source_fact_id=source_id,
                         target_fact_id=target_id,
                         relation_type=relation_type,
-                        confidence=float(rel_data.get('confidence', 0.7)),
-                        context=rel_data.get('context', '')
+                        confidence=confidence,
+                        context=context_str
                     )
                 except Exception as create_error:
                     self.logger.warning(
