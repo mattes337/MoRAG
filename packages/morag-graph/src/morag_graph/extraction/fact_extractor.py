@@ -310,12 +310,14 @@ class FactExtractor:
         domain = context.get('domain', 'general')
         language = context.get('language', 'en')
         
-        # Create extraction prompt
+        # Create extraction prompt with query context if available
+        query_context = context.get('query_context')
         prompt = FactExtractionPrompts.create_extraction_prompt(
             chunk_text=text,
             domain=domain,
             language=language,
-            max_facts=self.max_facts_per_chunk
+            max_facts=self.max_facts_per_chunk,
+            query_context=query_context
         )
         
         # Enhance prompt for specific domains
@@ -536,6 +538,10 @@ class FactExtractor:
                     'domain': context.get('domain'),
                     'language': context.get('language', 'en'),
                     'keywords': candidate.get('keywords', []),
+                    # Enhanced extraction metadata
+                    'query_relevance': candidate.get('query_relevance'),
+                    'evidence_strength': candidate.get('evidence_strength'),
+                    'source_span': candidate.get('source_span'),
                     # Detailed source metadata from context
                     'source_file_path': context.get('source_file_path'),
                     'source_file_name': context.get('source_file_name'),

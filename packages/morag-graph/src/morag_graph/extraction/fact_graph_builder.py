@@ -683,7 +683,10 @@ class FactGraphBuilder:
                         target_fact_id=target_id,
                         relation_type=relation_type,
                         confidence=confidence,
-                        context=context_str
+                        context=context_str,
+                        relationship_strength=rel_data.get('relationship_strength'),
+                        evidence_quality=rel_data.get('evidence_quality'),
+                        source_evidence=rel_data.get('source_evidence')
                     )
                 except Exception as create_error:
                     self.logger.warning(

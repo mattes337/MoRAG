@@ -98,11 +98,17 @@ class EntityExtractor:
         }
     
     def _create_entity_prompt(self) -> str:
-        """Create prompt for entity extraction."""
-        base_prompt = """Extract entities from the text in order of appearance.
+        """Create prompt for entity extraction with normalization."""
+        base_prompt = """Extract and normalize entities from the text in order of appearance.
         Focus on important entities like people, organizations, locations, concepts, and objects.
         Use exact text for extractions. Do not paraphrase or overlap entities.
         Provide meaningful attributes for each entity to add context.
+
+        For each entity:
+        1. Extract exact mention from text
+        2. Determine canonical form (normalized name)
+        3. Identify entity type and attributes
+        4. Assess confidence and provide disambiguation context
 
         IMPORTANT: Create SPECIFIC, DESCRIPTIVE entity types that reflect the actual nature of each entity.
         - Instead of generic types like "PERSON", use specific types like "RESEARCHER", "EXECUTIVE", "PATIENT", "AUTHOR"
@@ -141,17 +147,32 @@ class EntityExtractor:
                     lx.data.Extraction(
                         extraction_class="person",
                         extraction_text="researcher",
-                        attributes={"role": "professional"}
+                        attributes={
+                            "role": "professional",
+                            "canonical_name": "researcher",
+                            "confidence": 0.9,
+                            "disambiguation": "professional conducting research"
+                        }
                     ),
                     lx.data.Extraction(
                         extraction_class="organization",
                         extraction_text="organization",
-                        attributes={"type": "entity"}
+                        attributes={
+                            "type": "entity",
+                            "canonical_name": "organization",
+                            "confidence": 0.8,
+                            "disambiguation": "workplace or institution"
+                        }
                     ),
                     lx.data.Extraction(
                         extraction_class="location",
                         extraction_text="city",
-                        attributes={"type": "place"}
+                        attributes={
+                            "type": "place",
+                            "canonical_name": "city",
+                            "confidence": 0.9,
+                            "disambiguation": "urban location"
+                        }
                     ),
                 ]
             )

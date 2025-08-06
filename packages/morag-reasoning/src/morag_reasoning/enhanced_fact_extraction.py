@@ -50,9 +50,9 @@ class EnhancedFactExtractionService:
             List of extracted facts
         """
         try:
-            # Extract facts from graph relationships (existing approach)
+            # Extract facts from graph relationships with query context
             graph_facts = await self._extract_facts_from_graph(
-                user_query, entity_names, language
+                user_query, entity_names, language, user_query
             )
             
             # Extract facts using vector similarity if embedding service is available
@@ -93,7 +93,8 @@ class EnhancedFactExtractionService:
         self,
         user_query: str,
         entity_names: List[str],
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        query_context: Optional[str] = None
     ) -> List[RawFact]:
         """Extract facts from graph relationships (existing approach).
         

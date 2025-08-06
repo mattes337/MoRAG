@@ -89,11 +89,16 @@ class RelationExtractor:
         }
     
     def _create_relation_prompt(self) -> str:
-        """Create prompt for relation extraction."""
-        base_prompt = """Extract relationships between entities in the text.
+        """Create prompt for enhanced relation extraction."""
+        base_prompt = """Extract relationships between entities in the text with enhanced context assessment.
         Focus on meaningful connections between people, organizations, locations, and concepts.
         Use exact text spans for relationships. Provide context and attributes.
         Each relationship should connect two specific entities mentioned in the text.
+
+        For each relationship, assess:
+        - Relationship strength: direct (explicitly stated) | inferred (logically derivable) | contextual (domain knowledge)
+        - Evidence quality: explicit (clearly stated) | implicit (requires inference) | speculative (uncertain)
+        - Logical structure: sequential (process sequence) | hierarchical (parent-child) | associative (related concepts)
 
         IMPORTANT: Create SPECIFIC, DESCRIPTIVE relationship types that precisely describe the nature of the relationship.
         - Instead of generic types like "RELATES_TO", use specific types like "EMPLOYS", "RESEARCHES", "TREATS", "DEVELOPS"

@@ -85,7 +85,8 @@ class FactExtractionService:
         self,
         chunks: List[DocumentChunk],
         domain: Optional[str] = None,
-        language: str = "en"
+        language: str = "en",
+        query_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """Extract facts from document chunks.
         
@@ -120,7 +121,8 @@ class FactExtractionService:
             all_facts = []
             extraction_context = {
                 'domain': domain,
-                'language': language
+                'language': language,
+                'query_context': query_context
             }
             
             # Process chunks in parallel batches

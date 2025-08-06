@@ -46,6 +46,11 @@ class Fact(BaseModel):
     source_document_id: str = Field(..., description="Source document ID")
     extraction_confidence: float = Field(ge=0.0, le=1.0, description="Confidence in extraction")
 
+    # Enhanced extraction metadata
+    query_relevance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Relevance to specific query")
+    evidence_strength: Optional[str] = Field(default=None, description="Evidence quality: strong|moderate|weak")
+    source_span: Optional[str] = Field(default=None, description="Exact text span supporting this fact")
+
     # Detailed source metadata for reconstruction and citation
     source_file_path: Optional[str] = Field(default=None, description="Original file path")
     source_file_name: Optional[str] = Field(default=None, description="Original file name")
@@ -314,6 +319,11 @@ class FactRelation(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the relationship")
     context: Optional[str] = Field(default=None, description="Context explaining the relationship")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
+
+    # Enhanced relationship metadata
+    relationship_strength: Optional[str] = Field(default=None, description="Relationship strength: direct|inferred|contextual")
+    evidence_quality: Optional[str] = Field(default=None, description="Evidence quality: explicit|implicit|speculative")
+    source_evidence: Optional[str] = Field(default=None, description="Text span supporting this relationship")
     
     # Class variables for Neo4j integration
     _neo4j_label: ClassVar[str] = "FACT_RELATION"
@@ -397,12 +407,14 @@ class FactRelationType:
     SEQUENCE = "SEQUENCE"
     COMPARISON = "COMPARISON"
     CAUSATION = "CAUSATION"
-    TEMPORAL_ORDER = "TEMPORAL_ORDER"
-    
+    PREREQUISITE = "PREREQUISITE"
+    ALTERNATIVE = "ALTERNATIVE"
+    HIERARCHY = "HIERARCHY"
+
     @classmethod
     def all_types(cls) -> List[str]:
         """Get all available fact relation types."""
         return [
             cls.SUPPORTS, cls.CONTRADICTS, cls.ELABORATES, cls.SEQUENCE,
-            cls.COMPARISON, cls.CAUSATION, cls.TEMPORAL_ORDER
+            cls.COMPARISON, cls.CAUSATION, cls.PREREQUISITE, cls.ALTERNATIVE, cls.HIERARCHY
         ]

@@ -7,12 +7,13 @@ class FactExtractionPrompts:
     """Prompts for fact extraction using LLMs."""
     
     @staticmethod
-    def get_fact_extraction_prompt(domain: str = "general", language: str = "en") -> str:
-        """Get the enhanced fact extraction prompt with few-shot examples.
+    def get_fact_extraction_prompt(domain: str = "general", language: str = "en", query_context: str = None) -> str:
+        """Get the enhanced fact extraction prompt with few-shot examples and query context.
 
         Args:
             domain: Domain context for extraction
             language: Language of the text
+            query_context: Optional query context for relevance-aware extraction
 
         Returns:
             Formatted prompt for fact extraction
@@ -41,7 +42,17 @@ The extracted facts must be in the SAME language as the input text.
 If the input text is in {language_name}, your response must be entirely in {language_name}.
 """
 
-        return language_instruction + f"""
+        # Add query context awareness if provided
+        context_instruction = ""
+        if query_context:
+            context_instruction = f"""
+QUERY CONTEXT AWARENESS:
+This extraction is being performed to help answer: "{query_context}"
+Prioritize facts that are directly relevant to this query context.
+Focus on extracting information that would help answer this specific question or topic.
+"""
+
+        return language_instruction + context_instruction + f"""
 You are a knowledge extraction expert. Extract structured facts from the following text that represent specific, domain-relevant information that can be used to answer questions or understand concepts.
 
 ENHANCED FACT STRUCTURE:
@@ -169,7 +180,10 @@ Respond with JSON array of facts in {language_name}:
     "remarks": "safety warnings/contraindications/context",
     "fact_type": "process|definition|causal|methodological|safety",
     "confidence": 0.0-1.0,
-    "keywords": ["domain-specific", "technical", "terms"]
+    "query_relevance": 0.0-1.0,
+    "evidence_strength": "strong|moderate|weak",
+    "keywords": ["domain-specific", "technical", "terms"],
+    "source_span": "exact text span supporting this fact"
   }}}}
 ]
 
@@ -309,7 +323,13 @@ Identify relationships like:
 - SEQUENCE: Facts that represent steps in a process
 - COMPARISON: Facts that compare different approaches/solutions
 - CAUSATION: One fact describes the cause of another
-- TEMPORAL_ORDER: Facts that have a time-based sequence
+- PREREQUISITE: Required condition/dependency
+- ALTERNATIVE: Alternative approach/solution
+- HIERARCHY: Parent-child or containment relationship
+
+For each relationship, assess:
+- Relationship strength: direct (explicitly stated) | inferred (logically derivable) | contextual (domain knowledge)
+- Evidence quality: explicit (clearly stated) | implicit (requires inference) | speculative (uncertain)
 
 Only create relationships that are clearly supported by the text.
 
@@ -318,9 +338,12 @@ Respond with JSON array:
   {{
     "source_fact_id": "fact_id_1",
     "target_fact_id": "fact_id_2",
-    "relation_type": "SUPPORTS|ELABORATES|CONTRADICTS|SEQUENCE|COMPARISON|CAUSATION|TEMPORAL_ORDER",
+    "relation_type": "SUPPORTS|ELABORATES|CONTRADICTS|SEQUENCE|COMPARISON|CAUSATION|PREREQUISITE|ALTERNATIVE|HIERARCHY",
     "confidence": 0.0-1.0,
-    "context": "explanation of the relationship"
+    "relationship_strength": "direct|inferred|contextual",
+    "evidence_quality": "explicit|implicit|speculative",
+    "context": "explanation of the relationship",
+    "source_evidence": "text span supporting this relationship"
   }}
 ]"""
 
@@ -356,7 +379,8 @@ Respond with JSON:
         chunk_text: str,
         domain: str = "general",
         language: str = "en",
-        max_facts: int = 10
+        max_facts: int = 10,
+        query_context: str = None
     ) -> str:
         """Create a complete extraction prompt with text.
 
@@ -365,11 +389,12 @@ Respond with JSON:
             domain: Domain context
             language: Language of the text
             max_facts: Maximum number of facts to extract
+            query_context: Optional query context for relevance-aware extraction
 
         Returns:
             Complete prompt ready for LLM
         """
-        base_prompt = FactExtractionPrompts.get_fact_extraction_prompt(domain, language)
+        base_prompt = FactExtractionPrompts.get_fact_extraction_prompt(domain, language, query_context)
 
         # Replace the placeholder with actual text
         complete_prompt = base_prompt.replace("{{chunk_text}}", chunk_text)
