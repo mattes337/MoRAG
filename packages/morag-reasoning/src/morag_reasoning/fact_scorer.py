@@ -81,7 +81,7 @@ class FactRelevanceScorer:
             self.config.get('scoring_strategy', 'adaptive')
         )
         self.min_score_threshold = self.config.get('min_score_threshold', 0.2)
-        self.max_facts_to_score = self.config.get('max_facts_to_score', 100)
+        self.max_facts_to_score = self.config.get('max_facts_to_score', 100000)
         
         # LLM configuration
         self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE

@@ -343,7 +343,7 @@ class FactExtractionService:
             # Use Neo4j storage to get chunks
             async with self.neo4j_storage.driver.session() as session:
                 query = """
-                MATCH (d:Document {id: $document_id})-[:HAS_CHUNK]->(c:DocumentChunk)
+                MATCH (d:Document {id: $document_id})-[:CONTAINS]->(c:DocumentChunk)
                 RETURN c
                 ORDER BY c.index
                 """

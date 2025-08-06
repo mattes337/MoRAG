@@ -67,9 +67,9 @@ class EnhancedQueryRequest(BaseModel):
     # Fact-based retrieval options
     use_fact_retrieval: bool = Field(default=True, description="Use fact-based retrieval instead of traditional hybrid retrieval")
     max_depth: int = Field(default=3, ge=1, le=10, description="Maximum traversal depth for fact extraction")
-    max_facts_per_node: int = Field(default=5, ge=1, le=50, description="Maximum facts to extract per node")
+    max_facts_per_node: int = Field(default=1000, ge=1, le=10000, description="Maximum facts to extract per node (set high for exhaustive retrieval)")
     min_fact_score: float = Field(default=0.1, ge=0.0, le=1.0, description="Minimum score threshold for facts")
-    max_total_facts: int = Field(default=50, ge=1, le=500, description="Maximum total facts to collect")
+    max_total_facts: int = Field(default=10000, ge=1, le=100000, description="Maximum total facts to collect (set high for exhaustive retrieval)")
     facts_only: bool = Field(default=False, description="Return only facts without final answer synthesis")
     skip_fact_evaluation: bool = Field(default=False, description="Skip fact evaluation for faster processing")
     decay_rate: float = Field(default=0.2, ge=0.0, le=1.0, description="Rate at which fact scores decay per depth level")

@@ -347,7 +347,7 @@ class EntityOperations(BaseOperations):
                     MATCH (e:Entity {id: $entity_id})-[r]->(c:DocumentChunk)
                     WHERE type(r) IN ['CONTAINS', 'RELATES_TO', 'INVOLVES', 'ADDRESSES']
                     OPTIONAL MATCH (c)-[:MENTIONS]->(related_entity:Entity)
-                    OPTIONAL MATCH (c)<-[:HAS_CHUNK]-(d:Document)
+                    OPTIONAL MATCH (c)<-[:CONTAINS]-(d:Document)
                     WITH c, d, collect(DISTINCT related_entity.name) as related_entity_names
                     RETURN c.id as chunk_id,
                            c.document_id as document_id,
@@ -389,7 +389,7 @@ class EntityOperations(BaseOperations):
             MATCH (c:DocumentChunk)
             WHERE any(pattern IN $patterns WHERE c.text =~ pattern)
             OPTIONAL MATCH (c)-[:MENTIONS]->(related_entity:Entity)
-            OPTIONAL MATCH (c)<-[:HAS_CHUNK]-(d:Document)
+            OPTIONAL MATCH (c)<-[:CONTAINS]-(d:Document)
             WITH c, d, collect(DISTINCT related_entity.name) as related_entity_names
             RETURN c.id as chunk_id,
                    c.document_id as document_id,

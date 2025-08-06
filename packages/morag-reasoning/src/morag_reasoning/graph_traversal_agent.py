@@ -30,7 +30,7 @@ class GraphTraversalAgent:
         neo4j_storage: Neo4jStorage,
         qdrant_storage: QdrantStorage,
         embedding_service: Optional[GeminiEmbeddingService] = None,
-        max_facts_per_node: int = 5
+        max_facts_per_node: int = 1000
     ):
         """Initialize the GraphTraversalAgent.
 
@@ -107,13 +107,13 @@ Your job is to:
 3. Suggest related topics to explore next
 
 EXTRACTION APPROACH:
-- Be VERY AGGRESSIVE in extracting information - extract MANY facts
+- Be EXHAUSTIVE in extracting information - extract ALL relevant facts
 - Look for recommendations, treatments, foods, supplements, advice
 - Include both what helps and what to avoid
 - Extract specific details when available (dosages, amounts, etc.)
 - Extract from EVERY chunk that contains relevant information
 - Extract MULTIPLE facts per chunk when possible
-- Extract up to {self.max_facts_per_node} useful pieces of information (aim for the maximum!)
+- Extract ALL useful pieces of information above the relevance threshold - do not limit yourself
 
 WHAT TO LOOK FOR:
 - Treatments, therapies, or interventions
@@ -547,8 +547,8 @@ EXAMPLES OF WHAT TO EXTRACT:
 - "Patient reported better focus after change Z"
 
 REQUIREMENTS:
-- Extract AS MANY facts as possible, up to {self.max_facts_per_node} pieces of information
-- Aim for the MAXIMUM number of facts - don't stop early
+- Extract ALL relevant facts - be exhaustive and comprehensive
+- Do not limit the number of facts - extract everything above the relevance threshold
 - Make each fact clear and understandable
 - Include any specific details when available
 - For next exploration, suggest related entity names or "STOP_TRAVERSAL"

@@ -35,7 +35,7 @@ class EnhancedFactExtractionService:
         self,
         user_query: str,
         entity_names: List[str],
-        max_facts: int = 20,
+        max_facts: int = 10000,
         language: Optional[str] = None
     ) -> List[RawFact]:
         """Extract facts relevant to a query using both graph relationships and vector similarity.

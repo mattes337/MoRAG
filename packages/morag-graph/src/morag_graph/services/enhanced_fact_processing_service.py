@@ -384,7 +384,7 @@ class EnhancedFactProcessingService:
                             keyword_normalized = await self._normalize_entity_name_for_lookup(keyword.strip())
                             if keyword_normalized in entity_lookup:
                                 keyword_entity = entity_lookup[keyword_normalized]
-                                relation_type = self._determine_keyword_relation_type(fact, keyword)
+                                relation_type = await self._determine_keyword_relation_type(fact, keyword)
                                 success = await self._create_fact_entity_relation(
                                     fact, keyword_entity, relation_type
                                 )
@@ -434,9 +434,22 @@ class EnhancedFactProcessingService:
 
 "{fact_text}"
 
-Determine the most appropriate semantic relationship type for the subject. Choose from these common types or suggest a more specific one:
-- CAUSES, TREATS, PREVENTS, CONTAINS, AFFECTS, PRODUCES, REDUCES, INCREASES
-- REQUIRES, IMPROVES, DAMAGES, SUPPORTS, SOLVES, INVOLVES, RELATES_TO
+Determine the most appropriate semantic relationship type for the subject. Consider what action or relationship the subject has in this context. You can choose from common types or create a more specific domain-appropriate type:
+
+Common relationship types:
+- CAUSES, TREATS, PREVENTS, CURES, HEALS
+- CONTAINS, INCLUDES, COMPRISES, CONSISTS_OF
+- AFFECTS, INFLUENCES, IMPACTS, MODIFIES
+- PRODUCES, CREATES, GENERATES, MAKES
+- REDUCES, DECREASES, MINIMIZES, LOWERS
+- INCREASES, ENHANCES, IMPROVES, BOOSTS
+- REQUIRES, NEEDS, DEPENDS_ON, USES
+- SUPPORTS, ENABLES, FACILITATES, HELPS
+- SOLVES, ADDRESSES, HANDLES, MANAGES
+- INVOLVES, PARTICIPATES_IN, ENGAGES_IN
+- DEFINES, DESCRIBES, CHARACTERIZES, REPRESENTS
+
+Feel free to create domain-specific relationship types that better capture the semantic meaning.
 
 Return only the relationship type in uppercase, no explanation."""
 
@@ -454,10 +467,16 @@ Return only the relationship type in uppercase, no explanation."""
 
         # Fallback to simple pattern matching if LLM fails
         fact_text_lower = fact_text.lower()
-        if any(word in fact_text_lower for word in ['causes', 'leads to', 'results in', 'triggers']):
+        if any(word in fact_text_lower for word in ['causes', 'leads to', 'results in', 'triggers', 'creates']):
             return 'CAUSES'
-        elif any(word in fact_text_lower for word in ['treats', 'heals', 'cures', 'helps']):
+        elif any(word in fact_text_lower for word in ['treats', 'heals', 'cures', 'helps', 'fixes']):
             return 'TREATS'
+        elif any(word in fact_text_lower for word in ['prevents', 'blocks', 'stops', 'avoids']):
+            return 'PREVENTS'
+        elif any(word in fact_text_lower for word in ['improves', 'enhances', 'boosts', 'increases']):
+            return 'IMPROVES'
+        elif any(word in fact_text_lower for word in ['contains', 'includes', 'has', 'comprises']):
+            return 'CONTAINS'
         else:
             return 'INVOLVES'  # Default semantic relationship
 
@@ -478,9 +497,23 @@ Return only the relationship type in uppercase, no explanation."""
 
 "{fact_text}"
 
-Determine the most appropriate semantic relationship type for the object. Choose from these common types or suggest a more specific one:
-- SOLVES, TARGETS, IMPROVES, REDUCES, SUPPORTS, REQUIRES, ADDRESSES
-- IS_CAUSED_BY, IS_TREATED_BY, IS_PREVENTED_BY, RELATES_TO
+Determine the most appropriate semantic relationship type for the object. Consider what happens to the object or how it's affected in this context. You can choose from common types or create a more specific domain-appropriate type:
+
+Common relationship types:
+- SOLVES, ADDRESSES, HANDLES, MANAGES, FIXES
+- TARGETS, FOCUSES_ON, AIMS_AT, DIRECTS_TO
+- IMPROVES, ENHANCES, OPTIMIZES, UPGRADES
+- REDUCES, DECREASES, MINIMIZES, ELIMINATES
+- SUPPORTS, MAINTAINS, SUSTAINS, PRESERVES
+- REQUIRES, NEEDS, DEMANDS, NECESSITATES
+- IS_CAUSED_BY, IS_TRIGGERED_BY, RESULTS_FROM
+- IS_TREATED_BY, IS_HEALED_BY, IS_CURED_BY
+- IS_PREVENTED_BY, IS_BLOCKED_BY, IS_STOPPED_BY
+- IS_AFFECTED_BY, IS_INFLUENCED_BY, IS_MODIFIED_BY
+- IS_PRODUCED_BY, IS_CREATED_BY, IS_GENERATED_BY
+- IS_CONTAINED_IN, IS_PART_OF, BELONGS_TO
+
+Feel free to create domain-specific relationship types that better capture the semantic meaning.
 
 Return only the relationship type in uppercase, no explanation."""
 
@@ -498,36 +531,94 @@ Return only the relationship type in uppercase, no explanation."""
 
         # Fallback to simple pattern matching if LLM fails
         fact_text_lower = fact_text.lower()
-        if any(word in fact_text_lower for word in ['solves', 'addresses', 'fixes']):
+        if any(word in fact_text_lower for word in ['solves', 'addresses', 'fixes', 'handles']):
             return 'SOLVES'
-        elif any(word in fact_text_lower for word in ['improves', 'enhances', 'boosts']):
+        elif any(word in fact_text_lower for word in ['improves', 'enhances', 'boosts', 'optimizes']):
             return 'IMPROVES'
+        elif any(word in fact_text_lower for word in ['reduces', 'decreases', 'minimizes', 'lowers']):
+            return 'REDUCES'
+        elif any(word in fact_text_lower for word in ['caused by', 'triggered by', 'results from']):
+            return 'IS_CAUSED_BY'
+        elif any(word in fact_text_lower for word in ['treated by', 'healed by', 'cured by']):
+            return 'IS_TREATED_BY'
         else:
             return 'RELATES_TO'  # Default semantic relationship
 
-    def _determine_keyword_relation_type(self, fact: Fact, keyword: str) -> str:
-        """Determine semantic relationship type for keyword entity.
+    async def _determine_keyword_relation_type(self, fact: Fact, keyword: str) -> str:
+        """Determine semantic relationship type for keyword entity using LLM analysis.
 
         Args:
             fact: The fact containing the keyword
             keyword: The specific keyword
 
         Returns:
-            Semantic relationship type
+            Semantic relationship type determined by LLM
         """
-        # Keywords typically represent topics, categories, or tags
+        fact_text = fact.get_search_text() if fact.get_search_text() else ""
+
+        # Use LLM to determine the semantic relationship
+        prompt = f"""Analyze how the keyword "{keyword}" relates to the content in this fact:
+
+"{fact_text}"
+
+Determine the most appropriate semantic relationship type for the keyword. Consider what role the keyword plays in relation to the fact content. Choose from these common types or suggest a more specific one:
+
+- CATEGORIZED_AS (if keyword represents a domain/category/field)
+- ADDRESSES (if keyword represents a problem/condition being addressed)
+- USES_METHOD (if keyword represents a method/technique/approach)
+- USES_TOOL (if keyword represents a tool/instrument/device)
+- BASED_ON (if keyword represents a concept/theory/principle)
+- OCCURS_IN (if keyword represents a location/place/context)
+- OCCURS_DURING (if keyword represents a time/period/phase)
+- INVOLVES (if keyword represents an entity involved in the process)
+- PRODUCES (if keyword represents something produced/created)
+- REQUIRES (if keyword represents something needed/required)
+- AFFECTS (if keyword represents something affected/influenced)
+- RELATES_TO (general semantic relationship)
+
+Return only the relationship type in uppercase, no explanation."""
+
+        try:
+            if hasattr(self, 'llm_service') and self.llm_service:
+                response = await self.llm_service.generate(prompt, max_tokens=50)
+                relation_type = response.strip().upper()
+
+                # Validate the response is a reasonable relation type
+                if relation_type and len(relation_type) < 50 and relation_type.replace('_', '').isalpha():
+                    return relation_type
+
+        except Exception as e:
+            self.logger.warning(f"LLM keyword relation type determination failed: {e}")
+
+        # Fallback to simple semantic analysis if LLM fails
+        return self._fallback_keyword_relation_type(fact, keyword)
+
+    def _fallback_keyword_relation_type(self, fact: Fact, keyword: str) -> str:
+        """Fallback method for keyword relation type determination when LLM fails.
+
+        Args:
+            fact: The fact containing the keyword
+            keyword: The specific keyword
+
+        Returns:
+            Semantic relationship type based on simple heuristics
+        """
         fact_text = fact.get_search_text().lower() if fact.get_search_text() else ""
         keyword_lower = keyword.lower()
 
-        # Check if keyword represents a domain or category
-        if any(domain in keyword_lower for domain in ['health', 'medical', 'nutrition', 'gesundheit', 'medizin', 'ernährung']):
-            return 'CATEGORIZED_AS'
-        elif any(symptom in keyword_lower for symptom in ['symptom', 'condition', 'disease', 'disorder']):
-            return 'ADDRESSES'
-        elif any(method in keyword_lower for method in ['method', 'technique', 'approach', 'methode', 'technik']):
+        # Simple pattern-based fallback (domain-agnostic)
+        if any(word in fact_text for word in ['method', 'technique', 'approach', 'way', 'process']):
             return 'USES_METHOD'
+        elif any(word in fact_text for word in ['tool', 'instrument', 'device', 'equipment']):
+            return 'USES_TOOL'
+        elif any(word in fact_text for word in ['location', 'place', 'where', 'in', 'at']):
+            return 'OCCURS_IN'
+        elif any(word in fact_text for word in ['time', 'when', 'during', 'period']):
+            return 'OCCURS_DURING'
+        elif any(word in fact_text for word in ['cause', 'effect', 'result', 'impact']):
+            return 'AFFECTS'
         else:
-            return 'TAGGED_WITH'  # Default for general keywords
+            return 'RELATES_TO'  # Generic semantic relationship
 
     async def _store_facts(self, facts: List[Fact]) -> List[str]:
         """Store facts in Neo4j database.

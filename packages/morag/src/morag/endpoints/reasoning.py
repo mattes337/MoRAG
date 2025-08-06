@@ -370,7 +370,7 @@ async def simple_fact_based_reasoning(
             user_query=request.query,
             max_depth=request.max_depth,
             decay_rate=0.2,
-            max_facts_per_node=5,
+            max_facts_per_node=1000,
             min_fact_score=0.1,
             max_total_facts=request.max_facts,
             facts_only=request.facts_only,

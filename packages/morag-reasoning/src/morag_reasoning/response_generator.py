@@ -90,7 +90,7 @@ class ResponseGenerator:
         # Generation parameters
         self.default_max_length = self.config.get('default_max_length', 2000)
         self.min_facts_required = self.config.get('min_facts_required', 1)
-        self.max_facts_to_use = self.config.get('max_facts_to_use', 20)
+        self.max_facts_to_use = self.config.get('max_facts_to_use', 10000)
         
         # LLM configuration
         self.llm_enabled = self.config.get('llm_enabled', True) and GEMINI_AVAILABLE

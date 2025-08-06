@@ -221,7 +221,7 @@ async def get_recursive_fact_retrieval_info():
             "user_query": "The original query from the user (required)",
             "max_depth": "Maximum traversal depth (default: 3, range: 1-10)",
             "decay_rate": "Rate of score decay per depth level (default: 0.2, range: 0.0-1.0)",
-            "max_facts_per_node": "Maximum facts to extract per node (default: 5, range: 1-20)",
+            "max_facts_per_node": "Maximum facts to extract per node (default: 1000, range: 1-10000, set high for exhaustive retrieval)",
             "min_fact_score": "Minimum score threshold for facts (default: 0.1, range: 0.0-1.0)",
             "max_total_facts": "Maximum total facts to collect (default: 50, range: 1-200)",
             "facts_only": "Return only facts without final answer synthesis (default: false)",
