@@ -27,8 +27,8 @@ class AudioConversionOptions:
     include_timestamps: bool = True
     include_speakers: bool = True
     include_topics: bool = True
-    timestamp_format: str = "[%H:%M:%S]"  # Format for timestamps
-    group_by_speaker: bool = True  # Group consecutive segments by the same speaker
+    timestamp_format: str = "[%H:%M:%S]"  # Format for timestamps (legacy, now using dynamic format)
+    group_by_speaker: bool = False  # Group consecutive segments by the same speaker (disabled for per-line timestamps)
     group_by_topic: bool = True  # Group segments by topic
     include_metadata: bool = True  # Include metadata section in markdown
     metadata_fields: List[str] = field(default_factory=lambda: [
@@ -279,8 +279,8 @@ class AudioConverter:
                 markdown_content.append("## Detailed Transcript")
                 markdown_content.append("")
 
-                # Group segments by topic if requested and topic information is available
-                if options.group_by_topic and any(hasattr(segment, 'topic_id') and segment.topic_id is not None for segment in result.segments):
+                # Group segments by topic if both topic grouping and topic inclusion are enabled, and topic information is available
+                if options.group_by_topic and options.include_topics and any(hasattr(segment, 'topic_id') and segment.topic_id is not None for segment in result.segments):
                     topic_groups = {}
                     for segment in result.segments:
                         topic_id = getattr(segment, 'topic_id', None)
@@ -294,28 +294,46 @@ class AudioConverter:
                                 topic_groups[-1] = []
                             topic_groups[-1].append(segment)
 
+                    # Get topic information from result metadata if available
+                    topic_info_map = {}
+                    if hasattr(result, 'topic_segmentation') and result.topic_segmentation:
+                        for topic_segment in result.topic_segmentation.segments:
+                            # Extract topic ID from topic_segment.topic_id (e.g., "TOPIC_00" -> 0)
+                            if hasattr(topic_segment, 'topic_id') and topic_segment.topic_id:
+                                topic_id_str = topic_segment.topic_id
+                                if topic_id_str.startswith("TOPIC_"):
+                                    try:
+                                        topic_id = int(topic_id_str.split("_")[1])
+                                        topic_info_map[topic_id] = topic_segment
+                                    except (IndexError, ValueError):
+                                        pass
+
                     # Process each topic group
                     for topic_id, segments in sorted(topic_groups.items()):
                         if topic_id != -1:
-                            # Calculate topic timestamp range
-                            if segments:
-                                start_time = min(seg.start for seg in segments)
-                                end_time = max(seg.end for seg in segments)
+                            # Get topic information
+                            topic_segment = topic_info_map.get(topic_id)
+                            topic_title = None
+                            topic_start_seconds = None
 
-                                # Format timestamps
-                                start_hours, start_remainder = divmod(int(start_time), 3600)
-                                start_minutes, start_seconds = divmod(start_remainder, 60)
-                                end_hours, end_remainder = divmod(int(end_time), 3600)
-                                end_minutes, end_seconds = divmod(end_remainder, 60)
+                            if topic_segment:
+                                topic_title = getattr(topic_segment, 'title', None)
+                                topic_start_seconds = int(getattr(topic_segment, 'start_time', 0))
 
-                                start_formatted = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
-                                end_formatted = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
+                            # Fallback to calculating from segments if no topic info
+                            if not topic_title or topic_start_seconds is None:
+                                if segments:
+                                    start_time = min(seg.start for seg in segments)
+                                    topic_start_seconds = int(start_time)
+                                    topic_title = topic_title or f"Topic {topic_id + 1}"
+                                else:
+                                    topic_start_seconds = 0
+                                    topic_title = topic_title or f"Topic {topic_id + 1}"
 
-                                markdown_content.append(f"### Topic {topic_id + 1} ({start_formatted} - {end_formatted})")
-                            else:
-                                markdown_content.append(f"### Topic {topic_id + 1}")
+                            # Format topic header: # Topic Name [timestamp_in_seconds]
+                            markdown_content.append(f"# {topic_title} [{topic_start_seconds}]")
                         else:
-                            markdown_content.append("### Ungrouped Content")
+                            markdown_content.append("# Ungrouped Content [0]")
 
                         markdown_content.append("")
 
@@ -367,64 +385,91 @@ class AudioConverter:
         markdown_lines = []
 
         if options.group_by_speaker and any(segment.speaker for segment in segments):
-            # Group consecutive segments by speaker
+            # Group consecutive segments by speaker, but still use per-line timestamps
             current_speaker = None
-            current_speaker_text = []
-            current_start = None
-            current_end = None
+            current_segments = []
 
             for segment in segments:
                 speaker = segment.speaker or "Unknown"
 
                 if speaker != current_speaker:
-                    # Output the previous speaker's text
-                    if current_speaker and current_speaker_text:
-                        speaker_timestamp = ""
-                        if options.include_timestamps and current_start is not None and current_end is not None:
-                            # Format start-end range
-                            start_hours, start_remainder = divmod(int(current_start), 3600)
-                            start_minutes, start_seconds = divmod(start_remainder, 60)
-                            end_hours, end_remainder = divmod(int(current_end), 3600)
-                            end_minutes, end_seconds = divmod(end_remainder, 60)
+                    # Output the previous speaker's segments
+                    if current_speaker and current_segments:
+                        for seg in current_segments:
+                            # Skip empty segments
+                            if not seg.text or not seg.text.strip():
+                                continue
 
-                            start_time = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
-                            end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
-                            speaker_timestamp = f" ({start_time} - {end_time})"
+                            # Build line in [timecode][speaker] format
+                            line_content = ""
 
-                        # Join text without extra spaces and strip any trailing whitespace
-                        text_content = ' '.join(current_speaker_text).strip()
-                        if text_content:  # Only add non-empty content
-                            markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {text_content}")
+                            # Add timestamp if requested
+                            if options.include_timestamps:
+                                hours, remainder = divmod(int(seg.start), 3600)
+                                minutes, seconds = divmod(remainder, 60)
+
+                                # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                                if hours > 0:
+                                    timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                                else:
+                                    timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                                line_content += timestamp
+
+                            # Add speaker if available and requested
+                            if options.include_speakers:
+                                line_content += f"[{current_speaker}]"
+
+                            # Add the text
+                            text_content = seg.text.strip()
+                            if text_content:
+                                line_content += f" {text_content}"
+
+                            # Add to markdown lines if not empty
+                            if line_content.strip():
+                                markdown_lines.append(line_content)
 
                     # Start new speaker
                     current_speaker = speaker
-                    current_speaker_text = [segment.text.strip()] if segment.text.strip() else []
-                    current_start = segment.start
-                    current_end = segment.end
+                    current_segments = [segment] if segment.text.strip() else []
                 else:
                     # Continue with the same speaker
-                    if segment.text.strip():  # Only add non-empty text
-                        current_speaker_text.append(segment.text.strip())
-                    current_end = segment.end
+                    if segment.text.strip():
+                        current_segments.append(segment)
 
-            # Output the last speaker's text
-            if current_speaker and current_speaker_text:
-                speaker_timestamp = ""
-                if options.include_timestamps and current_start is not None and current_end is not None:
-                    # Format start-end range
-                    start_hours, start_remainder = divmod(int(current_start), 3600)
-                    start_minutes, start_seconds = divmod(start_remainder, 60)
-                    end_hours, end_remainder = divmod(int(current_end), 3600)
-                    end_minutes, end_seconds = divmod(end_remainder, 60)
+            # Output the last speaker's segments
+            if current_speaker and current_segments:
+                for seg in current_segments:
+                    # Skip empty segments
+                    if not seg.text or not seg.text.strip():
+                        continue
 
-                    start_time = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
-                    end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
-                    speaker_timestamp = f" ({start_time} - {end_time})"
+                    # Build line in [timecode][speaker] format
+                    line_content = ""
 
-                # Join text without extra spaces and strip any trailing whitespace
-                text_content = ' '.join(current_speaker_text).strip()
-                if text_content:  # Only add non-empty content
-                    markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {text_content}")
+                    # Add timestamp if requested
+                    if options.include_timestamps:
+                        hours, remainder = divmod(int(seg.start), 3600)
+                        minutes, seconds = divmod(remainder, 60)
+
+                        # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                        if hours > 0:
+                            timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                        else:
+                            timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                        line_content += timestamp
+
+                    # Add speaker if available and requested
+                    if options.include_speakers:
+                        line_content += f"[{current_speaker}]"
+
+                    # Add the text
+                    text_content = seg.text.strip()
+                    if text_content:
+                        line_content += f" {text_content}"
+
+                    # Add to markdown lines if not empty
+                    if line_content.strip():
+                        markdown_lines.append(line_content)
         else:
             # Process each segment individually
             for segment in segments:
@@ -434,24 +479,33 @@ class AudioConverter:
 
                 line_parts = []
 
+                # Build the line in the new [timecode][speaker] format
+                line_content = ""
+
                 # Add timestamp if requested
                 if options.include_timestamps:
                     hours, remainder = divmod(int(segment.start), 3600)
                     minutes, seconds = divmod(remainder, 60)
-                    timestamp = options.timestamp_format.replace("%H", f"{hours:02d}")\
-                                                .replace("%M", f"{minutes:02d}")\
-                                                .replace("%S", f"{seconds:02d}")
-                    line_parts.append(timestamp)
 
-                # Add speaker if available and requested
+                    # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                    if hours > 0:
+                        timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                    else:
+                        timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                    line_content += timestamp
+
+                # Add speaker if available and requested (directly concatenated, no space)
                 if options.include_speakers and segment.speaker:
-                    line_parts.append(f"**{segment.speaker}**:")
+                    line_content += f"[{segment.speaker}]"
 
-                # Add the text (stripped of whitespace)
-                line_parts.append(segment.text.strip())
+                # Add the text (with a space before text content)
+                text_content = segment.text.strip()
+                if text_content:
+                    line_content += f" {text_content}"
 
-                # Join parts and add to markdown lines
-                markdown_lines.append(" ".join(line_parts))
+                # Add to markdown lines if not empty
+                if line_content.strip():
+                    markdown_lines.append(line_content)
 
         # Filter out any empty lines that might have been added
         return [line for line in markdown_lines if line.strip()]

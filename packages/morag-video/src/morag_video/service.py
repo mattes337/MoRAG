@@ -173,7 +173,10 @@ class VideoService:
                         include_thumbnails=True,
                         include_keyframes=True,
                         include_transcript=True,
-                        group_by_speaker=self.config.enable_speaker_diarization,
+                        include_timestamps=True,
+                        include_speakers=self.config.enable_speaker_diarization,
+                        include_topics=self.config.enable_topic_segmentation,
+                        group_by_speaker=False,  # Use per-line timestamps as per new format
                         group_by_topic=self.config.enable_topic_segmentation
                     )
                     formatted_content = await self.converter.convert_to_markdown(result, conversion_options)

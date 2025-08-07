@@ -387,8 +387,8 @@ class IngestionCoordinator:
         """
         import re
 
-        # Look for topic headers in the content
-        topic_pattern = r'^###?\s*(.+?)(?:\n|$)'
+        # Look for topic headers in the content (updated for new format: # Topic Name [timestamp])
+        topic_pattern = r'^#\s*(.+?)\s*\[\d+\](?:\n|$)'
         topic_matches = list(re.finditer(topic_pattern, content, re.MULTILINE))
 
         if not topic_matches:
@@ -427,9 +427,10 @@ class IngestionCoordinator:
         """
         import re
 
-        # Look for timestamp patterns
-        timestamp_pattern = r'\[(\d{2}:\d{2}:\d{2})\]|\[(\d+:\d{2})\]|(\d+:\d{2}:\d{2})|(\d+:\d{2})'
-        timestamp_matches = list(re.finditer(timestamp_pattern, content))
+        # Look for timestamp patterns (updated for new format: [MM:SS][SPEAKER] or [HH:MM:SS][SPEAKER])
+        # This pattern matches lines starting with timestamps, preserving the full line structure
+        timestamp_pattern = r'^(\[\d{1,2}:\d{2}(?::\d{2})?\](?:\[[^\]]+\])?\s*.+?)(?=\n\[\d{1,2}:\d{2}|\n#|\Z)'
+        timestamp_matches = list(re.finditer(timestamp_pattern, content, re.MULTILINE | re.DOTALL))
 
         if not timestamp_matches:
             # No timestamps found, fall back to character chunking
@@ -438,17 +439,16 @@ class IngestionCoordinator:
         chunks = []
         current_chunk = ""
 
-        for i, match in enumerate(timestamp_matches):
-            # Find the end of this timestamp segment
-            next_match_start = timestamp_matches[i + 1].start() if i + 1 < len(timestamp_matches) else len(content)
-            segment = content[match.start():next_match_start].strip()
+        for match in timestamp_matches:
+            # Each match is a complete line with [timecode][speaker] text format
+            line = match.group(1).strip()
 
-            # If adding this segment would exceed chunk size, finalize current chunk
-            if current_chunk and len(current_chunk) + len(segment) > chunk_size:
+            # If adding this line would exceed chunk size, finalize current chunk
+            if current_chunk and len(current_chunk) + len(line) + 1 > chunk_size:  # +1 for newline
                 chunks.append(current_chunk.strip())
-                current_chunk = segment
+                current_chunk = line
             else:
-                current_chunk += "\n" + segment if current_chunk else segment
+                current_chunk += "\n" + line if current_chunk else line
 
         # Add the last chunk
         if current_chunk.strip():
@@ -469,8 +469,8 @@ class IngestionCoordinator:
         """
         import re
 
-        # Extract topic header
-        header_pattern = r'^(###?\s*.+?)(?:\n|$)'
+        # Extract topic header (updated for new format: # Topic Name [timestamp])
+        header_pattern = r'^(#\s*.+?\s*\[\d+\])(?:\n|$)'
         header_match = re.search(header_pattern, topic_content, re.MULTILINE)
         topic_header = header_match.group(1) if header_match else ""
 

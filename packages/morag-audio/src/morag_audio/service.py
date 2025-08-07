@@ -153,7 +153,9 @@ class AudioService:
                 conversion_options = AudioConversionOptions(
                     include_timestamps=True,
                     include_speakers=self.config.enable_diarization,
-                    include_topics=self.config.enable_topic_segmentation
+                    include_topics=self.config.enable_topic_segmentation,
+                    group_by_topic=self.config.enable_topic_segmentation,
+                    group_by_speaker=False  # Use per-line timestamps as per new format
                 )
 
                 if output_format == "markdown":
