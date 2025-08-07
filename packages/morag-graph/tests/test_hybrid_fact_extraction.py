@@ -21,25 +21,8 @@ class TestStructuredMetadata:
         assert metadata.primary_entities == ["entity1", "entity2"]
         assert metadata.relationships == ["relates_to", "affects"]
         assert metadata.domain_concepts == ["concept1", "concept2"]
-        assert metadata.subject is None
-        assert metadata.object is None
     
-    def test_structured_metadata_with_legacy_fields(self):
-        """Test structured metadata with legacy fields."""
-        metadata = StructuredMetadata(
-            primary_entities=["entity1"],
-            relationships=["relates_to"],
-            domain_concepts=["concept1"],
-            subject="legacy_subject",
-            object="legacy_object",
-            approach="legacy_approach",
-            solution="legacy_solution"
-        )
-        
-        assert metadata.subject == "legacy_subject"
-        assert metadata.object == "legacy_object"
-        assert metadata.approach == "legacy_approach"
-        assert metadata.solution == "legacy_solution"
+
 
 
 class TestHybridFact:
@@ -217,40 +200,7 @@ class TestHybridFactExtraction:
         assert fact.fact_type == "methodological"
         assert fact.extraction_confidence == 0.95
     
-    @pytest.mark.asyncio
-    async def test_legacy_format_fallback(self, fact_extractor):
-        """Test fallback to legacy format when fact_text is missing."""
-        # Mock LLM response with legacy format
-        mock_response = '''[
-          {
-            "subject": "Ashwagandha extract",
-            "object": "chronic stress and anxiety",
-            "approach": "300-600mg twice daily with meals",
-            "solution": "reduction of stress symptoms",
-            "fact_type": "methodological",
-            "confidence": 0.9,
-            "keywords": ["ashwagandha", "stress", "anxiety"]
-          }
-        ]'''
-        
-        fact_extractor.llm_client.generate.return_value = mock_response
-        
-        # Extract facts
-        facts = await fact_extractor.extract_facts(
-            chunk_text="Sample text about Ashwagandha",
-            chunk_id="chunk_123",
-            document_id="doc_456",
-            context={"domain": "medical", "language": "en"}
-        )
-        
-        assert len(facts) == 1
-        fact = facts[0]
-        # Should construct fact_text from legacy fields
-        assert "Ashwagandha extract" in fact.fact_text
-        assert "chronic stress and anxiety" in fact.fact_text
-        # Legacy fields should be preserved in metadata
-        assert fact.structured_metadata.subject == "Ashwagandha extract"
-        assert fact.structured_metadata.object == "chronic stress and anxiety"
+
 
 
 class TestHybridFactEntityConversion:

@@ -117,7 +117,7 @@ class FactFilter:
         
         for fact in facts:
             # Combine all fact text for keyword matching
-            fact_text = f"{fact.subject} {fact.object} {fact.approach} {fact.solution} {' '.join(fact.keywords)}"
+            fact_text = f"{fact.fact_text} {' '.join(fact.keywords)}"
             fact_text_lower = fact_text.lower()
             
             # Check excluded keywords first (immediate rejection)
@@ -220,7 +220,7 @@ class FactFilter:
     
     def _calculate_topic_relevance(self, fact: Fact, document_topics: List[str]) -> float:
         """Calculate simple topic relevance score."""
-        fact_text = f"{fact.subject} {fact.object} {fact.approach} {fact.solution}".lower()
+        fact_text = fact.fact_text.lower()
         fact_keywords = [kw.lower() for kw in fact.keywords]
 
         matches = 0

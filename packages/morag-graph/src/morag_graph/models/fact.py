@@ -16,12 +16,6 @@ class StructuredMetadata(BaseModel):
     relationships: List[str] = Field(default_factory=list, description="Important relationships or actions")
     domain_concepts: List[str] = Field(default_factory=list, description="Domain-specific concepts and terms")
 
-    # Legacy structured fields for backward compatibility (optional)
-    subject: Optional[str] = Field(default=None, description="Primary subject entity (legacy)")
-    object: Optional[str] = Field(default=None, description="Primary object entity (legacy)")
-    approach: Optional[str] = Field(default=None, description="Method or approach (legacy)")
-    solution: Optional[str] = Field(default=None, description="Solution or outcome (legacy)")
-
 
 class Fact(BaseModel):
     """Hybrid fact extracted from document content.
@@ -106,11 +100,6 @@ class Fact(BaseModel):
             "primary_entities": ",".join(self.structured_metadata.primary_entities) if self.structured_metadata.primary_entities else "",
             "relationships": ",".join(self.structured_metadata.relationships) if self.structured_metadata.relationships else "",
             "domain_concepts": ",".join(self.structured_metadata.domain_concepts) if self.structured_metadata.domain_concepts else "",
-            # Legacy fields for backward compatibility
-            "subject": self.structured_metadata.subject,
-            "object": self.structured_metadata.object,
-            "approach": self.structured_metadata.approach,
-            "solution": self.structured_metadata.solution,
             "fact_type": self.fact_type,
             "domain": self.domain,
             "confidence": self.extraction_confidence,
@@ -202,8 +191,7 @@ class Fact(BaseModel):
         return bool(
             self.fact_text and
             self.fact_text.strip() and
-            (self.structured_metadata.primary_entities or
-             self.structured_metadata.subject)
+            self.structured_metadata.primary_entities
         )
 
     def get_search_text(self) -> str:

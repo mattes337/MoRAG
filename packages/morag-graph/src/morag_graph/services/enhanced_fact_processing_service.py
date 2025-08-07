@@ -131,17 +131,19 @@ class EnhancedFactProcessingService:
         entities_to_create = {}  # Use dict to deduplicate by normalized name
 
         for fact in facts:
-            # Process subject entity
-            if fact.subject and fact.subject.strip():
-                await self._process_entity_from_fact_component(
-                    fact.subject.strip(), fact, entities_to_create, 'subject'
-                )
+            # Process primary entities
+            for entity_name in fact.structured_metadata.primary_entities:
+                if entity_name and entity_name.strip():
+                    await self._process_entity_from_fact_component(
+                        entity_name.strip(), fact, entities_to_create, 'primary_entity'
+                    )
 
-            # Process object entity
-            if fact.object and fact.object.strip():
-                await self._process_entity_from_fact_component(
-                    fact.object.strip(), fact, entities_to_create, 'object'
-                )
+            # Process domain concepts as entities
+            for concept_name in fact.structured_metadata.domain_concepts:
+                if concept_name and concept_name.strip():
+                    await self._process_entity_from_fact_component(
+                        concept_name.strip(), fact, entities_to_create, 'domain_concept'
+                    )
 
         # Create Entity objects with normalized names
         created_entities = []
@@ -350,31 +352,33 @@ class EnhancedFactProcessingService:
         
         for fact in facts:
             try:
-                # Create semantic relation from fact to subject entity
-                if fact.subject and fact.subject.strip():
-                    # Normalize subject name to find entity
-                    subject_normalized = await self._normalize_entity_name_for_lookup(fact.subject.strip())
-                    if subject_normalized in entity_lookup:
-                        subject_entity = entity_lookup[subject_normalized]
-                        relation_type = await self._determine_subject_relation_type(fact)
-                        success = await self._create_fact_entity_relation(
-                            fact, subject_entity, relation_type
-                        )
-                        if success:
-                            created_relations.append(f"fact_{fact.id}_to_{subject_entity.id}_{relation_type}")
+                # Create semantic relations from fact to primary entities
+                for entity_name in fact.structured_metadata.primary_entities:
+                    if entity_name and entity_name.strip():
+                        # Normalize entity name to find entity
+                        entity_normalized = await self._normalize_entity_name_for_lookup(entity_name.strip())
+                        if entity_normalized in entity_lookup:
+                            entity = entity_lookup[entity_normalized]
+                            relation_type = await self._determine_entity_relation_type(fact, entity_name)
+                            success = await self._create_fact_entity_relation(
+                                fact, entity, relation_type
+                            )
+                            if success:
+                                created_relations.append(f"fact_{fact.id}_to_{entity.id}_{relation_type}")
 
-                # Create semantic relation from fact to object entity
-                if fact.object and fact.object.strip():
-                    # Normalize object name to find entity
-                    object_normalized = await self._normalize_entity_name_for_lookup(fact.object.strip())
-                    if object_normalized in entity_lookup:
-                        object_entity = entity_lookup[object_normalized]
-                        relation_type = await self._determine_object_relation_type(fact)
-                        success = await self._create_fact_entity_relation(
-                            fact, object_entity, relation_type
-                        )
-                        if success:
-                            created_relations.append(f"fact_{fact.id}_to_{object_entity.id}_{relation_type}")
+                # Create semantic relations from fact to domain concept entities
+                for concept_name in fact.structured_metadata.domain_concepts:
+                    if concept_name and concept_name.strip():
+                        # Normalize concept name to find entity
+                        concept_normalized = await self._normalize_entity_name_for_lookup(concept_name.strip())
+                        if concept_normalized in entity_lookup:
+                            concept_entity = entity_lookup[concept_normalized]
+                            relation_type = "RELATES_TO_CONCEPT"
+                            success = await self._create_fact_entity_relation(
+                                fact, concept_entity, relation_type
+                            )
+                            if success:
+                                created_relations.append(f"fact_{fact.id}_to_{concept_entity.id}_{relation_type}")
 
                 # Create semantic relations from fact to keyword entities
                 if fact.keywords:
@@ -417,24 +421,24 @@ class EnhancedFactProcessingService:
         else:
             return entity_name.strip()
 
-    async def _determine_subject_relation_type(self, fact: Fact) -> str:
-        """Determine semantic relationship type for subject entity using LLM analysis.
+    async def _determine_entity_relation_type(self, fact: Fact, entity_name: str) -> str:
+        """Determine semantic relationship type for entity using LLM analysis.
 
         Args:
-            fact: The fact containing the subject
+            fact: The fact containing the entity
+            entity_name: Name of the entity
 
         Returns:
             Semantic relationship type determined by LLM
         """
-        fact_text = fact.get_search_text() if fact.get_search_text() else ""
-        subject = fact.subject if hasattr(fact, 'subject') else "subject"
+        fact_text = fact.fact_text
 
         # Use LLM to determine the semantic relationship
-        prompt = f"""Analyze how the subject "{subject}" relates to the content in this fact:
+        prompt = f"""Analyze how the entity "{entity_name}" relates to the content in this fact:
 
 "{fact_text}"
 
-Determine the most appropriate semantic relationship type for the subject. Consider what action or relationship the subject has in this context. You can choose from common types or create a more specific domain-appropriate type:
+Determine the most appropriate semantic relationship type for the entity. Consider what action or relationship the entity has in this context. You can choose from common types or create a more specific domain-appropriate type:
 
 Common relationship types:
 - CAUSES, TREATS, PREVENTS, CURES, HEALS
@@ -463,7 +467,7 @@ Return only the relationship type in uppercase, no explanation."""
                     return relation_type
 
         except Exception as e:
-            self.logger.warning(f"LLM subject relation type determination failed: {e}")
+            self.logger.warning(f"LLM entity relation type determination failed: {e}")
 
         # Fallback to simple pattern matching if LLM fails
         fact_text_lower = fact_text.lower()
@@ -480,69 +484,7 @@ Return only the relationship type in uppercase, no explanation."""
         else:
             return 'INVOLVES'  # Default semantic relationship
 
-    async def _determine_object_relation_type(self, fact: Fact) -> str:
-        """Determine semantic relationship type for object entity using LLM analysis.
 
-        Args:
-            fact: The fact containing the object
-
-        Returns:
-            Semantic relationship type determined by LLM
-        """
-        fact_text = fact.get_search_text() if fact.get_search_text() else ""
-        obj = fact.object if hasattr(fact, 'object') else "object"
-
-        # Use LLM to determine the semantic relationship
-        prompt = f"""Analyze how the object "{obj}" relates to the content in this fact:
-
-"{fact_text}"
-
-Determine the most appropriate semantic relationship type for the object. Consider what happens to the object or how it's affected in this context. You can choose from common types or create a more specific domain-appropriate type:
-
-Common relationship types:
-- SOLVES, ADDRESSES, HANDLES, MANAGES, FIXES
-- TARGETS, FOCUSES_ON, AIMS_AT, DIRECTS_TO
-- IMPROVES, ENHANCES, OPTIMIZES, UPGRADES
-- REDUCES, DECREASES, MINIMIZES, ELIMINATES
-- SUPPORTS, MAINTAINS, SUSTAINS, PRESERVES
-- REQUIRES, NEEDS, DEMANDS, NECESSITATES
-- IS_CAUSED_BY, IS_TRIGGERED_BY, RESULTS_FROM
-- IS_TREATED_BY, IS_HEALED_BY, IS_CURED_BY
-- IS_PREVENTED_BY, IS_BLOCKED_BY, IS_STOPPED_BY
-- IS_AFFECTED_BY, IS_INFLUENCED_BY, IS_MODIFIED_BY
-- IS_PRODUCED_BY, IS_CREATED_BY, IS_GENERATED_BY
-- IS_CONTAINED_IN, IS_PART_OF, BELONGS_TO
-
-Feel free to create domain-specific relationship types that better capture the semantic meaning.
-
-Return only the relationship type in uppercase, no explanation."""
-
-        try:
-            if hasattr(self, 'llm_service') and self.llm_service:
-                response = await self.llm_service.generate(prompt, max_tokens=50)
-                relation_type = response.strip().upper()
-
-                # Validate the response is a reasonable relation type
-                if relation_type and len(relation_type) < 50 and relation_type.replace('_', '').isalpha():
-                    return relation_type
-
-        except Exception as e:
-            self.logger.warning(f"LLM object relation type determination failed: {e}")
-
-        # Fallback to simple pattern matching if LLM fails
-        fact_text_lower = fact_text.lower()
-        if any(word in fact_text_lower for word in ['solves', 'addresses', 'fixes', 'handles']):
-            return 'SOLVES'
-        elif any(word in fact_text_lower for word in ['improves', 'enhances', 'boosts', 'optimizes']):
-            return 'IMPROVES'
-        elif any(word in fact_text_lower for word in ['reduces', 'decreases', 'minimizes', 'lowers']):
-            return 'REDUCES'
-        elif any(word in fact_text_lower for word in ['caused by', 'triggered by', 'results from']):
-            return 'IS_CAUSED_BY'
-        elif any(word in fact_text_lower for word in ['treated by', 'healed by', 'cured by']):
-            return 'IS_TREATED_BY'
-        else:
-            return 'RELATES_TO'  # Default semantic relationship
 
     async def _determine_keyword_relation_type(self, fact: Fact, keyword: str) -> str:
         """Determine semantic relationship type for keyword entity using LLM analysis.

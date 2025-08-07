@@ -108,20 +108,21 @@ class FactValidator:
     
     def _check_specificity(self, fact: Fact) -> List[str]:
         """Check if fact is specific enough to be useful.
-        
+
         Args:
             fact: Fact to check
-            
+
         Returns:
             List of specificity issues
         """
         issues = []
-        
-        # Check for generic subjects (only exact matches or at word boundaries)
-        subject_lower = fact.subject.lower().strip()
-        subject_words = set(subject_lower.split())
-        if subject_words.intersection(self.generic_subjects):
-            issues.append(f"Generic subject: '{fact.subject}'")
+
+        # Check for generic entities in primary entities
+        for entity in fact.structured_metadata.primary_entities:
+            entity_lower = entity.lower().strip()
+            entity_words = set(entity_lower.split())
+            if entity_words.intersection(self.generic_subjects):
+                issues.append(f"Generic entity: '{entity}'")
         
         # Check for overly vague language
         vague_patterns = [
@@ -203,29 +204,18 @@ class FactValidator:
             'hilft', 'reduziert', 'erhöht', 'stärkt', 'beruhigt', 'lindert'
         ]
         
-        # Combine all text fields for checking
-        combined_text = f"{fact.subject} {fact.object}"
-        if fact.approach:
-            combined_text += f" {fact.approach}"
-        if fact.solution:
-            combined_text += f" {fact.solution}"
-        if fact.remarks:
-            combined_text += f" {fact.remarks}"
-
-        combined_lower = combined_text.lower()
+        # Use fact_text for checking
+        fact_text_lower = fact.fact_text.lower()
 
         # Check for actionable content - be more lenient
         has_actionable_content = any(
-            indicator in combined_lower for indicator in actionable_indicators
+            indicator in fact_text_lower for indicator in actionable_indicators
         )
 
-        # Also check if the fact has approach or solution fields filled
-        has_approach_or_solution = bool(fact.approach and fact.approach.strip()) or bool(fact.solution and fact.solution.strip())
-
-        # Accept fact if it has either actionable indicators OR approach/solution fields
-        if not has_actionable_content and not has_approach_or_solution:
-            # Only fail if the fact is very generic
-            if len(combined_text.strip()) < 30:
+        # Accept fact if it has actionable indicators or is substantial
+        if not has_actionable_content:
+            # Only fail if the fact is very generic and brief
+            if len(fact.fact_text.strip()) < 30:
                 issues.append("Fact too brief and lacks actionable content")
 
         return issues

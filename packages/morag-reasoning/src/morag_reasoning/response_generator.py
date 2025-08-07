@@ -372,8 +372,8 @@ Format your response as JSON:
         formatted_facts = []
 
         for i, fact in enumerate(facts):
-            # Basic fact information - use fact_text if available, fallback to content
-            fact_content = getattr(fact.fact, 'fact_text', None) or getattr(fact.fact, 'content', 'No fact text available')
+            # Basic fact information - use fact_text
+            fact_content = fact.fact.fact_text
             fact_text = f"Fact {i+1}: {fact_content}"
 
             # Add confidence and source information
@@ -409,14 +409,11 @@ Format your response as JSON:
             for j, fact2 in enumerate(facts[i+1:], i+1):
                 # Check for contradictory statements
                 if self._are_facts_contradictory(fact1, fact2):
-                    fact1_content = getattr(fact1.fact, 'fact_text', None) or getattr(fact1.fact, 'content', 'No fact text available')
-                    fact2_content = getattr(fact2.fact, 'fact_text', None) or getattr(fact2.fact, 'content', 'No fact text available')
-
                     conflicts.append({
                         'fact1_id': i,
                         'fact2_id': j,
-                        'fact1_content': fact1_content,
-                        'fact2_content': fact2_content,
+                        'fact1_content': fact1.fact.fact_text,
+                        'fact2_content': fact2.fact.fact_text,
                         'fact1_confidence': fact1.score,
                         'fact2_confidence': fact2.score,
                         'type': 'contradiction'
@@ -427,8 +424,8 @@ Format your response as JSON:
     def _are_facts_contradictory(self, fact1: CitedFact, fact2: CitedFact) -> bool:
         """Check if two facts are contradictory."""
         # Simple heuristic: look for negation words and opposing statements
-        content1 = (getattr(fact1.fact, 'fact_text', None) or getattr(fact1.fact, 'content', '')).lower()
-        content2 = (getattr(fact2.fact, 'fact_text', None) or getattr(fact2.fact, 'content', '')).lower()
+        content1 = fact1.fact.fact_text.lower()
+        content2 = fact2.fact.fact_text.lower()
 
         # Check for explicit negations
         negation_words = ['not', 'no', 'never', 'cannot', 'does not', 'is not', 'are not']
@@ -521,28 +518,22 @@ Format your response as JSON:
         if options.format == ResponseFormat.SUMMARY:
             content_parts.append("Summary of findings:")
             for i, fact in enumerate(facts[:5], 1):
-                fact_content = getattr(fact.fact, 'fact_text', None) or getattr(fact.fact, 'content', 'No fact text available')
-                content_parts.append(f"{i}. {fact_content}")
+                content_parts.append(f"{i}. {fact.fact.fact_text}")
 
         elif options.format == ResponseFormat.BULLET_POINTS:
             content_parts.append("Key findings:")
             for fact in facts:
-                fact_content = getattr(fact.fact, 'fact_text', None) or getattr(fact.fact, 'content', 'No fact text available')
-                content_parts.append(f"• {fact_content}")
+                content_parts.append(f"• {fact.fact.fact_text}")
 
         else:  # DETAILED or other formats
             content_parts.append("Based on the available information:")
             for fact in facts:
-                fact_content = getattr(fact.fact, 'fact_text', None) or getattr(fact.fact, 'content', 'No fact text available')
-                content_parts.append(f"\n{fact_content}")
+                content_parts.append(f"\n{fact.fact.fact_text}")
 
         content = "\n".join(content_parts)
 
         # Extract key points
-        key_points = []
-        for fact in facts[:3]:
-            fact_content = getattr(fact.fact, 'fact_text', None) or getattr(fact.fact, 'content', 'No fact text available')
-            key_points.append(fact_content)
+        key_points = [fact.fact.fact_text for fact in facts[:3]]
         
         # Calculate average confidence
         avg_confidence = sum(fact.score for fact in facts) / len(facts) if facts else 0.0

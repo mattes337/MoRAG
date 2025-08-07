@@ -490,39 +490,16 @@ class FactExtractor:
                 # Extract required fact_text field
                 fact_text = candidate.get('fact_text', '')
                 if not fact_text or not fact_text.strip():
-                    # Fallback: try to construct from legacy fields if available
-                    subject = candidate.get('subject', '')
-                    obj = candidate.get('object', '')
-                    if subject and obj:
-                        approach = candidate.get('approach', '')
-                        solution = candidate.get('solution', '')
-                        parts = [f"{subject} relates to {obj}"]
-                        if approach:
-                            parts.append(f"through {approach}")
-                        if solution:
-                            parts.append(f"resulting in {solution}")
-                        fact_text = " ".join(parts) + "."
-                    else:
-                        self.logger.debug(
-                            f"Candidate {i} missing fact_text and cannot construct from legacy fields",
-                            candidate=candidate
-                        )
-                        continue
+                    self.logger.debug(
+                        f"Candidate {i} missing fact_text",
+                        candidate=candidate
+                    )
+                    continue
 
                 # Extract structured metadata
                 structured_metadata_data = candidate.get('structured_metadata', {})
                 if not isinstance(structured_metadata_data, dict):
                     structured_metadata_data = {}
-
-                # Add legacy fields to metadata for backward compatibility
-                if candidate.get('subject'):
-                    structured_metadata_data['subject'] = candidate['subject']
-                if candidate.get('object'):
-                    structured_metadata_data['object'] = candidate['object']
-                if candidate.get('approach'):
-                    structured_metadata_data['approach'] = candidate['approach']
-                if candidate.get('solution'):
-                    structured_metadata_data['solution'] = candidate['solution']
 
                 structured_metadata = StructuredMetadata(**structured_metadata_data)
 
@@ -615,23 +592,17 @@ class FactExtractor:
 
     def _generate_fact_keywords(self, fact: Fact) -> List[str]:
         """Generate keywords for fact indexing.
-        
+
         Args:
             fact: Fact to generate keywords for
-            
+
         Returns:
             List of keywords
         """
-        # Combine all text content
-        text_parts = [fact.subject, fact.object]
-        if fact.approach:
-            text_parts.append(fact.approach)
-        if fact.solution:
-            text_parts.append(fact.solution)
-        if fact.condition:
-            text_parts.append(fact.condition)
-        if fact.remarks:
-            text_parts.append(fact.remarks)
+        # Combine fact text and metadata
+        text_parts = [fact.fact_text]
+        text_parts.extend(fact.structured_metadata.primary_entities)
+        text_parts.extend(fact.structured_metadata.domain_concepts)
         
         combined_text = ' '.join(text_parts).lower()
         

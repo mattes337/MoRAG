@@ -11,7 +11,6 @@ This document describes the implementation of the hybrid fact extraction approac
 1. **Hybrid Fact Model** (`morag_graph.models.fact.Fact`)
    - `fact_text`: Complete, self-contained fact statement
    - `structured_metadata`: Extracted entities, relationships, and concepts
-   - Backward compatibility with legacy structured fields
 
 2. **Enhanced Extraction Prompts** (`morag_graph.extraction.fact_prompts`)
    - Focus on self-contained fact generation
@@ -21,11 +20,10 @@ This document describes the implementation of the hybrid fact extraction approac
 3. **Updated Graph Building** (`morag_graph.extraction.fact_entity_converter`)
    - Entity creation from metadata
    - Relationship mapping from fact content
-   - Support for both hybrid and legacy formats
+   - Pure hybrid format support
 
 4. **Response Generation Updates** (`morag_reasoning.response_generator`)
    - Direct use of fact_text for responses
-   - Fallback to legacy content field
    - Enhanced readability
 
 ## Hybrid Fact Structure
@@ -45,20 +43,7 @@ This document describes the implementation of the hybrid fact extraction approac
 }
 ```
 
-### Legacy Compatibility
-```json
-{
-  "structured_metadata": {
-    "primary_entities": ["entity1", "entity2"],
-    "relationships": ["relates_to"],
-    "domain_concepts": ["concept1"],
-    "subject": "legacy_subject",  // Preserved for compatibility
-    "object": "legacy_object",    // Preserved for compatibility
-    "approach": "legacy_approach", // Preserved for compatibility
-    "solution": "legacy_solution"  // Preserved for compatibility
-  }
-}
-```
+
 
 ## Benefits
 
@@ -93,15 +78,7 @@ This document describes the implementation of the hybrid fact extraction approac
 
 1. **Entity Creation**: From primary_entities and domain_concepts
 2. **Relationship Mapping**: Based on relationships metadata
-3. **Legacy Support**: Fallback to subject/object fields
-4. **Deduplication**: Prevents duplicate entities
-
-### Migration Support
-
-1. **Automatic Migration**: Legacy facts converted to hybrid format
-2. **Validation**: Ensures migration preserves essential information
-3. **Batch Processing**: Efficient handling of large fact sets
-4. **Rollback Support**: Ability to revert if needed
+3. **Deduplication**: Prevents duplicate entities
 
 ## Usage Examples
 
@@ -125,25 +102,7 @@ fact = Fact(
 )
 ```
 
-### Migrating Legacy Facts
-```python
-from morag_graph.migration.hybrid_fact_migration import migrate_legacy_facts_to_hybrid
 
-legacy_facts = [
-    {
-        "subject": "Ashwagandha extract",
-        "object": "chronic stress",
-        "approach": "300-600mg twice daily",
-        "solution": "stress reduction",
-        "source_chunk_id": "chunk_123",
-        "source_document_id": "doc_456",
-        "extraction_confidence": 0.9,
-        "fact_type": "methodological"
-    }
-]
-
-hybrid_facts = migrate_legacy_facts_to_hybrid(legacy_facts)
-```
 
 ### Graph Building
 ```python
@@ -158,9 +117,8 @@ entities, relationships = converter.convert_facts_to_entities(hybrid_facts)
 Comprehensive tests are provided in `packages/morag-graph/tests/test_hybrid_fact_extraction.py`:
 
 - **Model Tests**: StructuredMetadata and Fact model validation
-- **Extraction Tests**: Hybrid format parsing and legacy fallback
+- **Extraction Tests**: Hybrid format parsing
 - **Conversion Tests**: Entity and relationship creation
-- **Migration Tests**: Legacy to hybrid conversion
 
 ## Performance Considerations
 
@@ -172,7 +130,6 @@ Comprehensive tests are provided in `packages/morag-graph/tests/test_hybrid_fact
 
 ### Considerations
 - **Storage Overhead**: Slightly larger fact objects due to metadata
-- **Migration Cost**: One-time cost for converting legacy facts
 - **Prompt Complexity**: More sophisticated LLM prompts required
 
 ## Future Enhancements
@@ -189,8 +146,7 @@ The hybrid fact extraction approach successfully combines the benefits of natura
 
 - **Better Quality**: Self-contained, readable facts
 - **Graph Compatibility**: Structured metadata for entity/relationship extraction
-- **Backward Compatibility**: Seamless migration from legacy format
 - **Enhanced Responses**: Direct usage in response generation
 - **Future Flexibility**: Extensible architecture for future improvements
 
-This implementation maintains all existing functionality while significantly improving fact quality and usability across the MoRAG system.
+This implementation provides a clean, modern approach to fact extraction that significantly improves fact quality and usability across the MoRAG system.

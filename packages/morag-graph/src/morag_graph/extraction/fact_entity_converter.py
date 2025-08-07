@@ -107,31 +107,7 @@ class FactEntityConverter:
                     f"Concept '{concept_text}' relates to this fact"
                 ))
 
-        # Handle legacy structured fields for backward compatibility
-        if metadata.subject:
-            subject_entity = self._create_entity_from_text(
-                metadata.subject, "SUBJECT", fact, entity_cache
-            )
-            if subject_entity:
-                entities.append(subject_entity)
-                # Create relationship: Subject -> HAS_FACT -> Fact
-                relationships.append(self._create_fact_relationship(
-                    subject_entity.id, fact.id, "HAS_FACT",
-                    f"Subject '{metadata.subject}' is described by this fact"
-                ))
 
-        # Create object entity from legacy fields
-        if metadata.object:
-            object_entity = self._create_entity_from_text(
-                metadata.object, "OBJECT", fact, entity_cache
-            )
-            if object_entity:
-                entities.append(object_entity)
-                # Create relationship: Object -> DESCRIBED_IN -> Fact
-                relationships.append(self._create_fact_relationship(
-                    object_entity.id, fact.id, "DESCRIBED_IN",
-                    f"Object '{metadata.object}' is described in this fact"
-                ))
 
         # Create entities from keywords
         for keyword in fact.keywords:
