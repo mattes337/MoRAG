@@ -426,9 +426,9 @@ async def main():
     # Retrieval parameters
     parser.add_argument("--max-depth", type=int, default=3, help="Maximum traversal depth")
     parser.add_argument("--decay-rate", type=float, default=0.2, help="Rate of score decay per depth level")
-    parser.add_argument("--max-facts-per-node", type=int, default=5, help="Maximum facts to extract per node")
+    parser.add_argument("--max-facts-per-node", type=int, default=100, help="Maximum facts to extract per node")
     parser.add_argument("--min-fact-score", type=float, default=0.1, help="Minimum score threshold for facts")
-    parser.add_argument("--max-total-facts", type=int, default=50, help="Maximum total facts to collect")
+    parser.add_argument("--max-total-facts", type=int, default=100, help="Maximum total facts to collect")
     parser.add_argument("--language", help="Language for processing")
     parser.add_argument("--facts-only", action="store_true", help="Return only facts without final answer synthesis")
     parser.add_argument("--skip-fact-evaluation", action="store_true", help="Skip fact evaluation and return all raw facts without scoring")

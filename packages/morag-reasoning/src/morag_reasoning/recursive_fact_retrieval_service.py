@@ -383,21 +383,52 @@ class RecursiveFactRetrievalService:
         """Generate the final answer using the stronger LLM."""
         if not final_facts:
             return "I could not find enough relevant information to answer your query.", 0.0
-        
-        # Prepare context for final LLM
+
+        # First pass: collect unique documents and assign reference numbers
+        document_to_ref_num = {}
+        ref_counter = 1
+
+        for fact in final_facts:
+            doc_name = fact.source_metadata.document_name
+            if doc_name and doc_name not in document_to_ref_num:
+                document_to_ref_num[doc_name] = ref_counter
+                ref_counter += 1
+
+        # Prepare context for final LLM with reference numbers
         formatted_facts = []
         for fact in final_facts:
-            # Create detailed source information (without chunk references)
-            source_details = fact.source_description
-            if fact.source_metadata.document_name:
-                source_parts = [fact.source_metadata.document_name]
-                if fact.source_metadata.page_number:
-                    source_parts.append(f"page {fact.source_metadata.page_number}")
-                if fact.source_metadata.section:
-                    source_parts.append(f"section '{fact.source_metadata.section}'")
+            # Get reference number for this document
+            doc_name = fact.source_metadata.document_name
+            ref_num = document_to_ref_num.get(doc_name, "?")
+
+            # Create detailed source information with reference number and metadata
+            source_parts = []
+            if doc_name:
+                source_parts.append(f"[{ref_num}")
+
+                # Add metadata to the reference
+                metadata_parts = []
+
+                # For video/audio content, prioritize timestamp and skip section/chapter info
                 if fact.source_metadata.timestamp:
-                    source_parts.append(f"at {fact.source_metadata.timestamp}")
-                source_details = ", ".join(source_parts)
+                    metadata_parts.append(f"{fact.source_metadata.timestamp}")
+                else:
+                    # For non-video/audio content, include page, section, and chapter info
+                    if fact.source_metadata.page_number:
+                        metadata_parts.append(f"page {fact.source_metadata.page_number}")
+                    if fact.source_metadata.section:
+                        metadata_parts.append(f"section '{fact.source_metadata.section}'")
+                    if fact.source_metadata.additional_metadata.get("chapter"):
+                        metadata_parts.append(f"chapter {fact.source_metadata.additional_metadata['chapter']}")
+
+                if metadata_parts:
+                    source_parts.append(f", {', '.join(metadata_parts)}]")
+                else:
+                    source_parts.append("]")
+
+                source_details = "".join(source_parts)
+            else:
+                source_details = fact.source_description
 
             formatted_facts.append(
                 f"Fact (Score: {fact.final_decayed_score:.2f}, Source: {source_details}): {fact.fact_text}"
@@ -424,36 +455,10 @@ class RecursiveFactRetrievalService:
             language_name = language_names.get(language, language)
             language_instruction = f"\n\nIMPORTANT: Please respond in {language_name} ({language}). The entire response must be in {language_name}."
 
-        # Create references list
+        # Create references list from the already collected documents
         references = []
-        seen_sources = set()
-        ref_counter = 1
-
-        for fact in final_facts:
-            source_key = f"{fact.source_metadata.document_name}_{fact.source_metadata.chunk_index}"
-            if source_key not in seen_sources:
-                seen_sources.add(source_key)
-
-                # Build reference entry (without chunk references)
-                ref_parts = []
-                if fact.source_metadata.document_name:
-                    ref_parts.append(fact.source_metadata.document_name)
-
-                if fact.source_metadata.page_number:
-                    ref_parts.append(f"p. {fact.source_metadata.page_number}")
-
-                if fact.source_metadata.section:
-                    ref_parts.append(f"section '{fact.source_metadata.section}'")
-
-                if fact.source_metadata.timestamp:
-                    ref_parts.append(f"at {fact.source_metadata.timestamp}")
-
-                if fact.source_metadata.additional_metadata.get("chapter"):
-                    ref_parts.append(f"chapter '{fact.source_metadata.additional_metadata['chapter']}'")
-
-                if ref_parts:
-                    references.append(f"[{ref_counter}] {', '.join(ref_parts)}")
-                    ref_counter += 1
+        for doc_name, ref_num in sorted(document_to_ref_num.items(), key=lambda x: x[1]):
+            references.append(f"[{ref_num}] {doc_name}")
 
         references_section = "\n\n**References:**\n" + "\n".join(references) if references else ""
 
@@ -466,7 +471,14 @@ Relevant Facts:
 
 Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from the facts. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}
 
-IMPORTANT: Your answer must end with a references section listing all source documents. Include the references section exactly as provided below:
+IMPORTANT CITATION INSTRUCTIONS:
+- When referencing information from the facts, use the exact reference format shown in the source information
+- For example, if a fact shows "Source: [8, page 4, chapter 3]", use exactly "[8, page 4, chapter 3]" in your answer
+- If a fact shows "Source: [5, 3:23]", use exactly "[5, 3:23]" in your answer
+- Always include the metadata (page numbers, timestamps, chapters, etc.) in your citations
+- Your answer must end with a references section listing all source documents
+
+Include the references section exactly as provided below:
 {references_section}"""
         
         try:
