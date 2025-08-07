@@ -26,34 +26,30 @@ Extract at most {max_facts} high-quality facts from the text.
 ```
 
 ### Domain-Specific Fact Extraction
-```python
-# Research Domain
-"""You are extracting facts from research literature. Focus on:
+
+**Research Domain Focus**:
 - Research findings and results
 - Methodologies and approaches
 - Statistical data and measurements
 - Experimental procedures
 - Theoretical frameworks
-- Limitations and future work"""
+- Limitations and future work
 
-# Technical Domain
-"""You are extracting facts from technical documentation. Focus on:
+**Technical Domain Focus**:
 - Implementation details and procedures
 - Configuration and setup instructions
 - Technical specifications
 - Troubleshooting information
 - Best practices and recommendations
-- System requirements and dependencies"""
+- System requirements and dependencies
 
-# Business Domain
-"""You are extracting facts from business content. Focus on:
+**Business Domain Focus**:
 - Business processes and workflows
 - Strategic decisions and rationale
 - Performance metrics and KPIs
 - Market analysis and insights
 - Organizational structures and roles
-- Financial information and projections"""
-```
+- Financial information and projections
 
 ## Entity Extraction Prompts
 

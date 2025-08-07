@@ -44,92 +44,82 @@ To build the world's most adaptable RAG system that:
 ### Entity and Relationship Extraction
 
 #### ✅ DO: Dynamic Type Generation
-```python
-# LLM determines types based on content
-entity_extractor = EntityExtractor(config)  # No predefined types
-relation_extractor = RelationExtractor(config)  # No predefined types
+**Approach**: Use LLM to determine entity and relation types based on content analysis, without predefined type schemas.
 
-# LLM generates context-appropriate types like:
-# - PHARMACEUTICAL_DRUG, MEDICAL_CONDITION (medical domain)
-# - PROGRAMMING_LANGUAGE, SOFTWARE_FRAMEWORK (technical domain)
-# - LEGAL_STATUTE, COURT_CASE (legal domain)
-```
+**Benefits**:
+- LLM generates context-appropriate types like PHARMACEUTICAL_DRUG, MEDICAL_CONDITION (medical domain)
+- Supports PROGRAMMING_LANGUAGE, SOFTWARE_FRAMEWORK (technical domain)
+- Handles LEGAL_STATUTE, COURT_CASE (legal domain)
+- Adapts to any domain automatically
 
 #### ❌ DON'T: Hardcoded Domain Types
-```python
-# NEVER do this - hardcoded domain-specific types
-MEDICAL_TYPES = {"DRUG": "...", "DISEASE": "..."}
-LEGAL_TYPES = {"STATUTE": "...", "CASE": "..."}
-```
+**Avoid**: Static type definitions that limit system adaptability to specific domains.
+
+**Problems**: Hardcoded types like MEDICAL_TYPES or LEGAL_TYPES prevent system from adapting to new domains and content types.
 
 ### Graph Database Design
 
 #### ✅ DO: Generic Graph Structure
-```python
-# Generic relationships determined by LLM
-Document → CONTAINS → DocumentChunk → MENTIONS → Entity
-Entity ← SUBJECT ← Relation → OBJECT → Entity
-Relation → EXTRACTED_FROM → DocumentChunk
+**Schema**: Use generic graph structure with LLM-determined relationships.
 
-# LLM-generated relationship types:
-# TREATS, CAUSES, PREVENTS (medical)
-# IMPLEMENTS, EXTENDS, USES (technical)
-# REGULATES, APPLIES_TO, SUPERSEDES (legal)
-```
+**Structure**:
+- Document → CONTAINS → DocumentChunk → MENTIONS → Entity
+- Entity ← SUBJECT ← Relation → OBJECT → Entity
+- Relation → EXTRACTED_FROM → DocumentChunk
+
+**Dynamic Relationships**: LLM generates domain-appropriate relationship types:
+- Medical: TREATS, CAUSES, PREVENTS
+- Technical: IMPLEMENTS, EXTENDS, USES
+- Legal: REGULATES, APPLIES_TO, SUPERSEDES
 
 #### ❌ DON'T: Domain-Specific Schema
-```python
-# NEVER hardcode domain-specific relationships
-MEDICAL_RELATIONS = ["TREATS", "CAUSES"]
-TECH_RELATIONS = ["IMPLEMENTS", "EXTENDS"]
-```
+**Avoid**: Hardcoded domain-specific relationship lists that limit system flexibility and adaptability to new domains.
 
 ### Content Processing
 
 #### ✅ DO: Uniform Processing Pipeline
-```python
-# Same pipeline for all content types
-async def process_content(content: Any, content_type: ContentType) -> ProcessingResult:
-    # 1. Convert to markdown (universal format)
-    # 2. Extract entities and relations (LLM-driven)
-    # 3. Generate embeddings
-    # 4. Store in vector database
-    # 5. Build knowledge graph
-```
+**Approach**: Use same processing pipeline for all content types to ensure consistency.
+
+**Pipeline Steps**:
+1. Convert to markdown (universal format)
+2. Extract entities and relations (LLM-driven)
+3. Generate embeddings
+4. Store in vector database
+5. Build knowledge graph
 
 #### ✅ DO: Semantic Chunking
-```python
-# Intelligent chunking based on content structure
-chunking_strategies = {
-    "SEMANTIC": "LLM-driven semantic boundaries",
-    "CHAPTER": "Document structure-aware",
-    "TOPIC": "Topic-based with timestamps (audio/video)",
-    "PAGE": "Page-level for PDFs"
-}
-```
+**Strategy**: Use intelligent chunking based on content structure and type.
+
+**Chunking Strategies**:
+- **SEMANTIC**: LLM-driven semantic boundaries
+- **CHAPTER**: Document structure-aware chunking
+- **TOPIC**: Topic-based with timestamps (audio/video)
+- **PAGE**: Page-level chunking for PDFs
 
 ### API Design
 
 #### ✅ DO: Consistent Endpoints
-```python
-# Processing endpoints (immediate results)
-POST /process/file
-POST /process/url
-POST /process/youtube
+**Processing Endpoints** (immediate results):
+- POST /process/file
+- POST /process/url
+- POST /process/youtube
 
-# Ingestion endpoints (background + vector storage)
-POST /api/v1/ingest/file
-POST /api/v1/ingest/url
-POST /api/v1/ingest/batch
-```
+**Ingestion Endpoints** (background + vector storage):
+- POST /api/v1/ingest/file
+- POST /api/v1/ingest/url
+- POST /api/v1/ingest/batch
 
 #### ✅ DO: Flexible Configuration
-```python
-# Support multiple databases and configurations
-databases = [
+**Database Support**: Configure multiple databases and collections for different use cases.
+
+**Example Configuration**:
+```json
+{
+  "databases": [
     {"type": "qdrant", "collection": "documents"},
     {"type": "neo4j", "database": "knowledge_graph"}
-]
+  ]
+}
 ```
 
 ## Key Components
@@ -192,18 +182,12 @@ MORAG_ENABLE_TOPIC_SEGMENTATION=true
 - **Integration tests** for end-to-end workflows
 
 ### Example Test Structure
-```python
-def test_dynamic_entity_extraction():
-    """Test LLM generates appropriate entity types."""
-    extractor = EntityExtractor(config)  # No predefined types
-    
-    medical_text = "Aspirin treats headaches and reduces inflammation."
-    entities = await extractor.extract(medical_text)
-    
-    # LLM should generate medical-specific types
-    assert any(e.type in ["MEDICATION", "PHARMACEUTICAL_DRUG"] for e in entities)
-    assert any(e.type in ["SYMPTOM", "MEDICAL_CONDITION"] for e in entities)
-```
+**Test Approach**: Validate that LLM generates appropriate entity types dynamically without predefined schemas.
+
+**Test Case**: Dynamic entity extraction for medical content
+- **Input**: Medical text about aspirin treating headaches
+- **Expected**: LLM generates medical-specific entity types
+- **Validation**: Entities should include medication types (MEDICATION, PHARMACEUTICAL_DRUG) and condition types (SYMPTOM, MEDICAL_CONDITION)
 
 ## Performance Considerations
 
@@ -228,12 +212,11 @@ def test_dynamic_entity_extraction():
 - **Retry mechanisms** with exponential backoff
 
 ### Comprehensive Logging
-```python
-logger.info(f"Processing {content_type} content: {source}")
-logger.debug(f"LLM generated {len(entities)} entities, {len(relations)} relations")
-logger.warning(f"Fallback to rule-based extraction: {error}")
-logger.error(f"Critical failure in {component}: {error}")
-```
+**Logging Levels**:
+- **Info**: Processing status and content type information
+- **Debug**: Detailed LLM generation results (entity/relation counts)
+- **Warning**: Fallback mechanism activation and error recovery
+- **Error**: Critical component failures requiring attention
 
 ## Commit Message Guidelines
 

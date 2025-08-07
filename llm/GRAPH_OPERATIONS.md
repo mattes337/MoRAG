@@ -3,411 +3,200 @@
 ## Entity Operations
 
 ### Entity Storage with Deduplication
-```cypher
--- MERGE strategy for entity deduplication by normalized name
-MERGE (e:Person {normalized_name: $normalized_name})
-ON CREATE SET
-    e.id = $id,
-    e.name = $name,
-    e.type = $type,
-    e.confidence = $confidence,
-    e.metadata = $metadata,
-    e.created_at = datetime(),
-    e.updated_at = datetime()
-ON MATCH SET
-    e.name = CASE
-        WHEN $confidence > coalesce(e.confidence, 0.0) THEN $name
-        ELSE e.name
-    END,
-    e.type = CASE
-        WHEN $confidence > coalesce(e.confidence, 0.0) THEN $type
-        ELSE e.type
-    END,
-    e.confidence = CASE
-        WHEN $confidence > coalesce(e.confidence, 0.0) THEN $confidence
-        ELSE e.confidence
-    END,
-    e.metadata = $metadata,
-    e.updated_at = datetime()
-RETURN e.id as id, e.type as final_type, e.name as final_name
-```
+**Strategy**: Use MERGE operations for entity deduplication based on normalized names.
+
+**Deduplication Logic**:
+- **Primary Key**: Normalized name for entity matching
+- **Creation**: Set all properties including timestamps when creating new entities
+- **Matching**: Update properties only when new confidence is higher than existing
+- **Conditional Updates**: Preserve higher-confidence entity names and types
+- **Metadata Refresh**: Always update metadata and timestamps on matches
+- **Return Values**: Provide entity ID, final type, and final name for confirmation
 
 ### Dynamic Entity Labels
-```python
-def get_neo4j_label(entity_type):
-    """Convert entity type to Neo4j label (title case)."""
-    # Remove prefixes and normalize
-    clean_type = entity_type.replace("EntityType_", "").replace("_", " ")
-    
-    # Convert to title case
-    return clean_type.title().replace(" ", "")
+**Conversion Process**: Transform entity types to Neo4j-compatible labels using title case formatting.
 
-# Examples:
-# "PERSON" -> "Person"
-# "ORGANIZATION" -> "Organization" 
-# "MEDICAL_CONDITION" -> "MedicalCondition"
-```
+**Transformation Rules**:
+- **Prefix Removal**: Remove "EntityType_" prefixes from type names
+- **Underscore Handling**: Replace underscores with spaces for processing
+- **Title Case**: Convert to title case for proper Neo4j label format
+- **Space Removal**: Remove spaces to create valid Neo4j labels
+
+**Examples**:
+- "PERSON" → "Person"
+- "ORGANIZATION" → "Organization"
+- "MEDICAL_CONDITION" → "MedicalCondition"
 
 ### Entity Retrieval Patterns
-```cypher
--- Get entity by ID
-MATCH (e {id: $entity_id})
-RETURN e
+**Retrieval Methods**:
 
--- Get entities by type
-MATCH (e:Person)
-WHERE e.confidence >= $min_confidence
-RETURN e
-ORDER BY e.confidence DESC
+**By ID**: Direct entity lookup using unique identifier for precise retrieval.
 
--- Get entities by name pattern
-MATCH (e)
-WHERE e.name CONTAINS $search_term
-RETURN e, labels(e) as entity_labels
-ORDER BY e.confidence DESC
-```
+**By Type**: Filter entities by specific type labels with confidence thresholds, ordered by confidence score.
+
+**By Name Pattern**: Search entities using name pattern matching with CONTAINS operator, returning entities and their labels ordered by confidence.
 
 ## Relationship Operations
 
 ### Dynamic Relationship Creation
-```cypher
--- Create relationship with dynamic type
-MATCH (source {id: $source_id}), (target {id: $target_id})
-MERGE (source)-[r:PARTNERS_WITH {id: $relation_id}]->(target)
-SET r.type = $relation_type,
-    r.confidence = $confidence,
-    r.metadata = $metadata,
-    r.created_at = coalesce(r.created_at, datetime()),
-    r.updated_at = datetime()
-RETURN r.id as id
-```
+**Process**: Create relationships between entities with dynamic types and metadata.
+
+**Creation Steps**:
+1. **Entity Matching**: Find source and target entities by ID
+2. **Relationship Merging**: Use MERGE to avoid duplicate relationships
+3. **Property Setting**: Set relationship type, confidence, and metadata
+4. **Timestamp Management**: Set creation time on first creation, always update modification time
+5. **ID Return**: Return relationship ID for reference
 
 ### Relationship Type Normalization
-```python
-def normalize_relation_type(relation_type):
-    """Normalize relation type to Neo4j format."""
-    # Convert to uppercase and replace spaces/hyphens with underscores
-    normalized = relation_type.upper().replace(" ", "_").replace("-", "_")
-    
-    # Remove common prefixes
-    normalized = normalized.replace("RELATIONTYPE_", "")
-    
-    # Ensure singular form for consistency
-    singular_mappings = {
-        "TREATS": "TREATS",
-        "CAUSES": "CAUSES", 
-        "PREVENTS": "PREVENTS",
-        "PARTNERS_WITH": "PARTNERS_WITH",
-        "LOCATED_IN": "LOCATED_IN"
-    }
-    
-    return singular_mappings.get(normalized, normalized)
-```
+**Normalization Process**: Convert relationship types to consistent Neo4j format.
+
+**Normalization Rules**:
+- **Case Conversion**: Convert to uppercase for consistency
+- **Character Replacement**: Replace spaces and hyphens with underscores
+- **Prefix Removal**: Remove "RELATIONTYPE_" prefixes
+- **Singular Form**: Ensure singular form for consistency (TREATS, CAUSES, PREVENTS, etc.)
+- **Mapping Validation**: Use predefined mappings for common relationship types
 
 ### Relationship Queries
-```cypher
--- Get all relationships for an entity
-MATCH (e {id: $entity_id})-[r]-(connected)
-RETURN e, r, connected, type(r) as relationship_type
-ORDER BY r.confidence DESC
+**Query Types**:
 
--- Get specific relationship types
-MATCH (e {id: $entity_id})-[r:TREATS|CAUSES|PREVENTS]-(connected)
-RETURN e, r, connected
-ORDER BY r.confidence DESC
+**All Relationships**: Get all relationships for an entity with connected entities and relationship types, ordered by confidence.
 
--- Get relationship paths
-MATCH path = (source {id: $source_id})-[r*1..3]-(target {id: $target_id})
-RETURN path, length(path) as path_length
-ORDER BY path_length
-```
+**Specific Types**: Filter relationships by specific types (TREATS, CAUSES, PREVENTS) with connected entities, ordered by confidence.
+
+**Relationship Paths**: Find paths between specific entities within hop limits (1-3), returning path and length information ordered by path length.
 
 ## Graph Traversal Patterns
 
 ### Neighbor Discovery
-```cypher
--- Get direct neighbors
-MATCH (start:Entity {id: $entity_id})-[r]-(neighbor:Entity)
-WHERE start <> neighbor
-RETURN DISTINCT neighbor, r, type(r) as relation_type
-ORDER BY neighbor.name
+**Discovery Methods**:
 
--- Get neighbors within distance
-MATCH (start:Entity {id: $entity_id})
-MATCH path = (start)-[r*1..3]-(neighbor:Entity)
-WHERE start <> neighbor
-RETURN DISTINCT neighbor, length(path) as distance
-ORDER BY distance, neighbor.name
-```
+**Direct Neighbors**: Find entities directly connected to a starting entity, returning neighbors with relationship information, ordered by name.
+
+**Distance-Based**: Find neighbors within specified distance (1-3 hops), returning distinct neighbors with distance information, ordered by distance and name.
 
 ### Path Finding
-```cypher
--- Shortest path between entities
-MATCH (source:Entity {id: $source_id}), (target:Entity {id: $target_id})
-MATCH path = shortestPath((source)-[r*1..5]-(target))
-RETURN path,
-       length(path) as path_length,
-       [node in nodes(path) | {id: node.id, name: node.name, type: node.type}] as entities,
-       [rel in relationships(path) | {type: rel.type, confidence: rel.confidence}] as relationships
-ORDER BY path_length
+**Path Types**:
 
--- All paths between entities (limited)
-MATCH path = (source:Entity {id: $source_id})-[r*1..3]-(target:Entity {id: $target_id})
-WHERE source <> target
-RETURN [node in nodes(path) | node.id] as path_ids,
-       length(path) as path_length
-ORDER BY path_length
-LIMIT 10
-```
+**Shortest Path**: Find shortest path between two entities within hop limits (1-5), returning complete path information including entities and relationships, ordered by path length.
+
+**All Paths**: Find all paths between entities within distance limits (1-3 hops), returning path IDs and lengths, ordered by path length with result limiting (top 10).
 
 ### Breadth-First Exploration
-```cypher
--- BFS traversal with relationship filtering
-MATCH (start:Entity {id: $entity_id})
-CALL apoc.path.expandConfig(start, {
-    relationshipFilter: "TREATS|CAUSES|PREVENTS",
-    labelFilter: "+Entity",
-    minLevel: 1,
-    maxLevel: 3,
-    bfs: true,
-    uniqueness: "NODE_GLOBAL"
-}) YIELD path
-RETURN path, length(path) as depth
-ORDER BY depth
-```
+**BFS Configuration**: Use APOC procedures for advanced breadth-first traversal with filtering capabilities.
+
+**Configuration Options**:
+- **Relationship Filtering**: Specify allowed relationship types (TREATS, CAUSES, PREVENTS)
+- **Label Filtering**: Restrict to specific node labels (+Entity)
+- **Level Control**: Set minimum (1) and maximum (3) traversal levels
+- **Traversal Mode**: Use breadth-first search for systematic exploration
+- **Uniqueness**: Ensure global node uniqueness to avoid cycles
 
 ## Fact Operations
 
 ### Fact Storage
-```cypher
--- Store fact with relationships to entities
-CREATE (f:Fact {
-    id: $fact_id,
-    content: $content,
-    subject: $subject,
-    predicate: $predicate,
-    object: $object,
-    confidence: $confidence,
-    fact_type: $fact_type,
-    domain: $domain,
-    created_at: datetime()
-})
+**Storage Process**: Create fact nodes with comprehensive properties and establish relationships to source chunks and mentioned entities.
 
--- Link fact to source chunk
-MATCH (f:Fact {id: $fact_id})
-MATCH (chunk:DocumentChunk {id: $chunk_id})
-MERGE (chunk)-[:CONTAINS_FACT]->(f)
+**Fact Properties**:
+- **Core Information**: ID, content, subject, predicate, object
+- **Quality Metrics**: Confidence score, fact type, domain classification
+- **Metadata**: Creation timestamp for tracking
 
--- Link fact to entities
-MATCH (f:Fact {id: $fact_id})
-MATCH (e:Entity {id: $entity_id})
-MERGE (f)-[:MENTIONS]->(e)
-```
+**Relationship Creation**:
+- **Source Linking**: Connect facts to source document chunks via CONTAINS_FACT relationships
+- **Entity Linking**: Connect facts to mentioned entities via MENTIONS relationships
 
 ### Fact Retrieval
-```cypher
--- Get facts for entity
-MATCH (e:Entity {id: $entity_id})<-[:MENTIONS]-(f:Fact)
-RETURN f, e
-ORDER BY f.confidence DESC
+**Retrieval Methods**:
 
--- Get facts by domain
-MATCH (f:Fact)
-WHERE f.domain = $domain AND f.confidence >= $min_confidence
-RETURN f
-ORDER BY f.confidence DESC
+**By Entity**: Find all facts that mention a specific entity, ordered by confidence score.
 
--- Get facts with source attribution
-MATCH (chunk:DocumentChunk)-[:CONTAINS_FACT]->(f:Fact)-[:MENTIONS]->(e:Entity)
-WHERE e.id = $entity_id
-RETURN f, chunk, e
-ORDER BY f.confidence DESC
-```
+**By Domain**: Filter facts by domain and minimum confidence threshold, ordered by confidence.
+
+**With Source Attribution**: Retrieve facts for an entity along with source chunk information, ordered by confidence for complete traceability.
 
 ## Document and Chunk Operations
 
 ### Document Storage
-```cypher
--- Store document with metadata
-CREATE (d:Document {
-    id: $document_id,
-    title: $title,
-    content_type: $content_type,
-    file_path: $file_path,
-    metadata: $metadata,
-    created_at: datetime()
-})
+**Storage Components**:
 
--- Store document chunk
-CREATE (chunk:DocumentChunk {
-    id: $chunk_id,
-    document_id: $document_id,
-    chunk_index: $chunk_index,
-    text: $text,
-    start_position: $start_position,
-    end_position: $end_position,
-    metadata: $metadata,
-    created_at: datetime()
-})
+**Document Node**: Store document with comprehensive metadata including ID, title, content type, file path, and creation timestamp.
 
--- Link chunk to document
-MATCH (d:Document {id: $document_id})
-MATCH (chunk:DocumentChunk {document_id: $document_id})
-MERGE (d)-[:HAS_CHUNK]->(chunk)
-```
+**Document Chunk**: Create chunk nodes with document reference, chunk index, text content, position information, and metadata.
+
+**Relationship Linking**: Establish HAS_CHUNK relationships between documents and their chunks for hierarchical organization.
 
 ### Chunk Retrieval
-```cypher
--- Get chunks for document
-MATCH (d:Document {id: $document_id})-[:HAS_CHUNK]->(chunk:DocumentChunk)
-RETURN chunk
-ORDER BY chunk.chunk_index
+**Retrieval Methods**:
 
--- Get chunks containing entity mentions
-MATCH (chunk:DocumentChunk)-[:CONTAINS_FACT]->(f:Fact)-[:MENTIONS]->(e:Entity)
-WHERE e.id = $entity_id
-RETURN DISTINCT chunk, f, e
-ORDER BY chunk.chunk_index
-```
+**By Document**: Get all chunks for a specific document, ordered by chunk index for sequential reading.
+
+**By Entity Mentions**: Find chunks that contain facts mentioning specific entities, returning chunks with associated facts and entities, ordered by chunk index.
 
 ## Performance Optimization
 
 ### Index Creation
-```cypher
--- Entity indexes
-CREATE INDEX entity_id_index FOR (e:Entity) ON (e.id);
-CREATE INDEX entity_name_index FOR (e:Entity) ON (e.name);
-CREATE INDEX entity_normalized_name_index FOR (e:Entity) ON (e.normalized_name);
-CREATE INDEX entity_type_index FOR (e:Entity) ON (e.type);
+**Index Categories**:
 
--- Fact indexes
-CREATE INDEX fact_id_index FOR (f:Fact) ON (f.id);
-CREATE INDEX fact_domain_index FOR (f:Fact) ON (f.domain);
-CREATE INDEX fact_confidence_index FOR (f:Fact) ON (f.confidence);
+**Entity Indexes**: Create indexes on entity ID, name, normalized_name, and type for fast entity lookups and searches.
 
--- Document indexes
-CREATE INDEX document_id_index FOR (d:Document) ON (d.id);
-CREATE INDEX chunk_id_index FOR (c:DocumentChunk) ON (c.id);
-CREATE INDEX chunk_document_id_index FOR (c:DocumentChunk) ON (c.document_id);
-```
+**Fact Indexes**: Index fact ID, domain, and confidence for efficient fact filtering and retrieval.
+
+**Document Indexes**: Index document ID, chunk ID, and chunk document_id for fast document and chunk operations.
 
 ### Query Optimization
-```cypher
--- Use EXPLAIN to analyze query performance
-EXPLAIN MATCH (e:Entity {id: $entity_id})-[r]-(connected)
-RETURN e, r, connected
+**Optimization Tools**:
 
--- Use PROFILE for detailed execution statistics
-PROFILE MATCH (e:Entity)-[r:TREATS]-(target)
-WHERE e.confidence > 0.8
-RETURN e, target
-ORDER BY e.confidence DESC
-LIMIT 10
-```
+**EXPLAIN**: Analyze query execution plans to understand performance characteristics and identify bottlenecks.
+
+**PROFILE**: Get detailed execution statistics including actual row counts, database hits, and timing information for performance tuning.
 
 ### Batch Operations
-```cypher
--- Batch entity creation
-UNWIND $entities as entity
-MERGE (e:Entity {normalized_name: entity.normalized_name})
-ON CREATE SET e += entity, e.created_at = datetime()
-ON MATCH SET e += entity, e.updated_at = datetime()
+**Batch Processing**:
 
--- Batch relationship creation
-UNWIND $relationships as rel
-MATCH (source {id: rel.source_id})
-MATCH (target {id: rel.target_id})
-MERGE (source)-[r:RELATIONSHIP {id: rel.id}]->(target)
-SET r += rel.properties
-```
+**Entity Creation**: Use UNWIND for batch entity creation with MERGE operations, setting properties and timestamps appropriately for creation and updates.
+
+**Relationship Creation**: Batch create relationships by unwinding relationship data, matching source and target entities, and merging relationships with properties.
 
 ## Graph Analytics
 
 ### Entity Statistics
-```cypher
--- Entity count by type
-MATCH (e:Entity)
-RETURN labels(e)[0] as entity_type, count(e) as count
-ORDER BY count DESC
+**Statistical Analysis**:
 
--- Entity confidence distribution
-MATCH (e:Entity)
-RETURN 
-    CASE 
-        WHEN e.confidence >= 0.9 THEN "High (0.9+)"
-        WHEN e.confidence >= 0.7 THEN "Medium (0.7-0.9)"
-        WHEN e.confidence >= 0.5 THEN "Low (0.5-0.7)"
-        ELSE "Very Low (<0.5)"
-    END as confidence_range,
-    count(e) as count
-ORDER BY confidence_range
-```
+**Entity Count by Type**: Count entities grouped by their primary label/type, ordered by frequency for understanding data distribution.
+
+**Confidence Distribution**: Categorize entities by confidence ranges (High 0.9+, Medium 0.7-0.9, Low 0.5-0.7, Very Low <0.5) to assess data quality.
 
 ### Relationship Statistics
-```cypher
--- Relationship count by type
-MATCH ()-[r]->()
-RETURN type(r) as relationship_type, count(r) as count
-ORDER BY count DESC
+**Relationship Analysis**:
 
--- Most connected entities
-MATCH (e:Entity)-[r]-()
-RETURN e.name, e.type, count(r) as connection_count
-ORDER BY connection_count DESC
-LIMIT 10
-```
+**Count by Type**: Count relationships grouped by type, ordered by frequency to understand relationship patterns.
+
+**Most Connected Entities**: Find entities with highest connection counts (top 10) to identify central nodes in the graph.
 
 ### Graph Connectivity
-```cypher
--- Connected components
-CALL gds.wcc.stream('entity-graph')
-YIELD nodeId, componentId
-RETURN componentId, count(nodeId) as component_size
-ORDER BY component_size DESC
+**Connectivity Analysis**:
 
--- PageRank for entity importance
-CALL gds.pageRank.stream('entity-graph')
-YIELD nodeId, score
-MATCH (e:Entity) WHERE id(e) = nodeId
-RETURN e.name, e.type, score
-ORDER BY score DESC
-LIMIT 10
-```
+**Connected Components**: Use Graph Data Science library to identify connected components and their sizes for understanding graph structure.
+
+**PageRank Analysis**: Calculate PageRank scores to identify most important entities based on their position in the graph network (top 10).
 
 ## Error Handling
 
 ### Constraint Violations
-```cypher
--- Handle duplicate entity creation
-MERGE (e:Entity {id: $entity_id})
-ON CREATE SET e += $properties
-ON MATCH SET e += $properties
-RETURN e
+**Error Handling Strategies**:
 
--- Handle missing entities in relationships
-MATCH (source {id: $source_id}), (target {id: $target_id})
-WITH source, target
-WHERE source IS NOT NULL AND target IS NOT NULL
-MERGE (source)-[r:RELATIONSHIP]->(target)
-RETURN r
-```
+**Duplicate Entity Creation**: Use MERGE operations with ON CREATE and ON MATCH clauses to handle duplicate entity creation gracefully.
+
+**Missing Entity References**: Validate entity existence before creating relationships using WHERE clauses to ensure both source and target entities exist.
 
 ### Transaction Management
-```python
-async def execute_graph_transaction(operations):
-    async with neo4j_driver.session() as session:
-        async with session.begin_transaction() as tx:
-            try:
-                results = []
-                for operation in operations:
-                    result = await tx.run(operation.query, operation.parameters)
-                    results.append(result)
-                
-                await tx.commit()
-                return results
-            
-            except Exception as e:
-                await tx.rollback()
-                logger.error(f"Transaction failed: {e}")
-                raise
-```
+**Transaction Handling**: Execute multiple graph operations within a single transaction for consistency and atomicity.
+
+**Process**:
+1. **Session Management**: Create Neo4j session for database connection
+2. **Transaction Begin**: Start transaction for atomic operations
+3. **Operation Execution**: Execute multiple operations within transaction scope
+4. **Result Collection**: Gather results from all operations
+5. **Commit/Rollback**: Commit on success or rollback on failure with error logging

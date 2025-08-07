@@ -8,38 +8,24 @@
 **Provider**: Gemini API
 **Task Types**: `retrieval_document`, `retrieval_query`, `semantic_similarity`
 
-```python
-# Configuration
-embedding_config = {
-    "model_name": "text-embedding-004",
-    "provider": "gemini",
-    "batch_size": 50,
-    "max_tokens": 8192,
-    "normalize": True,
-    "api_key": os.getenv("GEMINI_API_KEY")
+**Configuration**:
+```json
+{
+  "model_name": "text-embedding-004",
+  "provider": "gemini",
+  "batch_size": 50,
+  "max_tokens": 8192,
+  "normalize": true,
+  "api_key": "GEMINI_API_KEY"
 }
 ```
 
 ### Task-Specific Embeddings
-```python
-# Document embedding (for storage)
-doc_embedding = await embedding_service.generate_embedding(
-    text=document_text,
-    task_type="retrieval_document"
-)
+**Document Embedding** (for storage): Use `retrieval_document` task type when generating embeddings for document storage and indexing.
 
-# Query embedding (for search)
-query_embedding = await embedding_service.generate_embedding(
-    text=user_query,
-    task_type="retrieval_query"
-)
+**Query Embedding** (for search): Use `retrieval_query` task type when generating embeddings for user queries and search operations.
 
-# Similarity comparison
-similarity_embedding = await embedding_service.generate_embedding(
-    text=comparison_text,
-    task_type="semantic_similarity"
-)
-```
+**Similarity Comparison**: Use `semantic_similarity` task type when generating embeddings for content comparison and similarity analysis.
 
 ## Batch Processing Strategies
 
@@ -50,104 +36,54 @@ similarity_embedding = await embedding_service.generate_embedding(
 - **Delay Between Batches**: 0.05 seconds
 
 ### Batch Processing Implementation
-```python
-async def generate_embeddings_batch(texts, task_type="retrieval_document"):
-    batch_size = 100
-    all_embeddings = []
-    
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i + batch_size]
-        
-        # Generate embeddings for batch
-        batch_embeddings = await embedding_service.generate_batch_embeddings(
-            texts=batch,
-            task_type=task_type
-        )
-        
-        all_embeddings.extend(batch_embeddings)
-        
-        # Rate limiting delay
-        if i + batch_size < len(texts):
-            await asyncio.sleep(0.05)
-    
-    return all_embeddings
-```
+**Process**: Generate embeddings in batches to optimize API usage and performance.
+
+**Steps**:
+1. **Batch Creation**: Split input texts into batches of specified size (default 100)
+2. **Batch Processing**: Generate embeddings for each batch using specified task type
+3. **Result Aggregation**: Combine all batch results into single embedding list
+4. **Rate Limiting**: Apply delay between batches (0.05 seconds) to respect API limits
 
 ### Performance Optimization
-```python
-# Async processing with semaphore
-semaphore = asyncio.Semaphore(5)  # Limit concurrent requests
+**Concurrency Control**: Use semaphore to limit concurrent requests (recommended: 5 concurrent requests).
 
-async def generate_embedding_with_limit(text, task_type):
-    async with semaphore:
-        return await embedding_service.generate_embedding(text, task_type)
+**Parallel Processing**: Process multiple embedding requests simultaneously while respecting rate limits.
 
-# Parallel processing
-tasks = [
-    generate_embedding_with_limit(text, "retrieval_document")
-    for text in texts
-]
-embeddings = await asyncio.gather(*tasks)
-```
+**Implementation**: Create tasks for each text input and use async gathering to process them efficiently.
 
 ## Vector Search Patterns
 
 ### Similarity Search Configuration
-```python
-search_config = {
-    "score_threshold": 0.5,  # Minimum similarity threshold
-    "limit": 20,             # Maximum results
-    "filters": {             # Optional metadata filters
-        "content_type": "document",
-        "language": "en"
-    }
+```json
+{
+  "score_threshold": 0.5,
+  "limit": 20,
+  "filters": {
+    "content_type": "document",
+    "language": "en"
+  }
 }
 ```
 
 ### Search Implementation
-```python
-async def search_similar_content(query, limit=10, score_threshold=0.5):
-    # Generate query embedding
-    query_embedding = await embedding_service.generate_embedding(
-        text=query,
-        task_type="retrieval_query"
-    )
-    
-    # Search for similar vectors
-    results = await vector_storage.search_similar(
-        query_vector=query_embedding,
-        limit=limit,
-        score_threshold=score_threshold
-    )
-    
-    return results
-```
+**Process**: Generate query embedding and search for similar vectors in storage.
+
+**Steps**:
+1. **Query Embedding**: Generate embedding for search query using `retrieval_query` task type
+2. **Vector Search**: Search vector storage for similar embeddings within specified limits
+3. **Result Filtering**: Apply score threshold and limit to filter results
+4. **Result Return**: Return ranked list of similar content
 
 ### Hybrid Search (Vector + Graph)
-```python
-async def hybrid_search(query, config):
-    # Vector search
-    vector_results = await vector_search(query, config.max_vector_results)
-    
-    # Graph search
-    graph_results = await graph_search(query, config.max_graph_results)
-    
-    # Fusion strategies
-    if config.fusion_strategy == "weighted_combination":
-        combined_results = weighted_fusion(
-            vector_results, graph_results,
-            vector_weight=config.vector_weight,
-            graph_weight=config.graph_weight
-        )
-    elif config.fusion_strategy == "rank_fusion":
-        combined_results = rank_fusion(vector_results, graph_results)
-    else:  # adaptive
-        combined_results = adaptive_fusion(
-            vector_results, graph_results, query_analysis
-        )
-    
-    return combined_results
-```
+**Approach**: Combine vector similarity search with graph traversal for comprehensive results.
+
+**Process**:
+1. **Vector Search**: Perform similarity search using embeddings
+2. **Graph Search**: Execute graph traversal for relationship-based results
+3. **Fusion Strategy**: Combine results using one of three strategies:
+   - **Weighted Combination**: Apply configurable weights to vector and graph results
+   - **Rank Fusion**: Merge results based on ranking positions
+   - **Adaptive**: Dynamically choose fusion method based on query analysis
 
 ## Similarity Thresholds
 
@@ -163,210 +99,112 @@ similarity_thresholds = {
 ```
 
 ### Dynamic Threshold Adjustment
-```python
-def calculate_dynamic_threshold(query_complexity, result_count):
-    base_threshold = 0.5
-    
-    # Adjust based on query complexity
-    if query_complexity > 0.7:
-        base_threshold -= 0.1  # Lower threshold for complex queries
-    elif query_complexity < 0.3:
-        base_threshold += 0.1  # Higher threshold for simple queries
-    
-    # Adjust based on result availability
-    if result_count < 5:
-        base_threshold -= 0.1  # Lower threshold if few results
-    elif result_count > 50:
-        base_threshold += 0.1  # Higher threshold if many results
-    
-    return max(0.2, min(0.8, base_threshold))
-```
+**Algorithm**: Adjust similarity threshold based on query complexity and result availability.
+
+**Adjustment Rules**:
+- **Complex Queries** (>0.7): Lower threshold by 0.1 to capture more results
+- **Simple Queries** (<0.3): Raise threshold by 0.1 for more precise results
+- **Few Results** (<5): Lower threshold by 0.1 to find more matches
+- **Many Results** (>50): Raise threshold by 0.1 to filter results
+- **Bounds**: Keep threshold between 0.2 and 0.8
 
 ## Entity Embedding Strategies
 
 ### Entity Representation
-```python
-def create_entity_embedding_text(entity):
-    # Combine entity information for embedding
-    text_parts = [
-        f"Entity: {entity.name}",
-        f"Type: {entity.type}",
-        f"Description: {entity.attributes.get('description', '')}"
-    ]
-    
-    # Add context from related facts
-    if entity.related_facts:
-        fact_texts = [fact.content for fact in entity.related_facts[:3]]
-        text_parts.extend(fact_texts)
-    
-    return " | ".join(text_parts)
-```
+**Approach**: Combine entity information into comprehensive text for embedding generation.
+
+**Text Components**:
+- Entity name and type information
+- Description from entity attributes
+- Context from related facts (up to 3 most relevant)
+- Pipe-separated format for structured representation
 
 ### Entity Similarity Search
-```python
-async def search_similar_entities(query_embedding, limit=10, threshold=0.3):
-    # Manual similarity calculation for Neo4j stored embeddings
-    query = """
-    MATCH (e:Entity)
-    WHERE e.embedding IS NOT NULL
-    WITH e, gds.similarity.cosine(e.embedding, $query_embedding) AS similarity
-    WHERE similarity >= $threshold
-    RETURN e.id, e.name, e.type, similarity
-    ORDER BY similarity DESC
-    LIMIT $limit
-    """
-    
-    results = await neo4j_storage.execute_query(query, {
-        "query_embedding": query_embedding,
-        "threshold": threshold,
-        "limit": limit
-    })
-    
-    return results
-```
+**Approach**: Search for similar entities using cosine similarity calculation on stored embeddings.
+
+**Process**:
+1. **Query Execution**: Find entities with non-null embeddings in Neo4j
+2. **Similarity Calculation**: Use cosine similarity between query and entity embeddings
+3. **Threshold Filtering**: Return only entities above similarity threshold (default 0.3)
+4. **Result Ranking**: Order results by similarity score in descending order
+5. **Limit Application**: Return top N results (default 10)
 
 ## Chunking for Embeddings
 
 ### Content-Aware Chunking
-```python
-def create_embedding_chunks(content, content_type, metadata):
-    if content_type in ["audio", "video"]:
-        # Line-based chunking for transcripts
-        chunks = content.split('\n')
-        chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
-    
-    elif content_type == "document":
-        # Semantic chunking for documents
-        chunks = semantic_chunker.chunk(
-            text=content,
-            max_chunk_size=4000,
-            min_chunk_size=1000
-        )
-    
-    else:
-        # Default size-based chunking
-        chunks = size_based_chunker.chunk(
-            text=content,
-            chunk_size=4000,
-            overlap=200
-        )
-    
-    return chunks
-```
+**Strategy**: Apply different chunking approaches based on content type for optimal embedding generation.
+
+**Chunking Methods**:
+- **Audio/Video**: Line-based chunking for transcripts, split by newlines and filter empty chunks
+- **Documents**: Semantic chunking with 4000 max size, 1000 min size for coherent content blocks
+- **Default**: Size-based chunking with 4000 character chunks and 200 character overlap
 
 ### Chunk Metadata Enhancement
-```python
-def enhance_chunk_metadata(chunk, chunk_index, document_metadata):
-    enhanced_metadata = {
-        "chunk_index": chunk_index,
-        "chunk_size": len(chunk),
-        "document_id": document_metadata["document_id"],
-        "content_type": document_metadata["content_type"],
-        "source_file": document_metadata["source_file"],
-        "language": document_metadata.get("language", "en"),
-        "processing_timestamp": datetime.now().isoformat()
-    }
-    
-    # Add content-specific metadata
-    if document_metadata["content_type"] == "audio":
-        enhanced_metadata.update({
-            "speaker_info": extract_speaker_info(chunk),
-            "timestamp_range": extract_timestamp_range(chunk)
-        })
-    elif document_metadata["content_type"] == "document":
-        enhanced_metadata.update({
-            "page_number": extract_page_number(chunk),
-            "section_title": extract_section_title(chunk)
-        })
-    
-    return enhanced_metadata
-```
+**Purpose**: Enrich chunk metadata with content-specific information for better retrieval and context.
+
+**Base Metadata**:
+- Chunk index, size, document ID, content type, source file
+- Language information and processing timestamp
+
+**Content-Specific Enhancements**:
+- **Audio Content**: Speaker information and timestamp ranges
+- **Document Content**: Page numbers and section titles
+- **Other Types**: Additional metadata based on content characteristics
 
 ## Vector Storage Operations
 
 ### Qdrant Configuration
-```python
-qdrant_config = {
-    "collection_name": os.getenv("MORAG_QDRANT_COLLECTION", "morag_vectors"),
-    "vector_size": 768,
-    "distance": "Cosine",
-    "on_disk_payload": True,
-    "optimizers_config": {
-        "deleted_threshold": 0.2,
-        "vacuum_min_vector_number": 1000,
-        "default_segment_number": 0,
-        "max_segment_size": None,
-        "memmap_threshold": None,
-        "indexing_threshold": 20000,
-        "flush_interval_sec": 5,
-        "max_optimization_threads": 1
-    }
+```json
+{
+  "collection_name": "morag_vectors",
+  "vector_size": 768,
+  "distance": "Cosine",
+  "on_disk_payload": true,
+  "optimizers_config": {
+    "deleted_threshold": 0.2,
+    "vacuum_min_vector_number": 1000,
+    "default_segment_number": 0,
+    "max_segment_size": null,
+    "memmap_threshold": null,
+    "indexing_threshold": 20000,
+    "flush_interval_sec": 5,
+    "max_optimization_threads": 1
+  }
 }
 ```
 
 ### Storage Operations
-```python
-async def store_vectors(embeddings, metadata_list, collection_name=None):
-    points = []
-    for i, (embedding, metadata) in enumerate(zip(embeddings, metadata_list)):
-        point = {
-            "id": metadata.get("id", str(uuid.uuid4())),
-            "vector": embedding,
-            "payload": metadata
-        }
-        points.append(point)
-    
-    # Batch upsert
-    await qdrant_client.upsert(
-        collection_name=collection_name or default_collection,
-        points=points
-    )
-```
+**Process**: Store embeddings with metadata in vector database using batch operations.
+
+**Steps**:
+1. **Point Creation**: Create vector points with IDs, embeddings, and metadata payloads
+2. **ID Generation**: Use provided IDs or generate UUIDs for new points
+3. **Batch Upsert**: Store multiple points efficiently using batch operations
+4. **Collection Management**: Use specified collection or default collection name
 
 ### Search with Filters
-```python
-async def search_with_filters(query_vector, filters, limit=10):
-    search_filter = Filter(
-        must=[
-            FieldCondition(
-                key=key,
-                match=MatchValue(value=value)
-            )
-            for key, value in filters.items()
-        ]
-    )
-    
-    results = await qdrant_client.search(
-        collection_name=collection_name,
-        query_vector=query_vector,
-        query_filter=search_filter,
-        limit=limit,
-        with_payload=True
-    )
-    
-    return results
-```
+**Approach**: Combine vector similarity search with metadata filtering for precise results.
+
+**Process**:
+1. **Filter Construction**: Create field conditions for each filter criteria
+2. **Query Execution**: Search vectors with combined similarity and metadata filters
+3. **Result Limiting**: Apply limit to control number of returned results
+4. **Payload Inclusion**: Return results with full metadata payloads
 
 ## Performance Monitoring
 
 ### Embedding Generation Metrics
-```python
-embedding_metrics = {
-    "generation_time": "Time to generate embeddings",
-    "batch_efficiency": "Embeddings per second in batch",
-    "api_call_count": "Number of API calls made",
-    "error_rate": "Percentage of failed generations",
-    "cache_hit_rate": "Percentage of cached embeddings used"
-}
-```
+**Key Metrics**:
+- **Generation Time**: Time to generate embeddings
+- **Batch Efficiency**: Embeddings per second in batch processing
+- **API Call Count**: Number of API calls made
+- **Error Rate**: Percentage of failed generations
+- **Cache Hit Rate**: Percentage of cached embeddings used
 
 ### Search Performance Metrics
-```python
-search_metrics = {
-    "search_latency": "Time to complete search",
-    "result_relevance": "Average similarity score of results",
-    "recall_rate": "Percentage of relevant results found",
-    "precision_rate": "Percentage of results that are relevant",
-    "throughput": "Searches per second"
-}
-```
+**Key Metrics**:
+- **Search Latency**: Time to complete search operations
+- **Result Relevance**: Average similarity score of results
+- **Recall Rate**: Percentage of relevant results found
+- **Precision Rate**: Percentage of results that are relevant
+- **Throughput**: Searches per second

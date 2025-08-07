@@ -53,10 +53,7 @@ Document -> DocumentChunk -> Fact -> Entity
 - Any domain-specific type the LLM identifies
 
 ### Entity Normalization
-```python
-normalized_name = entity_name.lower().strip()
-entity_id = f"ent_{md5(normalized_name)[:12]}"
-```
+**Process**: Convert entity names to lowercase, strip whitespace, and generate deterministic IDs using MD5 hash of normalized name (first 12 characters with "ent_" prefix).
 
 ## Relation Extraction
 
@@ -143,19 +140,11 @@ Each fact generates:
 4. **Merge Application**: Update all references to merged entities
 
 ### Deduplication Process
-```python
-# Step 1: Normalize names
-normalized = entity.name.lower().strip()
-
-# Step 2: Find candidates
-candidates = find_similar_entities(normalized, threshold=0.8)
-
-# Step 3: LLM validation
-confirmed_merges = llm_validate_merges(candidates)
-
-# Step 4: Apply merges
-update_entity_references(confirmed_merges)
-```
+**Steps**:
+1. **Name Normalization**: Convert entity names to lowercase and strip whitespace
+2. **Candidate Finding**: Identify similar entities using similarity threshold (0.8)
+3. **LLM Validation**: Use LLM to confirm which entities should be merged
+4. **Merge Application**: Update all entity references to point to canonical entities
 
 ### Cross-Document Deduplication
 - Entities are global across all documents

@@ -8,20 +8,9 @@
 **Max Depth**: 4 hops
 **Bidirectional**: False
 
-```python
-# Configuration
-strategy = ReasoningStrategy(
-    name="forward_chaining",
-    description="Start from query entities and explore forward",
-    max_depth=4,
-    bidirectional=False,
-    use_weights=True
-)
+**Configuration**: Uses ReasoningStrategy with forward chaining enabled, maximum depth of 4 hops, and relationship weights for scoring.
 
-# Example Query: "What products does Apple make?"
-# Starting entities: ["Apple Inc."]
-# Forward exploration: Apple -> MANUFACTURES -> iPhone, iPad, MacBook
-```
+**Example**: For query "What products does Apple make?", starts with "Apple Inc." entity and explores forward through MANUFACTURES relationships to discover iPhone, iPad, MacBook products.
 
 ### 2. Backward Chaining
 **Strategy**: Start from potential answers and work backward to query entities
@@ -29,20 +18,9 @@ strategy = ReasoningStrategy(
 **Max Depth**: 3 hops
 **Bidirectional**: False
 
-```python
-# Configuration
-strategy = ReasoningStrategy(
-    name="backward_chaining",
-    description="Start from potential answers and work backward",
-    max_depth=3,
-    bidirectional=False,
-    use_weights=True
-)
+**Configuration**: Uses ReasoningStrategy with backward chaining enabled, maximum depth of 3 hops, and relationship weights for scoring.
 
-# Example Query: "Who invented the iPhone?"
-# Target entities: ["iPhone"]
-# Backward exploration: iPhone <- INVENTED_BY <- Steve Jobs <- WORKED_AT <- Apple
-```
+**Example**: For query "Who invented the iPhone?", starts with "iPhone" entity and explores backward through INVENTED_BY and WORKED_AT relationships to discover Steve Jobs and Apple connections.
 
 ### 3. Bidirectional Search
 **Strategy**: Search from both query entities and target entities, meet in middle
@@ -50,46 +28,21 @@ strategy = ReasoningStrategy(
 **Max Depth**: 5 hops
 **Bidirectional**: True
 
-```python
-# Configuration
-strategy = ReasoningStrategy(
-    name="bidirectional",
-    description="Search from both ends and meet in the middle",
-    max_depth=5,
-    bidirectional=True,
-    use_weights=True
-)
+**Configuration**: Uses ReasoningStrategy with bidirectional search enabled, maximum depth of 5 hops, and relationship weights for scoring.
 
-# Example Query: "How is Apple's AI research connected to Stanford University?"
-# Start: ["Apple Inc.", "AI research"]
-# Target: ["Stanford University"]
-# Meet in middle: Apple -> PARTNERS_WITH -> Stanford
-```
+**Example**: For query "How is Apple's AI research connected to Stanford University?", starts from both "Apple Inc./AI research" and "Stanford University" entities, exploring until paths meet in the middle through PARTNERS_WITH relationships.
 
 ## Path Selection Algorithm
 
 ### LLM-Based Path Ranking
-```python
-async def select_paths(query, available_paths, strategy):
-    # 1. Create path selection prompt
-    prompt = create_path_selection_prompt(query, available_paths)
-    
-    # 2. Get LLM analysis (temperature=0.1 for consistency)
-    response = await llm_client.generate(
-        prompt=prompt,
-        max_tokens=1000,
-        temperature=0.1
-    )
-    
-    # 3. Parse LLM response to extract selected paths
-    selected_paths = parse_path_selection(response, available_paths)
-    
-    # 4. Apply additional scoring based on strategy
-    scored_paths = await score_paths(query, selected_paths, strategy)
-    
-    # 5. Sort by relevance and return top paths
-    return sorted(scored_paths, key=lambda x: x.relevance_score, reverse=True)
-```
+**Process**: Uses LLM analysis to rank and select the most relevant reasoning paths for a given query.
+
+**Steps**:
+1. **Path Selection Prompt**: Create structured prompt with query and available paths
+2. **LLM Analysis**: Generate response using low temperature (0.1) for consistency, max 1000 tokens
+3. **Response Parsing**: Extract selected paths from LLM response
+4. **Strategy Scoring**: Apply additional scoring based on reasoning strategy
+5. **Ranking**: Sort paths by relevance score in descending order
 
 ### Path Scoring Criteria
 1. **Semantic Relevance**: How well path entities relate to query
@@ -101,31 +54,15 @@ async def select_paths(query, available_paths, strategy):
 ## Iterative Context Refinement
 
 ### Refinement Process
-```python
-async def refine_context(query, initial_context):
-    iteration_count = 0
-    current_context = initial_context
-    
-    while iteration_count < max_iterations:
-        # 1. Analyze current context sufficiency
-        analysis = await analyze_context(query, current_context)
-        
-        # 2. Check if context is sufficient
-        if analysis.is_sufficient and analysis.confidence >= threshold:
-            break
-        
-        # 3. Retrieve additional information based on gaps
-        additional_context = await retrieve_additional(
-            query, analysis.gaps, current_context
-        )
-        
-        # 4. Merge new context with existing
-        current_context = merge_contexts(current_context, additional_context)
-        
-        iteration_count += 1
-    
-    return current_context
-```
+**Purpose**: Iteratively improve context quality until sufficiency threshold is reached.
+
+**Process**:
+1. **Context Analysis**: Analyze current context sufficiency for the query
+2. **Sufficiency Check**: Determine if context meets confidence threshold requirements
+3. **Gap Identification**: Identify missing information types and knowledge gaps
+4. **Additional Retrieval**: Retrieve supplementary information based on identified gaps
+5. **Context Merging**: Combine new context with existing information
+6. **Iteration Control**: Continue until max iterations reached or sufficiency achieved
 
 ### Context Analysis Criteria
 ```json
@@ -145,39 +82,17 @@ async def refine_context(query, initial_context):
 ### Breadth-First Search (BFS)
 **Use Case**: Finding all entities within a specific distance
 **Pattern**: Explore all neighbors at distance 1, then distance 2, etc.
-
-```cypher
-MATCH (start:Entity {id: $entity_id})
-MATCH path = (start)-[r*1..3]-(neighbor:Entity)
-WHERE start <> neighbor
-RETURN DISTINCT neighbor, length(path) as distance
-ORDER BY distance, neighbor.name
-```
+**Implementation**: Uses graph traversal to find distinct neighbors within specified hop distance, ordered by distance and name.
 
 ### Depth-First Search (DFS)
 **Use Case**: Following specific relationship chains
 **Pattern**: Follow one path deeply before exploring alternatives
-
-```cypher
-MATCH path = (start:Entity {id: $entity_id})-[r*1..4]-(end:Entity)
-WHERE start <> end
-RETURN path, nodes(path) as entities, relationships(path) as relations
-ORDER BY length(path)
-```
+**Implementation**: Traverses paths from start entity to end entities, returning complete path information including nodes and relationships, ordered by path length.
 
 ### Shortest Path Finding
 **Use Case**: Finding most direct connections between entities
-**Pattern**: Use Neo4j's shortestPath algorithm
-
-```cypher
-MATCH (source:Entity {id: $source_id}), (target:Entity {id: $target_id})
-MATCH path = shortestPath((source)-[r*1..5]-(target))
-RETURN path,
-       length(path) as path_length,
-       [node in nodes(path) | {id: node.id, name: node.name, type: node.type}] as entities,
-       [rel in relationships(path) | {type: rel.type, confidence: rel.confidence}] as relationships
-ORDER BY path_length
-```
+**Pattern**: Use graph database shortest path algorithms
+**Implementation**: Finds shortest paths between source and target entities within specified hop limits, returning path details including entity and relationship information, ordered by path length.
 
 ## Intelligent Retrieval Workflow
 
@@ -191,64 +106,24 @@ ORDER BY path_length
 7. **Response Synthesis**: Generate final answer with citations
 
 ### Entity Identification Service
-```python
-async def identify_entities(query):
-    # Extract entities using NER and entity linking
-    entities = await extract_entities(query)
-    
-    # Link to knowledge graph entities
-    linked_entities = []
-    for entity in entities:
-        graph_entity = await find_graph_entity(entity.name)
-        if graph_entity:
-            linked_entities.append(graph_entity)
-    
-    return linked_entities
-```
+**Purpose**: Extract and link entities from user queries to knowledge graph entities.
+
+**Process**:
+1. **Entity Extraction**: Use NER (Named Entity Recognition) to identify entities in query text
+2. **Entity Linking**: Match extracted entities to existing knowledge graph entities
+3. **Graph Lookup**: Find corresponding graph entities by name matching
+4. **Result Compilation**: Return list of linked entities for further processing
 
 ### Recursive Path Following
-```python
-async def follow_paths_recursively(query, initial_entities, max_iterations):
-    iterations = []
-    current_entities = set(initial_entities)
-    
-    for i in range(max_iterations):
-        # Make LLM decision about which paths to follow
-        path_decision = await make_path_decision(query, current_entities, i)
-        
-        # Follow selected paths
-        new_entities = set()
-        paths_followed = []
-        
-        for entity in path_decision.entities_to_explore:
-            neighbors = await find_neighbors(entity, max_distance=1)
-            new_entities.update([n.id for n in neighbors])
-            
-            # Record path information
-            for neighbor in neighbors:
-                path = await find_shortest_path(entity, neighbor.id)
-                if path:
-                    paths_followed.append(path)
-        
-        # Record iteration
-        iteration = RetrievalIteration(
-            iteration_number=i,
-            entities_explored=list(path_decision.entities_to_explore),
-            new_entities_found=list(new_entities - current_entities),
-            paths_followed=paths_followed,
-            reasoning=path_decision.reasoning
-        )
-        iterations.append(iteration)
-        
-        # Update current entities
-        current_entities.update(new_entities)
-        
-        # Check if we should continue
-        if not path_decision.should_continue:
-            break
-    
-    return iterations
-```
+**Purpose**: Iteratively explore graph paths based on LLM decisions until termination criteria met.
+
+**Process**:
+1. **Path Decision**: Use LLM to decide which entities to explore in current iteration
+2. **Neighbor Discovery**: Find neighboring entities within specified distance
+3. **Path Recording**: Track shortest paths between explored entities and neighbors
+4. **Iteration Tracking**: Record exploration details including entities, paths, and reasoning
+5. **Entity Expansion**: Add newly discovered entities to current entity set
+6. **Termination Check**: Continue until max iterations or LLM decides to stop
 
 ## Decision Making Patterns
 
@@ -260,21 +135,21 @@ async def follow_paths_recursively(query, initial_entities, max_iterations):
 5. **Diminishing Returns**: Stop when new information becomes sparse
 
 ### LLM Decision Prompts
-```
-Given the current exploration state, decide which entities to explore next.
+**Template Structure**: Provides current exploration state and asks LLM to decide next exploration steps.
 
-Query: {query}
-Current Entities: {entities}
-Iteration: {iteration_number}
+**Input Context**:
+- Current query being processed
+- Set of currently known entities
+- Current iteration number
+- Exploration history and context
 
-Consider:
-1. Which entities are most likely to lead to query-relevant information?
-2. Should we explore broadly (many entities) or deeply (fewer entities)?
-3. Have we gathered sufficient information to answer the query?
-4. What is the expected value of continuing exploration?
+**Decision Criteria**:
+1. **Relevance Assessment**: Which entities most likely lead to query-relevant information
+2. **Exploration Strategy**: Whether to explore broadly (many entities) or deeply (fewer entities)
+3. **Sufficiency Evaluation**: Whether sufficient information has been gathered
+4. **Value Analysis**: Expected value of continuing exploration vs. stopping
 
-Return decision with reasoning.
-```
+**Output Requirements**: Decision with detailed reasoning for transparency and debugging.
 
 ## Performance Optimization
 
