@@ -469,31 +469,113 @@ User Question: "{user_query}"
 Relevant Facts:
 {context}
 
-Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from the facts. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}
+CRITICAL CITATION REQUIREMENTS:
+1. You MUST use ALL references provided in the references section below
+2. When referencing information from the facts, use the exact reference format shown in the source information
+3. For example, if a fact shows "Source: [8, page 4, chapter 3]", use exactly "[8, page 4, chapter 3]" in your answer
+4. If a fact shows "Source: [5, 3:23]", use exactly "[5, 3:23]" in your answer
+5. Always include the metadata (page numbers, timestamps, chapters, etc.) in your citations
+6. Every reference number from the references section must appear at least once in your answer text
+7. Your answer must end with the complete references section listing all source documents
 
-IMPORTANT CITATION INSTRUCTIONS:
-- When referencing information from the facts, use the exact reference format shown in the source information
-- For example, if a fact shows "Source: [8, page 4, chapter 3]", use exactly "[8, page 4, chapter 3]" in your answer
-- If a fact shows "Source: [5, 3:23]", use exactly "[5, 3:23]" in your answer
-- Always include the metadata (page numbers, timestamps, chapters, etc.) in your citations
-- Your answer must end with a references section listing all source documents
+Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from ALL the facts provided. Make sure to cite information from each source document. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}
 
-Include the references section exactly as provided below:
+MANDATORY: Your response must end with exactly this references section:
 {references_section}"""
         
         try:
             # Use the stronger LLM for final synthesis
             response = await self.stronger_llm_client.generate(prompt)
-            
+
+            # Verify that all references are used in the response
+            response = self._ensure_all_references_used(response, document_to_ref_num, final_facts, user_query, language)
+
             # Calculate confidence based on fact scores and coverage
             avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(final_facts)
             confidence_score = min(1.0, avg_score * (len(final_facts) / 10))  # Boost confidence with more facts
-            
+
             return response, confidence_score
             
         except Exception as e:
             self.logger.error("Failed to generate final answer", error=str(e))
             return f"An error occurred while generating the final answer: {str(e)}", 0.0
+
+    def _ensure_all_references_used(
+        self,
+        response: str,
+        document_to_ref_num: dict,
+        final_facts: List[FinalFact],
+        user_query: str,
+        language: Optional[str] = None
+    ) -> str:
+        """Ensure all references are used in the response text."""
+        import re
+
+        # Find which references are actually used in the response
+        used_refs = set()
+        for ref_num in document_to_ref_num.values():
+            # Look for reference patterns like [1], [1, page 5], [1, 2:30], etc.
+            pattern = rf'\[{ref_num}(?:[^\]]*)\]'
+            if re.search(pattern, response):
+                used_refs.add(ref_num)
+
+        # Find unused references
+        all_refs = set(document_to_ref_num.values())
+        unused_refs = all_refs - used_refs
+
+        if not unused_refs:
+            # All references are used, return as is
+            return response
+
+        # Find facts from unused references and add them to the response
+        unused_facts = []
+        for fact in final_facts:
+            doc_name = fact.source_metadata.document_name
+            ref_num = document_to_ref_num.get(doc_name)
+            if ref_num in unused_refs:
+                unused_facts.append((fact, ref_num))
+
+        if unused_facts:
+            # Add a section with the unused facts
+            additional_info = []
+
+            # Group facts by reference
+            ref_to_facts = {}
+            for fact, ref_num in unused_facts:
+                if ref_num not in ref_to_facts:
+                    ref_to_facts[ref_num] = []
+                ref_to_facts[ref_num].append(fact)
+
+            for ref_num in sorted(ref_to_facts.keys()):
+                facts_for_ref = ref_to_facts[ref_num]
+                for fact in facts_for_ref:
+                    # Create proper citation with metadata
+                    source_parts = [str(ref_num)]
+
+                    # Add metadata to the citation
+                    if hasattr(fact.source_metadata, 'page_number') and fact.source_metadata.page_number:
+                        source_parts.append(f"page {fact.source_metadata.page_number}")
+                    if hasattr(fact.source_metadata, 'chapter') and fact.source_metadata.chapter:
+                        source_parts.append(f"chapter {fact.source_metadata.chapter}")
+                    if hasattr(fact.source_metadata, 'timestamp') and fact.source_metadata.timestamp:
+                        source_parts.append(str(fact.source_metadata.timestamp))
+
+                    citation = f"[{', '.join(source_parts)}]"
+                    additional_info.append(f"{fact.fact_text} {citation}")
+
+            # Insert additional information before the references section
+            if "**References:**" in response:
+                # Insert before references
+                parts = response.split("**References:**")
+                if len(parts) == 2:
+                    additional_section = "\n\nAdditional relevant information:\n" + "\n".join(f"- {info}" for info in additional_info)
+                    response = parts[0].rstrip() + additional_section + "\n\n**References:**" + parts[1]
+            else:
+                # Append at the end
+                additional_section = "\n\nAdditional relevant information:\n" + "\n".join(f"- {info}" for info in additional_info)
+                response += additional_section
+
+        return response
     
     def _create_error_response(
         self,
