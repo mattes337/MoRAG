@@ -3,175 +3,133 @@
 ## Audio Files (.mp3, .wav, .m4a, .flac, .aac, .ogg)
 
 ### Structure
-```markdown
-# Audio Transcription: filename.mp3
+Audio files are converted to structured markdown with the following components:
 
-## Audio Information
-- **Duration**: 5.2 minutes
-- **Speakers Detected**: 2
-- **Topics Identified**: 3
-- **Speaker Diarization**: Yes
-- **Topic Segmentation**: Yes
+**Header Section**: Contains the title "Audio Transcription: filename.ext"
 
-# Introduction [0]
-SPEAKER_00: Welcome to today's discussion about artificial intelligence.
-SPEAKER_01: Thank you for having me on the show.
+**Audio Information Section**: Includes metadata such as duration, number of speakers detected, number of topics identified, and whether speaker diarization and topic segmentation are enabled.
 
-# Technology Overview [45]
-SPEAKER_00: Let's start with the basics of machine learning.
-SPEAKER_01: Machine learning is a subset of artificial intelligence.
-SPEAKER_00: It enables computers to learn without explicit programming.
+**Content Structure**: The main content is organized by topics when topic segmentation is enabled, or as a continuous transcript when disabled. Each topic section has a header with the topic name and timestamp in seconds (e.g., "# Introduction [0]").
 
-# Future Implications [120]
-SPEAKER_01: The future of AI looks very promising.
-SPEAKER_00: We're seeing applications in healthcare and education.
-```
+**Line Format**: Each line contains a timestamp in [MM:SS] or [HH:MM:SS] format, followed by the speaker identifier (SPEAKER_00, SPEAKER_01, etc.), and then the spoken text. The format is: [timecode][speaker] text
+
+**Timestamp Format**: Timestamps use the format [MM:SS] for content under one hour, or [HH:MM:SS] for longer content. Examples: [02:15], [01:23:45]. The timestamp represents the start time of that particular utterance or segment.
 
 ### Key Requirements
-- Topic headers with single timestamp in seconds: `# Topic [timestamp]`
-- Speaker labels: `SPEAKER_00:`, `SPEAKER_01:`, etc.
-- One line per speaker utterance
-- No separate transcript sections
-- Timestamps mark topic boundaries, not individual lines
+- Topic headers with single timestamp in seconds when topic segmentation is enabled: `# Topic Name [timestamp_in_seconds]`
+- Each line includes individual timestamps for precise timing in [MM:SS] or [HH:MM:SS] format
+- Speaker labels: SPEAKER_00, SPEAKER_01, etc. when speaker diarization is enabled
+- Line format: `[timecode][speaker] text` when both features enabled, `[timecode] text` when only timestamps
+- One line per speaker utterance or logical speech segment
+- No separate transcript sections - all content is integrated into the topic structure
+- Timestamps mark both topic boundaries (in headers) and individual utterances (per line)
+
+### Structure Variants
+
+**With Speaker Diarization and Topic Segmentation Enabled**:
+Content is organized by topics with headers containing timestamps in seconds. Each line includes individual timestamps and speaker identification in the format `[MM:SS][SPEAKER_XX] text` or `[HH:MM:SS][SPEAKER_XX] text`.
+
+**With Speaker Diarization Only (No Topic Segmentation)**:
+Content flows continuously without topic headers. Each line includes timestamps and speaker identification in the format `[MM:SS][SPEAKER_XX] text` or `[HH:MM:SS][SPEAKER_XX] text`.
+
+**With Topic Segmentation Only (No Speaker Diarization)**:
+Content is organized by topics with headers containing timestamps in seconds. Lines contain only timestamps and text in the format `[MM:SS] text` or `[HH:MM:SS] text`.
+
+**With Neither Feature Enabled**:
+Content flows as a simple timestamped transcript with lines in the format `[MM:SS] text` or `[HH:MM:SS] text`, without topic organization or speaker identification.
 
 ## Video Files (.mp4, .avi, .mov, .mkv, .webm)
 
 ### Structure
-```markdown
-# Video Analysis: filename.mp4
+Video files follow the same transcription format as audio files, with additional video-specific metadata.
 
-## Video Information
-- **Duration**: 8.5 minutes
-- **Resolution**: 1920x1080
-- **Audio Tracks**: 1
-- **Speakers Detected**: 1
+**Header Section**: Contains the title "Video Analysis: filename.ext"
 
-# Introduction [0]
-SPEAKER_00: Today we'll explore the fundamentals of neural networks.
-SPEAKER_00: This presentation covers basic concepts and applications.
+**Video Information Section**: Includes video-specific metadata such as duration, resolution, audio tracks, number of speakers detected, and processing options enabled.
 
-# Neural Network Basics [90]
-SPEAKER_00: A neural network consists of interconnected nodes.
-SPEAKER_00: Each node processes information and passes it forward.
-
-# Applications [300]
-SPEAKER_00: Neural networks are used in image recognition.
-SPEAKER_00: They're also essential for natural language processing.
-```
+**Content Structure**: Identical to audio files - organized by topics when topic segmentation is enabled, or as continuous transcript when disabled. Audio content from the video is formatted with the same timestamp and speaker structure.
 
 ### Key Requirements
 - Same format as audio for transcript sections
-- Video-specific metadata in information section
-- Audio content formatted as topics with timestamps
-- Speaker-labeled dialogue format
+- Video-specific metadata in information section (resolution, audio tracks, etc.)
+- Audio content formatted identically to audio files
+- Same `[timecode][speaker] text` format for dialogue when both features enabled
+- Same structure variants apply as for audio files
+
+### Structure Variants
+
+**With Speaker Diarization and Topic Segmentation Enabled**:
+Content is organized by topics with headers containing timestamps in seconds. Each line includes individual timestamps and speaker identification in the format `[MM:SS][SPEAKER_XX] text` or `[HH:MM:SS][SPEAKER_XX] text`.
+
+**With Speaker Diarization Only (No Topic Segmentation)**:
+Content flows continuously without topic headers. Each line includes timestamps and speaker identification in the format `[MM:SS][SPEAKER_XX] text` or `[HH:MM:SS][SPEAKER_XX] text`.
+
+**With Topic Segmentation Only (No Speaker Diarization)**:
+Content is organized by topics with headers containing timestamps in seconds. Lines contain only timestamps and text in the format `[MM:SS] text` or `[HH:MM:SS] text`.
+
+**With Neither Feature Enabled**:
+Content flows as a simple timestamped transcript with lines in the format `[MM:SS] text` or `[HH:MM:SS] text`, without topic organization or speaker identification.
 
 ## Document Files (.pdf, .docx, .txt, .md)
 
 ### Structure
-```markdown
-# Document: filename.pdf
+Document files are converted to structured markdown preserving the original document hierarchy and formatting.
 
-## Document Information
-- **Pages**: 15
-- **Word Count**: 3,500
-- **Document Type**: Research Paper
-- **Language**: English
+**Header Section**: Contains the title "Document: filename.ext"
 
-## Chapter 1: Introduction
+**Document Information Section**: Includes metadata such as page count, word count, document type, and language.
 
-This chapter introduces the fundamental concepts of machine learning and artificial intelligence. The field has evolved significantly over the past decade.
-
-### Section 1.1: Background
-
-Machine learning algorithms have become increasingly sophisticated. They now power many applications we use daily.
-
-## Chapter 2: Methodology
-
-The research methodology employed in this study follows established protocols. Data collection occurred over six months.
-
-### Section 2.1: Data Collection
-
-Participants were recruited from three universities. The sample size was 150 individuals.
-```
+**Content Structure**: Preserves the original document structure including chapters, sections, and subsections. Hierarchical headings are maintained using appropriate markdown heading levels. Paragraphs are kept intact to preserve readability and context.
 
 ### Key Requirements
-- Preserve original document structure (chapters, sections)
-- Maintain hierarchical headings
-- Keep paragraphs intact
+- Preserve original document structure (chapters, sections, subsections)
+- Maintain hierarchical headings using appropriate markdown levels
+- Keep paragraphs intact to preserve context and readability
 - Include page/chapter metadata where available
+- Maintain formatting elements like lists, tables, and emphasis
 
 ## Image Files (.jpg, .png, .gif, .bmp, .tiff)
 
 ### Structure
-```markdown
-# Image Analysis: filename.jpg
+Image files are analyzed and converted to structured markdown containing visual analysis, text extraction, and metadata.
 
-## Image Information
-- **Dimensions**: 1920x1080
-- **File Size**: 2.3 MB
-- **Format**: JPEG
-- **Color Space**: RGB
+**Header Section**: Contains the title "Image Analysis: filename.ext"
 
-## Visual Content
+**Image Information Section**: Includes technical metadata such as dimensions, file size, format, and color space.
 
-The image shows a modern office environment with multiple workstations. There are approximately 12 people working at computers. The lighting is natural, coming from large windows on the left side.
+**Visual Content Section**: Contains a descriptive analysis of the visual elements in the image, including objects, people, settings, lighting, and composition.
 
-## Text Content (OCR)
+**Text Content (OCR) Section**: Contains any text extracted from the image using optical character recognition, presented as quoted strings or structured text.
 
-"Welcome to TechCorp"
-"Innovation Through Technology"
-"Established 2010"
-
-## Objects Detected
-
-- Computers: 12
-- Chairs: 15
-- Desks: 6
-- Windows: 4
-- People: 12
-```
+**Objects Detected Section**: Lists detected objects with counts or descriptions, typically generated by computer vision analysis.
 
 ### Key Requirements
-- Descriptive visual content analysis
-- OCR text extraction in separate section
-- Object detection results
-- Technical metadata
+- Descriptive visual content analysis covering all significant elements
+- OCR text extraction in a separate, clearly marked section
+- Object detection results with counts or descriptions
+- Technical metadata including file properties
+- Clear separation between different types of analysis
 
 ## Web Content (.html, .url)
 
 ### Structure
-```markdown
-# Web Page: page-title
+Web content is extracted and converted to clean, structured markdown preserving the original article hierarchy.
 
-## Page Information
-- **URL**: https://example.com/article
-- **Title**: Article Title
-- **Author**: John Doe
-- **Published**: 2024-01-15
-- **Word Count**: 1,200
+**Header Section**: Contains the title "Web Page: page-title" where page-title is extracted from the HTML title tag or main heading.
 
-## Main Content
+**Page Information Section**: Includes web-specific metadata such as URL, title, author, publication date, and word count.
 
-The main article content appears here, cleaned of navigation elements and advertisements. Paragraphs are preserved as they appear in the original.
+**Main Content Section**: Contains the primary article content with navigation elements, advertisements, and extraneous content removed. The original paragraph structure and formatting are preserved.
 
-### Subsection Title
+**Subsection Structure**: Subsections maintain their hierarchical structure using appropriate markdown heading levels, following the same formatting rules as document processing.
 
-Subsection content follows the same formatting rules as document processing.
+**Links Section**: Contains important links extracted from the content, presented as a bulleted list with descriptive text and URLs.
 
-## Links
-
-- [Related Article](https://example.com/related)
-- [External Reference](https://external.com/ref)
-
-## Metadata
-
-- **Last Modified**: 2024-01-20
-- **Language**: en
-- **Keywords**: technology, innovation, AI
-```
+**Metadata Section**: Additional metadata such as last modified date, language, keywords, and other relevant information.
 
 ### Key Requirements
-- Clean content extraction (no navigation/ads)
-- Preserve article structure
-- Extract and list important links
-- Include web-specific metadata
+- Clean content extraction removing navigation, advertisements, and non-content elements
+- Preserve original article structure and hierarchy
+- Extract and list important links in a separate section
+- Include comprehensive web-specific metadata
+- Maintain readability and formatting of the original content

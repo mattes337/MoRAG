@@ -4,26 +4,36 @@
 
 ### Strategy: Line-Based Topic Chunking
 **Rule**: Always split by line, never inside a line
-**Rationale**: Each line represents a speaker utterance with timestamp context
+**Rationale**: Each line represents a speaker utterance with precise timestamp context
 
-```markdown
-# Introduction [0]
-SPEAKER_00: Welcome to today's discussion.
-SPEAKER_01: Thank you for having me.
+**Content Format**: Audio and video content uses the format `[timecode][speaker] text` when both speaker diarization and topic segmentation are enabled. Lines may also be `[timecode] text` when only timestamps are available.
 
-# Main Topic [45]  
-SPEAKER_00: Let's discuss machine learning.
-SPEAKER_01: It's a fascinating field.
-```
+**Topic Organization**: When topic segmentation is enabled, content is organized under topic headers with timestamps in seconds (e.g., `# Introduction [0]`). When disabled, content flows continuously.
 
-**Chunking Result**:
-- Chunk 1: "SPEAKER_00: Welcome to today's discussion.\nSPEAKER_01: Thank you for having me."
-- Chunk 2: "SPEAKER_00: Let's discuss machine learning.\nSPEAKER_01: It's a fascinating field."
+**Chunking Approach**:
+- **With Topic Segmentation**: Split primarily at topic boundaries, keeping complete topics together when possible
+- **Without Topic Segmentation**: Split at natural speaker turn boundaries or logical speech segments
+- **Line Preservation**: Never split within a line to maintain timestamp and speaker context integrity
+
+### Format Variants and Chunking
+
+**With Speaker Diarization and Topic Segmentation**:
+Content organized by topics with speaker-identified lines. Chunk at topic boundaries first, then at speaker turn boundaries if size limits require.
+
+**With Speaker Diarization Only**:
+Continuous content with speaker identification. Chunk at natural speaker turn boundaries or conversation breaks.
+
+**With Topic Segmentation Only**:
+Content organized by topics without speaker identification. Chunk primarily at topic boundaries.
+
+**With Neither Feature**:
+Simple timestamped transcript. Chunk at natural speech pauses or logical content breaks while preserving line integrity.
 
 **Configuration**:
-- chunk_strategy: "topic_based"
+- chunk_strategy: "topic_based" (when topics available) or "line_based" (when topics disabled)
 - preserve_speaker_turns: true
-- include_topic_headers: true
+- include_topic_headers: true (when available)
+- preserve_timestamps: true
 - max_chunk_size: 4000 characters
 - respect_line_boundaries: true
 
