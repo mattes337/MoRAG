@@ -12,6 +12,7 @@ This module handles the complete ingestion flow including:
 import json
 import asyncio
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timezone
@@ -353,7 +354,7 @@ class IngestionCoordinator:
             content: Text content to chunk
             chunk_size: Maximum chunk size
             chunk_overlap: Overlap between chunks
-            content_type: Type of content (audio, video, document, etc.)
+            content_type: Type of content (audio, video, document, image, web, text, code, archive)
             metadata: Additional metadata for chunking decisions
 
         Returns:
@@ -362,13 +363,33 @@ class IngestionCoordinator:
         if len(content) <= chunk_size:
             return [content]
 
-        # Use topic-based chunking for audio/video content
+        # Use topic-based chunking for audio/video content (line-based with topic awareness)
         if content_type in ['audio', 'video'] and metadata:
             return self._create_topic_based_chunks(content, chunk_size, chunk_overlap, metadata)
 
-        # Use document-aware chunking for documents
+        # Use chapter/page-aware semantic chunking for documents
         elif content_type == 'document':
             return self._create_document_chunks(content, chunk_size, chunk_overlap)
+
+        # Use section-based chunking for images
+        elif content_type == 'image':
+            return self._create_image_section_chunks(content, chunk_size, chunk_overlap)
+
+        # Use article structure chunking for web content
+        elif content_type == 'web':
+            return self._create_web_article_chunks(content, chunk_size, chunk_overlap)
+
+        # Use paragraph-based semantic chunking for text files
+        elif content_type == 'text':
+            return self._create_text_semantic_chunks(content, chunk_size, chunk_overlap)
+
+        # Use function/class boundary chunking for code files
+        elif content_type == 'code':
+            return self._create_code_structural_chunks(content, chunk_size, chunk_overlap)
+
+        # Use file-based chunking for archive content
+        elif content_type == 'archive':
+            return self._create_archive_file_chunks(content, chunk_size, chunk_overlap)
 
         # Fallback to character-based chunking with word boundaries
         return self._create_character_chunks(content, chunk_size, chunk_overlap)
@@ -491,6 +512,384 @@ class IngestionCoordinator:
             result_chunks.append(full_chunk)
 
         return result_chunks
+
+    def _create_image_section_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks based on content sections for image analysis.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of text chunks split by sections
+        """
+        # Look for section headers in image content
+        section_pattern = r'^##\s+(.+?)(?=\n##|\Z)'
+        sections = re.split(r'^##\s+', content, flags=re.MULTILINE)
+
+        if len(sections) <= 1:
+            # No sections found, fall back to character chunking
+            return self._create_character_chunks(content, chunk_size, chunk_overlap)
+
+        chunks = []
+        current_chunk = ""
+
+        # Process each section
+        for i, section in enumerate(sections):
+            if not section.strip():
+                continue
+
+            # Add section header back (except for first empty split)
+            if i > 0:
+                section_lines = section.strip().split('\n', 1)
+                if len(section_lines) > 1:
+                    section_header = f"## {section_lines[0]}"
+                    section_content = section_lines[1]
+                    full_section = f"{section_header}\n{section_content}"
+                else:
+                    full_section = f"## {section.strip()}"
+            else:
+                full_section = section.strip()
+
+            # Check if adding this section would exceed chunk size
+            if current_chunk and len(current_chunk) + len(full_section) + 2 > chunk_size:
+                # Save current chunk and start new one
+                if current_chunk.strip():
+                    chunks.append(current_chunk.strip())
+                current_chunk = full_section
+            else:
+                # Add to current chunk
+                if current_chunk:
+                    current_chunk += f"\n\n{full_section}"
+                else:
+                    current_chunk = full_section
+
+        # Add final chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # If any chunk is still too large, split it further
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) > chunk_size:
+                # Split large chunks while preserving structure
+                sub_chunks = self._create_character_chunks(chunk, chunk_size, chunk_overlap)
+                final_chunks.extend(sub_chunks)
+            else:
+                final_chunks.append(chunk)
+
+        return final_chunks
+
+    def _create_web_article_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks based on article structure for web content.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of text chunks following article hierarchy
+        """
+        # Look for hierarchical headers (##, ###, etc.)
+        header_pattern = r'^(#{2,})\s+(.+?)$'
+        lines = content.split('\n')
+
+        chunks = []
+        current_chunk = ""
+        current_section = ""
+
+        for line in lines:
+            header_match = re.match(header_pattern, line)
+
+            if header_match:
+                # Found a header
+                header_level = len(header_match.group(1))
+                header_text = header_match.group(2)
+
+                # If we have content and this is a major section (## level), start new chunk
+                if current_chunk.strip() and header_level == 2:
+                    chunks.append(current_chunk.strip())
+                    current_chunk = line
+                else:
+                    # Add header to current chunk
+                    if current_chunk:
+                        current_chunk += f"\n{line}"
+                    else:
+                        current_chunk = line
+            else:
+                # Regular content line
+                if current_chunk:
+                    current_chunk += f"\n{line}"
+                else:
+                    current_chunk = line
+
+                # Check if chunk is getting too large
+                if len(current_chunk) > chunk_size:
+                    # Find a good break point (paragraph boundary)
+                    paragraphs = current_chunk.split('\n\n')
+                    if len(paragraphs) > 1:
+                        # Keep all but the last paragraph in current chunk
+                        chunk_content = '\n\n'.join(paragraphs[:-1])
+                        chunks.append(chunk_content.strip())
+                        current_chunk = paragraphs[-1]
+                    else:
+                        # No paragraph breaks, split at sentence boundaries
+                        sentences = current_chunk.split('. ')
+                        if len(sentences) > 1:
+                            chunk_content = '. '.join(sentences[:-1]) + '.'
+                            chunks.append(chunk_content.strip())
+                            current_chunk = sentences[-1]
+
+        # Add final chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # Post-process: merge very small chunks and split very large ones
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) < 200 and final_chunks:  # Merge small chunks
+                final_chunks[-1] += f"\n\n{chunk}"
+            elif len(chunk) > chunk_size * 1.5:  # Split very large chunks
+                sub_chunks = self._create_character_chunks(chunk, chunk_size, chunk_overlap)
+                final_chunks.extend(sub_chunks)
+            else:
+                final_chunks.append(chunk)
+
+        return final_chunks
+
+    def _create_text_semantic_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks using paragraph boundaries and semantic analysis for text files.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of text chunks with semantic boundaries
+        """
+        # Split by paragraphs first
+        paragraphs = content.split('\n\n')
+
+        chunks = []
+        current_chunk = ""
+
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+
+            # Check if adding this paragraph would exceed chunk size
+            if current_chunk and len(current_chunk) + len(paragraph) + 2 > chunk_size:
+                # Save current chunk
+                if current_chunk.strip():
+                    chunks.append(current_chunk.strip())
+                current_chunk = paragraph
+            else:
+                # Add paragraph to current chunk
+                if current_chunk:
+                    current_chunk += f"\n\n{paragraph}"
+                else:
+                    current_chunk = paragraph
+
+        # Add final chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # Handle chunks that are still too large by splitting at sentence boundaries
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) > chunk_size:
+                # Split at sentence boundaries
+                sentences = re.split(r'(?<=[.!?])\s+', chunk)
+                sub_chunk = ""
+
+                for sentence in sentences:
+                    if sub_chunk and len(sub_chunk) + len(sentence) + 1 > chunk_size:
+                        if sub_chunk.strip():
+                            final_chunks.append(sub_chunk.strip())
+                        sub_chunk = sentence
+                    else:
+                        if sub_chunk:
+                            sub_chunk += f" {sentence}"
+                        else:
+                            sub_chunk = sentence
+
+                if sub_chunk.strip():
+                    final_chunks.append(sub_chunk.strip())
+            else:
+                final_chunks.append(chunk)
+
+        return final_chunks
+
+    def _create_code_structural_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks based on function/class boundaries for code files.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of text chunks preserving code structure
+        """
+        lines = content.split('\n')
+        chunks = []
+        current_chunk = ""
+        current_function = ""
+        indent_level = 0
+
+        # Patterns for different languages
+        function_patterns = [
+            r'^\s*(def\s+\w+.*?:)',  # Python functions
+            r'^\s*(function\s+\w+.*?\{)',  # JavaScript functions
+            r'^\s*(class\s+\w+.*?[:{])',  # Class definitions
+            r'^\s*(public|private|protected)?\s*(static\s+)?\w+\s+\w+\s*\([^)]*\)\s*\{',  # Java/C# methods
+        ]
+
+        for line in lines:
+            # Check if this line starts a function/class
+            is_function_start = any(re.match(pattern, line) for pattern in function_patterns)
+
+            if is_function_start:
+                # If we have accumulated content and this would make chunk too large, save it
+                if current_chunk and len(current_chunk) + len(current_function) > chunk_size:
+                    if current_chunk.strip():
+                        chunks.append(current_chunk.strip())
+                    current_chunk = current_function
+                    current_function = line
+                else:
+                    # Add previous function to chunk
+                    if current_function:
+                        if current_chunk:
+                            current_chunk += f"\n\n{current_function}"
+                        else:
+                            current_chunk = current_function
+                    current_function = line
+
+                # Track indentation for function end detection
+                indent_level = len(line) - len(line.lstrip())
+            else:
+                # Add line to current function
+                if current_function:
+                    current_function += f"\n{line}"
+                else:
+                    # Standalone line (imports, comments, etc.)
+                    if current_chunk:
+                        current_chunk += f"\n{line}"
+                    else:
+                        current_chunk = line
+
+        # Add final function and chunk
+        if current_function:
+            if current_chunk:
+                current_chunk += f"\n\n{current_function}"
+            else:
+                current_chunk = current_function
+
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # Handle chunks that are still too large
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) > chunk_size * 1.5:
+                # Split large chunks while trying to preserve function boundaries
+                sub_chunks = self._create_character_chunks(chunk, chunk_size, chunk_overlap)
+                final_chunks.extend(sub_chunks)
+            else:
+                final_chunks.append(chunk)
+
+        return final_chunks
+
+    def _create_archive_file_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+        """Create chunks based on file boundaries for archive content.
+
+        Args:
+            content: Text content to chunk
+            chunk_size: Maximum chunk size
+            chunk_overlap: Overlap between chunks
+
+        Returns:
+            List of text chunks split by file boundaries
+        """
+        # Look for file boundary markers (typically added during archive extraction)
+        file_pattern = r'^---\s*File:\s*(.+?)\s*---'
+        sections = re.split(file_pattern, content, flags=re.MULTILINE)
+
+        if len(sections) <= 1:
+            # No file boundaries found, fall back to character chunking
+            return self._create_character_chunks(content, chunk_size, chunk_overlap)
+
+        chunks = []
+        current_chunk = ""
+
+        # Process each file section
+        for i in range(0, len(sections), 2):
+            if i + 1 < len(sections):
+                file_name = sections[i + 1] if i + 1 < len(sections) else "unknown"
+                file_content = sections[i + 2] if i + 2 < len(sections) else ""
+
+                # Create file header
+                file_header = f"--- File: {file_name} ---"
+                full_file = f"{file_header}\n{file_content.strip()}"
+
+                # Check if adding this file would exceed chunk size
+                if current_chunk and len(current_chunk) + len(full_file) + 2 > chunk_size:
+                    # Save current chunk and start new one
+                    if current_chunk.strip():
+                        chunks.append(current_chunk.strip())
+                    current_chunk = full_file
+                else:
+                    # Add to current chunk
+                    if current_chunk:
+                        current_chunk += f"\n\n{full_file}"
+                    else:
+                        current_chunk = full_file
+            else:
+                # Handle remaining content
+                if sections[i].strip():
+                    if current_chunk:
+                        current_chunk += f"\n{sections[i].strip()}"
+                    else:
+                        current_chunk = sections[i].strip()
+
+        # Add final chunk
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
+
+        # If any chunk is still too large, split it further while preserving file context
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) > chunk_size:
+                # Try to split at file boundaries within the chunk
+                file_sections = re.split(r'^---\s*File:', chunk, flags=re.MULTILINE)
+                if len(file_sections) > 1:
+                    # Multiple files in chunk, split them
+                    sub_chunk = file_sections[0].strip()
+                    for j in range(1, len(file_sections)):
+                        file_part = f"--- File:{file_sections[j]}"
+                        if sub_chunk and len(sub_chunk) + len(file_part) > chunk_size:
+                            if sub_chunk.strip():
+                                final_chunks.append(sub_chunk.strip())
+                            sub_chunk = file_part
+                        else:
+                            if sub_chunk:
+                                sub_chunk += f"\n\n{file_part}"
+                            else:
+                                sub_chunk = file_part
+                    if sub_chunk.strip():
+                        final_chunks.append(sub_chunk.strip())
+                else:
+                    # Single large file, use character chunking
+                    sub_chunks = self._create_character_chunks(chunk, chunk_size, chunk_overlap)
+                    final_chunks.extend(sub_chunks)
+            else:
+                final_chunks.append(chunk)
+
+        return final_chunks
 
     def _create_document_chunks(self, content: str, chunk_size: int, chunk_overlap: int) -> List[str]:
         """Create chunks optimized for document content.

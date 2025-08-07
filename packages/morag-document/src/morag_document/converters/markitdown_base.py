@@ -21,6 +21,7 @@ from morag_core.utils.file_handling import get_file_info, detect_format, get_fil
 from morag_core.config import get_settings
 
 from ..services.markitdown_service import MarkitdownService
+from .document_formatter import DocumentFormatter
 
 logger = structlog.get_logger(__name__)
 
@@ -33,6 +34,7 @@ class MarkitdownConverter(BaseConverter):
         self.supported_formats: Set[str] = set()
         self._markitdown_service = None
         self.settings = get_settings()
+        self.formatter = DocumentFormatter()
 
     async def _get_markitdown_service(self) -> MarkitdownService:
         """Get or create markitdown service instance."""
@@ -95,10 +97,36 @@ class MarkitdownConverter(BaseConverter):
 
             # Convert using markitdown
             markitdown_service = await self._get_markitdown_service()
-            markdown_content = await markitdown_service.convert_file(file_path, self._get_markitdown_options(options))
-            
-            # Set the raw text as the markdown content
-            document.raw_text = markdown_content
+            raw_markdown_content = await markitdown_service.convert_file(file_path, self._get_markitdown_options(options))
+
+            # Clean up markitdown artifacts
+            cleaned_content = self.formatter.clean_markitdown_artifacts(raw_markdown_content)
+
+            # Extract additional metadata from content
+            content_metadata = self.formatter.extract_metadata_from_content(cleaned_content)
+
+            # Update document metadata with extracted information
+            for key, value in content_metadata.items():
+                if not hasattr(metadata, key) or getattr(metadata, key) is None:
+                    setattr(metadata, key, value)
+
+            # Format content according to LLM documentation specifications
+            formatted_content = self.formatter.format_document_content(
+                cleaned_content,
+                file_path,
+                {
+                    'page_count': content_metadata.get('page_count'),
+                    'word_count': content_metadata.get('word_count'),
+                    'document_type': self._map_format_to_document_type(format_type).value,
+                    'language': content_metadata.get('language'),
+                    'file_size': file_info.get('file_size'),
+                    'sections': content_metadata.get('sections', []),
+                    'section_count': content_metadata.get('section_count', 0)
+                }
+            )
+
+            # Set the formatted content as the document text
+            document.raw_text = formatted_content
 
             # Detect language if not specified
             if not document.metadata.language and document.raw_text:

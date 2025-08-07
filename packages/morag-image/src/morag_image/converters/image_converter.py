@@ -13,6 +13,7 @@ from morag_core.interfaces.converter import (
 )
 from morag_core.models.document import Document, DocumentType
 from morag_document.services.markitdown_service import MarkitdownService
+from .image_formatter import ImageFormatter
 
 logger = structlog.get_logger(__name__)
 
@@ -26,6 +27,7 @@ class ImageConverter:
             "image", "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "svg"
         }
         self.markitdown_service = MarkitdownService()
+        self.formatter = ImageFormatter()
 
     async def supports_format(self, format_type: str) -> bool:
         """Check if format is supported.
@@ -72,20 +74,35 @@ class ImageConverter:
         try:
             # Use markitdown for image OCR and description
             logger.info("Converting image file with markitdown", file_path=str(file_path))
-            
+
             result = await self.markitdown_service.convert_file(file_path)
-            
+
+            # Extract image metadata
+            image_metadata = self.formatter.extract_image_metadata(file_path)
+
+            # Format content according to LLM documentation specifications
+            formatted_content = self.formatter.format_image_content(
+                result.text_content,
+                file_path,
+                {
+                    **image_metadata,
+                    **result.metadata
+                }
+            )
+
             # Create document
             document = Document(
                 id=options.document_id,
                 title=options.title or file_path.stem,
-                raw_text=result.text_content,
+                raw_text=formatted_content,
                 document_type=DocumentType.IMAGE,
                 file_path=str(file_path),
                 metadata={
-                    "file_size": file_path.stat().st_size,
+                    "file_size": image_metadata.get('file_size', file_path.stat().st_size),
                     "format": format_type,
                     "conversion_method": "markitdown",
+                    "dimensions": image_metadata.get('dimensions'),
+                    "color_space": image_metadata.get('color_space'),
                     **result.metadata
                 }
             )
