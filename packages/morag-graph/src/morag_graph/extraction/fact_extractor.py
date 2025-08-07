@@ -455,25 +455,27 @@ class FactExtractor:
         return []
     
     def _structure_facts(
-        self, 
-        candidates: List[Dict[str, Any]], 
-        chunk_id: str, 
+        self,
+        candidates: List[Dict[str, Any]],
+        chunk_id: str,
         document_id: str,
         context: Dict[str, Any]
     ) -> List[Fact]:
-        """Convert LLM output to structured Fact objects.
-        
+        """Convert LLM output to structured Fact objects using hybrid approach.
+
         Args:
             candidates: List of fact candidate dictionaries
             chunk_id: Source chunk identifier
             document_id: Source document identifier
             context: Extraction context
-            
+
         Returns:
             List of structured Fact objects
         """
+        from ..models.fact import StructuredMetadata
+
         facts = []
-        
+
         for i, candidate in enumerate(candidates):
             try:
                 # Ensure candidate is a dictionary
@@ -485,32 +487,44 @@ class FactExtractor:
                     )
                     continue
 
-                # Extract required fields with None handling
-                subject = candidate.get('subject', '')
-                obj = candidate.get('object', '')
+                # Extract required fact_text field
+                fact_text = candidate.get('fact_text', '')
+                if not fact_text or not fact_text.strip():
+                    # Fallback: try to construct from legacy fields if available
+                    subject = candidate.get('subject', '')
+                    obj = candidate.get('object', '')
+                    if subject and obj:
+                        approach = candidate.get('approach', '')
+                        solution = candidate.get('solution', '')
+                        parts = [f"{subject} relates to {obj}"]
+                        if approach:
+                            parts.append(f"through {approach}")
+                        if solution:
+                            parts.append(f"resulting in {solution}")
+                        fact_text = " ".join(parts) + "."
+                    else:
+                        self.logger.debug(
+                            f"Candidate {i} missing fact_text and cannot construct from legacy fields",
+                            candidate=candidate
+                        )
+                        continue
 
-                # Handle None values and strip strings
-                if subject is None:
-                    subject = ''
-                elif isinstance(subject, str):
-                    subject = subject.strip()
-                else:
-                    subject = str(subject).strip()
+                # Extract structured metadata
+                structured_metadata_data = candidate.get('structured_metadata', {})
+                if not isinstance(structured_metadata_data, dict):
+                    structured_metadata_data = {}
 
-                if obj is None:
-                    obj = ''
-                elif isinstance(obj, str):
-                    obj = obj.strip()
-                else:
-                    obj = str(obj).strip()
+                # Add legacy fields to metadata for backward compatibility
+                if candidate.get('subject'):
+                    structured_metadata_data['subject'] = candidate['subject']
+                if candidate.get('object'):
+                    structured_metadata_data['object'] = candidate['object']
+                if candidate.get('approach'):
+                    structured_metadata_data['approach'] = candidate['approach']
+                if candidate.get('solution'):
+                    structured_metadata_data['solution'] = candidate['solution']
 
-                if not subject or not obj:
-                    self.logger.debug(
-                        f"Candidate {i} missing required fields",
-                        subject=subject,
-                        object=obj
-                    )
-                    continue
+                structured_metadata = StructuredMetadata(**structured_metadata_data)
 
                 # Helper function to safely handle optional string fields
                 def safe_strip(value):
@@ -523,14 +537,10 @@ class FactExtractor:
                         stripped = str(value).strip()
                         return stripped if stripped else None
 
-                # Create fact with all available information
+                # Create fact with hybrid approach
                 fact_data = {
-                    'subject': subject,
-                    'object': obj,
-                    'approach': safe_strip(candidate.get('approach')),
-                    'solution': safe_strip(candidate.get('solution')),
-                    'condition': safe_strip(candidate.get('condition')),
-                    'remarks': safe_strip(candidate.get('remarks')),
+                    'fact_text': fact_text.strip(),
+                    'structured_metadata': structured_metadata,
                     'source_chunk_id': chunk_id,
                     'source_document_id': document_id,
                     'extraction_confidence': float(candidate.get('confidence', 0.8)),
@@ -555,14 +565,14 @@ class FactExtractor:
                     'speaker_label': context.get('speaker_label'),
                     'source_text_excerpt': context.get('source_text_excerpt')
                 }
-                
+
                 # Validate fact type
                 if fact_data['fact_type'] not in FactType.all_types():
                     fact_data['fact_type'] = FactType.DEFINITION
-                
+
                 fact = Fact(**fact_data)
                 facts.append(fact)
-                
+
             except Exception as e:
                 self.logger.warning(
                     "Failed to structure fact candidate",
@@ -570,7 +580,7 @@ class FactExtractor:
                     error=str(e)
                 )
                 continue
-        
+
         return facts
 
     def _create_domain_filter_configs(self) -> Dict[str, DomainFilterConfig]:

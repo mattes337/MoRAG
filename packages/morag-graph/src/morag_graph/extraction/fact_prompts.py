@@ -53,22 +53,23 @@ Focus on extracting information that would help answer this specific question or
 """
 
         return language_instruction + context_instruction + f"""
-You are a knowledge extraction expert. Extract structured facts from the following text that represent specific, domain-relevant information that can be used to answer questions or understand concepts.
+You are a knowledge extraction expert. Extract self-contained facts from the following text that represent specific, domain-relevant information that can be used to answer questions or understand concepts.
 
-ENHANCED FACT STRUCTURE:
-A fact should contain:
-- Subject: The main entity, substance, or concept the fact is about
-- Object: The specific condition, problem, or target being addressed
-- Approach: The specific method, dosage, technique, procedure, or characteristic (include exact amounts, frequencies, durations when available)
-- Solution: The expected outcome, benefit, result, or explanation
-- Condition: The question/precondition/situation when this fact applies (NEW FIELD)
-- Remarks: Important context, contraindications, warnings, or qualifications
-- Keywords: Domain-specific technical terms that should become separate entities
+HYBRID FACT APPROACH:
+Each fact should be a complete, self-contained statement that includes all necessary context and can stand alone. Additionally, extract structured metadata to support knowledge graph construction.
+
+FACT STRUCTURE:
+- fact_text: A comprehensive, complete statement that includes all relevant information with full context
+- structured_metadata: Key entities, relationships, and concepts for graph building
+  * primary_entities: Main entities mentioned in the fact
+  * relationships: Important actions, connections, or relationships
+  * domain_concepts: Domain-specific technical terms and concepts
 
 QUALITY REQUIREMENTS:
 - Facts must be SPECIFIC and DOMAIN-RELEVANT, not overly generic
 - Include exact dosages, measurements, frequencies, and durations when mentioned
 - Each fact must be SELF-CONTAINED and usable without the original text
+- Write facts as complete sentences that provide full context
 - AVOID overly generic advice like "take a break", "consult a doctor", "eat healthy", "exercise regularly"
 - Focus on domain-specific knowledge including:
   * Medical conditions, symptoms, and diagnostic criteria
@@ -87,12 +88,12 @@ Text: "For chronic stress and anxiety, use 300-600mg of standardized Ashwagandha
 
 Extracted Fact:
 {{
-  "subject": "Ashwagandha extract (5% withanolides)",
-  "object": "chronic stress and anxiety",
-  "approach": "300-600mg standardized extract twice daily with meals for 8-12 weeks",
-  "solution": "reduction of chronic stress and anxiety symptoms",
-  "condition": "To manage chronic stress and anxiety with herbal medicine",
-  "remarks": "Do not exceed 2 weeks without a break. Requires standardized extract with 5% withanolides",
+  "fact_text": "For chronic stress and anxiety management, standardized Ashwagandha extract containing 5% withanolides should be taken at 300-600mg twice daily with meals for 8-12 weeks for optimal results, with breaks not exceeding 2 weeks to ensure safety and effectiveness.",
+  "structured_metadata": {{
+    "primary_entities": ["Ashwagandha extract", "chronic stress", "anxiety", "withanolides"],
+    "relationships": ["treats", "manages", "reduces"],
+    "domain_concepts": ["standardized extract", "dosage", "treatment duration", "herbal medicine"]
+  }},
   "fact_type": "methodological",
   "confidence": 0.9,
   "keywords": ["ashwagandha", "withanolides", "adaptogen", "chronic stress", "anxiety management"]
@@ -103,12 +104,12 @@ Text: "To optimize PostgreSQL query performance, create a B-tree index on freque
 
 Extracted Fact:
 {{
-  "subject": "PostgreSQL B-tree index",
-  "object": "query performance optimization",
-  "approach": "CREATE INDEX on frequently queried columns, most selective column first for composite indexes, monthly REINDEX",
-  "solution": "improved query execution speed and database performance",
-  "condition": "To optimize database query performance in PostgreSQL",
-  "remarks": "Requires monthly maintenance with REINDEX. Column selectivity order matters for composite indexes",
+  "fact_text": "PostgreSQL query performance can be optimized by creating B-tree indexes on frequently queried columns using CREATE INDEX syntax, with composite queries requiring multi-column indexes where the most selective column is placed first, and indexes should be rebuilt monthly using REINDEX for optimal performance.",
+  "structured_metadata": {{
+    "primary_entities": ["PostgreSQL", "B-tree index", "query performance", "database optimization"],
+    "relationships": ["optimizes", "improves", "requires"],
+    "domain_concepts": ["CREATE INDEX", "composite queries", "column selectivity", "REINDEX", "database maintenance"]
+  }},
   "fact_type": "methodological",
   "confidence": 0.95,
   "keywords": ["PostgreSQL", "B-tree index", "query optimization", "database performance", "REINDEX"]
@@ -119,12 +120,12 @@ Text: "ADHS zeigt sich in drei Haupttypen: der unaufmerksame Typ mit Konzentrati
 
 Extracted Fact:
 {{
-  "subject": "ADHS Mischtyp",
-  "object": "Alltagsherausforderungen bei ADHS",
-  "approach": "Kombination von Unaufmerksamkeit und Hyperaktivität-Impulsivität",
-  "solution": "Verständnis der komplexen Symptomatik für bessere Behandlungsansätze",
-  "condition": "Bei der Diagnose und Behandlung von ADHS-Mischtyp",
-  "remarks": "Besondere Herausforderungen durch das Aufeinandertreffen beider Symptomgruppen",
+  "fact_text": "ADHS manifestiert sich in drei Haupttypen: dem unaufmerksamen Typ mit Konzentrationsschwierigkeiten und Vergesslichkeit, dem hyperaktiv-impulsiven Typ mit Unruhe und spontanen Handlungen, und dem Mischtyp, der beide Symptomgruppen kombiniert und besondere Herausforderungen im Alltag mit sich bringt.",
+  "structured_metadata": {{
+    "primary_entities": ["ADHS", "unaufmerksamer Typ", "hyperaktiv-impulsiver Typ", "Mischtyp"],
+    "relationships": ["manifestiert sich", "kombiniert", "verursacht"],
+    "domain_concepts": ["Konzentrationsschwierigkeiten", "Vergesslichkeit", "Unruhe", "spontane Handlungen", "Alltagsherausforderungen"]
+  }},
   "fact_type": "descriptive",
   "confidence": 0.9,
   "keywords": ["ADHS", "Mischtyp", "Unaufmerksamkeit", "Hyperaktivität", "Impulsivität", "Symptomatik"]
@@ -135,28 +136,28 @@ Text: "For small business cash flow management, maintain 3-6 months of operating
 
 Extracted Fact:
 {{
-  "subject": "50/30/20 cash flow rule",
-  "object": "small business financial stability",
-  "approach": "50% essential expenses, 30% growth investments, 20% emergency fund, monthly review with seasonal adjustments",
-  "solution": "improved cash flow management and financial stability",
-  "condition": "To manage cash flow for small business operations",
-  "remarks": "Requires 3-6 months operating expenses in reserve. Monthly review essential for seasonal adjustments",
+  "fact_text": "Small business cash flow management requires maintaining 3-6 months of operating expenses in reserve and following the 50/30/20 rule where 50% goes to essential expenses, 30% to growth investments, and 20% to emergency fund, with monthly reviews and seasonal adjustments to ensure financial stability.",
+  "structured_metadata": {{
+    "primary_entities": ["small business", "cash flow management", "50/30/20 rule", "operating expenses", "emergency fund"],
+    "relationships": ["requires", "allocates", "maintains"],
+    "domain_concepts": ["essential expenses", "growth investments", "financial reserves", "seasonal adjustments", "monthly review"]
+  }},
   "fact_type": "methodological",
   "confidence": 0.85,
   "keywords": ["cash flow management", "50/30/20 rule", "small business", "financial planning", "emergency fund"]
 }}
 
-Example 4 (Legal/Compliance):
+Example 5 (Legal/Compliance):
 Text: "Under GDPR Article 17, individuals have the right to erasure (right to be forgotten) within 30 days of request. Organizations must delete personal data unless legal obligations require retention. Document all deletion requests and maintain audit logs for compliance verification."
 
 Extracted Fact:
 {{
-  "subject": "GDPR Article 17 right to erasure",
-  "object": "personal data deletion compliance",
-  "approach": "Delete personal data within 30 days of request, maintain audit logs, document all requests",
-  "solution": "GDPR compliance and individual privacy protection",
-  "condition": "To comply with GDPR data erasure requirements",
-  "remarks": "Exceptions apply for legal obligations. Audit logs required for compliance verification",
+  "fact_text": "Under GDPR Article 17, individuals have the right to erasure (right to be forgotten) which requires organizations to delete personal data within 30 days of request unless legal obligations require retention, with all deletion requests documented and audit logs maintained for compliance verification.",
+  "structured_metadata": {{
+    "primary_entities": ["GDPR Article 17", "right to erasure", "personal data", "organizations", "legal obligations"],
+    "relationships": ["requires", "delete", "document", "maintain"],
+    "domain_concepts": ["data deletion", "compliance verification", "audit logs", "retention requirements", "privacy rights"]
+  }},
   "fact_type": "regulatory",
   "confidence": 0.95,
   "keywords": ["GDPR", "right to erasure", "data deletion", "compliance", "audit logs"]
@@ -172,26 +173,27 @@ Text: {{{{chunk_text}}}}
 Respond with JSON array of facts in {language_name}:
 [
   {{{{
-    "subject": "specific substance/entity",
-    "object": "specific condition/problem/target",
-    "approach": "exact method/dosage/procedure with specific details",
-    "solution": "specific outcome/benefit/result",
-    "condition": "question/precondition/situation when this applies",
-    "remarks": "safety warnings/contraindications/context",
-    "fact_type": "process|definition|causal|methodological|safety",
+    "fact_text": "Complete, self-contained fact statement with full context",
+    "structured_metadata": {{
+      "primary_entities": ["key", "entities", "mentioned"],
+      "relationships": ["important", "actions", "connections"],
+      "domain_concepts": ["domain-specific", "technical", "terms"]
+    }},
+    "fact_type": "process|definition|causal|methodological|safety|descriptive|regulatory",
     "confidence": 0.0-1.0,
     "query_relevance": 0.0-1.0,
     "evidence_strength": "strong|moderate|weak",
-    "keywords": ["domain-specific", "technical", "terms"],
+    "keywords": ["searchable", "terms"],
     "source_span": "exact text span supporting this fact"
   }}}}
 ]
 
 CRITICAL GUIDELINES:
 - LANGUAGE: Extract ALL content in {language_name} ({language}). Never use English or other languages.
+- Write complete, self-contained fact_text that includes all necessary context
 - Only extract facts with high practical value and specificity
-- Include exact measurements, frequencies, and specifications
-- The "condition" field should describe when/why to use this fact
+- Include exact measurements, frequencies, and specifications in the fact_text
+- Extract meaningful entities and relationships in structured_metadata
 - Keywords should become separate entities in the knowledge graph
 - Ensure confidence >0.7 for all extracted facts
 - Avoid trivial or commonly known information

@@ -66,52 +66,102 @@ class FactEntityConverter:
         return unique_entities, unique_relationships
     
     def _convert_single_fact(self, fact: Fact, entity_cache: Dict[str, Entity]) -> Tuple[List[Entity], List[Relation]]:
-        """Convert a single fact to entities and relationships.
-        
+        """Convert a single fact to entities and relationships using hybrid approach.
+
         Args:
             fact: Fact to convert
             entity_cache: Cache of existing entities
-            
+
         Returns:
             Tuple of (entities, relationships)
         """
         entities = []
         relationships = []
-        
-        # Create subject entity
-        subject_entity = self._create_entity_from_text(
-            fact.subject, "SUBJECT", fact, entity_cache
-        )
-        if subject_entity:
-            entities.append(subject_entity)
-            # Create relationship: Subject -> HAS_FACT -> Fact
-            relationships.append(self._create_fact_relationship(
-                subject_entity.id, fact.id, "HAS_FACT", 
-                f"Subject '{fact.subject}' is described by this fact"
-            ))
-        
-        # Create object entity
-        object_entity = self._create_entity_from_text(
-            fact.object, "OBJECT", fact, entity_cache
-        )
-        if object_entity:
-            entities.append(object_entity)
-            # Create relationship: Object -> DESCRIBED_IN -> Fact
-            relationships.append(self._create_fact_relationship(
-                object_entity.id, fact.id, "DESCRIBED_IN",
-                f"Object '{fact.object}' is described in this fact"
-            ))
-        
-        # Skip keyword entities here - keywords should be linked to chunks, not facts
-        # Keywords will be handled separately in chunk processing
-        
-        # Create relationships between subject and object if both exist
-        if subject_entity and object_entity and subject_entity.id != object_entity.id:
-            relationships.append(self._create_entity_relationship(
-                subject_entity.id, object_entity.id, "RELATES_TO",
-                f"Subject and object are related through fact {fact.id}"
-            ))
-        
+
+        # Create entities from structured metadata
+        metadata = fact.structured_metadata
+
+        # Create entities from primary entities
+        for entity_text in metadata.primary_entities:
+            entity = self._create_entity_from_text(
+                entity_text, "PRIMARY", fact, entity_cache
+            )
+            if entity:
+                entities.append(entity)
+                # Create relationship: Entity -> MENTIONED_IN -> Fact
+                relationships.append(self._create_fact_relationship(
+                    entity.id, fact.id, "MENTIONED_IN",
+                    f"Entity '{entity_text}' is mentioned in this fact"
+                ))
+
+        # Create entities from domain concepts
+        for concept_text in metadata.domain_concepts:
+            entity = self._create_entity_from_text(
+                concept_text, "CONCEPT", fact, entity_cache
+            )
+            if entity:
+                entities.append(entity)
+                # Create relationship: Concept -> RELATES_TO -> Fact
+                relationships.append(self._create_fact_relationship(
+                    entity.id, fact.id, "RELATES_TO",
+                    f"Concept '{concept_text}' relates to this fact"
+                ))
+
+        # Handle legacy structured fields for backward compatibility
+        if metadata.subject:
+            subject_entity = self._create_entity_from_text(
+                metadata.subject, "SUBJECT", fact, entity_cache
+            )
+            if subject_entity:
+                entities.append(subject_entity)
+                # Create relationship: Subject -> HAS_FACT -> Fact
+                relationships.append(self._create_fact_relationship(
+                    subject_entity.id, fact.id, "HAS_FACT",
+                    f"Subject '{metadata.subject}' is described by this fact"
+                ))
+
+        # Create object entity from legacy fields
+        if metadata.object:
+            object_entity = self._create_entity_from_text(
+                metadata.object, "OBJECT", fact, entity_cache
+            )
+            if object_entity:
+                entities.append(object_entity)
+                # Create relationship: Object -> DESCRIBED_IN -> Fact
+                relationships.append(self._create_fact_relationship(
+                    object_entity.id, fact.id, "DESCRIBED_IN",
+                    f"Object '{metadata.object}' is described in this fact"
+                ))
+
+        # Create entities from keywords
+        for keyword in fact.keywords:
+            keyword_entity = self._create_entity_from_text(
+                keyword, "KEYWORD", fact, entity_cache
+            )
+            if keyword_entity:
+                entities.append(keyword_entity)
+                # Create relationship: Keyword -> TAGGED_IN -> Fact
+                relationships.append(self._create_fact_relationship(
+                    keyword_entity.id, fact.id, "TAGGED_IN",
+                    f"Keyword '{keyword}' tags this fact"
+                ))
+
+        # Create relationships between entities based on metadata relationships
+        primary_entities_objs = [e for e in entities if e.type == "PRIMARY"]
+        for i, entity1 in enumerate(primary_entities_objs):
+            for entity2 in primary_entities_objs[i+1:]:
+                if entity1.id != entity2.id:
+                    # Use relationships from metadata to determine connection type
+                    relation_type = "RELATES_TO"
+                    if metadata.relationships:
+                        # Use first relationship as the connection type
+                        relation_type = metadata.relationships[0].upper().replace(" ", "_")
+
+                    relationships.append(self._create_entity_relationship(
+                        entity1.id, entity2.id, relation_type,
+                        f"Entities are related through fact {fact.id}"
+                    ))
+
         return entities, relationships
     
     def _create_entity_from_text(

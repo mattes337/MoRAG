@@ -9,20 +9,31 @@ from pydantic import BaseModel, Field
 from .types import FactId
 
 
+class StructuredMetadata(BaseModel):
+    """Structured metadata extracted from fact text for graph building."""
+
+    primary_entities: List[str] = Field(default_factory=list, description="Key entities mentioned in the fact")
+    relationships: List[str] = Field(default_factory=list, description="Important relationships or actions")
+    domain_concepts: List[str] = Field(default_factory=list, description="Domain-specific concepts and terms")
+
+    # Legacy structured fields for backward compatibility (optional)
+    subject: Optional[str] = Field(default=None, description="Primary subject entity (legacy)")
+    object: Optional[str] = Field(default=None, description="Primary object entity (legacy)")
+    approach: Optional[str] = Field(default=None, description="Method or approach (legacy)")
+    solution: Optional[str] = Field(default=None, description="Solution or outcome (legacy)")
+
+
 class Fact(BaseModel):
-    """Structured fact extracted from document content.
-    
+    """Hybrid fact extracted from document content.
+
     A fact represents actionable, specific knowledge that can be used to answer
-    questions. Unlike generic entities, facts contain structured information
-    with clear subject-object relationships and optional approach/solution details.
-    
+    questions. This hybrid approach combines self-contained fact text with
+    structured metadata for both human readability and machine processing.
+
     Attributes:
         id: Unique fact identifier
-        subject: What the fact is about (main entity or concept)
-        object: What is being described, studied, or acted upon
-        approach: How something is done or achieved (optional)
-        solution: What solves a problem or achieves a goal (optional)
-        remarks: Additional context, limitations, or qualifications (optional)
+        fact_text: Complete, self-contained fact statement with full context
+        structured_metadata: Extracted entities, relationships, and concepts for graph building
         source_chunk_id: Source document chunk ID for provenance
         source_document_id: Source document ID for provenance
         extraction_confidence: Confidence in the extraction (0.0 to 1.0)
@@ -32,14 +43,10 @@ class Fact(BaseModel):
         created_at: Extraction timestamp
         language: Language of the fact content
     """
-    
+
     id: FactId = Field(default="", description="Unique fact identifier")
-    subject: str = Field(..., description="What the fact is about")
-    object: str = Field(..., description="What is being described or acted upon")
-    approach: Optional[str] = Field(default=None, description="How something is done/achieved")
-    solution: Optional[str] = Field(default=None, description="What solves a problem/achieves goal")
-    condition: Optional[str] = Field(default=None, description="Question/precondition/situation when this fact applies")
-    remarks: Optional[str] = Field(default=None, description="Additional context/qualifications")
+    fact_text: str = Field(..., description="Complete, self-contained fact statement with full context")
+    structured_metadata: StructuredMetadata = Field(default_factory=StructuredMetadata, description="Structured metadata for graph building")
     
     # Provenance
     source_chunk_id: str = Field(..., description="Source document chunk ID")
@@ -80,7 +87,9 @@ class Fact(BaseModel):
         """Initialize fact with auto-generated ID if not provided."""
         if 'id' not in data or not data['id']:
             # Generate deterministic ID based on content
-            content_for_hash = f"{data.get('subject', '')}{data.get('object', '')}{data.get('source_chunk_id', '')}"
+            fact_text = data.get('fact_text', '')
+            source_chunk_id = data.get('source_chunk_id', '')
+            content_for_hash = f"{fact_text}{source_chunk_id}"
             content_hash = hashlib.md5(content_for_hash.encode()).hexdigest()[:12]
             data['id'] = f"fact_{content_hash}"
         super().__init__(**data)
@@ -93,12 +102,15 @@ class Fact(BaseModel):
         """
         return {
             "id": self.id,
-            "subject": self.subject,
-            "object": self.object,
-            "approach": self.approach,
-            "solution": self.solution,
-            "condition": self.condition,
-            "remarks": self.remarks,
+            "fact_text": self.fact_text,
+            "primary_entities": ",".join(self.structured_metadata.primary_entities) if self.structured_metadata.primary_entities else "",
+            "relationships": ",".join(self.structured_metadata.relationships) if self.structured_metadata.relationships else "",
+            "domain_concepts": ",".join(self.structured_metadata.domain_concepts) if self.structured_metadata.domain_concepts else "",
+            # Legacy fields for backward compatibility
+            "subject": self.structured_metadata.subject,
+            "object": self.structured_metadata.object,
+            "approach": self.structured_metadata.approach,
+            "solution": self.structured_metadata.solution,
             "fact_type": self.fact_type,
             "domain": self.domain,
             "confidence": self.extraction_confidence,
@@ -129,11 +141,8 @@ class Fact(BaseModel):
         """
         return {
             "id": self.id,
-            "subject": self.subject,
-            "object": self.object,
-            "approach": self.approach,
-            "solution": self.solution,
-            "remarks": self.remarks,
+            "fact_text": self.fact_text,
+            "structured_metadata": self.structured_metadata.model_dump(),
             "source_chunk_id": self.source_chunk_id,
             "source_document_id": self.source_document_id,
             "extraction_confidence": self.extraction_confidence,
@@ -159,65 +168,62 @@ class Fact(BaseModel):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Fact':
         """Create fact from dictionary representation.
-        
+
         Args:
             data: Dictionary containing fact data
-            
+
         Returns:
             Fact instance
         """
         # Handle datetime conversion
         if 'created_at' in data and isinstance(data['created_at'], str):
             data['created_at'] = datetime.fromisoformat(data['created_at'])
-        
+
+        # Handle structured metadata conversion
+        if 'structured_metadata' in data and isinstance(data['structured_metadata'], dict):
+            data['structured_metadata'] = StructuredMetadata(**data['structured_metadata'])
+
         return cls(**data)
     
     def get_display_text(self) -> str:
         """Get human-readable display text for the fact.
-        
+
         Returns:
-            Formatted text representation of the fact
+            The fact text itself (self-contained)
         """
-        parts = [f"Subject: {self.subject}", f"Object: {self.object}"]
-        
-        if self.approach:
-            parts.append(f"Approach: {self.approach}")
-        if self.solution:
-            parts.append(f"Solution: {self.solution}")
-        if self.remarks:
-            parts.append(f"Remarks: {self.remarks}")
-            
-        return " | ".join(parts)
-    
+        return self.fact_text
+
     def is_complete(self) -> bool:
         """Check if fact has minimum required information.
-        
+
         Returns:
-            True if fact has subject, object, and at least one of approach/solution
+            True if fact has fact_text and at least one entity in metadata
         """
         return bool(
-            self.subject and 
-            self.object and 
-            (self.approach or self.solution)
+            self.fact_text and
+            self.fact_text.strip() and
+            (self.structured_metadata.primary_entities or
+             self.structured_metadata.subject)
         )
-    
+
     def get_search_text(self) -> str:
         """Get text for full-text search indexing.
-        
+
         Returns:
-            Combined text of all fact components for search
+            Combined text of fact and metadata for search
         """
-        components = [self.subject, self.object]
-        
-        if self.approach:
-            components.append(self.approach)
-        if self.solution:
-            components.append(self.solution)
-        if self.remarks:
-            components.append(self.remarks)
+        components = [self.fact_text]
+
+        # Add metadata components
+        if self.structured_metadata.primary_entities:
+            components.extend(self.structured_metadata.primary_entities)
+        if self.structured_metadata.relationships:
+            components.extend(self.structured_metadata.relationships)
+        if self.structured_metadata.domain_concepts:
+            components.extend(self.structured_metadata.domain_concepts)
         if self.keywords:
             components.extend(self.keywords)
-            
+
         return " ".join(components)
 
     def get_citation(self) -> str:
