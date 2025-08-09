@@ -91,19 +91,37 @@ async def handle_tool_call(call, state):
 ```
 
 ### Citation Enforcement
-- In prompts and validators, require source format [filename:chunk_index:topic] not entity labels.
+- In prompts and validators, require source format [document_type:filename:chunk_index:metadata] not entity labels.
+- Document type examples: audio, video, pdf, document, word, excel, powerpoint
+- Metadata depends on document type:
+  - audio, video: timecode=HH:MM:SS
+  - pdf: page=N:chapter=X.Y
+  - document types: page=N:section=X.Y
+- Multi-valued metadata: [pdf:my-file.pdf:1:page=1:chapter=2.2]
 - Reject/repair facts missing source tags.
 
 ### Tests
 ```python
 async def test_tool_policy_enforced():
     with pytest.raises(AssertionError):
-        await handle_tool_call(ToolCall(name="delete_node", args={}), state)
-
+        await handle_tool_call(ToolCall(name="delete_node", args={}), state)### Tests
+```python
 async def test_citation_format():
     facts = await llm_fact_extract("...text...")
     for f in facts:
-        assert re.match(r"^.+:\d+:.*$", f['source'])
+        # New structured format: [document_type:filename:chunk_index:metadata]
+        assert re.match(r"^\[\w+:[^:]+:\d+(?::[^\]]+)*\]$", f['source'])
+        
+async def test_structured_citations():
+    # Test different document types
+    test_cases = [
+        "[pdf:research.pdf:1:page=15:chapter=2.2]",
+        "[audio:interview.mp3:3:timecode=00:15:30]",
+        "[video:presentation.mp4:2:timecode=01:23:45]",
+        "[document:report.docx:5:page=8]"
+    ]
+    for citation in test_cases:
+        assert re.match(r"^\[\w+:[^:]+:\d+(?::[^\]]+)*\]$", citation)
 ```
 
 ## Performance Considerations

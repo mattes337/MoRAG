@@ -18,12 +18,7 @@ logger = structlog.get_logger(__name__)
 
 class CitationFormat(Enum):
     """Supported citation formats."""
-    APA = "apa"
-    MLA = "mla"
-    CHICAGO = "chicago"
-    IEEE = "ieee"
-    SIMPLE = "simple"
-    JSON = "json"
+    STRUCTURED = "structured"  # Format: [document_type:filename:chunk_index:metadata]
 
 
 @dataclass
@@ -39,6 +34,7 @@ class SourceReference:
     author: Optional[str] = None
     publication_date: Optional[str] = None
     publisher: Optional[str] = None
+    document_type: Optional[str] = None  # Document type (audio, video, pdf, etc.)
     metadata: Dict[str, Any] = None
 
 
@@ -71,7 +67,7 @@ class CitationManager:
         
         # Citation parameters
         self.default_format = CitationFormat(
-            self.config.get('default_format', 'simple')
+            self.config.get('default_format', 'structured')
         )
         self.max_sources_per_fact = self.config.get('max_sources_per_fact', 5)
         self.enable_verification = self.config.get('enable_verification', True)
@@ -334,141 +330,13 @@ class CitationManager:
         sources: List[SourceReference],
         citation_format: CitationFormat
     ) -> str:
-        """Generate citation text in the specified format."""
+        """Generate citation text in the structured format."""
         if not sources:
             return "No sources available"
         
-        if citation_format == CitationFormat.SIMPLE:
-            return self._generate_simple_citation(sources)
-        elif citation_format == CitationFormat.JSON:
-            return self._generate_json_citation(sources)
-        elif citation_format == CitationFormat.APA:
-            return self._generate_apa_citation(sources)
-        elif citation_format == CitationFormat.MLA:
-            return self._generate_mla_citation(sources)
-        elif citation_format == CitationFormat.CHICAGO:
-            return self._generate_chicago_citation(sources)
-        elif citation_format == CitationFormat.IEEE:
-            return self._generate_ieee_citation(sources)
-        else:
-            return self._generate_simple_citation(sources)
+        return self._generate_structured_citation(sources)
     
-    def _generate_simple_citation(self, sources: List[SourceReference]) -> str:
-        """Generate simple citation format (without chunk references)."""
-        citations = []
-        for i, source in enumerate(sources, 1):
-            citation_parts = []
 
-            if source.document_title:
-                citation_parts.append(source.document_title)
-
-            if source.page_number:
-                citation_parts.append(f"p. {source.page_number}")
-
-            if source.timestamp:
-                citation_parts.append(f"at {source.timestamp}")
-
-            if citation_parts:
-                citations.append(f"[{i}] {', '.join(citation_parts)}")
-            else:
-                citations.append(f"[{i}] {source.document_id}")
-
-        return "; ".join(citations)
-    
-    def _generate_json_citation(self, sources: List[SourceReference]) -> str:
-        """Generate JSON citation format."""
-        import json
-        
-        citation_data = []
-        for source in sources:
-            source_dict = {
-                'document_id': source.document_id,
-                'title': source.document_title,
-                'confidence': source.confidence
-            }
-            
-            if source.chunk_id:
-                source_dict['chunk_id'] = source.chunk_id
-            if source.page_number:
-                source_dict['page'] = source.page_number
-            if source.timestamp:
-                source_dict['timestamp'] = source.timestamp
-            if source.url:
-                source_dict['url'] = source.url
-            if source.author:
-                source_dict['author'] = source.author
-            
-            citation_data.append(source_dict)
-        
-        return json.dumps(citation_data, indent=2)
-    
-    def _generate_apa_citation(self, sources: List[SourceReference]) -> str:
-        """Generate APA citation format."""
-        citations = []
-        for source in sources:
-            citation_parts = []
-            
-            if source.author:
-                citation_parts.append(source.author)
-            
-            if source.publication_date:
-                citation_parts.append(f"({source.publication_date})")
-            
-            if source.document_title:
-                citation_parts.append(f"{source.document_title}")
-            
-            if source.publisher:
-                citation_parts.append(source.publisher)
-            
-            citations.append(". ".join(citation_parts) + ".")
-        
-        return " ".join(citations)
-    
-    def _generate_mla_citation(self, sources: List[SourceReference]) -> str:
-        """Generate MLA citation format."""
-        citations = []
-        for source in sources:
-            citation_parts = []
-            
-            if source.author:
-                citation_parts.append(source.author)
-            
-            if source.document_title:
-                citation_parts.append(f'"{source.document_title}"')
-            
-            if source.publisher:
-                citation_parts.append(source.publisher)
-            
-            if source.publication_date:
-                citation_parts.append(source.publication_date)
-            
-            citations.append(", ".join(citation_parts) + ".")
-        
-        return " ".join(citations)
-    
-    def _generate_chicago_citation(self, sources: List[SourceReference]) -> str:
-        """Generate Chicago citation format."""
-        # Simplified Chicago format
-        return self._generate_apa_citation(sources)
-    
-    def _generate_ieee_citation(self, sources: List[SourceReference]) -> str:
-        """Generate IEEE citation format."""
-        citations = []
-        for i, source in enumerate(sources, 1):
-            citation_parts = []
-            
-            if source.author:
-                citation_parts.append(source.author)
-            
-            if source.document_title:
-                citation_parts.append(f'"{source.document_title}"')
-            
-            if source.publication_date:
-                citation_parts.append(source.publication_date)
-            
-            citations.append(f"[{i}] " + ", ".join(citation_parts) + ".")
-        
-        return " ".join(citations)
     
     async def _verify_sources(self, sources: List[SourceReference]) -> str:
         """Verify the availability and accuracy of sources."""
@@ -585,3 +453,50 @@ class CitationManager:
 
         final_confidence = base_confidence + metadata_quality + context_quality
         return min(1.0, final_confidence)
+    
+    def _generate_structured_citation(self, sources: List[SourceReference]) -> str:
+        """Generate structured citation format: [document_type:filename:chunk_index:metadata]."""
+        citations = []
+        
+        for source in sources:
+            # Extract filename from document_title or document_id
+            filename = source.document_title or source.document_id or "unknown"
+            
+            # Get document type, default to 'document' if not specified
+            doc_type = source.document_type or "document"
+            
+            # Get chunk index, default to 0 if not specified
+            chunk_index = source.chunk_id or "0"
+            
+            # Build metadata components based on document type
+            metadata_parts = []
+            
+            if doc_type in ["audio", "video"] and source.timestamp:
+                metadata_parts.append(f"timecode={source.timestamp}")
+            elif doc_type == "pdf":
+                if source.page_number:
+                    metadata_parts.append(f"page={source.page_number}")
+                # Add chapter if available in metadata
+                if source.metadata and source.metadata.get("chapter"):
+                    metadata_parts.append(f"chapter={source.metadata['chapter']}")
+            elif doc_type in ["document", "word", "excel", "powerpoint"]:
+                if source.page_number:
+                    metadata_parts.append(f"page={source.page_number}")
+            
+            # Add any additional metadata from the metadata dict
+            if source.metadata:
+                for key, value in source.metadata.items():
+                    if key not in ["chapter"] and value is not None:  # chapter already handled above
+                        metadata_parts.append(f"{key}={value}")
+            
+            # Construct the citation
+            citation_base = f"[{doc_type}:{filename}:{chunk_index}"
+            
+            if metadata_parts:
+                citation = citation_base + ":" + ":".join(metadata_parts) + "]"
+            else:
+                citation = citation_base + "]"
+            
+            citations.append(citation)
+        
+        return "; ".join(citations)
