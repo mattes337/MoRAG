@@ -79,7 +79,7 @@ class TestResponseGenerator:
             score=0.9,
             sources=[source1],
             citation_text="Physics Papers, p. 42",
-            citation_format=CitationFormat.SIMPLE,
+            citation_format=CitationFormat.STRUCTURED,
             verification_status="verified",
             metadata={}
         )
@@ -89,7 +89,7 @@ class TestResponseGenerator:
             score=0.8,
             sources=[source2],
             citation_text="Physics Papers, p. 43",
-            citation_format=CitationFormat.SIMPLE,
+            citation_format=CitationFormat.STRUCTURED,
             verification_status="verified",
             metadata={}
         )
@@ -204,7 +204,7 @@ class TestResponseGenerator:
             score=0.1,
             sources=[],
             citation_text="",
-            citation_format=CitationFormat.SIMPLE,
+            citation_format=CitationFormat.STRUCTURED,
             verification_status="unverified",
             metadata={}
         )
@@ -246,7 +246,7 @@ class TestResponseGenerator:
             score=0.3,  # Below threshold
             sources=[],
             citation_text="",
-            citation_format=CitationFormat.SIMPLE,
+            citation_format=CitationFormat.STRUCTURED,
             verification_status="unverified",
             metadata={}
         )

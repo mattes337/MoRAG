@@ -2,9 +2,9 @@
 
 A comprehensive, modular system for processing and indexing various types of content for retrieval-augmented generation (RAG) applications.
 
-## 🚀 PydanticAI Integration Complete!
+## 🚀 Latest Enhancements Complete!
 
-MoRAG has been enhanced with **PydanticAI integration** for superior AI-powered processing:
+MoRAG has been enhanced with **PydanticAI integration** and **unified citation formats** for superior AI-powered processing:
 
 ### ✅ Completed Enhancements
 
@@ -15,6 +15,8 @@ MoRAG has been enhanced with **PydanticAI integration** for superior AI-powered 
 - **⚡ Structured Outputs**: Type-safe, validated responses from all AI agents
 - **🛡️ Error Handling**: Robust retry logic and circuit breaker patterns
 - **📊 Pattern Matching**: Curated knowledge bases for technology, organizations, locations, dates, and more
+- **📋 Unified Citation Format**: Standardized structured citations across all content types
+- **🔧 Graph Tool Controller**: Gemini function calling interface for graph operations
 
 ## 🎉 Modular Architecture Complete!
 
@@ -64,6 +66,20 @@ packages/
 - **Batch Embedding**: Optimized batch processing using Gemini's native batch API for 4x faster embeddings
 - **Remote Processing**: Offload computationally intensive tasks (audio/video) to remote workers with GPU support
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
+
+### 📋 Citation System
+- **Structured Citations**: Unified citation format across all content types: `[source_type:source_name:source_index:metadata]`
+- **Source Traceability**: Complete provenance tracking from original sources to extracted facts
+- **Multi-format Support**: Citations for documents, audio, video, web content, and extracted facts
+- **Metadata Preservation**: Rich metadata including page numbers, timestamps, sections, and fact IDs
+
+### 🔧 Graph Operations
+- **Gemini Function Calling**: Secure interface for graph operations with policy enforcement
+- **Entity Operations**: Extract, match, and traverse entities in the knowledge graph
+- **Fact Extraction**: AI-powered structured fact extraction with confidence scoring
+- **Neighbor Expansion**: Graph traversal with configurable depth and relationship filtering
+- **Content Retrieval**: Fetch entity-associated content chunks with relevance scoring
+- **Action Tracing**: Complete audit trail of all graph operations for monitoring and debugging
 
 ## Quick Start
 

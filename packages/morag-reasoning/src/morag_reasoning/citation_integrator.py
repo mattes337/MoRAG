@@ -28,7 +28,7 @@ class CitationStyle(Enum):
 class CitationOptions:
     """Options for citation integration."""
     style: CitationStyle = CitationStyle.INLINE
-    format: CitationFormat = CitationFormat.SIMPLE
+    format: CitationFormat = CitationFormat.STRUCTURED
     include_timestamps: bool = True
     include_page_numbers: bool = True
     include_confidence: bool = False
@@ -82,7 +82,7 @@ class CitationIntegrator:
         
         # Citation formatting
         self.default_style = CitationStyle(self.config.get('default_style', 'inline'))
-        self.default_format = CitationFormat(self.config.get('default_format', 'simple'))
+        self.default_format = CitationFormat(self.config.get('default_format', 'structured'))
         
         # Performance settings
         self.enable_caching = self.config.get('enable_caching', True)
@@ -273,20 +273,12 @@ class CitationIntegrator:
         fact: CitedFact,
         options: CitationOptions
     ) -> str:
-        """Format citation text based on options."""
+        """Format citation text in structured format."""
         if not fact.sources:
-            return f"[{fact.fact.fact_id}]"
+            return f"[unknown:unknown:0:fact_id={fact.fact.fact_id}]"
         
         source = fact.sources[0]
-        
-        if options.format == CitationFormat.SIMPLE:
-            return f"[{source.document_title or source.document_id}]"
-        elif options.format == CitationFormat.APA:
-            return f"({source.author or 'Unknown'}, {source.publication_date or 'n.d.'})"
-        elif options.format == CitationFormat.MLA:
-            return f"({source.author or 'Unknown'})"
-        else:
-            return f"[{source.document_id}]"
+        return self._format_structured_citation(source)
     
     def _deduplicate_matches(self, matches: List[CitationMatch]) -> List[CitationMatch]:
         """Remove duplicate citation matches."""
@@ -533,3 +525,45 @@ class CitationIntegrator:
             citation_count=0,
             metadata={'uncited_reason': reason}
         )
+    
+    def _format_structured_citation(self, source: SourceReference) -> str:
+        """Format a single source as structured citation: [document_type:filename:chunk_index:metadata]."""
+        # Extract filename from document_title or document_id
+        filename = source.document_title or source.document_id or "unknown"
+        
+        # Get document type, default to 'document' if not specified
+        doc_type = source.document_type or "document"
+        
+        # Get chunk index, default to 0 if not specified
+        chunk_index = source.chunk_id or "0"
+        
+        # Build metadata components based on document type
+        metadata_parts = []
+        
+        if doc_type in ["audio", "video"] and source.timestamp:
+            metadata_parts.append(f"timecode={source.timestamp}")
+        elif doc_type == "pdf":
+            if source.page_number:
+                metadata_parts.append(f"page={source.page_number}")
+            # Add chapter if available in metadata
+            if source.metadata and source.metadata.get("chapter"):
+                metadata_parts.append(f"chapter={source.metadata['chapter']}")
+        elif doc_type in ["document", "word", "excel", "powerpoint"]:
+            if source.page_number:
+                metadata_parts.append(f"page={source.page_number}")
+        
+        # Add any additional metadata from the metadata dict
+        if source.metadata:
+            for key, value in source.metadata.items():
+                if key not in ["chapter"] and value is not None:  # chapter already handled above
+                    metadata_parts.append(f"{key}={value}")
+        
+        # Construct the citation
+        citation_base = f"[{doc_type}:{filename}:{chunk_index}"
+        
+        if metadata_parts:
+            citation = citation_base + ":" + ":".join(metadata_parts) + "]"
+        else:
+            citation = citation_base + "]"
+        
+        return citation

@@ -49,7 +49,7 @@ class ResponseOptions:
     max_length: int = 2000
     include_reasoning: bool = True
     include_confidence: bool = True
-    citation_format: CitationFormat = CitationFormat.SIMPLE
+    citation_format: CitationFormat = CitationFormat.STRUCTURED
     language: str = "en"
     tone: str = "professional"
     metadata: Dict[str, Any] = None
