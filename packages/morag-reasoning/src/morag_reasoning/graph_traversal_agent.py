@@ -1,6 +1,7 @@
 """GraphTraversalAgent for intelligent graph traversal and fact extraction."""
 
 import json
+import os
 import structlog
 from typing import List, Set, Dict, Any, Optional
 from pydantic_ai import Agent
@@ -23,7 +24,7 @@ class NodeContext(BaseModel):
 
 class GraphTraversalAgent:
     """Agent responsible for navigating the Neo4j graph and extracting raw facts."""
-    
+
     def __init__(
         self,
         llm_client: LLMClient,
@@ -44,6 +45,11 @@ class GraphTraversalAgent:
         self.llm_client = llm_client
         self.neo4j_storage = neo4j_storage
         self.qdrant_storage = qdrant_storage
+        # Retrieval tuning for co-occurrence-based neighbor expansion
+        self.enable_cooccurrence_neighbors: bool = os.getenv("MORAG_RETRIEVAL_ENABLE_COOCC", "true").lower() == "true"
+        self.cooccurrence_min_share: float = float(os.getenv("MORAG_RETRIEVAL_COOCC_SHARE", "0.12"))
+        self.cooccurrence_max_neighbors: int = int(os.getenv("MORAG_RETRIEVAL_COOCC_LIMIT", "100"))
+
         self.embedding_service = embedding_service
         self.max_facts_per_node = max_facts_per_node
         self.logger = structlog.get_logger(__name__)
@@ -150,7 +156,7 @@ Be generous in extracting information - anything related to the user's query is 
             return "Unknown Entity"
         except Exception:
             return "Unknown Entity"
-    
+
     async def _get_document_chunks_for_entities(self, entity_names: List[str]) -> List[Dict[str, Any]]:
         """Get DocumentChunk nodes for specific entity names using multiple methods.
 
@@ -262,6 +268,15 @@ Be generous in extracting information - anything related to the user's query is 
             """
 
             result = await self.neo4j_storage._connection_ops._execute_query(query, {"entity_names": entity_names})
+
+            # Optionally include co-occurrence neighbors via Facts
+            coocc_related_names: List[str] = []
+            if self.enable_cooccurrence_neighbors:
+                try:
+                    coocc_related_names = await self._find_cooccurrence_related_entities(entity_names)
+                except Exception as e:
+                    self.logger.warning("Failed to get co-occurrence related entities", error=str(e))
+
             graph_related_names = [record["related_entity_name"] for record in result]
 
             # If we have embedding service, also find semantically similar entities
@@ -270,7 +285,7 @@ Be generous in extracting information - anything related to the user's query is 
                 vector_related_names = await self._find_vector_related_entities(entity_names)
 
             # Combine and deduplicate results
-            all_related_names = list(set(graph_related_names + vector_related_names))
+            all_related_names = list(set(graph_related_names + vector_related_names + coocc_related_names))
 
             self.logger.debug(
                 "Found related entities",
@@ -286,7 +301,7 @@ Be generous in extracting information - anything related to the user's query is 
             self.logger.error("Failed to get related entity names",
                             entity_names=entity_names, error=str(e))
             return []
-    
+
     async def extract_facts_from_entity_chunks(
         self,
         user_query: str,
@@ -436,7 +451,7 @@ Be generous in extracting information - anything related to the user's query is 
                 next_nodes_to_explore="NONE",
                 reasoning=f"Error occurred during fact extraction: {str(e)}"
             )
-    
+
     def _create_chunk_fact_extraction_prompt(
         self,
         user_query: str,
@@ -619,6 +634,7 @@ Remember: Extract EVERYTHING useful - the more facts the better!"""
                     if similar['name'] not in entity_names:
                         all_similar_names.append(similar['name'])
 
+
             # Remove duplicates and return
             unique_similar_names = list(set(all_similar_names))
 
@@ -637,3 +653,65 @@ Remember: Extract EVERYTHING useful - the more facts the better!"""
                 error=str(e)
             )
             return []
+
+
+    async def _find_cooccurrence_related_entities(self, entity_names: List[str]) -> List[str]:
+        """Find entities that co-occur with the given entities via shared facts.
+
+        We look for (e1:Entity)<-[]-(f:Fact)-[]->(e2:Entity), aggregate by e2, and rank by co-occurrence.
+        Applies a min share threshold to reduce noise and limits the result size.
+        """
+        if not entity_names:
+            return []
+        try:
+            # Compute total facts per seed entity for share calculation
+            totals_query = """
+            MATCH (e:Entity)
+            WHERE e.name IN $entity_names
+            MATCH (f:Fact)-[]->(e)
+            RETURN e.name AS name, count(DISTINCT f) AS total
+            """
+            totals = await self.neo4j_storage._connection_ops._execute_query(totals_query, {"entity_names": entity_names})
+            totals_map = {row["name"]: max(1, row["total"]) for row in totals}
+
+            # Co-occurrence across the frontier; compute share per source entity then aggregate by target entity
+            coocc_query = """
+            MATCH (e1:Entity)
+            WHERE e1.name IN $entity_names
+            MATCH (f:Fact)-[]->(e1)
+            MATCH (f)-[]->(e2:Entity)
+            WHERE e2.name IS NOT NULL AND NOT e2.name IN $entity_names
+            WITH e1.name AS src_name, e2.name AS tgt_name, count(DISTINCT f) AS cofacts
+            RETURN src_name, tgt_name, cofacts
+            """
+            rows = await self.neo4j_storage._connection_ops._execute_query(coocc_query, {"entity_names": entity_names})
+
+            # Aggregate and filter by share
+            scores: Dict[str, float] = {}
+            counts: Dict[str, int] = {}
+            for row in rows:
+                src = row.get("src_name")
+                tgt = row.get("tgt_name")
+                co = int(row.get("cofacts", 0))
+                total = totals_map.get(src, 1)
+                share = float(co) / float(total)
+                if share >= self.cooccurrence_min_share:
+                    scores[tgt] = max(scores.get(tgt, 0.0), share)
+                    counts[tgt] = counts.get(tgt, 0) + co
+
+            # Rank targets by counts then share
+            ranked = sorted(scores.keys(), key=lambda t: (counts.get(t, 0), scores.get(t, 0.0)), reverse=True)
+            if self.cooccurrence_max_neighbors > 0:
+                ranked = ranked[: self.cooccurrence_max_neighbors]
+
+            self.logger.debug(
+                "Co-occurrence neighbors computed",
+                seeds=entity_names,
+                min_share=self.cooccurrence_min_share,
+                returned=len(ranked)
+            )
+            return ranked
+        except Exception as e:
+            self.logger.warning("Co-occurrence neighbor computation failed", error=str(e))
+            return []
+
