@@ -14,16 +14,19 @@ docker run --rm \
   -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
   morag-maintenance:latest
 ```
-- Apply with detachment:
+- Apply with detachment and entity links:
 ```bash
 docker run --rm \
   -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
   -e MORAG_KWH_APPLY=true -e MORAG_KWH_DETACH_MOVED=true \
+  -e MORAG_KWH_LINK_ENTITIES=true -e MORAG_KWH_ENTITY_LINK_TYPE=NARROWS_TO \
   morag-maintenance:latest
 ```
 - CLI (no Docker):
 ```bash
-python -m morag_graph.maintenance.keyword_hierarchization --threshold 50 --limit-keywords 5 --apply --detach-moved
+python -m morag_graph.maintenance.keyword_hierarchization \
+  --threshold 50 --limit-keywords 5 --apply --detach-moved \
+  --link-entities --entity-link-type NARROWS_TO
 ```
 
 ### Environment Variables (Overrides)

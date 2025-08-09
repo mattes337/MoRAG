@@ -35,6 +35,8 @@ class HierarchizationConfig:
     batch_size: int = 200
     dry_run: bool = True
     detach_moved: bool = True
+    # Link parent keyword to proposals by default
+    link_entities: bool = True
     job_tag: str = ""
 
     def ensure_defaults(self) -> None:
@@ -53,6 +55,20 @@ class KeywordHierarchizationService:
         self.storage = storage
         self.config = config or HierarchizationConfig()
         self.config.ensure_defaults()
+        self._llm_client = None
+
+    async def _get_llm_client(self):
+        # Always try Gemini; fallback if not available
+        if self._llm_client is not None:
+            return self._llm_client
+        try:
+            from morag_reasoning.llm import LLMClient  # type: ignore
+            # Pass None to use environment variables for configuration
+            self._llm_client = LLMClient(None)
+            return self._llm_client
+        except Exception as e:
+            logger.warning("LLM client unavailable for entity link typing; will use fallback type", error=str(e))
+            return None
 
     async def run(self, limit_keywords: int = 5) -> Dict[str, Any]:
         """Run hierarchization for up to limit_keywords candidates.
@@ -126,6 +142,9 @@ class KeywordHierarchizationService:
 
         # Apply changes in small batches
         await self._apply_rewiring(k_id, assignments, reltypes, detach=self.config.detach_moved)
+        # Optionally create entity-to-entity links from parent to proposals that received assignments
+        if self.config.link_entities:
+            await self._link_parent_to_proposals(k_id, proposals, assignments)
 
         return {
             "keyword": k_name,
@@ -236,12 +255,108 @@ class KeywordHierarchizationService:
             for i in range(0, len(fids), self.config.batch_size):
                 batch = fids[i : i + self.config.batch_size]
                 await self._batch_attach(k_id, pid, batch, reltypes)
+        # Optionally detach from parent for moved facts
         if detach:
             for pid, fids in assignments.items():
-                # Detach only those facts that we reattached elsewhere
                 for i in range(0, len(fids), self.config.batch_size):
                     batch = fids[i : i + self.config.batch_size]
                     await self._batch_detach_from_keyword(k_id, batch)
+
+    async def _link_parent_to_proposals(
+        self,
+        k_id: str,
+        proposals: List[Dict[str, Any]],
+        assignments: Dict[str, List[str]],
+    ) -> None:
+        # Only link proposals that actually received assignments (to avoid noise)
+        active_pids = [pid for pid, fids in assignments.items() if fids]
+        if not active_pids:
+            return
+        # Group proposals by pid for quick lookup
+        pid_to_name: Dict[str, str] = {p["e_id"]: p["e_name"] for p in proposals}
+
+    async def _infer_entity_link_type(self, parent_name: str, child_name: str, samples: List[str]) -> str:
+        client = await self._get_llm_client()
+        fallback = "ASSOCIATED_WITH"
+        # If no LLM available, fallback
+        if not client:
+            return fallback
+        try:
+            sample_text = "\n\n".join(samples[:3]) if samples else ""
+            prompt = (
+                "You are normalizing relationship types between generic keywords in a knowledge graph.\n"
+                "Return STRICT JSON with keys relation_type and direction.\n"
+                "- relation_type: UPPERCASE, SINGULAR, descriptive but concise (e.g., NARROWS_TO, CAUSES, TREATS, ASSOCIATED_WITH).\n"
+                "- direction: 'A_TO_B' if from the first term to the second, else 'B_TO_A'.\n"
+                f"Terms: A='{parent_name}', B='{child_name}'.\n"
+                f"Evidence (optional):\n{sample_text}\n"
+                "JSON only."
+            )
+            text = await client.generate(prompt)
+            import json, re
+            m = re.search(r"\{.*\}", text, re.S)
+            data = json.loads(m.group(0)) if m else json.loads(text)
+            rtype = str(data.get("relation_type", "")).strip().upper().replace(" ", "_")
+            direction = str(data.get("direction", "A_TO_B")).strip().upper()
+            if not rtype:
+                rtype = fallback
+            if direction not in {"A_TO_B", "B_TO_A"}:
+                direction = "A_TO_B"
+            if rtype in {"RELATED_TO", "RELATES_TO", "IS_RELATED_TO"}:
+                rtype = fallback
+            return f"{rtype}|{direction}"
+        except Exception as e:
+            logger.warning("LLM inference failed for entity link type; using fallback", error=str(e))
+            return f"{fallback}|A_TO_B"
+
+    async def _sample_cofacts(self, parent_id: str, child_id: str) -> List[str]:
+        q = """
+        MATCH (f:Fact)-[]->(k:Entity {id: $parent_id})
+        MATCH (f)-[]->(p:Entity {id: $child_id})
+        RETURN f.subject + ' ' + COALESCE(f.approach, '') + ' ' +
+               COALESCE(f.object, '') + ' ' + COALESCE(f.solution, '') + ' ' +
+               COALESCE(f.remarks, '') AS txt
+        LIMIT 3
+        """
+        rows = await self.storage._connection_ops._execute_query(q, {"parent_id": parent_id, "child_id": child_id})
+        return [r.get("txt", "").strip() for r in rows if r.get("txt", "").strip()]
+        # For each active proposal, infer relation type + direction and create link
+        parent_name = (await self.storage._connection_ops._execute_query(
+            "MATCH (k:Entity {id: $k_id}) RETURN k.name AS name", {"k_id": k_id}
+        ))[0].get("name", k_id)
+
+        total_linked = 0
+        for pid in active_pids:
+            child_name = pid_to_name.get(pid, pid)
+            samples = await self._sample_cofacts(k_id, pid)
+            type_and_dir = await self._infer_entity_link_type(parent_name, child_name, samples)
+            rtype, direction = type_and_dir.split("|", 1)
+            if direction == "A_TO_B":
+                q = f"""
+                MATCH (a:Entity {{id: $parent}}), (b:Entity {{id: $child}})
+                MERGE (a)-[h:{rtype}]->(b)
+                ON CREATE SET h.created_at = datetime()
+                SET h.job_tag = $job_tag, h.created_from = 'keyword_hierarchization'
+                RETURN count(h) AS linked
+                """
+            else:
+                q = f"""
+                MATCH (a:Entity {{id: $parent}}), (b:Entity {{id: $child}})
+                MERGE (b)-[h:{rtype}]->(a)
+                ON CREATE SET h.created_at = datetime()
+                SET h.job_tag = $job_tag, h.created_from = 'keyword_hierarchization'
+                RETURN count(h) AS linked
+                """
+            res = await self.storage._connection_ops._execute_query(q, {"parent": k_id, "child": pid, "job_tag": self.config.job_tag})
+            total_linked += (res[0]["linked"] if res else 0)
+
+        logger.info(
+            "Entity links created",
+            parent_id=k_id,
+            proposals=[pid_to_name.get(pid, pid) for pid in active_pids],
+            link_type="LLM_INFERRED",
+            total_linked=total_linked,
+        )
 
     async def _batch_attach(self, k_id: str, pid: str, fid_batch: List[str], reltypes: Dict[str, str]) -> None:
         # We must apply the original reltype per fact
@@ -316,6 +431,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=200)
     parser.add_argument("--limit-keywords", type=int, default=5)
     parser.add_argument("--detach-moved", action="store_true", default=False)
+    # Linking is enabled by default and uses LLM to determine type; no flags needed
     parser.add_argument("--apply", action="store_true", help="Actually apply changes (disable dry-run)")
     parser.add_argument("--job-tag", type=str, default="")
     args = parser.parse_args()
@@ -330,6 +446,8 @@ def main():
         "batch_size": args.batch_size,
         "dry_run": not args.apply,
         "detach_moved": args.detach_moved,
+        # link_entities defaults to True
+        "link_entities": True,
         "job_tag": args.job_tag,
     }
 
