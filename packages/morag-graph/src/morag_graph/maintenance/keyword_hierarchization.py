@@ -155,9 +155,24 @@ class KeywordHierarchizationService:
             "min_share": self.config.cooccurrence_min_share,
         }
         rows = await self.storage._connection_ops._execute_query(q, params)
+        # Log diagnostics for visibility when no proposals are produced
+        logger.info(
+            "Co-occurrence proposals evaluated",
+            keyword_id=k_id,
+            total_facts=total_facts,
+            min_share=self.config.cooccurrence_min_share,
+            found=len(rows),
+        )
         # Trim and diversify simply by taking top N for now
         trimmed = rows[: self.config.max_new_keywords]
         if len(trimmed) < self.config.min_new_keywords:
+            logger.info(
+                "Insufficient proposals after trimming",
+                required=self.config.min_new_keywords,
+                found=len(trimmed),
+                max_new=self.config.max_new_keywords,
+                keyword_id=k_id,
+            )
             return []
         return trimmed
 
@@ -241,7 +256,7 @@ class KeywordHierarchizationService:
         for rtype, items in by_type.items():
             q = f"""
             UNWIND $items AS row
-            MATCH (f:Fact {id: row.fid})
+            MATCH (f:Fact {{id: row.fid}})
             MATCH (p:Entity {{id: row.pid}})
             MERGE (f)-[r:{rtype}]->(p)
             ON CREATE SET r.created_at = datetime()

@@ -359,6 +359,41 @@ python -m morag_graph.maintenance.keyword_hierarchization --threshold 50 --limit
 ```
 
 
+#### Generalized maintenance runner (multi-job)
+- The maintenance image uses a generic runner. Select jobs via MORAG_MAINT_JOBS (comma-separated). Currently supported: keyword_hierarchization.
+```bash
+# Run keyword hierarchization (dry-run by default)
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  -e MORAG_MAINT_JOBS=keyword_hierarchization \
+  morag-maintenance:latest
+
+# Apply with common tuning overrides
+# If proposals are empty, lower the share and/or min-new thresholds
+# (See maintenance/KEYWORD_HIERARCHIZATION.md for details)
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  -e MORAG_MAINT_JOBS=keyword_hierarchization \
+  -e MORAG_KWH_APPLY=true \
+  -e MORAG_KWH_DETACH_MOVED=true \
+  -e MORAG_KWH_SHARE=0.08 \
+  -e MORAG_KWH_MIN_NEW=2 \
+  morag-maintenance:latest
+```
+
+Environment overrides for keyword hierarchization:
+- MORAG_KWH_THRESHOLD: minimum facts on a keyword (default 50)
+- MORAG_KWH_MIN_NEW / MORAG_KWH_MAX_NEW: min/max number of proposed keywords (defaults 3/6)
+- MORAG_KWH_MIN_PER: minimum facts per proposed keyword (default 5)
+- MORAG_KWH_MAX_MOVE_RATIO: cap on fraction of facts to move (default 0.8)
+- MORAG_KWH_SHARE: minimum co-occurrence share for a proposal (default 0.18)
+- MORAG_KWH_BATCH_SIZE: batch size for writes (default 200)
+- MORAG_KWH_DETACH_MOVED: true to delete the original edges after reattach
+- MORAG_KWH_APPLY: true to apply (false = dry-run)
+- MORAG_KWH_JOB_TAG: optional tag stored on created relationships
+- MORAG_KWH_LIMIT_KEYWORDS: process up to N keywords per run (default 5)
+
+
 ### CPU Compatibility (NEW)
 
 ✅ **Fixed CPU Compatibility Issues**: MoRAG now includes comprehensive CPU compatibility fixes to prevent crashes on systems with limited instruction set support.
