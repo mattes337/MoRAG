@@ -334,6 +334,31 @@ python tests/cli/test-docker-fixes.py
 
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
 
+### Maintenance: Keyword Hierarchization (Standalone)
+
+- Build image:
+```bash
+docker build -f Dockerfile.maintenance -t morag-maintenance:latest .
+```
+- Run (dry-run by default):
+```bash
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  morag-maintenance:latest
+```
+- Apply with detachment:
+```bash
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  -e MORAG_KWH_APPLY=true -e MORAG_KWH_DETACH_MOVED=true \
+  morag-maintenance:latest
+```
+- CLI (no Docker):
+```bash
+python -m morag_graph.maintenance.keyword_hierarchization --threshold 50 --limit-keywords 5 --apply --detach-moved
+```
+
+
 ### CPU Compatibility (NEW)
 
 ✅ **Fixed CPU Compatibility Issues**: MoRAG now includes comprehensive CPU compatibility fixes to prevent crashes on systems with limited instruction set support.

@@ -1,0 +1,31 @@
+# Minimal maintenance container for one-shot maintenance jobs (generic)
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Create user
+RUN useradd -ms /bin/bash morag
+WORKDIR /app
+
+# Install system deps if needed for Neo4j TLS
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install
+COPY requirements.txt ./
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Copy only what's needed (keep image lean)
+COPY packages/morag-graph/src ./packages/morag-graph/src
+COPY scripts/maintenance_runner.py ./scripts/maintenance_runner.py
+
+# Ensure module import path
+ENV PYTHONPATH="/app/packages/morag-graph/src:${PYTHONPATH}"
+
+USER morag
+
+# Default command runs the selected maintenance jobs to completion
+# Select jobs via MORAG_MAINT_JOBS (comma-separated), e.g. "keyword_hierarchization"
+ENTRYPOINT ["python", "scripts/maintenance_runner.py"]
+
