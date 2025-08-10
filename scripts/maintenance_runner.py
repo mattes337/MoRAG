@@ -166,14 +166,12 @@ def parse_cleanup_overrides() -> Dict[str, Any]:
     mapping = {
         "MORAG_REL_CLEANUP_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
         "MORAG_REL_CLEANUP_BATCH_SIZE": ("batch_size", int),
-        "MORAG_REL_CLEANUP_LIMIT_RELATIONS": ("limit_relations", int),
         "MORAG_REL_CLEANUP_MIN_CONFIDENCE": ("min_confidence", float),
         "MORAG_REL_CLEANUP_REMOVE_UNRELATED": ("remove_unrelated", lambda v: v.strip().lower() == "true"),
         "MORAG_REL_CLEANUP_REMOVE_GENERIC": ("remove_generic", lambda v: v.strip().lower() == "true"),
         "MORAG_REL_CLEANUP_CONSOLIDATE_SIMILAR": ("consolidate_similar", lambda v: v.strip().lower() == "true"),
         "MORAG_REL_CLEANUP_SIMILARITY_THRESHOLD": ("similarity_threshold", float),
         "MORAG_REL_CLEANUP_JOB_TAG": ("job_tag", str),
-        "MORAG_REL_CLEANUP_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
     }
 
     overrides: Dict[str, Any] = {}

@@ -19,7 +19,6 @@ class TestRelationshipCleanupConfig:
         config = RelationshipCleanupConfig()
         assert config.dry_run is False
         assert config.batch_size == 100
-        assert config.limit_relations == 1000
         assert config.min_confidence == 0.3
         assert config.remove_unrelated is True
         assert config.remove_generic is True
@@ -34,7 +33,7 @@ class TestRelationshipCleanupConfig:
             min_confidence=-0.1        # Should be clamped to 0.0
         )
         config.ensure_defaults()
-        
+
         assert config.similarity_threshold == 1.0
         assert config.batch_size == 1
         assert config.min_confidence == 0.0
@@ -121,7 +120,7 @@ async def test_run_relationship_cleanup_integration():
     """Test the main run_relationship_cleanup function."""
     # This is a basic integration test that verifies the function can be called
     # In a real environment, this would need proper Neo4j setup
-    
+
     # Mock the Neo4j config and storage
     with pytest.raises(Exception):  # Expected to fail without proper Neo4j setup
-        await run_relationship_cleanup({"dry_run": True, "limit_relations": 1})
+        await run_relationship_cleanup({"dry_run": True})

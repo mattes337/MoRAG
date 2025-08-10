@@ -45,15 +45,13 @@ The `RELATIONSHIP_CLEANUP` maintenance job performs comprehensive cleanup of pro
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MORAG_REL_CLEANUP_DRY_RUN` | `false` | Apply changes by default (set to `true` for preview) |
-| `MORAG_REL_CLEANUP_BATCH_SIZE` | `100` | Number of relationships to process per batch |
-| `MORAG_REL_CLEANUP_LIMIT_RELATIONS` | `1000` | Maximum relationships to process per run |
+| `MORAG_REL_CLEANUP_BATCH_SIZE` | `100` | Batch size for bulk operations |
 | `MORAG_REL_CLEANUP_MIN_CONFIDENCE` | `0.3` | Minimum confidence threshold for relationships |
 | `MORAG_REL_CLEANUP_REMOVE_UNRELATED` | `true` | Remove "UNRELATED" type relationships |
 | `MORAG_REL_CLEANUP_REMOVE_GENERIC` | `true` | Remove overly generic relationship types |
 | `MORAG_REL_CLEANUP_CONSOLIDATE_SIMILAR` | `true` | Merge semantically similar relationships |
 | `MORAG_REL_CLEANUP_SIMILARITY_THRESHOLD` | `0.85` | Threshold for semantic similarity merging |
 | `MORAG_REL_CLEANUP_JOB_TAG` | `""` | Job tag for tracking and idempotency |
-| `MORAG_REL_CLEANUP_ENABLE_ROTATION` | `false` | Enable rotation to prevent processing same relationships |
 
 ## Performance & Safety
 
@@ -102,7 +100,6 @@ python scripts/maintenance_runner.py
 # Custom configuration
 MORAG_MAINT_JOBS="relationship_cleanup" \
 MORAG_REL_CLEANUP_DRY_RUN="false" \
-MORAG_REL_CLEANUP_LIMIT_RELATIONS="500" \
 MORAG_REL_CLEANUP_MIN_CONFIDENCE="0.4" \
 python scripts/maintenance_runner.py
 ```

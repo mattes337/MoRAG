@@ -38,21 +38,18 @@ except ImportError:
 class RelationshipCleanupConfig:
     """Configuration for relationship cleanup job."""
     dry_run: bool = False                       # Apply changes by default
-    batch_size: int = 100                       # Batch size for processing
-    limit_relations: int = 1000                 # Max relationships to process per run
+    batch_size: int = 100                       # Batch size for processing (used for bulk operations)
     min_confidence: float = 0.3                 # Minimum confidence threshold
     remove_unrelated: bool = True               # Remove "UNRELATED" type relationships
     remove_generic: bool = True                 # Remove overly generic relationship types
     consolidate_similar: bool = True            # Merge semantically similar relationships
     similarity_threshold: float = 0.85          # Threshold for semantic similarity merging
     job_tag: str = ""                          # Job tag for tracking
-    enable_rotation: bool = False               # Enable rotation to prevent starvation
 
     def ensure_defaults(self) -> None:
         """Ensure all configuration values are within valid ranges."""
         self.similarity_threshold = max(0.0, min(1.0, self.similarity_threshold))
         self.batch_size = max(1, self.batch_size)
-        self.limit_relations = max(1, self.limit_relations)
         self.min_confidence = max(0.0, min(1.0, self.min_confidence))
 
 
@@ -129,8 +126,7 @@ class RelationshipCleanupService:
         result = RelationshipCleanupResult(dry_run=self.config.dry_run)
 
         logger.info("Starting relationship cleanup",
-                   dry_run=self.config.dry_run,
-                   limit=self.config.limit_relations)
+                   dry_run=self.config.dry_run)
 
         try:
             # Always use the optimized type-based approach
@@ -552,14 +548,12 @@ def parse_cleanup_overrides() -> Dict[str, Any]:
     return {
         "dry_run": _parse_bool(os.getenv("MORAG_REL_CLEANUP_DRY_RUN"), False),
         "batch_size": _parse_int(os.getenv("MORAG_REL_CLEANUP_BATCH_SIZE"), 100),
-        "limit_relations": _parse_int(os.getenv("MORAG_REL_CLEANUP_LIMIT_RELATIONS"), 1000),
         "min_confidence": _parse_float(os.getenv("MORAG_REL_CLEANUP_MIN_CONFIDENCE"), 0.3),
         "remove_unrelated": _parse_bool(os.getenv("MORAG_REL_CLEANUP_REMOVE_UNRELATED"), True),
         "remove_generic": _parse_bool(os.getenv("MORAG_REL_CLEANUP_REMOVE_GENERIC"), True),
         "consolidate_similar": _parse_bool(os.getenv("MORAG_REL_CLEANUP_CONSOLIDATE_SIMILAR"), True),
         "similarity_threshold": _parse_float(os.getenv("MORAG_REL_CLEANUP_SIMILARITY_THRESHOLD"), 0.85),
         "job_tag": os.getenv("MORAG_REL_CLEANUP_JOB_TAG", ""),
-        "enable_rotation": _parse_bool(os.getenv("MORAG_REL_CLEANUP_ENABLE_ROTATION"), False),
     }
 
 
