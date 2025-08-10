@@ -3,6 +3,7 @@
 
 Select jobs to run via MORAG_MAINT_JOBS (comma-separated).
 Currently supported jobs:
+- keyword_deduplication
 - keyword_hierarchization
 - keyword_linking
 
@@ -50,6 +51,7 @@ def _parse_bool(val: str, default: bool = False) -> bool:
 
 
 def parse_kwh_overrides() -> Dict[str, Any]:
+    """Parse keyword hierarchization environment variables."""
     mapping = {
         "MORAG_KWH_THRESHOLD": ("threshold_min_facts", int),
         "MORAG_KWH_MIN_NEW": ("min_new_keywords", int),
@@ -64,6 +66,7 @@ def parse_kwh_overrides() -> Dict[str, Any]:
         "MORAG_KWH_JOB_TAG": ("job_tag", str),
         "MORAG_KWH_LIMIT_KEYWORDS": ("limit_keywords", int),
     }
+
     overrides: Dict[str, Any] = {}
     for env_key, (param_key, caster) in mapping.items():
         val = os.getenv(env_key)
@@ -71,13 +74,69 @@ def parse_kwh_overrides() -> Dict[str, Any]:
             try:
                 overrides[param_key] = caster(val)
             except Exception:
-                logger.warning("Invalid env value for maintenance override", key=env_key, value=val)
+                logger.warning("Invalid env value for keyword hierarchization override", key=env_key, value=val)
+
     # Ensure link_entities defaults to True if not provided
     if "link_entities" not in overrides:
         overrides["link_entities"] = True
+
     # Ensure dry_run defaults to False (apply changes by default)
     if "dry_run" not in overrides:
         overrides["dry_run"] = False
+
+    return overrides
+
+
+
+def parse_kwd_overrides() -> Dict[str, Any]:
+    """Parse keyword deduplication environment variables."""
+    mapping = {
+        "MORAG_KWD_SIMILARITY_THRESHOLD": ("similarity_threshold", float),
+        "MORAG_KWD_MAX_CLUSTER_SIZE": ("max_cluster_size", int),
+        # "MORAG_KWD_MIN_FACTS": ("min_fact_threshold", int),  # REMOVED - filter was counterproductive
+        "MORAG_KWD_PRESERVE_CONFIDENCE": ("preserve_high_confidence", float),
+        "MORAG_KWD_SEMANTIC_WEIGHT": ("semantic_similarity_weight", float),
+        "MORAG_KWD_BATCH_SIZE": ("batch_size", int),
+        "MORAG_KWD_LIMIT_ENTITIES": ("limit_entities", int),
+        "MORAG_KWD_APPLY": ("dry_run", lambda v: not (v.strip().lower() == "true")),
+        "MORAG_KWD_JOB_TAG": ("job_tag", str),
+        "MORAG_KWD_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
+        "MORAG_KWD_PROCESS_ALL_SMALL": ("process_all_if_small", lambda v: v.strip().lower() == "true"),
+    }
+
+    overrides: Dict[str, Any] = {}
+    for env_key, (param_key, caster) in mapping.items():
+        val = os.getenv(env_key)
+        if val is not None and val != "":
+            try:
+                overrides[param_key] = caster(val)
+            except Exception:
+                logger.warning("Invalid env value for keyword deduplication override", key=env_key, value=val)
+
+    # Ensure dry_run defaults to False (safe default for deduplication)
+    if "dry_run" not in overrides:
+        overrides["dry_run"] = False
+
+    # Ensure rotation defaults to True (prevent starvation)
+    if "enable_rotation" not in overrides:
+        overrides["enable_rotation"] = True
+
+    # Ensure process_all_if_small defaults to True (efficiency for small datasets)
+    if "process_all_if_small" not in overrides:
+        overrides["process_all_if_small"] = True
+
+    # Log job_tag for rotation tracking
+    if "job_tag" in overrides:
+        logger.info("Using explicit job_tag for rotation", job_tag=overrides["job_tag"])
+    else:
+        logger.info("Using default date-based job_tag for rotation (set MORAG_KWD_JOB_TAG for custom rotation)")
+
+    # Log batch size clarification if set
+    if "limit_entities" in overrides:
+        logger.info("Rotation batch size configured", limit_entities=overrides["limit_entities"])
+    if "batch_size" in overrides:
+        logger.info("Merge batch size configured (internal processing)", batch_size=overrides["batch_size"])
+
     return overrides
 
 
@@ -102,11 +161,20 @@ async def run_keyword_linking_job() -> Dict[str, Any]:
     return {"job": "keyword_linking", "result": result}
 
 
+async def run_keyword_deduplication_job() -> Dict[str, Any]:
+    from morag_graph.maintenance.keyword_deduplication import run_keyword_deduplication
+
+    overrides = parse_kwd_overrides()
+    logger.info("Running job: keyword_deduplication", overrides=overrides)
+    result = await run_keyword_deduplication(overrides)
+    return {"job": "keyword_deduplication", "result": result}
+
+
 async def main_async() -> int:
-    # Jobs to run; if not set, run all
+    # Jobs to run; if not set, run all (deduplication first for optimal order)
     jobs_env = os.getenv("MORAG_MAINT_JOBS")
     if not jobs_env:
-        jobs = ["keyword_hierarchization", "keyword_linking"]
+        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking"]
     else:
         jobs = [j.strip() for j in jobs_env.split(",") if j.strip()]
 
@@ -114,6 +182,7 @@ async def main_async() -> int:
 
     # Job dispatch table
     job_handlers: Dict[str, Callable[[], Any]] = {
+        "keyword_deduplication": run_keyword_deduplication_job,
         "keyword_hierarchization": run_keyword_hierarchization_job,
         "keyword_linking": run_keyword_linking_job,
     }

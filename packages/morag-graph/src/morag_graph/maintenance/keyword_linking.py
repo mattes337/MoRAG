@@ -28,7 +28,7 @@ class KeywordLinkingConfig:
     batch_size: int = 200
     dry_run: bool = True
     job_tag: str = ""
-    fallback_link_type: str = "ASSOCIATED_WITH"  # used only if inference fails
+    fallback_link_type: str = "RELATES_TO"  # used only if inference fails
 
     def ensure_defaults(self) -> None:
         if not self.job_tag:
@@ -122,34 +122,113 @@ class KeywordLinkingService:
     async def _infer_type(self, parent_name: str, child_name: str, samples: List[str]) -> str:
         client = await self._get_llm_client()
         if not client:
-            return self.config.fallback_link_type
-        try:
-            sample_text = "\n\n".join(samples[:3]) if samples else ""
-            prompt = (
-                "You are normalizing relationship types between domain-agnostic keywords in a knowledge graph.\n"
-                "Rules: Return STRICT JSON with keys relation_type and direction.\n"
-                "- relation_type: UPPERCASE, SINGULAR, descriptive but concise (e.g., NARROWS_TO, CAUSES, TREATS, ASSOCIATED_WITH).\n"
-                "- direction: 'A_TO_B' if from the first term to the second, else 'B_TO_A'.\n"
-                f"Terms: A='{parent_name}', B='{child_name}'.\n"
-                f"Evidence (optional):\n{sample_text}\n"
-                "JSON only, no prose."
-            )
-            text = await client.generate(prompt)
-            import json, re
-            m = re.search(r"\{.*\}", text, re.S)
-            data = json.loads(m.group(0)) if m else json.loads(text)
-            rtype = str(data.get("relation_type", "")).strip().upper().replace(" ", "_")
-            direction = str(data.get("direction", "A_TO_B")).strip().upper()
-            if not rtype:
-                rtype = self.config.fallback_link_type
-            if direction not in {"A_TO_B", "B_TO_A"}:
-                direction = "A_TO_B"
-            if rtype in {"RELATED_TO", "RELATES_TO", "IS_RELATED_TO"}:
-                rtype = self.config.fallback_link_type
-            return f"{rtype}|{direction}"
-        except Exception as e:
-            logger.warning("LLM inference failed, using fallback type", error=str(e))
             return f"{self.config.fallback_link_type}|A_TO_B"
+
+        sample_text = "\n\n".join(samples[:3]) if samples else ""
+        prompt = (
+            f"SYSTEM: You are a JSON-only API. You MUST respond with ONLY valid JSON. Any other text will cause system failure.\n\n"
+            f"CONSTRAINT: Your response must be EXACTLY one JSON object. No explanations, no markdown, no additional text.\n\n"
+            f"TASK: Determine the SPECIFIC relationship type (avoid generic terms):\n"
+            f"A = {parent_name}\n"
+            f"B = {child_name}\n"
+            f"Evidence = {sample_text[:150] if sample_text else 'none'}\n\n"
+            f"REQUIRED FORMAT (copy exactly, replace TYPE and DIRECTION):\n"
+            f'{{"relation_type": "TYPE", "direction": "DIRECTION"}}\n\n'
+            f"PREFERRED TYPES (choose most specific, avoid ASSOCIATED_WITH):\n"
+            f"Medical: CAUSES, PREVENTS, TREATS, CURES, IMPROVES, WORSENS\n"
+            f"Functional: REQUIRES, ENABLES, SUPPORTS, INHIBITS, ACTIVATES, REGULATES\n"
+            f"Structural: PART_OF, CONTAINS, SPECIALIZES, GENERALIZES\n"
+            f"Process: LEADS_TO, RESULTS_FROM, PRODUCES, CONSUMES, USES\n"
+            f"Change: INCREASES, DECREASES, REDUCES, MANAGES, INFLUENCES\n"
+            f"DIRECTION: A_TO_B (A affects B), B_TO_A (B affects A)\n\n"
+            f"JSON:"
+        )
+
+        # Retry logic with exponential backoff
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                text = await client.generate(prompt)
+                logger.debug(f"LLM response (attempt {attempt + 1})",
+                           response_preview=text[:200],
+                           response_length=len(text))
+
+                # Parse JSON response directly (should be JSON-only now)
+                import json, re
+
+                fallback_data = {
+                    "relation_type": "INFLUENCES",  # More specific than RELATES_TO
+                    "direction": "A_TO_B"
+                }
+
+                # Clean the response text
+                cleaned_text = text.strip()
+
+                # Remove any potential markdown formatting
+                if cleaned_text.startswith('```json'):
+                    cleaned_text = cleaned_text[7:]
+                if cleaned_text.endswith('```'):
+                    cleaned_text = cleaned_text[:-3]
+                cleaned_text = cleaned_text.strip()
+
+                # Try direct JSON parsing first
+                try:
+                    data = json.loads(cleaned_text)
+                    logger.debug(f"Direct JSON parsing successful")
+                except json.JSONDecodeError:
+                    # If direct parsing fails, try to extract JSON
+                    json_match = re.search(r'\{[^{}]*"relation_type"[^{}]*"direction"[^{}]*\}', text)
+                    if json_match:
+                        try:
+                            data = json.loads(json_match.group(0))
+                            logger.debug(f"Extracted JSON from response")
+                        except json.JSONDecodeError:
+                            logger.warning(f"JSON extraction failed (attempt {attempt + 1})",
+                                         response_text=text[:300])
+                            data = fallback_data
+                    else:
+                        logger.warning(f"No JSON found in response (attempt {attempt + 1})",
+                                     response_text=text[:300])
+                        data = fallback_data
+
+                rtype = str(data.get("relation_type", "")).strip().upper().replace(" ", "_")
+                direction = str(data.get("direction", "A_TO_B")).strip().upper()
+
+                if not rtype:
+                    rtype = self.config.fallback_link_type
+                if direction not in {"A_TO_B", "B_TO_A"}:
+                    direction = "A_TO_B"
+                # Convert generic relationship types to more specific ones
+                if rtype in {"RELATED_TO", "RELATES_TO", "IS_RELATED_TO"}:
+                    rtype = "INFLUENCES"  # Use a more specific fallback
+                elif rtype == "ASSOCIATED_WITH":
+                    # Try to infer a more specific relationship based on context
+                    if any(word in sample_text.lower() for word in ["treat", "cure", "heal", "therapy"]):
+                        rtype = "TREATS"
+                    elif any(word in sample_text.lower() for word in ["cause", "lead", "result"]):
+                        rtype = "CAUSES"
+                    elif any(word in sample_text.lower() for word in ["prevent", "avoid", "protect"]):
+                        rtype = "PREVENTS"
+                    elif any(word in sample_text.lower() for word in ["improve", "enhance", "boost"]):
+                        rtype = "IMPROVES"
+                    elif any(word in sample_text.lower() for word in ["support", "help", "assist"]):
+                        rtype = "SUPPORTS"
+                    else:
+                        rtype = "INFLUENCES"  # Final fallback
+
+                logger.debug(f"Parsed relationship", relation_type=rtype, direction=direction)
+                return f"{rtype}|{direction}"
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.warning(f"LLM inference failed (attempt {attempt + 1}/{max_retries}), retrying in {wait_time}s",
+                                 error=str(e), parent=parent_name, child=child_name)
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.warning("LLM inference failed after all retries, using fallback type",
+                                 error=str(e), parent=parent_name, child=child_name)
+                    return f"INFLUENCES|A_TO_B"
 
     async def _sample_cofacts(self, parent_id: str, child_id: str) -> List[str]:
         q = """

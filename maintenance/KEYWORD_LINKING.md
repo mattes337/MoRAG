@@ -27,7 +27,8 @@ The job always attempts to use an LLM (Gemini) to infer a specific, normalized r
 
 ### Maintenance Runner (recommended)
 - Run all jobs by default (if MORAG_MAINT_JOBS not set):
-  - This includes keyword_hierarchization and keyword_linking
+  - This includes keyword_deduplication, keyword_hierarchization and keyword_linking
+  - Jobs run in optimal order: deduplication → hierarchization → linking
 
 - Only keyword_linking:
 ```
