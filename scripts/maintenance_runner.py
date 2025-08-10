@@ -7,6 +7,7 @@ Currently supported jobs:
 - keyword_hierarchization
 - keyword_linking
 - relationship_merger
+- relationship_cleanup
 
 Exit code is non-zero if any selected job fails (respecting fail-fast behavior).
 """
@@ -160,6 +161,37 @@ def parse_rel_merger_overrides() -> Dict[str, Any]:
     return overrides
 
 
+def parse_cleanup_overrides() -> Dict[str, Any]:
+    """Parse relationship cleanup environment variables."""
+    mapping = {
+        "MORAG_REL_CLEANUP_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_CLEANUP_BATCH_SIZE": ("batch_size", int),
+        "MORAG_REL_CLEANUP_LIMIT_RELATIONS": ("limit_relations", int),
+        "MORAG_REL_CLEANUP_MIN_CONFIDENCE": ("min_confidence", float),
+        "MORAG_REL_CLEANUP_REMOVE_UNRELATED": ("remove_unrelated", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_CLEANUP_REMOVE_GENERIC": ("remove_generic", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_CLEANUP_CONSOLIDATE_SIMILAR": ("consolidate_similar", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_CLEANUP_SIMILARITY_THRESHOLD": ("similarity_threshold", float),
+        "MORAG_REL_CLEANUP_JOB_TAG": ("job_tag", str),
+        "MORAG_REL_CLEANUP_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
+    }
+
+    overrides: Dict[str, Any] = {}
+    for env_key, (param_key, caster) in mapping.items():
+        val = os.getenv(env_key)
+        if val is not None and val != "":
+            try:
+                overrides[param_key] = caster(val)
+            except Exception:
+                logger.warning("Invalid env value for relationship cleanup override", key=env_key, value=val)
+
+    # Ensure dry_run defaults to False (apply changes by default)
+    if "dry_run" not in overrides:
+        overrides["dry_run"] = False
+
+    return overrides
+
+
 def parse_kwd_overrides() -> Dict[str, Any]:
     """Parse keyword deduplication environment variables."""
     mapping = {
@@ -251,11 +283,20 @@ async def run_relationship_merger_job() -> Dict[str, Any]:
     return {"job": "relationship_merger", "result": result}
 
 
+async def run_relationship_cleanup_job() -> Dict[str, Any]:
+    from morag_graph.maintenance.relationship_cleanup import run_relationship_cleanup
+
+    overrides = parse_cleanup_overrides()
+    logger.info("Running job: relationship_cleanup", overrides=overrides)
+    result = await run_relationship_cleanup(overrides)
+    return {"job": "relationship_cleanup", "result": result}
+
+
 async def main_async() -> int:
     # Jobs to run; if not set, run all (deduplication first for optimal order)
     jobs_env = os.getenv("MORAG_MAINT_JOBS")
     if not jobs_env:
-        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking", "relationship_merger"]
+        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking", "relationship_merger", "relationship_cleanup"]
     else:
         jobs = [j.strip() for j in jobs_env.split(",") if j.strip()]
 
@@ -267,6 +308,7 @@ async def main_async() -> int:
         "keyword_hierarchization": run_keyword_hierarchization_job,
         "keyword_linking": run_keyword_linking_job,
         "relationship_merger": run_relationship_merger_job,
+        "relationship_cleanup": run_relationship_cleanup_job,
     }
 
     summaries: List[Dict[str, Any]] = []

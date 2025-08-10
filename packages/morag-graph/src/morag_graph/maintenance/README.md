@@ -38,16 +38,25 @@ Merges redundant relationships to reduce graph overhead and improve performance.
 - **Bidirectional Merging**: Consolidates A→B and B→A relationships when appropriate
 - **Transitive Analysis**: Identifies and merges transitive redundancy (A→B→C where A→C exists)
 
+### 5. Relationship Cleanup (`relationship_cleanup`)
+Performs comprehensive cleanup of problematic relationships in the knowledge graph.
+
+**Features:**
+- **Meaningless Removal**: Removes "UNRELATED" and overly generic relationship types
+- **Invalid Detection**: Finds orphaned, self-referential, and type-incompatible relationships
+- **Duplicate Cleanup**: Identifies and removes exact and semantic duplicates
+- **Consolidation**: Merges similar relationships with confidence aggregation
+
 ## Running Maintenance Jobs
 
 ### Using the Maintenance Runner
 
 ```bash
-# Run all jobs (default order: deduplication, hierarchization, linking, relationship_merger)
+# Run all jobs (default order: deduplication, hierarchization, linking, relationship_merger, relationship_cleanup)
 python scripts/maintenance_runner.py
 
 # Run specific jobs
-MORAG_MAINT_JOBS="keyword_deduplication,relationship_merger" python scripts/maintenance_runner.py
+MORAG_MAINT_JOBS="keyword_deduplication,relationship_cleanup" python scripts/maintenance_runner.py
 
 # Run single job
 MORAG_MAINT_JOBS="relationship_merger" python scripts/maintenance_runner.py
@@ -71,6 +80,21 @@ All jobs support environment variable configuration:
 | `MORAG_REL_MERGE_TRANSITIVE` | false | Merge transitive relationships (conservative) |
 | `MORAG_REL_MIN_CONFIDENCE` | 0.5 | Minimum confidence for relationships to consider |
 
+#### Relationship Cleanup
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MORAG_REL_CLEANUP_DRY_RUN` | `true` | Preview changes without applying them |
+| `MORAG_REL_CLEANUP_BATCH_SIZE` | 100 | Number of relationships to process per batch |
+| `MORAG_REL_CLEANUP_LIMIT_RELATIONS` | 1000 | Maximum relationships to process per run |
+| `MORAG_REL_CLEANUP_MIN_CONFIDENCE` | 0.3 | Minimum confidence threshold for relationships |
+| `MORAG_REL_CLEANUP_REMOVE_UNRELATED` | `true` | Remove "UNRELATED" type relationships |
+| `MORAG_REL_CLEANUP_REMOVE_GENERIC` | `true` | Remove overly generic relationship types |
+| `MORAG_REL_CLEANUP_CONSOLIDATE_SIMILAR` | `true` | Merge semantically similar relationships |
+| `MORAG_REL_CLEANUP_SIMILARITY_THRESHOLD` | 0.85 | Threshold for semantic similarity merging |
+| `MORAG_REL_CLEANUP_JOB_TAG` | `""` | Job tag for tracking and idempotency |
+| `MORAG_REL_CLEANUP_ENABLE_ROTATION` | `false` | Enable rotation to prevent processing same relationships |
+
 #### Example: Relationship Merger
 
 ```bash
@@ -84,6 +108,23 @@ python scripts/maintenance_runner.py
 MORAG_MAINT_JOBS="relationship_merger" \
 MORAG_REL_DRY_RUN="true" \
 MORAG_REL_LIMIT_RELATIONS="500" \
+python scripts/maintenance_runner.py
+```
+
+#### Example: Relationship Cleanup
+
+```bash
+# Apply changes (default behavior)
+MORAG_MAINT_JOBS="relationship_cleanup" \
+MORAG_REL_CLEANUP_DRY_RUN="false" \
+MORAG_REL_CLEANUP_LIMIT_RELATIONS="500" \
+MORAG_REL_CLEANUP_MIN_CONFIDENCE="0.4" \
+python scripts/maintenance_runner.py
+
+# Dry run (preview only)
+MORAG_MAINT_JOBS="relationship_cleanup" \
+MORAG_REL_CLEANUP_DRY_RUN="true" \
+MORAG_REL_CLEANUP_REMOVE_UNRELATED="true" \
 python scripts/maintenance_runner.py
 ```
 
