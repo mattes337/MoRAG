@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import structlog
 
 from morag_graph.storage import Neo4jStorage, Neo4jConfig
+from .base import MaintenanceJobBase, validate_positive_int, validate_float_range
+from .query_optimizer import QueryOptimizer
 
 logger = structlog.get_logger(__name__)
 
@@ -38,13 +40,16 @@ class HierarchizationConfig:
     # Link parent keyword to proposals by default
     link_entities: bool = True
     job_tag: str = ""
+    # Circuit breaker settings
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_timeout: int = 60
 
     def ensure_defaults(self) -> None:
         if not self.job_tag:
             self.job_tag = f"kw_hier_{int(time.time())}"
 
 
-class KeywordHierarchizationService:
+class KeywordHierarchizationService(MaintenanceJobBase):
     """Implements the keyword hierarchization algorithm using Neo4j.
 
     Facts connect to Entity via various relation types. We treat any (f:Fact)-[r]->(e:Entity)
@@ -55,7 +60,40 @@ class KeywordHierarchizationService:
         self.storage = storage
         self.config = config or HierarchizationConfig()
         self.config.ensure_defaults()
+
+        # Initialize base class with config dict
+        config_dict = {
+            'job_tag': self.config.job_tag,
+            'dry_run': self.config.dry_run,
+            'batch_size': self.config.batch_size,
+            'circuit_breaker_threshold': self.config.circuit_breaker_threshold,
+            'circuit_breaker_timeout': self.config.circuit_breaker_timeout,
+        }
+        super().__init__(config_dict)
+
+        self.query_optimizer = QueryOptimizer(storage)
         self._llm_client = None
+
+    def validate_config(self) -> List[str]:
+        """Validate configuration and return list of errors."""
+        errors = []
+
+        # Validate integer parameters
+        errors.extend(validate_positive_int(self.config.threshold_min_facts, "threshold_min_facts", min_value=1, max_value=10000))
+        errors.extend(validate_positive_int(self.config.min_new_keywords, "min_new_keywords", min_value=1, max_value=20))
+        errors.extend(validate_positive_int(self.config.max_new_keywords, "max_new_keywords", min_value=1, max_value=50))
+        errors.extend(validate_positive_int(self.config.min_per_new_keyword, "min_per_new_keyword", min_value=1, max_value=1000))
+        errors.extend(validate_positive_int(self.config.batch_size, "batch_size", min_value=1, max_value=10000))
+
+        # Validate float parameters
+        errors.extend(validate_float_range(self.config.max_move_ratio, "max_move_ratio", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.config.cooccurrence_min_share, "cooccurrence_min_share", min_value=0.0, max_value=1.0))
+
+        # Validate logical constraints
+        if self.config.min_new_keywords > self.config.max_new_keywords:
+            errors.append("min_new_keywords must be <= max_new_keywords")
+
+        return errors
 
     async def _get_llm_client(self):
         # Always try Gemini; fallback if not available
@@ -75,33 +113,40 @@ class KeywordHierarchizationService:
 
         Returns a summary dict for logging/reporting.
         """
+        self.log_job_start()
+
+        # Validate configuration
+        config_errors = self.validate_config()
+        if config_errors:
+            raise ValueError(f"Configuration errors: {'; '.join(config_errors)}")
+
         candidates = await self._find_candidates(limit_keywords)
         summary: Dict[str, Any] = {
             "job_tag": self.config.job_tag,
             "processed": [],
+            "total_candidates": len(candidates),
+            "errors": [],
         }
-        for k in candidates:
+
+        # Process candidates with error handling
+        async def process_candidate(k):
             k_id, k_name, fact_count = k["k_id"], k["k_name"], k["fact_count"]
-            try:
-                result = await self._process_keyword(k_id, k_name, fact_count)
-                summary["processed"].append(result)
-            except Exception as e:
-                logger.error("Keyword hierarchization failed", keyword=k_name, error=str(e))
+            return await self._process_keyword(k_id, k_name, fact_count)
+
+        batch_result = await self.safe_execute_batch(candidates, process_candidate)
+        summary["processed"] = batch_result.successful
+        summary["errors"] = [str(e) for _, e in batch_result.failed]
+
+        self.log_job_complete(summary)
         return summary
 
     async def _find_candidates(self, limit_keywords: int) -> List[Dict[str, Any]]:
-        q = """
-        MATCH (k:Entity)
-        WITH k
-        MATCH (f:Fact)-[r]->(k)
-        WITH k, count(DISTINCT f) AS fact_count
-        WHERE fact_count >= $threshold
-        RETURN k.id AS k_id, k.name AS k_name, fact_count
-        ORDER BY fact_count DESC
-        LIMIT $limit_keywords
-        """
+        """Find entity candidates with high fact counts using optimized query."""
         params = {"threshold": self.config.threshold_min_facts, "limit_keywords": limit_keywords}
-        return await self.storage._connection_ops._execute_query(q, params)
+        return await self.query_optimizer.find_entities_by_fact_count(
+            min_fact_count=self.config.threshold_min_facts,
+            limit=limit_keywords
+        )
 
     async def _process_keyword(self, k_id: str, k_name: str, total_facts: int) -> Dict[str, Any]:
         # Propose related entities via co-occurrence on shared facts
@@ -280,8 +325,9 @@ class KeywordHierarchizationService:
         fallback = "ASSOCIATED_WITH"
         # If no LLM available, fallback
         if not client:
-            return fallback
-        try:
+            return f"{fallback}|A_TO_B"
+
+        async def llm_inference():
             sample_text = "\n\n".join(samples[:3]) if samples else ""
             prompt = (
                 "You are normalizing relationship types between generic keywords in a knowledge graph.\n"
@@ -305,6 +351,9 @@ class KeywordHierarchizationService:
             if rtype in {"RELATED_TO", "RELATES_TO", "IS_RELATED_TO"}:
                 rtype = fallback
             return f"{rtype}|{direction}"
+
+        try:
+            return await self.safe_llm_call(llm_inference)
         except Exception as e:
             logger.warning("LLM inference failed for entity link type; using fallback", error=str(e))
             return f"{fallback}|A_TO_B"

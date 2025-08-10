@@ -29,6 +29,15 @@ from morag_graph.extraction.systematic_deduplicator import (
     MergeCandidate
 )
 from morag_graph.models.entity import Entity
+from morag_graph.maintenance.base import (
+    MaintenanceJobBase,
+    MaintenanceJobError,
+    PartialFailureError,
+    validate_positive_int,
+    validate_float_range
+)
+from morag_graph.maintenance.config_validator import MaintenanceConfigValidator
+from morag_graph.maintenance.query_optimizer import QueryOptimizer
 
 logger = structlog.get_logger(__name__)
 
@@ -56,21 +65,60 @@ class KeywordDeduplicationConfig:
             self.job_tag = f"kw_dedup_{date_str}"
 
 
-class KeywordDeduplicationService:
+class KeywordDeduplicationService(MaintenanceJobBase):
     """Intelligent keyword deduplication using LLM-based viability analysis."""
 
     def __init__(self, storage: Neo4jStorage, config: Optional[KeywordDeduplicationConfig] = None):
+        # Convert config to dict for base class
+        config_obj = config or KeywordDeduplicationConfig()
+        config_obj.ensure_defaults()
+        config_dict = {
+            'similarity_threshold': config_obj.similarity_threshold,
+            'max_cluster_size': config_obj.max_cluster_size,
+            'min_fact_threshold': config_obj.min_fact_threshold,
+            'preserve_high_confidence': config_obj.preserve_high_confidence,
+            'semantic_similarity_weight': config_obj.semantic_similarity_weight,
+            'batch_size': config_obj.batch_size,
+            'dry_run': config_obj.dry_run,
+            'job_tag': config_obj.job_tag,
+            'limit_entities': config_obj.limit_entities,
+            'enable_rotation': config_obj.enable_rotation,
+            'process_all_if_small': config_obj.process_all_if_small
+        }
+
+        super().__init__(config_dict)
         self.storage = storage
-        self.config = config or KeywordDeduplicationConfig()
-        self.config.ensure_defaults()
+        self.config = config_obj
         self._llm_client = None
-        
+        self.query_optimizer = QueryOptimizer(storage)
+
         # Use existing deduplication infrastructure
         self.deduplicator = SystematicDeduplicator(
             similarity_threshold=self.config.similarity_threshold,
             merge_confidence_threshold=0.7,  # Lower threshold for keyword merging
             enable_llm_validation=True
         )
+
+    def validate_config(self) -> List[str]:
+        """Validate configuration and return list of errors."""
+        validation_result = MaintenanceConfigValidator.validate_job_config(
+            'keyword_deduplication',
+            self.config.__dict__
+        )
+
+        if not validation_result.is_valid:
+            logger.error("Configuration validation failed",
+                        errors=validation_result.errors,
+                        warnings=validation_result.warnings)
+
+        if validation_result.warnings:
+            logger.warning("Configuration warnings", warnings=validation_result.warnings)
+
+        if validation_result.recommendations:
+            logger.info("Configuration recommendations",
+                       recommendations=validation_result.recommendations)
+
+        return validation_result.errors
 
     async def _get_llm_client(self):
         if self._llm_client is not None:
@@ -85,30 +133,43 @@ class KeywordDeduplicationService:
 
     async def run(self) -> Dict[str, Any]:
         """Run keyword deduplication job."""
-        start_time = time.time()
-        
-        # Get candidate entities for deduplication
-        entities = await self._get_deduplication_candidates()
-        
-        if not entities:
-            return {
-                "job_tag": self.config.job_tag,
-                "processed": 0,
-                "merges_performed": 0,
-                "processing_time": time.time() - start_time,
-                "message": "No entities found for deduplication"
-            }
+        # Validate configuration first
+        config_errors = self.validate_config()
+        if config_errors:
+            raise MaintenanceJobError(f"Configuration validation failed: {'; '.join(config_errors)}")
 
-        # Find merge candidates using enhanced similarity
-        merge_candidates = await self._find_keyword_merge_candidates(entities)
-        
-        # Validate merges with LLM viability analysis
-        confirmed_merges = await self._validate_merges_with_viability_analysis(merge_candidates)
-        
-        # Apply merges if not dry run
-        merges_applied = 0
-        if not self.config.dry_run and confirmed_merges:
-            merges_applied = await self._apply_keyword_merges(confirmed_merges)
+        self.log_job_start()
+        start_time = time.time()
+
+        try:
+            # Get candidate entities for deduplication
+            entities = await self._get_deduplication_candidates()
+
+            if not entities:
+                result = {
+                    "job_tag": self.job_tag,
+                    "processed": 0,
+                    "merges_performed": 0,
+                    "processing_time": time.time() - start_time,
+                    "message": "No entities found for deduplication"
+                }
+                self.log_job_complete(result)
+                return result
+
+            # Find merge candidates using enhanced similarity
+            merge_candidates = await self._find_keyword_merge_candidates(entities)
+
+            # Validate merges with LLM viability analysis
+            confirmed_merges = await self._validate_merges_with_viability_analysis(merge_candidates)
+
+            # Apply merges if not dry run
+            merges_applied = 0
+            if not self.config.dry_run and confirmed_merges:
+                merges_applied = await self._apply_keyword_merges(confirmed_merges)
+
+        except Exception as e:
+            logger.error("Keyword deduplication job failed", error=str(e))
+            raise MaintenanceJobError(f"Job execution failed: {str(e)}") from e
 
         processing_time = time.time() - start_time
         
@@ -133,24 +194,31 @@ class KeywordDeduplicationService:
 
     async def _get_deduplication_candidates(self) -> List[Entity]:
         """Get entities that are candidates for deduplication using rotation to prevent starvation."""
-        # Get total count of all entities and eligible entities
-        total_count_query = """
-        MATCH (e:Entity)
-        RETURN count(e) AS total_count
-        """
+        try:
+            # Get total count of all entities and eligible entities using optimized queries
+            total_count_query = """
+            MATCH (e:Entity)
+            USING INDEX e:Entity(name)
+            RETURN count(e) AS total_count
+            """
 
-        eligible_count_query = """
-        MATCH (e:Entity)
-        WHERE e.confidence < $max_confidence
-        RETURN count(e) AS eligible_count
-        """
+            eligible_count_query = """
+            MATCH (e:Entity)
+            USING INDEX e:Entity(name)
+            WHERE e.confidence < $max_confidence OR e.confidence IS NULL
+            RETURN count(e) AS eligible_count
+            """
 
-        count_params = {
-            "max_confidence": self.config.preserve_high_confidence
-        }
+            count_params = {
+                "max_confidence": self.config.preserve_high_confidence
+            }
 
-        total_result = await self.storage._connection_ops._execute_query(total_count_query, {})
-        eligible_result = await self.storage._connection_ops._execute_query(eligible_count_query, count_params)
+            total_result = await self.query_optimizer._execute_with_stats(total_count_query, {}, "total_entity_count")
+            eligible_result = await self.query_optimizer._execute_with_stats(eligible_count_query, count_params, "eligible_entity_count")
+
+        except Exception as e:
+            logger.error("Failed to get entity counts", error=str(e))
+            raise MaintenanceJobError(f"Failed to get entity counts: {str(e)}") from e
 
         total_entities_all = total_result[0]["total_count"] if total_result else 0
         total_entities = eligible_result[0]["eligible_count"] if eligible_result else 0
@@ -374,22 +442,47 @@ class KeywordDeduplicationService:
         
         confirmed_merges = []
         
-        for candidate in candidates:
-            try:
-                should_merge, confidence, reasoning = await self._analyze_merge_viability(
-                    client, candidate
-                )
-                
-                if should_merge:
-                    candidate.merge_confidence = confidence
-                    candidate.merge_reason = "llm_approved"
-                    confirmed_merges.append(candidate)
-                    
-            except Exception as e:
-                logger.warning(f"Viability analysis failed for candidate: {e}")
+        # Process candidates in batches with error handling
+        batch_result = await self.safe_execute_batch(
+            candidates,
+            lambda candidate: self._analyze_single_merge_viability(client, candidate)
+        )
+
+        # Add successful merges to confirmed list
+        for should_merge, confidence, candidate in batch_result.successful:
+            if should_merge:
+                candidate.merge_confidence = confidence
+                candidate.merge_reason = "llm_approved"
+                confirmed_merges.append(candidate)
+
+        # Log any failures
+        if batch_result.failed:
+            logger.warning(f"Viability analysis failed for {len(batch_result.failed)} candidates",
+                         success_rate=batch_result.success_rate)
         
         logger.info(f"Confirmed {len(confirmed_merges)} merges via viability analysis")
         return confirmed_merges
+
+    async def _analyze_single_merge_viability(
+        self,
+        client,
+        candidate: MergeCandidate
+    ) -> Tuple[bool, float, MergeCandidate]:
+        """Analyze a single merge candidate with circuit breaker protection."""
+        try:
+            should_merge, confidence, reasoning = await self.safe_llm_call(
+                self._analyze_merge_viability, client, candidate
+            )
+            return should_merge, confidence, candidate
+        except Exception as e:
+            logger.error("LLM viability analysis failed",
+                        candidate=candidate.primary_entity.name,
+                        error=str(e))
+            # Fall back to rule-based validation for this candidate
+            rule_based_result = self._rule_based_validation([candidate])
+            if rule_based_result:
+                return True, 0.7, candidate  # Lower confidence for rule-based
+            return False, 0.0, candidate
 
     async def _analyze_merge_viability(
         self, 

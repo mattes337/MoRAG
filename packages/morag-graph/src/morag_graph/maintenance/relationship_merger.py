@@ -25,6 +25,8 @@ import structlog
 
 from morag_graph.storage import Neo4jStorage, Neo4jConfig
 from morag_reasoning.llm import LLMClient
+from .base import MaintenanceJobBase, validate_positive_int, validate_float_range
+from .query_optimizer import QueryOptimizer
 
 logger = structlog.get_logger(__name__)
 
@@ -40,6 +42,9 @@ class RelationshipMergerConfig:
     merge_bidirectional: bool = True        # Merge bidirectional relationships
     merge_transitive: bool = False          # Merge transitive relationships (conservative)
     min_confidence: float = 0.5             # Minimum confidence for relationships to consider
+    # Circuit breaker settings
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_timeout: int = 60
 
     def ensure_defaults(self) -> None:
         """Ensure all configuration values are within valid ranges."""
@@ -47,6 +52,8 @@ class RelationshipMergerConfig:
         self.batch_size = max(1, self.batch_size)
         self.limit_relations = max(1, self.limit_relations)
         self.min_confidence = max(0.0, min(1.0, self.min_confidence))
+        if not self.job_tag:
+            self.job_tag = f"rel_merger_{int(time.time())}"
 
 
 @dataclass
@@ -99,7 +106,7 @@ class RelationshipMergerResult:
         }
 
 
-class RelationshipMerger:
+class RelationshipMerger(MaintenanceJobBase):
     """Handles relationship merging operations."""
 
     def __init__(self, config: RelationshipMergerConfig, neo4j_storage: Neo4jStorage, llm_client: LLMClient):
@@ -108,8 +115,57 @@ class RelationshipMerger:
         self.llm_client = llm_client
         self.logger = logger.bind(component="relationship_merger")
 
+        # Initialize base class with config dict
+        config_dict = {
+            'job_tag': self.config.job_tag,
+            'dry_run': self.config.dry_run,
+            'batch_size': self.config.batch_size,
+            'circuit_breaker_threshold': self.config.circuit_breaker_threshold,
+            'circuit_breaker_timeout': self.config.circuit_breaker_timeout,
+        }
+        super().__init__(config_dict)
+
+        self.query_optimizer = QueryOptimizer(neo4j_storage)
+
+    def validate_config(self) -> List[str]:
+        """Validate configuration and return list of errors."""
+        errors = []
+
+        # Validate integer parameters
+        errors.extend(validate_positive_int(self.config.batch_size, "batch_size", min_value=1, max_value=10000))
+        errors.extend(validate_positive_int(self.config.limit_relations, "limit_relations", min_value=1, max_value=100000))
+
+        # Validate float parameters
+        errors.extend(validate_float_range(self.config.similarity_threshold, "similarity_threshold", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.config.min_confidence, "min_confidence", min_value=0.0, max_value=1.0))
+
+        return errors
+
+    async def run(self) -> Dict[str, Any]:
+        """Run the relationship merger process."""
+        result = await self.run_merger()
+        return {
+            "total_relationships": result.total_relationships,
+            "processed_relationships": result.processed_relationships,
+            "duplicate_merges": result.duplicate_merges,
+            "semantic_merges": result.semantic_merges,
+            "bidirectional_merges": result.bidirectional_merges,
+            "transitive_merges": result.transitive_merges,
+            "total_merges": result.total_merges,
+            "processing_time": result.processing_time,
+            "dry_run": result.dry_run,
+            "job_tag": result.job_tag
+        }
+
     async def run_merger(self) -> RelationshipMergerResult:
         """Run the relationship merger process."""
+        self.log_job_start()
+
+        # Validate configuration
+        config_errors = self.validate_config()
+        if config_errors:
+            raise ValueError(f"Configuration errors: {'; '.join(config_errors)}")
+
         start_time = time.time()
         self.config.ensure_defaults()
 
@@ -376,7 +432,7 @@ class RelationshipMerger:
         """
 
         try:
-            response = await self.llm_client.generate(prompt)
+            response = await self.safe_llm_call(self.llm_client.generate, prompt)
 
             # Handle empty or whitespace-only responses
             if not response or not response.strip():

@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import structlog
 
 from morag_graph.storage import Neo4jStorage, Neo4jConfig
+from .base import MaintenanceJobBase, validate_positive_int, validate_float_range
+from .query_optimizer import QueryOptimizer
 
 logger = structlog.get_logger(__name__)
 
@@ -45,12 +47,17 @@ class RelationshipCleanupConfig:
     consolidate_similar: bool = True            # Merge semantically similar relationships
     similarity_threshold: float = 0.85          # Threshold for semantic similarity merging
     job_tag: str = ""                          # Job tag for tracking
+    # Circuit breaker settings
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_timeout: int = 60
 
     def ensure_defaults(self) -> None:
         """Ensure all configuration values are within valid ranges."""
         self.similarity_threshold = max(0.0, min(1.0, self.similarity_threshold))
         self.batch_size = max(1, self.batch_size)
         self.min_confidence = max(0.0, min(1.0, self.min_confidence))
+        if not self.job_tag:
+            self.job_tag = f"rel_cleanup_{int(time.time())}"
 
 
 
@@ -82,13 +89,25 @@ class RelationshipCleanupResult:
             }
 
 
-class RelationshipCleanupService:
+class RelationshipCleanupService(MaintenanceJobBase):
     """Service for cleaning up problematic relationships in the knowledge graph."""
 
     def __init__(self, storage: Neo4jStorage, config: Optional[RelationshipCleanupConfig] = None):
         self.neo4j_storage = storage
         self.config = config or RelationshipCleanupConfig()
         self.config.ensure_defaults()
+
+        # Initialize base class with config dict
+        config_dict = {
+            'job_tag': self.config.job_tag,
+            'dry_run': self.config.dry_run,
+            'batch_size': self.config.batch_size,
+            'circuit_breaker_threshold': self.config.circuit_breaker_threshold,
+            'circuit_breaker_timeout': self.config.circuit_breaker_timeout,
+        }
+        super().__init__(config_dict)
+
+        self.query_optimizer = QueryOptimizer(storage)
 
         # Initialize LLM client for assessment
         self._llm_client = None
@@ -120,8 +139,32 @@ class RelationshipCleanupService:
             "CREATED_BY", "AUTHORED_BY", "LOCATED_IN"
         }
 
+    def validate_config(self) -> List[str]:
+        """Validate configuration and return list of errors."""
+        errors = []
+
+        # Validate integer parameters
+        errors.extend(validate_positive_int(self.config.batch_size, "batch_size", min_value=1, max_value=10000))
+
+        # Validate float parameters
+        errors.extend(validate_float_range(self.config.min_confidence, "min_confidence", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.config.similarity_threshold, "similarity_threshold", min_value=0.0, max_value=1.0))
+
+        return errors
+
+    async def run(self) -> Dict[str, Any]:
+        """Run the relationship cleanup process."""
+        return await self.run_cleanup()
+
     async def run_cleanup(self) -> RelationshipCleanupResult:
         """Run the relationship cleanup process with intelligent performance optimization."""
+        self.log_job_start()
+
+        # Validate configuration
+        config_errors = self.validate_config()
+        if config_errors:
+            raise ValueError(f"Configuration errors: {'; '.join(config_errors)}")
+
         start_time = time.time()
         result = RelationshipCleanupResult(dry_run=self.config.dry_run)
 
@@ -240,7 +283,7 @@ Respond with JSON:
     "reasoning": "explanation of decisions"
 }}"""
 
-            response = await self._llm_client.generate_text(prompt)
+            response = await self.safe_llm_call(self._llm_client.generate_text, prompt)
 
             # Parse JSON response
             import json
@@ -341,7 +384,7 @@ Respond with JSON:
     "reason": "explanation"
 }}"""
 
-                response = await self._llm_client.generate_text(prompt)
+                response = await self.safe_llm_call(self._llm_client.generate_text, prompt)
 
                 # Parse JSON response
                 import json

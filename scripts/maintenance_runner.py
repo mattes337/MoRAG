@@ -265,11 +265,38 @@ async def run_keyword_linking_job() -> Dict[str, Any]:
 
 async def run_keyword_deduplication_job() -> Dict[str, Any]:
     from morag_graph.maintenance.keyword_deduplication import run_keyword_deduplication
+    from morag_graph.maintenance.base import MaintenanceJobError, PartialFailureError
 
     overrides = parse_kwd_overrides()
     logger.info("Running job: keyword_deduplication", overrides=overrides)
-    result = await run_keyword_deduplication(overrides)
-    return {"job": "keyword_deduplication", "result": result}
+
+    try:
+        result = await run_keyword_deduplication(overrides)
+        return {"job": "keyword_deduplication", "result": result, "status": "success"}
+    except PartialFailureError as e:
+        logger.warning("Job completed with partial failures",
+                      successful=e.successful_count,
+                      failed=e.failed_count,
+                      error=str(e))
+        return {
+            "job": "keyword_deduplication",
+            "result": {"error": str(e), "partial_success": True},
+            "status": "partial_failure"
+        }
+    except MaintenanceJobError as e:
+        logger.error("Job failed with maintenance error", error=str(e))
+        return {
+            "job": "keyword_deduplication",
+            "result": {"error": str(e)},
+            "status": "failed"
+        }
+    except Exception as e:
+        logger.error("Job failed with unexpected error", error=str(e))
+        return {
+            "job": "keyword_deduplication",
+            "result": {"error": f"Unexpected error: {str(e)}"},
+            "status": "failed"
+        }
 
 
 async def run_relationship_merger_job() -> Dict[str, Any]:
@@ -325,17 +352,48 @@ async def main_async() -> int:
         try:
             summary = await handler()
             summaries.append(summary)
+
+            # Check job status and handle accordingly
+            status = summary.get("status", "unknown")
+            if status == "failed":
+                error_msg = summary.get("result", {}).get("error", "Unknown error")
+                logger.error("Maintenance job failed", job=job, error=error_msg)
+                errors.append(f"{job}: {error_msg}")
+                if fail_fast:
+                    break
+            elif status == "partial_failure":
+                error_msg = summary.get("result", {}).get("error", "Partial failure")
+                logger.warning("Maintenance job had partial failures", job=job, error=error_msg)
+                # Don't add to errors list for partial failures unless fail_fast is enabled
+                if fail_fast:
+                    errors.append(f"{job}: {error_msg}")
+                    break
+            else:
+                logger.info("Maintenance job completed successfully", job=job)
+
         except Exception as e:
-            logger.error("Maintenance job failed", job=job, error=str(e))
+            logger.error("Maintenance job failed with exception", job=job, error=str(e))
             errors.append(f"{job}: {e}")
             if fail_fast:
                 break
+
+    # Calculate success metrics
+    successful_jobs = [s for s in summaries if s.get("status") == "success"]
+    partial_failures = [s for s in summaries if s.get("status") == "partial_failure"]
+    failed_jobs = [s for s in summaries if s.get("status") == "failed"]
 
     output = {
         "jobs": jobs,
         "summaries": summaries,
         "errors": errors,
         "success": len(errors) == 0,
+        "metrics": {
+            "total_jobs": len(jobs),
+            "successful": len(successful_jobs),
+            "partial_failures": len(partial_failures),
+            "failed": len(failed_jobs),
+            "success_rate": len(successful_jobs) / len(jobs) if jobs else 0
+        }
     }
     print(json.dumps(output, indent=2))
     return 0 if len(errors) == 0 else 1
