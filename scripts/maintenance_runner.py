@@ -6,6 +6,7 @@ Currently supported jobs:
 - keyword_deduplication
 - keyword_hierarchization
 - keyword_linking
+- relationship_merger
 
 Exit code is non-zero if any selected job fails (respecting fail-fast behavior).
 """
@@ -62,7 +63,7 @@ def parse_kwh_overrides() -> Dict[str, Any]:
         "MORAG_KWH_BATCH_SIZE": ("batch_size", int),
         "MORAG_KWH_DETACH_MOVED": ("detach_moved", lambda v: v.strip().lower() == "true"),
         # Linking defaults to True and uses LLM to infer types; no envs for toggling/type
-        "MORAG_KWH_APPLY": ("dry_run", lambda v: not (v.strip().lower() == "true")),
+        "MORAG_KWH_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
         "MORAG_KWH_JOB_TAG": ("job_tag", str),
         "MORAG_KWH_LIMIT_KEYWORDS": ("limit_keywords", int),
     }
@@ -99,6 +100,77 @@ def parse_kwd_overrides() -> Dict[str, Any]:
         "MORAG_KWD_BATCH_SIZE": ("batch_size", int),
         "MORAG_KWD_LIMIT_ENTITIES": ("limit_entities", int),
         "MORAG_KWD_APPLY": ("dry_run", lambda v: not (v.strip().lower() == "true")),
+        "MORAG_KWD_JOB_TAG": ("job_tag", str),
+        "MORAG_KWD_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
+        "MORAG_KWD_PROCESS_ALL_SMALL": ("process_all_if_small", lambda v: v.strip().lower() == "true"),
+    }
+
+
+def parse_rel_merger_overrides() -> Dict[str, Any]:
+    """Parse relationship merger environment variables."""
+    mapping = {
+        "MORAG_REL_SIMILARITY_THRESHOLD": ("similarity_threshold", float),
+        "MORAG_REL_BATCH_SIZE": ("batch_size", int),
+        "MORAG_REL_LIMIT_RELATIONS": ("limit_relations", int),
+        "MORAG_REL_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_JOB_TAG": ("job_tag", str),
+        "MORAG_REL_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_MERGE_BIDIRECTIONAL": ("merge_bidirectional", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_MERGE_TRANSITIVE": ("merge_transitive", lambda v: v.strip().lower() == "true"),
+        "MORAG_REL_MIN_CONFIDENCE": ("min_confidence", float),
+    }
+
+    overrides: Dict[str, Any] = {}
+    for env_key, (param_key, caster) in mapping.items():
+        val = os.getenv(env_key)
+        if val is not None and val != "":
+            try:
+                overrides[param_key] = caster(val)
+            except Exception:
+                logger.warning("Invalid env value for relationship merger override", key=env_key, value=val)
+
+    # Ensure dry_run defaults to False (apply changes by default)
+    if "dry_run" not in overrides:
+        overrides["dry_run"] = False
+
+    # Ensure rotation defaults to True (prevent starvation)
+    if "enable_rotation" not in overrides:
+        overrides["enable_rotation"] = True
+
+    # Ensure bidirectional merge defaults to True
+    if "merge_bidirectional" not in overrides:
+        overrides["merge_bidirectional"] = True
+
+    # Ensure transitive merge defaults to False (more conservative)
+    if "merge_transitive" not in overrides:
+        overrides["merge_transitive"] = False
+
+    # Log job_tag for rotation tracking
+    if "job_tag" in overrides:
+        logger.info("Using explicit job_tag for rotation", job_tag=overrides["job_tag"])
+    else:
+        logger.info("Using default date-based job_tag for rotation (set MORAG_REL_JOB_TAG for custom rotation)")
+
+    # Log batch size clarification if set
+    if "limit_relations" in overrides:
+        logger.info("Rotation batch size configured", limit_relations=overrides["limit_relations"])
+    if "batch_size" in overrides:
+        logger.info("Merge batch size configured (internal processing)", batch_size=overrides["batch_size"])
+
+    return overrides
+
+
+def parse_kwd_overrides() -> Dict[str, Any]:
+    """Parse keyword deduplication environment variables."""
+    mapping = {
+        "MORAG_KWD_SIMILARITY_THRESHOLD": ("similarity_threshold", float),
+        "MORAG_KWD_MAX_CLUSTER_SIZE": ("max_cluster_size", int),
+        # "MORAG_KWD_MIN_FACTS": ("min_fact_threshold", int),  # REMOVED - filter was counterproductive
+        "MORAG_KWD_PRESERVE_CONFIDENCE": ("preserve_high_confidence", float),
+        "MORAG_KWD_SEMANTIC_WEIGHT": ("semantic_similarity_weight", float),
+        "MORAG_KWD_BATCH_SIZE": ("batch_size", int),
+        "MORAG_KWD_LIMIT_ENTITIES": ("limit_entities", int),
+        "MORAG_KWD_DRY_RUN": ("dry_run", lambda v: v.strip().lower() == "true"),
         "MORAG_KWD_JOB_TAG": ("job_tag", str),
         "MORAG_KWD_ENABLE_ROTATION": ("enable_rotation", lambda v: v.strip().lower() == "true"),
         "MORAG_KWD_PROCESS_ALL_SMALL": ("process_all_if_small", lambda v: v.strip().lower() == "true"),
@@ -170,11 +242,20 @@ async def run_keyword_deduplication_job() -> Dict[str, Any]:
     return {"job": "keyword_deduplication", "result": result}
 
 
+async def run_relationship_merger_job() -> Dict[str, Any]:
+    from morag_graph.maintenance.relationship_merger import run_relationship_merger
+
+    overrides = parse_rel_merger_overrides()
+    logger.info("Running job: relationship_merger", overrides=overrides)
+    result = await run_relationship_merger(overrides)
+    return {"job": "relationship_merger", "result": result}
+
+
 async def main_async() -> int:
     # Jobs to run; if not set, run all (deduplication first for optimal order)
     jobs_env = os.getenv("MORAG_MAINT_JOBS")
     if not jobs_env:
-        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking"]
+        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking", "relationship_merger"]
     else:
         jobs = [j.strip() for j in jobs_env.split(",") if j.strip()]
 
@@ -185,6 +266,7 @@ async def main_async() -> int:
         "keyword_deduplication": run_keyword_deduplication_job,
         "keyword_hierarchization": run_keyword_hierarchization_job,
         "keyword_linking": run_keyword_linking_job,
+        "relationship_merger": run_relationship_merger_job,
     }
 
     summaries: List[Dict[str, Any]] = []
