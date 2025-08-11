@@ -383,7 +383,9 @@ class EntityOperations(BaseOperations):
         # Method 2: Text pattern matching as fallback
         if not chunks:
             # Create a case-insensitive regex pattern for each entity name
-            patterns = [f"(?i)\\b{name.replace(' ', '\\s+')}\\b" for name in entity_names]
+            word_boundary = r'\b'
+            whitespace_pattern = r'\s+'
+            patterns = [f"(?i){word_boundary}{name.replace(' ', whitespace_pattern)}{word_boundary}" for name in entity_names]
 
             query = """
             MATCH (c:DocumentChunk)
