@@ -56,8 +56,8 @@ click>=8.1.0
 markitdown>=0.1.2
 
 # PDF Processing
-pypdf>=5.6.0
-pdfminer.six>=20250506
+pypdf>=5.6.0,<6.0.0
+pdfminer.six>=20241201,<20250506
 
 # Office Documents
 python-docx>=1.1.2
@@ -70,10 +70,10 @@ nltk>=3.9.0
 langdetect>=1.0.9
 
 # Markdown and HTML
-markdown>=3.7
-markdownify>=0.11.6
-beautifulsoup4>=4.13.0
-html2text>=2025.4.15
+markdown>=3.7,<4.0.0
+markdownify>=0.11.6,<1.0.0
+beautifulsoup4>=4.13.0,<5.0.0
+html2text>=2024.2.26,<2025.4.15
 
 # ============================================================================
 # AUDIO PROCESSING DEPENDENCIES
@@ -104,7 +104,7 @@ speechbrain>=1.0.0
 tensorboardx>=2.6.0
 
 # Audio Utilities
-audioop-lts>=0.2.1
+audioop-lts>=0.2.1; python_version<="3.11"
 onnxruntime>=1.22.0
 
 # ============================================================================
@@ -112,29 +112,29 @@ onnxruntime>=1.22.0
 # ============================================================================
 
 # Video Processing
-opencv-python>=4.11.0
-moviepy>=2.2.0
-imageio>=2.37.0
-imageio-ffmpeg>=0.6.0
+opencv-python>=4.10.0,<4.11.0
+moviepy>=2.1.0,<2.2.0
+imageio>=2.35.0,<2.37.0
+imageio-ffmpeg>=0.5.0,<0.6.0
 
 # ============================================================================
 # IMAGE PROCESSING DEPENDENCIES
 # ============================================================================
 
 # Image Processing and OCR
-Pillow>=10.4.0
-pytesseract>=0.3.13
-easyocr>=1.7.2
-opencv-python-headless>=4.11.0
+Pillow>=10.4.0,<11.0.0
+pytesseract>=0.3.13,<1.0.0
+easyocr>=1.7.2,<2.0.0
+opencv-python-headless>=4.10.0,<4.11.0
 
 # ============================================================================
 # WEB SCRAPING DEPENDENCIES
 # ============================================================================
 
 # Web Content Extraction
-yt-dlp>=2025.5.22
-playwright>=1.40.0
-trafilatura>=1.6.0
+yt-dlp>=2024.12.13,<2025.5.22
+playwright>=1.40.0,<2.0.0
+trafilatura>=1.6.0,<2.0.0
 
 # ============================================================================
 # GRAPH AND KNOWLEDGE EXTRACTION
@@ -151,10 +151,10 @@ langextract>=1.0.0
 # ============================================================================
 
 # Scientific Computing
-numpy>=2.2.0
-pandas>=2.2.0
-scipy>=1.15.0
-scikit-learn>=1.6.0
+numpy>=2.1.0,<2.2.0
+pandas>=2.1.0,<2.2.0
+scipy>=1.13.0,<1.15.0
+scikit-learn>=1.5.0,<1.6.0
 
 # ============================================================================
 # DEVELOPMENT AND TESTING (Optional - uncomment for development)
