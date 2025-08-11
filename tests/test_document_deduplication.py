@@ -203,7 +203,7 @@ class TestMarkdownConversionWithDeduplication:
     @patch('morag.api_models.endpoints.conversion.get_deduplication_service')
     def test_convert_without_document_id(self, mock_get_service, client, sample_text_file):
         """Test conversion without document ID (auto-generation)."""
-        mock_service = AsyncMock()
+        mock_service = Mock()
         mock_service.generate_document_id.return_value = "auto-generated-123"
         mock_get_service.return_value = mock_service
         
