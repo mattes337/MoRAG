@@ -1,6 +1,6 @@
 # ============================================================================
-# MoRAG - Multimodal RAG Ingestion Pipeline
-# Complete Requirements File for Production Installation
+# MoRAG - Docker-Compatible Requirements File
+# Minimal requirements with Python 3.11 compatibility
 # ============================================================================
 
 # ============================================================================
@@ -8,140 +8,120 @@
 # ============================================================================
 
 # FastAPI and Web Framework
-fastapi==0.115.4
-uvicorn==0.32.1
-python-multipart==0.0.17
-starlette==0.41.3
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+starlette==0.27.0
 
 # Pydantic and Data Validation
-pydantic>=2.10.0,<2.11.2
-pydantic-settings>=2.7.0,<3.0.0
-pydantic-ai>=0.3.4,<1.0.0
+pydantic>=2.5.0,<2.10.0
+pydantic-settings>=2.1.0,<2.7.0
 
 # Task Queue and Background Processing
-celery==5.3.6
-redis==5.2.1
+celery==5.3.4
+redis==5.0.1
 
 # Vector Database and Search
-qdrant-client==1.12.1
+qdrant-client==1.7.0
 
 # LLM and AI Services
-google-genai>=1.15.0,<1.18.0
-google-generativeai>=0.3.2,<1.0.0
+google-generativeai>=0.3.2,<0.8.0
 
 # gRPC and Protocol Buffers (version compatibility fixes)
-grpcio>=1.73.0,<2.0.0
-grpcio-status>=1.62.3,<2.0.0
-grpcio-tools>=1.73.0,<2.0.0
-protobuf>=6.30.0,<7.0.0
+grpcio>=1.60.0,<1.73.0
+grpcio-status>=1.60.0,<1.73.0
+grpcio-tools>=1.60.0,<1.73.0
+protobuf>=4.25.0,<5.0.0
 
 # HTTP and Network
-httpx==0.28.1
-aiofiles==24.1.0
-requests>=2.32.0
+httpx==0.25.2
+aiofiles==23.2.1
+requests>=2.31.0,<2.33.0
 
 # Configuration and Environment
-python-dotenv==1.0.1
-structlog==24.4.0
+python-dotenv==1.0.0
+structlog==23.2.0
 
 # System and Utilities
-psutil==6.1.0
-click>=8.1.0
+psutil==5.9.6
+click>=8.1.0,<9.0.0
 
 # ============================================================================
 # DOCUMENT PROCESSING DEPENDENCIES
 # ============================================================================
 
 # Universal Document Conversion
-markitdown>=0.1.2
+markitdown>=0.0.1,<0.1.0
 
 # PDF Processing
-pypdf>=5.6.0,<6.0.0
-pdfminer.six>=20241201,<20250506
+pypdf>=3.0.0,<4.0.0
+pdfminer.six>=20221105,<20241201
 
 # Office Documents
-python-docx>=1.1.2
-openpyxl>=3.1.5
-python-pptx>=1.0.2
+python-docx>=0.8.11,<1.2.0
+openpyxl>=3.1.0,<3.2.0
+python-pptx>=0.6.21,<1.1.0
 
 # Text Processing and NLP
-spacy>=3.8.0
-nltk>=3.9.0
-langdetect>=1.0.9
+spacy>=3.7.0,<3.8.0
+nltk>=3.8.0,<3.9.0
+langdetect>=1.0.9,<2.0.0
 
 # Markdown and HTML
-markdown>=3.7,<4.0.0
-markdownify>=0.11.6,<1.0.0
-beautifulsoup4>=4.13.0,<5.0.0
-html2text>=2024.2.26,<2025.4.15
+markdown>=3.5.0,<3.7.0
+markdownify>=0.11.6,<0.12.0
+beautifulsoup4>=4.12.0,<4.13.0
+html2text>=2020.1.16,<2024.0.0
 
 # ============================================================================
 # AUDIO PROCESSING DEPENDENCIES
 # ============================================================================
 
 # Audio Conversion and Processing
-pydub>=0.25.1
-ffmpeg-python>=0.2.0
-mutagen>=1.47.0
-soundfile>=0.13.0
-audioread>=3.0.0
+pydub>=0.25.1,<0.26.0
+ffmpeg-python>=0.2.0,<0.3.0
+mutagen>=1.47.0,<1.48.0
+soundfile>=0.12.0,<0.13.0
+audioread>=3.0.0,<3.1.0
 
 # Speech Recognition and Transcription
-faster-whisper>=1.1.0
-
-# Advanced Audio Processing
-pyannote.audio>=3.3.0,<4.0.0
-sentence-transformers>=3.0.0,<5.0.0
-torch>=2.1.0,<2.7.0
-torchaudio>=2.1.0,<2.7.0
-
-# PyAnnote.audio dependencies
-asteroid-filterbanks>=0.4.0,<1.0.0
-pytorch-lightning>=2.0.0,<2.5.0
-pyannote-metrics>=3.2.0,<4.0.0
-pytorch-metric-learning>=2.0.0,<3.0.0
-speechbrain>=0.5.0,<1.0.0
-tensorboardx>=2.6.0,<3.0.0
-
-# Audio Utilities
-audioop-lts>=0.2.1; python_version<="3.11"
-onnxruntime>=1.22.0
+faster-whisper>=0.10.0,<1.1.0
 
 # ============================================================================
 # VIDEO PROCESSING DEPENDENCIES
 # ============================================================================
 
 # Video Processing
-opencv-python>=4.10.0,<4.11.0
-moviepy>=2.1.0,<2.2.0
-imageio>=2.35.0,<2.37.0
-imageio-ffmpeg>=0.5.0,<0.6.0
+opencv-python>=4.8.0,<4.10.0
+moviepy>=1.0.3,<2.1.0
+imageio>=2.31.0,<2.35.0
+imageio-ffmpeg>=0.4.8,<0.5.0
 
 # ============================================================================
 # IMAGE PROCESSING DEPENDENCIES
 # ============================================================================
 
 # Image Processing and OCR
-Pillow>=10.4.0,<11.0.0
-pytesseract>=0.3.13,<1.0.0
-easyocr>=1.7.2,<2.0.0
-opencv-python-headless>=4.10.0,<4.11.0
+Pillow>=10.0.0,<10.4.0
+pytesseract>=0.3.10,<0.4.0
+easyocr>=1.7.0,<1.8.0
+opencv-python-headless>=4.8.0,<4.10.0
 
 # ============================================================================
 # WEB SCRAPING DEPENDENCIES
 # ============================================================================
 
 # Web Content Extraction
-yt-dlp>=2024.12.13,<2025.5.22
-playwright>=1.40.0,<2.0.0
-trafilatura>=1.6.0,<2.0.0
+yt-dlp>=2023.12.30,<2024.12.0
+playwright>=1.40.0,<1.45.0
+trafilatura>=1.6.0,<1.7.0
 
 # ============================================================================
 # GRAPH AND KNOWLEDGE EXTRACTION
 # ============================================================================
 
 # Graph Database
-neo4j>=5.15.0,<6.0.0
+neo4j>=5.15.0,<5.28.0
 
 # Entity and Relation Extraction
 langextract>=1.0.0,<2.0.0
@@ -151,44 +131,35 @@ langextract>=1.0.0,<2.0.0
 # ============================================================================
 
 # Scientific Computing
-numpy>=2.1.0,<2.2.0
-pandas>=2.1.0,<2.2.0
-scipy>=1.13.0,<1.15.0
-scikit-learn>=1.5.0,<1.6.0
+numpy>=1.24.0,<2.1.0
+pandas>=2.0.0,<2.1.0
+scipy>=1.11.0,<1.13.0
+scikit-learn>=1.3.0,<1.5.0
 
 # ============================================================================
-# DEVELOPMENT AND TESTING (Optional - uncomment for development)
+# MACHINE LEARNING (Minimal versions for Python 3.11 compatibility)
 # ============================================================================
 
-# Testing Framework
-# pytest>=8.3.0
-# pytest-asyncio>=1.0.0
-# pytest-cov>=6.1.0
+# PyTorch CPU-only (compatible versions)
+torch>=2.0.0,<2.1.0
+torchaudio>=2.0.0,<2.1.0
 
-# Code Quality
-# black>=25.1.0
-# isort>=6.0.0
-# flake8>=7.2.0
-# mypy>=1.16.0
+# Transformers and Embeddings
+sentence-transformers>=2.2.0,<3.0.0
 
-# Pre-commit Hooks
-# pre-commit>=4.2.0
+# Audio Processing (minimal)
+# pyannote.audio - EXCLUDED due to Python 3.13 requirements
+# speechbrain - EXCLUDED due to Python 3.13 requirements
+# pytorch-lightning - EXCLUDED due to Python 3.13 requirements
 
 # ============================================================================
 # INSTALLATION INSTRUCTIONS
 # ============================================================================
 #
-# Basic Installation:
-#   pip install -r requirements.txt
+# This is a Docker-compatible requirements file with Python 3.11 support.
+# Some advanced audio processing features are disabled to maintain compatibility.
 #
-# Development Installation:
-#   1. Uncomment development dependencies above
-#   2. pip install -r requirements.txt
-#
-# Alternative Installation Methods:
-#   pip install -e ".[all-extras]"  # Install with all optional dependencies
-#   pip install -e ".[audio]"       # Install with audio processing only
-#   pip install -e ".[video]"       # Install with video processing only
-#   pip install -e ".[web]"         # Install with web scraping only
+# To use this file:
+#   pip install -r requirements-docker.txt
 #
 # ============================================================================

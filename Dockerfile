@@ -28,8 +28,8 @@ FROM base AS dependencies
 # Set working directory for consistent paths
 WORKDIR /build
 
-# Copy only requirements.txt first (this layer will be cached unless requirements.txt changes)
-COPY requirements.txt ./
+# Copy only requirements-docker.txt first (this layer will be cached unless requirements-docker.txt changes)
+COPY requirements-docker.txt ./requirements.txt
 
 # Install PyTorch CPU-only version first for compatibility
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
