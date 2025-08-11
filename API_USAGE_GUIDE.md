@@ -1,106 +1,124 @@
-# MoRAG API Usage Guide - Fixed and Updated
+# MoRAG API Usage Guide
 
-This guide provides corrected API usage examples for all MoRAG content types with the latest fixes applied.
+This guide provides comprehensive API usage examples for all MoRAG content types using the unified processing endpoint.
 
-## � Important: Dual Format Output
+## 🚀 Unified Processing Endpoint
 
-**MoRAG now provides dual format output to optimize for different use cases:**
+**MoRAG provides a single, unified endpoint for all processing needs:**
+
+`POST /api/v1/process` - Handles all content types and processing modes
+
+**Three Processing Modes:**
+- **Convert Mode** (`mode=convert`) - Fast markdown conversion for UI preview
+- **Process Mode** (`mode=process`) - Full processing with immediate results
+- **Ingest Mode** (`mode=ingest`) - Full processing + vector storage (background)
+
+**Three Source Types:**
+- **File Upload** (`source_type=file`) - Upload files via multipart form
+- **URL Processing** (`source_type=url`) - Process web content and URLs
+- **Batch Processing** (`source_type=batch`) - Process multiple items
+
+## 📊 Dual Format Output
+
+**MoRAG provides optimized output formats:**
 
 - **API Responses**: Structured JSON format for easy integration and webhooks
-- **Qdrant Storage**: Markdown format for optimal vector search and retrieval
+- **Vector Storage**: Markdown format for optimal vector search and retrieval
 
 This ensures that:
 - API consumers receive well-structured JSON data
 - Vector storage maintains human-readable markdown for better search quality
 - Both formats are generated efficiently during processing
 
-## �🔧 Fixed Issues
+## 📚 API Usage Examples
 
-### ✅ Image Processing
-- **Issue**: `UnsupportedFormatError: Unsupported format: Format 'image' is not supported`
-- **Fix**: Added image file extensions to content type detection and image processing route to orchestrator
-- **Status**: ✅ FIXED
-
-### ✅ Web Processing Routing
-- **Issue**: `/process/url` returns `'string' is not a valid ContentType` error
-- **Fix**: Fixed orchestrator routing to use services instead of direct processor calls
-- **Status**: ✅ FIXED
-
-### ✅ YouTube Processing Routing
-- **Issue**: `/process/youtube` returns `YouTubeProcessor does not support file processing`
-- **Fix**: Fixed orchestrator routing to use services instead of direct processor calls
-- **Status**: ✅ FIXED
-
-### ✅ Audio Processing Configuration
-- **Issue**: Diarization and topic segmentation disabled by default
-- **Fix**: Changed default configuration to enable both features
-- **Status**: ✅ FIXED
-
-### ✅ Structured JSON Output
-- **Issue**: All processors returned markdown instead of structured JSON
-- **Fix**: Implemented JSON output format for audio and video processing
-- **Status**: ✅ FIXED
-
-## 📚 Corrected API Usage Examples
-
-### 1. Image Processing
+### 1. Convert Mode - Fast Markdown Conversion
 
 ```bash
-# Upload PNG/JPEG files
-curl -X POST "http://localhost:8000/process/file" \
-  -F "file=@image.png" \
-  -F "content_type=image"
+# Convert PDF to markdown for UI preview
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F "file=@document.pdf" \
+  -F 'request_data={"mode":"convert","source_type":"file"}'
 
-# Response will include extracted text and image caption
+# Convert image with text extraction
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F "file=@image.png" \
+  -F 'request_data={"mode":"convert","source_type":"file","content_type":"image"}'
 ```
 
-### 2. Web Processing
+### 2. Process Mode - Full Processing with Immediate Results
 
 ```bash
-# Process web pages
-curl -X POST "http://localhost:8000/process/web" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com",
-    "options": {}
-  }'
-
-# OR use the generic URL endpoint
-curl -X POST "http://localhost:8000/process/url" \
-  -H "Content-Type: application/json" \
-  -d '{
+# Process web page with immediate results
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F 'request_data={
+    "mode": "process",
+    "source_type": "url",
     "url": "https://example.com",
     "content_type": "web"
   }'
-```
 
-### 3. YouTube Processing
-
-```bash
-# Process YouTube videos
-curl -X POST "http://localhost:8000/process/youtube" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://youtube.com/watch?v=VIDEO_ID",
-    "options": {}
-  }'
-
-# OR use the generic URL endpoint
-curl -X POST "http://localhost:8000/process/url" \
-  -H "Content-Type: application/json" \
-  -d '{
+# Process YouTube video with immediate results
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F 'request_data={
+    "mode": "process",
+    "source_type": "url",
     "url": "https://youtube.com/watch?v=VIDEO_ID",
     "content_type": "youtube"
+  }'
+
+# Process uploaded file with immediate results
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F "file=@audio.mp3" \
+  -F 'request_data={
+    "mode": "process",
+    "source_type": "file",
+    "content_type": "audio"
+  }'
+```
+
+### 3. Ingest Mode - Background Processing + Vector Storage
+
+```bash
+# Ingest document with webhook notifications
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F "file=@document.pdf" \
+  -F 'request_data={
+    "mode": "ingest",
+    "source_type": "file",
+    "webhook_config": {
+      "url": "https://your-app.com/webhook"
+    },
+    "document_id": "doc-123"
+  }'
+
+# Ingest URL content with background processing
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F 'request_data={
+    "mode": "ingest",
+    "source_type": "url",
+    "url": "https://example.com/article",
+    "webhook_config": {
+      "url": "https://your-app.com/webhook"
+    }
   }'
 ```
 
 ### 4. Audio Processing with Structured JSON Output
 
 ```bash
-# Upload audio file with diarization and topic segmentation enabled
-curl -X POST "http://localhost:8000/process/file" \
+# Process audio file with full features
+curl -X POST "http://localhost:8000/api/v1/process" \
   -F "file=@audio.mp3" \
-  -F "content_type=audio"
+  -F 'request_data={
+    "mode": "process",
+    "source_type": "file",
+    "content_type": "audio",
+    "processing_options": {
+      "language": "en",
+      "include_metadata": true
+    }
+  }'
 ```
 
 **Expected JSON Response Format:**
@@ -152,10 +170,18 @@ curl -X POST "http://localhost:8000/process/file" \
 ### 5. Video Processing with Structured JSON Output
 
 ```bash
-# Upload video file
-curl -X POST "http://localhost:8000/process/file" \
+# Process video file with full features
+curl -X POST "http://localhost:8000/api/v1/process" \
   -F "file=@video.mp4" \
-  -F "content_type=video"
+  -F 'request_data={
+    "mode": "process",
+    "source_type": "file",
+    "content_type": "video",
+    "processing_options": {
+      "include_thumbnails": true,
+      "include_metadata": true
+    }
+  }'
 ```
 
 **Expected JSON Response Format:**
@@ -197,11 +223,18 @@ curl -X POST "http://localhost:8000/process/file" \
 ### 6. Document Processing with Chapter Splitting
 
 ```bash
-# Upload PDF document with chapter splitting
-curl -X POST "http://localhost:8000/process/file" \
+# Process PDF document with chapter splitting
+curl -X POST "http://localhost:8000/api/v1/process" \
   -F "file=@document.pdf" \
-  -F "content_type=document" \
-  -F "options={\"chunking_strategy\": \"chapter\"}"
+  -F 'request_data={
+    "mode": "process",
+    "source_type": "file",
+    "content_type": "document",
+    "processing_options": {
+      "chunking_strategy": "chapter",
+      "include_metadata": true
+    }
+  }'
 ```
 
 **Expected JSON Response Format:**
@@ -253,109 +286,179 @@ curl -X POST "http://localhost:8000/process/file" \
 }
 ```
 
-## 🔄 Endpoint Summary
+### 7. Batch Processing
 
-| Endpoint | Method | Purpose | Content Types |
-|----------|--------|---------|---------------|
-| `/process/file` | POST | Upload and process files | document, audio, video, image |
-| `/process/url` | POST | Process content from URLs (auto-detect type) | web, youtube |
-| `/process/web` | POST | Process web pages specifically | web |
-| `/process/youtube` | POST | Process YouTube videos specifically | youtube |
-| `/process/batch` | POST | Process multiple items | all types |
+```bash
+# Process multiple items in one request
+curl -X POST "http://localhost:8000/api/v1/process" \
+  -F 'request_data={
+    "mode": "ingest",
+    "source_type": "batch",
+    "items": [
+      {"url": "https://example.com/article1", "type": "web"},
+      {"url": "https://youtube.com/watch?v=abc", "type": "youtube"}
+    ],
+    "webhook_config": {
+      "url": "https://your-app.com/webhook"
+    }
+  }'
+```
 
-## 🎯 Configuration Options
+## 🔄 Unified Endpoint Summary
+
+| Mode | Purpose | Response | Storage |
+|------|---------|----------|---------|
+| `convert` | Fast markdown conversion | Immediate markdown | None |
+| `process` | Full processing | Immediate structured JSON | None |
+| `ingest` | Full processing + storage | Task ID | Vector database |
+
+| Source Type | Input Method | Supported Content |
+|-------------|--------------|-------------------|
+| `file` | Multipart upload | Documents, audio, video, images |
+| `url` | JSON request | Web pages, YouTube videos |
+| `batch` | JSON array | Multiple mixed items |
+
+## 🎯 Processing Options
 
 ### Audio Processing Options
 ```json
 {
-  "enable_diarization": true,        // Default: true (now enabled)
-  "enable_topic_segmentation": true, // Default: true (now enabled)
-  "model_size": "medium",            // tiny, base, small, medium, large-v2
-  "language": null,                  // Auto-detect if null
-  "output_format": "json"            // json, markdown, txt
+  "processing_options": {
+    "language": "en",                 // Language hint or auto-detect
+    "chunking_strategy": "topic",     // topic, time, sentence
+    "chunk_size": 4000,              // Characters per chunk
+    "chunk_overlap": 200,            // Overlap between chunks
+    "include_metadata": true         // Include processing metadata
+  }
 }
 ```
 
 ### Video Processing Options
 ```json
 {
-  "include_thumbnails": false,       // Default: false (opt-in)
-  "extract_audio": true,             // Default: true
-  "enable_speaker_diarization": true, // Default: true
-  "enable_topic_segmentation": true, // Default: true
-  "output_format": "json"            // json, markdown
+  "processing_options": {
+    "include_thumbnails": false,     // Generate video thumbnails
+    "language": "en",                // Language hint or auto-detect
+    "chunking_strategy": "topic",    // topic, time, sentence
+    "chunk_size": 4000,             // Characters per chunk
+    "include_metadata": true        // Include processing metadata
+  }
 }
 ```
 
 ### Document Processing Options
 ```json
 {
-  "chunking_strategy": "chapter",    // chapter, page, paragraph, sentence, word, character
-  "chunk_size": 1000,               // Size for non-chapter strategies
-  "chunk_overlap": 100,             // Overlap for non-chapter strategies
-  "extract_metadata": true,         // Extract document metadata
-  "extract_images": true,           // Extract images from document
-  "extract_tables": true,           // Extract tables from document
-  "output_format": "json"           // json, markdown, txt
+  "processing_options": {
+    "chunking_strategy": "chapter",  // chapter, page, paragraph, semantic
+    "chunk_size": 4000,             // Characters per chunk (non-chapter)
+    "chunk_overlap": 200,           // Overlap between chunks
+    "language": "en",               // Language hint
+    "include_metadata": true        // Include document metadata
+  }
+}
+```
+
+### Database Configuration (for Ingest Mode)
+```json
+{
+  "database_config": {
+    "neo4j_uri": "bolt://localhost:7687",
+    "neo4j_user": "neo4j",
+    "neo4j_password": "password",
+    "qdrant_url": "http://localhost:6333",
+    "qdrant_api_key": "optional-api-key",
+    "collection_name": "my_documents"
+  }
+}
+```
+
+### Webhook Configuration (for Ingest Mode)
+```json
+{
+  "webhook_config": {
+    "url": "https://your-app.com/webhook",
+    "auth_token": "optional-bearer-token"
+  }
 }
 ```
 
 **Available Chunking Strategies:**
-- `chapter`: Split by detected chapters with page numbers (recommended for books/reports)
-- `page`: Split by page boundaries (good for PDFs)
-- `paragraph`: Split by paragraphs (good for articles)
-- `sentence`: Split by sentences (fine-grained)
-- `word`: Split by words (very fine-grained)
-- `character`: Split by characters (basic splitting)
+- `chapter`: Split by detected chapters with page numbers (documents)
+- `page`: Split by page boundaries (PDFs)
+- `paragraph`: Split by paragraphs (articles)
+- `semantic`: Smart semantic splitting (recommended)
+- `topic`: Split by topic changes (audio/video)
+- `time`: Split by time intervals (audio/video)
 
 ## 🚀 Python API Usage
 
 ```python
 import asyncio
-from morag import MoRAGAPI
+import httpx
+import json
 
 async def main():
-    api = MoRAGAPI()
-    
-    # Process different content types
-    image_result = await api.process_image("image.png")
-    audio_result = await api.process_audio("audio.mp3")
-    video_result = await api.process_video("video.mp4")
-    web_result = await api.process_web_page("https://example.com")
-    youtube_result = await api.process_youtube_video("https://youtube.com/watch?v=123")
-    
-    # Auto-detect content type from URL
-    auto_result = await api.process_url("https://example.com")
-    
-    await api.cleanup()
+    base_url = "http://localhost:8000"
+
+    async with httpx.AsyncClient() as client:
+        # Convert mode - fast markdown conversion
+        with open("document.pdf", "rb") as f:
+            response = await client.post(
+                f"{base_url}/api/v1/process",
+                files={"file": f},
+                data={"request_data": json.dumps({
+                    "mode": "convert",
+                    "source_type": "file"
+                })}
+            )
+        convert_result = response.json()
+
+        # Process mode - full processing
+        response = await client.post(
+            f"{base_url}/api/v1/process",
+            data={"request_data": json.dumps({
+                "mode": "process",
+                "source_type": "url",
+                "url": "https://example.com",
+                "content_type": "web"
+            })}
+        )
+        process_result = response.json()
+
+        # Ingest mode - background processing + storage
+        with open("audio.mp3", "rb") as f:
+            response = await client.post(
+                f"{base_url}/api/v1/process",
+                files={"file": f},
+                data={"request_data": json.dumps({
+                    "mode": "ingest",
+                    "source_type": "file",
+                    "webhook_config": {
+                        "url": "https://your-app.com/webhook"
+                    }
+                })}
+            )
+        ingest_result = response.json()
+
+        print(f"Convert: {convert_result['success']}")
+        print(f"Process: {process_result['success']}")
+        print(f"Ingest Task ID: {ingest_result['task_id']}")
 
 asyncio.run(main())
 ```
 
-## ✅ Verification
+## 🗄️ Task Management (for Ingest Mode)
 
-All fixes have been tested and verified:
-- ✅ Image processing works for PNG, JPEG, GIF files
-- ✅ Web processing correctly routes to web services
-- ✅ YouTube processing correctly routes to YouTube services
-- ✅ Audio processing has diarization and topic segmentation enabled by default
-- ✅ Structured JSON output implemented for audio, video, and documents
-- ✅ Document chapter splitting with page numbers implemented
-- ✅ Chapter detection patterns for various document formats
-- ✅ All content types properly routed through orchestrator
-- ✅ Comprehensive JSON output schemas for all content types
+When using `mode=ingest`, MoRAG processes content in the background and provides task tracking capabilities.
 
-## 🗄️ Ingestion API (Background Processing + Vector Storage)
+### Automatic Content Type Detection
 
-The ingestion endpoints process content in the background and store results in the vector database for retrieval. These are ideal for building a searchable knowledge base.
-
-#### Automatic Content Type Detection
-
-MoRAG can automatically detect content types based on file extensions and URL patterns:
+MoRAG automatically detects content types based on file extensions and URL patterns:
 
 - **Files**: Detects based on file extension (.pdf → document, .mp3 → audio, .mp4 → video, etc.)
 - **URLs**: Detects YouTube URLs, web pages, and other URL patterns
-- **Fallback**: You can still specify `source_type` explicitly if needed
+- **Fallback**: You can still specify `content_type` explicitly if needed
 
 Supported auto-detection:
 - Documents: `.pdf`, `.docx`, `.txt`, `.md`, `.html`, etc.
@@ -365,115 +468,10 @@ Supported auto-detection:
 - YouTube: `youtube.com` and `youtu.be` URLs
 - Web: Other HTTP/HTTPS URLs
 
-### File Ingestion
-
-```bash
-# Ingest a document file (auto-detect content type)
-curl -X POST "http://localhost:8000/api/v1/ingest/file" \
-  -F "file=@document.pdf" \
-  -F "request_data={\"metadata\": {\"tags\": [\"important\"], \"category\": \"research\"}}"
-
-# Ingest with explicit source type and database configuration
-curl -X POST "http://localhost:8000/api/v1/ingest/file" \
-  -F "file=@document.pdf" \
-  -F "request_data={
-    \"source_type\": \"document\",
-    \"metadata\": {\"tags\": [\"important\"], \"category\": \"research\"},
-    \"databases\": [
-      {
-        \"type\": \"qdrant\",
-        \"hostname\": \"localhost\",
-        \"port\": 6333,
-        \"database_name\": \"my_collection\"
-      },
-      {
-        \"type\": \"neo4j\",
-        \"hostname\": \"bolt://localhost:7687\",
-        \"username\": \"neo4j\",
-        \"password\": \"password\",
-        \"database_name\": \"my_database\"
-      }
-    ]
-  }"
-
-# Response
-{
-  "task_id": "abc123-def456-ghi789",
-  "status": "pending",
-  "message": "File ingestion started for document.pdf",
-  "estimated_time": 60
-}
-```
-
-### URL Ingestion
-
-```bash
-# Ingest web content (auto-detect content type)
-curl -X POST "http://localhost:8000/api/v1/ingest/url" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com/article",
-    "metadata": {"category": "news", "priority": 1}
-  }'
-
-# Ingest YouTube video (auto-detect)
-curl -X POST "http://localhost:8000/api/v1/ingest/url" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://youtube.com/watch?v=VIDEO_ID",
-    "webhook_url": "https://your-app.com/webhook"
-  }'
-
-# Ingest with explicit source type
-curl -X POST "http://localhost:8000/api/v1/ingest/url" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source_type": "web",
-    "url": "https://example.com/article",
-    "metadata": {"category": "news", "priority": 1}
-  }'
-```
-
-### Batch Ingestion
-
-```bash
-# Ingest multiple items (auto-detect content types)
-curl -X POST "http://localhost:8000/api/v1/ingest/batch" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "items": [
-      {
-        "url": "https://example.com/page1"
-      },
-      {
-        "url": "https://youtube.com/watch?v=VIDEO_ID"
-      }
-    ],
-    "webhook_url": "https://your-app.com/batch-webhook"
-  }'
-
-# Ingest with explicit source types
-curl -X POST "http://localhost:8000/api/v1/ingest/batch" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "items": [
-      {
-        "source_type": "web",
-        "url": "https://example.com/page1"
-      },
-      {
-        "source_type": "youtube",
-        "url": "https://youtube.com/watch?v=VIDEO_ID"
-      }
-    ],
-    "webhook_url": "https://your-app.com/batch-webhook"
-  }'
-```
-
 ### Task Status Monitoring
 
 ```bash
-# Check task status
+# Check task status (when using mode=ingest)
 curl "http://localhost:8000/api/v1/status/abc123-def456-ghi789"
 
 # Response
@@ -493,13 +491,13 @@ curl "http://localhost:8000/api/v1/status/"
 curl "http://localhost:8000/api/v1/status/stats/queues"
 
 # Cancel a task
-curl -X DELETE "http://localhost:8000/api/v1/ingest/abc123-def456-ghi789"
+curl -X DELETE "http://localhost:8000/api/v1/status/abc123-def456-ghi789"
 ```
 
 ### Search Stored Content
 
 ```bash
-# Search the vector database
+# Search the vector database (content stored via mode=ingest)
 curl -X POST "http://localhost:8000/search" \
   -H "Content-Type: application/json" \
   -d '{
@@ -509,13 +507,10 @@ curl -X POST "http://localhost:8000/search" \
   }'
 ```
 
-## 🔄 Processing vs Ingestion
+## 🔄 Processing Mode Comparison
 
-| Feature | Processing (`/process/*`) | Ingestion (`/api/v1/ingest/*`) |
-|---------|---------------------------|--------------------------------|
-| **Response** | Immediate results | Task ID for tracking |
-| **Storage** | No storage | Stored in vector database |
-| **Use Case** | One-time processing | Building searchable knowledge base |
-| **Background** | Synchronous | Asynchronous with Celery |
-| **Webhooks** | Not supported | Supported |
-| **Search** | Not searchable | Searchable via `/search` |
+| Mode | Response | Storage | Use Case | Background |
+|------|----------|---------|----------|------------|
+| `convert` | Immediate markdown | None | UI preview | Synchronous |
+| `process` | Immediate structured JSON | None | One-time analysis | Synchronous |
+| `ingest` | Task ID | Vector database | Searchable knowledge base | Asynchronous |

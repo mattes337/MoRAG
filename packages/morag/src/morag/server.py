@@ -10,6 +10,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
 import structlog
 
@@ -39,6 +40,10 @@ from morag.api_models.endpoints.search import setup_search_endpoints
 from morag.api_models.endpoints.ingestion import setup_ingestion_endpoints
 from morag.api_models.endpoints.tasks import setup_task_endpoints, setup_task_management_endpoints
 from morag.api_models.endpoints.admin import setup_admin_endpoints
+from morag.api_models.endpoints.conversion import setup_conversion_endpoints
+from morag.api_models.endpoints.temp_files import setup_temp_files_endpoints
+from morag.api_models.endpoints.unified import setup_unified_endpoints
+from morag.api_models.openapi_schemas import OPENAPI_TAGS, OPENAPI_SERVERS, OPENAPI_SECURITY_SCHEMES
 
 logger = structlog.get_logger(__name__)
 
@@ -99,24 +104,45 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     app = FastAPI(
         title="MoRAG API",
         description="""
-        Modular Retrieval Augmented Generation System
+        # Multi-modal Retrieval Augmented Generation API
 
-        ## Features
+        MoRAG provides comprehensive document processing, analysis, and retrieval capabilities
+        with support for multiple file formats including PDFs, audio, video, and text documents.
+
+        ## Core Features
         - **Processing Endpoints**: Process content and return results immediately
         - **Ingestion Endpoints**: Process content and store in vector database for retrieval
         - **Task Management**: Track processing status and manage background tasks
         - **Search**: Query stored content using vector similarity
+
+        ## UI Interoperability Features
+
+        Specialized endpoints for UI applications:
+
+        - **Markdown Conversion**: Fast file-to-markdown conversion for preview functionality
+        - **Processing with Webhooks**: Complete document processing with real-time progress notifications
+        - **Document Deduplication**: ID-based deduplication system to prevent duplicate processing
+        - **Temporary File Management**: Access to intermediate files generated during processing
+
+        ## Authentication
+
+        Most endpoints support optional Bearer token authentication. Temporary file endpoints
+        require session-based access control for security.
 
         ## Endpoint Categories
         - `/process/*` - Immediate processing (no storage)
         - `/api/v1/ingest/*` - Background processing with vector storage
         - `/api/v1/status/*` - Task status and management
         - `/search` - Vector similarity search
+        - `/api/convert/*` - File conversion for UI preview
+        - `/api/files/*` - Temporary file management
         """,
-        version="0.1.0",
+        version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
-        lifespan=lifespan
+        lifespan=lifespan,
+        openapi_tags=OPENAPI_TAGS,
+        servers=OPENAPI_SERVERS
     )
 
     # Add CORS middleware
@@ -144,20 +170,66 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
 
     # Setup modular endpoints
+    # NOTE: Legacy endpoints kept for backward compatibility
+    # New unified endpoint is the recommended approach
     processing_router = setup_processing_endpoints(get_morag_api)
     search_router = setup_search_endpoints(get_morag_api)
     ingestion_router = setup_ingestion_endpoints(get_morag_api)
     tasks_router = setup_task_endpoints(get_morag_api)
     task_mgmt_router = setup_task_management_endpoints(get_morag_api)
     admin_router = setup_admin_endpoints(get_morag_api)
+    conversion_router = setup_conversion_endpoints()
+    temp_files_router = setup_temp_files_endpoints()
+
+    # Setup new unified endpoint (recommended)
+    unified_router = setup_unified_endpoints(get_morag_api)
 
     # Include routers
+    # New unified endpoint first (takes precedence)
+    app.include_router(unified_router)
+
+    # Legacy endpoints for backward compatibility
     app.include_router(processing_router)
     app.include_router(search_router)
     app.include_router(ingestion_router)
     app.include_router(tasks_router)
     app.include_router(task_mgmt_router)
     app.include_router(admin_router)
+    app.include_router(conversion_router)
+    app.include_router(temp_files_router)
+
+    # Custom OpenAPI schema with security schemes
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+
+        openapi_schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+            servers=app.servers,
+            tags=app.openapi_tags
+        )
+
+        # Add security schemes
+        openapi_schema["components"]["securitySchemes"] = OPENAPI_SECURITY_SCHEMES
+
+        # Add examples and additional documentation
+        openapi_schema["info"]["contact"] = {
+            "name": "MoRAG Support",
+            "email": "support@morag.example.com"
+        }
+
+        openapi_schema["info"]["license"] = {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        }
+
+        app.openapi_schema = openapi_schema
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
 
 
     # Include routers

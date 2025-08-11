@@ -87,15 +87,24 @@ GET /api/v1/remote-jobs/{job_id}/download
 ```python
 # Upload file with remote processing enabled
 import requests
+import json
 
 files = {'file': open('audio.mp3', 'rb')}
 data = {
-    'remote': True,  # Enable remote processing
-    'content_type': 'audio',
-    'webhook_url': 'http://my-app.com/webhook'
+    'request_data': json.dumps({
+        'mode': 'ingest',
+        'source_type': 'file',
+        'content_type': 'audio',
+        'webhook_config': {
+            'url': 'http://my-app.com/webhook'
+        },
+        'metadata': {
+            'remote': True  # Enable remote processing
+        }
+    })
 }
 
-response = requests.post('http://morag-server/api/v1/ingest/file', 
+response = requests.post('http://morag-server/api/v1/process',
                         files=files, data=data)
 ```
 
