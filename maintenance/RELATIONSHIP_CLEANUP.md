@@ -6,20 +6,22 @@ The `RELATIONSHIP_CLEANUP` maintenance job performs comprehensive cleanup of pro
 
 ## What it does
 
-### 1. LLM-Powered Assessment
-- **Intelligent Analysis**: Uses LLM to assess relationship types and individual relationships for meaningfulness, validity, and duplication
-- **Context-Aware Decisions**: Considers entity types, relationship semantics, and graph context
+### 1. LLM-Powered Semantic Assessment
+- **Semantic Value Analysis**: Uses LLM to evaluate relationship types for semantic richness and meaningfulness
+- **Context-Aware Decisions**: Considers entity types, relationship semantics, and graph context without static keyword lists
+- **Generic vs Specific Detection**: Identifies low-value generic relationships (like "TAGGED_WITH") when high-value specific alternatives exist (like "TREATS", "CAUSES")
 - **Performance Optimization**: Analyzes relationship types first for bulk operations, then handles individual cases
-- **Fallback Rules**: Uses rule-based detection when LLM is unavailable
+- **Minimal Fallback**: Uses only the most obviously problematic types when LLM is unavailable
 
 ### 2. Duplicate Relationship Detection
 - **Exact Duplicates**: Identifies relationships with identical source, target, and type
 - **Semantic Duplicates**: Uses LLM to find relationships with different types but equivalent meaning (e.g., "WORKS_AT" vs "EMPLOYED_BY")
 - **Bidirectional Duplicates**: Detects redundant A→B and B→A relationships where only one direction is meaningful
 
-### 3. Meaningless Relationship Removal
-- **"UNRELATED" Relationships**: Removes relationships explicitly marked as "UNRELATED" (if entities are unrelated, they shouldn't be connected)
-- **Generic/Vague Types**: LLM identifies overly generic relationship types like "RELATED_TO", "ASSOCIATED_WITH" when more specific relationships exist
+### 3. Semantic Value-Based Relationship Removal
+- **Meaningless Relationships**: Removes relationships explicitly marked as "UNRELATED" (if entities are unrelated, they shouldn't be connected)
+- **Low-Value Generic Types**: LLM identifies relationships with low semantic value like "TAGGED_WITH", "RELATED_TO", "ASSOCIATED_WITH" when more descriptive alternatives exist
+- **Context-Aware Generic Cleanup**: Removes generic relationships only when specific alternatives exist between the same entities (e.g., remove "TAGGED_WITH" if "TREATS" exists)
 - **Self-Referential Relationships**: Removes relationships where source and target are the same entity (unless explicitly valid like "PART_OF" for hierarchical structures)
 
 ### 4. Invalid Relationship Detection
@@ -70,10 +72,11 @@ The job uses an optimized type-based approach for maximum efficiency:
 
 ### Type-Based Approach (Always Used)
 1. **Analyze Types**: Get summary of all relationship types and their counts
-2. **LLM Assessment**: Use LLM to identify problematic types and merge candidates
+2. **LLM Semantic Assessment**: Use LLM to evaluate semantic value and identify problematic types and merge candidates
 3. **Bulk Operations**: Remove entire relationship types (e.g., all "UNRELATED" relationships)
 4. **Type Merging**: Convert relationship types in bulk (e.g., "EMPLOYED_BY" → "WORKS_AT")
-5. **Individual Cleanup**: Handle remaining issues (orphaned, low confidence)
+5. **Generic Cleanup**: Remove low-value generic relationships when specific alternatives exist between same entities
+6. **Individual Cleanup**: Handle remaining issues (orphaned, low confidence)
 
 This approach provides optimal performance by analyzing types first, then performing bulk operations rather than assessing individual relationships.
 
@@ -179,9 +182,10 @@ The job returns structured results:
    (Entity A)-[RELATES_TO]->(Non-existent Entity)  → REMOVED
    ```
 
-5. **Generic consolidation**:
+5. **Generic vs specific cleanup**:
    ```
-   (A)-[RELATED_TO]->(B) + (A)-[WORKS_AT]->(B)  → Keep WORKS_AT, remove RELATED_TO
+   (Drug)-[TAGGED_WITH]->(Disease) + (Drug)-[TREATS]->(Disease)  → Keep TREATS, remove TAGGED_WITH
+   (Person)-[RELATED_TO]->(Company) + (Person)-[WORKS_AT]->(Company)  → Keep WORKS_AT, remove RELATED_TO
    ```
 
 ## Integration with Other Jobs

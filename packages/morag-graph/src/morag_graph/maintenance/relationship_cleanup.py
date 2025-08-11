@@ -124,14 +124,10 @@ class RelationshipCleanupService(MaintenanceJobBase):
             except Exception as e:
                 logger.warning("Failed to initialize LLM client", error=str(e))
 
-        # Define problematic relationship types (fallback when LLM unavailable)
-        self.meaningless_types = {
-            "UNRELATED", "NOT_RELATED", "NO_RELATION", "UNCONNECTED"
-        }
-
-        self.generic_types = {
-            "RELATED_TO", "ASSOCIATED_WITH", "CONNECTED_TO", "LINKED_TO",
-            "RELATES", "ASSOCIATES", "CONNECTS", "LINKS"
+        # Minimal fallback types (only when LLM completely unavailable)
+        # These are only the most obviously problematic types
+        self.fallback_meaningless_types = {
+            "UNRELATED", "NOT_RELATED", "NO_RELATION"
         }
 
         self.invalid_self_referential_types = {
@@ -207,7 +203,10 @@ class RelationshipCleanupService(MaintenanceJobBase):
         if type_analysis.get("merge_pairs"):
             await self._merge_relationships_by_type_pairs(type_analysis["merge_pairs"], result)
 
-        # Step 5: Handle remaining individual cases (orphaned, low confidence, etc.)
+        # Step 5: Remove generic relationships when specific alternatives exist
+        await self._cleanup_generic_relationships_with_specific_alternatives(result)
+
+        # Step 6: Handle remaining individual cases (orphaned, low confidence, etc.)
         await self._cleanup_remaining_issues(result)
 
     async def _get_relationship_type_summary(self) -> List[Dict[str, Any]]:
@@ -265,22 +264,33 @@ class RelationshipCleanupService(MaintenanceJobBase):
             for rt in relationship_types[:20]:  # Limit to top 20 types
                 type_summary.append(f"- {rt['neo4j_type']} (count: {rt['count']}, avg_confidence: {rt['avg_confidence']:.2f})")
 
-            prompt = f"""Analyze these relationship types from a knowledge graph and identify cleanup opportunities:
+            prompt = f"""Analyze these relationship types from a knowledge graph and identify cleanup opportunities based on semantic value and meaningfulness:
 
 {chr(10).join(type_summary)}
 
-Identify:
-1. Types that should be REMOVED entirely (meaningless like "UNRELATED", "NOT_RELATED")
-2. Types that should be MERGED (semantically equivalent like "WORKS_AT" + "EMPLOYED_BY")
+Evaluate each relationship type for:
+1. **Semantic Value**: Does it provide meaningful information about the relationship?
+   - HIGH VALUE: Specific, descriptive types like "TREATS", "CAUSES", "IMPROVES", "WORSENS", "SOLVES", "PREVENTS"
+   - LOW VALUE: Generic, vague types like "TAGGED_WITH", "RELATED_TO", "ASSOCIATED_WITH", "CONNECTED_TO"
+   - NO VALUE: Meaningless types like "UNRELATED", "NOT_RELATED", "NO_RELATION"
+
+2. **Semantic Equivalence**: Are there types that express the same relationship?
+   - Examples: "WORKS_AT" ≈ "EMPLOYED_BY", "LOCATED_IN" ≈ "BASED_IN", "FOUNDED_BY" ≈ "ESTABLISHED_BY"
+
+Decision criteria:
+- REMOVE types with no semantic value or that are explicitly meaningless
+- REMOVE generic types when more specific alternatives exist for the same entity pairs
+- MERGE semantically equivalent types, keeping the most descriptive/specific one as primary
+- PRESERVE all types that add unique semantic value, even if they seem similar
 
 Respond with JSON:
 {{
     "remove_types": ["TYPE1", "TYPE2"],
     "merge_pairs": [
-        {{"primary": "WORKS_AT", "merge_into": ["EMPLOYED_BY", "WORKS_FOR"]}},
-        {{"primary": "LOCATED_IN", "merge_into": ["BASED_IN", "SITUATED_IN"]}}
+        {{"primary": "MOST_DESCRIPTIVE_TYPE", "merge_into": ["EQUIVALENT_TYPE1", "EQUIVALENT_TYPE2"]}},
+        {{"primary": "SPECIFIC_TYPE", "merge_into": ["GENERIC_EQUIVALENT"]}}
     ],
-    "reasoning": "explanation of decisions"
+    "reasoning": "detailed explanation of semantic value assessment and decisions"
 }}"""
 
             response = await self.safe_llm_call(self._llm_client.generate_text, prompt)
@@ -309,45 +319,26 @@ Respond with JSON:
             return self._analyze_relationship_types_fallback(relationship_types)
 
     def _analyze_relationship_types_fallback(self, relationship_types: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Fallback rule-based analysis of relationship types."""
+        """Minimal fallback analysis when LLM is completely unavailable."""
         remove_types = []
         merge_pairs = []
 
-        # Find types to remove - check both neo4j_type and stored_type
+        # Only remove the most obviously meaningless types
         for rt in relationship_types:
             neo4j_type = rt["neo4j_type"]
             stored_type = rt.get("stored_type", neo4j_type)
 
-            # Check if either type is meaningless
-            if (neo4j_type in self.meaningless_types or
-                stored_type in self.meaningless_types):
+            # Only check for explicitly meaningless types
+            if (neo4j_type in self.fallback_meaningless_types or
+                stored_type in self.fallback_meaningless_types):
                 # Use the stored_type if available, otherwise neo4j_type
                 remove_types.append(stored_type if stored_type else neo4j_type)
 
-        # Find types to merge (simple rule-based)
-        type_groups = [
-            {"primary": "WORKS_AT", "merge_into": ["EMPLOYED_BY", "WORKS_FOR", "EMPLOYEE_OF"]},
-            {"primary": "LOCATED_IN", "merge_into": ["BASED_IN", "SITUATED_IN", "POSITIONED_IN"]},
-            {"primary": "FOUNDED_BY", "merge_into": ["ESTABLISHED_BY", "CREATED_BY", "STARTED_BY"]},
-            {"primary": "PART_OF", "merge_into": ["COMPONENT_OF", "MEMBER_OF", "BELONGS_TO"]},
-        ]
+        # No static merge rules - let the LLM handle semantic decisions
+        # This fallback is intentionally minimal to avoid hardcoded assumptions
 
-        # Build set of existing types (prefer stored_type)
-        existing_types = set()
-        for rt in relationship_types:
-            stored_type = rt.get("stored_type")
-            if stored_type:
-                existing_types.add(stored_type)
-            else:
-                existing_types.add(rt["neo4j_type"])
-
-        for group in type_groups:
-            merge_candidates = [t for t in group["merge_into"] if t in existing_types]
-            if merge_candidates and group["primary"] in existing_types:
-                merge_pairs.append({"primary": group["primary"], "merge_into": merge_candidates})
-
-        logger.info("Fallback analysis completed",
-                   remove_types=remove_types,
+        logger.warning("Using minimal fallback analysis - LLM unavailable for semantic assessment",
+                      remove_types=remove_types,
                    merge_pairs_count=len(merge_pairs))
 
         return {
@@ -355,6 +346,109 @@ Respond with JSON:
             "merge_pairs": merge_pairs,
             "reasoning": "Rule-based fallback analysis"
         }
+
+    async def _cleanup_generic_relationships_with_specific_alternatives(self, result: RelationshipCleanupResult) -> None:
+        """Remove generic relationships when more specific alternatives exist between the same entities."""
+        if not self._llm_client:
+            logger.info("Skipping generic relationship cleanup - LLM unavailable")
+            return
+
+        # Find entity pairs with multiple relationship types
+        query = """
+        MATCH (a)-[r1]->(b)
+        WITH a, b, collect(DISTINCT type(r1)) as rel_types, collect(r1) as relationships
+        WHERE size(rel_types) > 1
+        RETURN a.name as source_name, b.name as target_name,
+               rel_types, relationships
+        LIMIT 100
+        """
+
+        result_data = await self.neo4j_storage._connection_ops._execute_query(query, {})
+
+        for record in result_data:
+            source_name = record["source_name"]
+            target_name = record["target_name"]
+            rel_types = record["rel_types"]
+            relationships = record["relationships"]
+
+            if len(rel_types) <= 1:
+                continue
+
+            # Use LLM to determine which relationships to keep vs remove
+            generic_to_remove = await self._identify_generic_relationships_to_remove(
+                source_name, target_name, rel_types
+            )
+
+            if generic_to_remove:
+                # Remove the generic relationships
+                for rel_type in generic_to_remove:
+                    remove_query = """
+                    MATCH (a {name: $source_name})-[r]->(b {name: $target_name})
+                    WHERE type(r) = $rel_type
+                    DELETE r
+                    RETURN count(r) as removed_count
+                    """
+
+                    if not self.dry_run:
+                        remove_result = await self.neo4j_storage._connection_ops._execute_query(
+                            remove_query, {
+                                "source_name": source_name,
+                                "target_name": target_name,
+                                "rel_type": rel_type
+                            }
+                        )
+                        removed_count = remove_result[0]["removed_count"] if remove_result else 0
+                        result.generic_removed += removed_count
+                        logger.info(f"Removed {removed_count} generic {rel_type} relationships between {source_name} and {target_name}")
+
+    async def _identify_generic_relationships_to_remove(self, source_name: str, target_name: str, rel_types: List[str]) -> List[str]:
+        """Use LLM to identify which relationship types are generic and should be removed."""
+        try:
+            prompt = f"""Analyze these relationship types between two entities and identify which are generic/low-value when more specific alternatives exist:
+
+Source Entity: {source_name}
+Target Entity: {target_name}
+Relationship Types: {', '.join(rel_types)}
+
+Identify relationship types that should be REMOVED because they are:
+1. Generic/vague (like "TAGGED_WITH", "RELATED_TO", "ASSOCIATED_WITH") when more specific types exist
+2. Low semantic value compared to more descriptive alternatives
+3. Redundant given the presence of more informative relationship types
+
+Keep relationship types that:
+- Provide unique, specific semantic information
+- Add distinct meaning not captured by other types
+- Are domain-specific and descriptive
+
+Examples:
+- If both "TAGGED_WITH" and "TREATS" exist → remove "TAGGED_WITH"
+- If both "RELATED_TO" and "CAUSES" exist → remove "RELATED_TO"
+- If both "ASSOCIATED_WITH" and "IMPROVES" exist → remove "ASSOCIATED_WITH"
+
+Respond with JSON:
+{{
+    "remove_types": ["GENERIC_TYPE1", "GENERIC_TYPE2"],
+    "reasoning": "explanation of why these are generic compared to alternatives"
+}}"""
+
+            response = await self.safe_llm_call(self._llm_client.generate_text, prompt)
+
+            # Parse JSON response
+            import json
+            try:
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = response[json_start:json_end]
+                    result = json.loads(json_str)
+                    return result.get("remove_types", [])
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse LLM generic relationship analysis")
+                return []
+
+        except Exception as e:
+            logger.warning("LLM generic relationship analysis failed", error=str(e))
+            return []
 
 
 
@@ -366,22 +460,24 @@ Respond with JSON:
         # Use LLM assessment if available
         if self._llm_client:
             try:
-                prompt = f"""Are these two relationship types semantically similar or equivalent?
+                prompt = f"""Analyze these two relationship types for semantic similarity and value:
 
 Type 1: {type1}
 Type 2: {type2}
 
-Consider if they express the same or very similar relationships between entities.
-Examples of similar types:
-- WORKS_AT and EMPLOYED_BY
-- LOCATED_IN and BASED_IN
-- FOUNDED_BY and CREATED_BY
+Consider:
+1. **Semantic Equivalence**: Do they express the same relationship meaning?
+   - Examples: "WORKS_AT" ≈ "EMPLOYED_BY", "LOCATED_IN" ≈ "BASED_IN"
+2. **Semantic Value**: Which provides more specific, descriptive information?
+   - High value: "TREATS", "CAUSES", "IMPROVES", "PREVENTS"
+   - Low value: "TAGGED_WITH", "RELATED_TO", "ASSOCIATED_WITH"
 
 Respond with JSON:
 {{
     "are_similar": true/false,
     "confidence": 0.0-1.0,
-    "reason": "explanation"
+    "preferred_type": "TYPE1 or TYPE2 (if similar, which is more descriptive)",
+    "reason": "explanation focusing on semantic value and specificity"
 }}"""
 
                 response = await self.safe_llm_call(self._llm_client.generate_text, prompt)
