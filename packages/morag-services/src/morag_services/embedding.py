@@ -423,18 +423,25 @@ class GeminiEmbeddingService(BaseEmbeddingService):
         texts: List[str],
         task_type: str = "retrieval_document",
         batch_size: Optional[int] = None,
-        delay_between_batches: float = 0.1,
+        delay_between_batches: Optional[float] = None,
         use_native_batch: bool = True
     ) -> List[EmbeddingResult]:
         """Generate embeddings for multiple texts with optimized batch processing."""
         if not texts:
             return []
 
-        # Use config batch size if none provided
+        # Use config batch size if none provided, with performance optimization
         if batch_size is None:
-            batch_size = self.config.batch_size
+            batch_size = min(self.config.batch_size, 100)  # Cap at 100 for performance
+
+        # Use optimized delay if none provided
+        if delay_between_batches is None:
+            delay_between_batches = getattr(self.config, 'delay_between_batches', 0.05)
 
         results = []
+
+        # Performance monitoring
+        start_time = time.time()
 
         # Use native batch API if enabled and available
         if use_native_batch:
@@ -461,9 +468,9 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                     result = await self.generate_embedding(text, task_type)
                     batch_results.append(result)
 
-                    # Small delay between individual requests to avoid hitting rate limits
+                    # Optimized delay between individual requests
                     if j < len(batch) - 1:  # Don't delay after the last item
-                        await asyncio.sleep(0.1)  # 100ms delay between requests
+                        await asyncio.sleep(0.02)  # Reduced to 20ms for better performance
 
                 except Exception as e:
                     logger.error("Failed to generate embedding in batch", error=str(e))
@@ -480,9 +487,17 @@ class GeminiEmbeddingService(BaseEmbeddingService):
             if i + batch_size < len(texts):
                 await asyncio.sleep(delay_between_batches)
 
+        # Performance logging
+        total_time = time.time() - start_time
+        successful_embeddings = len([r for r in results if r.token_count > 0])
+
         logger.info("Completed batch embedding generation",
                    total_texts=len(texts),
-                   successful_embeddings=len([r for r in results if r.token_count > 0]))
+                   successful_embeddings=successful_embeddings,
+                   total_time=total_time,
+                   avg_time_per_text=total_time / len(texts) if texts else 0,
+                   batch_size=batch_size,
+                   delay_between_batches=delay_between_batches)
 
         return results
 
@@ -584,6 +599,8 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         # For non-rate-limit errors, still use limited retries
         max_retries_non_rate_limit = 3
+        # Use configurable max retries for rate limit errors when not retrying indefinitely
+        max_retries_rate_limit = getattr(settings, 'entity_extraction_max_retries', 20)
         attempt = 0
 
         while True:
@@ -620,15 +637,15 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                         time.sleep(delay)
                         continue
                     else:
-                        # Legacy behavior: limited retries
-                        if attempt <= max_retries_non_rate_limit:
-                            delay = base_delay * (exponential_base ** (attempt - 1))
+                        # Legacy behavior: limited retries with configurable max retries
+                        if attempt <= max_retries_rate_limit:
+                            delay = min(base_delay * (exponential_base ** (attempt - 1)), max_delay)
                             if use_jitter:
-                                delay += (time.time() % 1)
+                                delay *= (0.5 + (time.time() % 1) * 0.5)  # Add 0-50% jitter
                             logger.warning(
                                 "Rate limit hit in text generation, retrying with limited attempts",
                                 attempt=attempt,
-                                max_retries=max_retries_non_rate_limit,
+                                max_retries=max_retries_rate_limit,
                                 delay=delay,
                                 error=error_str
                             )
@@ -636,7 +653,7 @@ class GeminiEmbeddingService(BaseEmbeddingService):
                             continue
                         else:
                             logger.error("Rate limit exceeded after all retries in text generation", error=error_str)
-                            raise RateLimitError(f"Rate limit exceeded after {max_retries_non_rate_limit} retries: {error_str}")
+                            raise RateLimitError(f"Rate limit exceeded after {max_retries_rate_limit} retries: {error_str}")
                 else:
                     # Non-rate-limit error, use limited retries
                     if attempt <= max_retries_non_rate_limit:
@@ -761,7 +778,7 @@ class EmbeddingServiceFactory:
     def create_gemini_service(
         api_key: str,
         embedding_model: str = "text-embedding-004",
-        generation_model: str = "gemini-2.0-flash-001"
+        generation_model: str = "gemini-2.0-flash"
     ) -> GeminiEmbeddingService:
         """Create a Gemini embedding service."""
         return GeminiEmbeddingService(api_key, embedding_model, generation_model)

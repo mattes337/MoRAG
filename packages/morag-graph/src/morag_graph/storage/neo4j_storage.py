@@ -1,4 +1,4 @@
-"""Neo4J storage backend for graph data."""
+"""Neo4J storage backend for graph data - Refactored with modular operations."""
 
 import logging
 from typing import Dict, List, Optional, Any, Set
@@ -7,10 +7,21 @@ from datetime import datetime
 from neo4j import AsyncGraphDatabase, AsyncDriver, AsyncSession
 from pydantic import BaseModel
 
-from ..models import Entity, Relation, Graph, Document, DocumentChunk
+from ..models import Entity, Relation, Graph, Document, DocumentChunk, Fact
 from ..models.types import EntityId, RelationId
 from ..utils.id_generation import UnifiedIDGenerator, IDValidator
 from .base import BaseStorage
+from .neo4j_operations import (
+    ConnectionOperations,
+    DocumentOperations,
+    EntityOperations,
+    RelationOperations,
+    FactOperations,
+    GraphOperations,
+    QueryOperations
+)
+
+# OpenIE operations removed - replaced by LangExtract
 
 logger = logging.getLogger(__name__)
 
@@ -44,1517 +55,387 @@ class Neo4jStorage(BaseStorage):
         """
         self.config = config
         self.driver: Optional[AsyncDriver] = None
+        
+        # Initialize operation handlers
+        self._connection_ops: Optional[ConnectionOperations] = None
+        self._document_ops: Optional[DocumentOperations] = None
+        self._entity_ops: Optional[EntityOperations] = None
+        self._relation_ops: Optional[RelationOperations] = None
+        self._fact_ops: Optional[FactOperations] = None
+        self._graph_ops: Optional[GraphOperations] = None
+        self._query_ops: Optional[QueryOperations] = None
+
     
     async def connect(self) -> None:
         """Connect to Neo4J database."""
-        try:
-            # Configure basic driver settings
-            driver_kwargs = {
-                "auth": (self.config.username, self.config.password),
-                "max_connection_lifetime": self.config.max_connection_lifetime,
-                "max_connection_pool_size": self.config.max_connection_pool_size,
-                "connection_acquisition_timeout": self.config.connection_acquisition_timeout,
-            }
+        # Initialize connection operations
+        self._connection_ops = ConnectionOperations(self.config)
+        await self._connection_ops.connect()
+        
+        # Store driver reference for other operations
+        self.driver = self._connection_ops.driver
+        
+        # Initialize other operation handlers
+        self._document_ops = DocumentOperations(self.driver, self.config.database)
+        self._entity_ops = EntityOperations(self.driver, self.config.database)
+        self._relation_ops = RelationOperations(self.driver, self.config.database)
+        self._fact_ops = FactOperations(self.driver, self.config.database)
+        self._graph_ops = GraphOperations(self.driver, self.config.database)
+        self._query_ops = QueryOperations(self.driver, self.config.database)
 
-            # For encrypted URI schemes (bolt+s://, bolt+ssc://, neo4j+s://, neo4j+ssc://),
-            # encryption and trust settings are handled by the URI scheme itself
-            # Only add SSL configuration for non-encrypted URIs
-            if self.config.uri.startswith(('bolt://', 'neo4j://')) and not self.config.verify_ssl:
-                # For non-encrypted URIs, add SSL context if needed
-                import ssl
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
-                driver_kwargs["ssl_context"] = ssl_context
-
-            self.driver = AsyncGraphDatabase.driver(
-                self.config.uri,
-                **driver_kwargs
-            )
-
-            # Ensure database exists before testing connection
-            await self._ensure_database_exists()
-
-            # Test connection to the specific database
-            async with self.driver.session(database=self.config.database) as session:
-                await session.run("RETURN 1")
-
-            logger.info("Connected to Neo4J database")
-
-        except Exception as e:
-            logger.error(f"Failed to connect to Neo4J: {e}")
-            raise
+        logger.info("Neo4J storage initialized with modular operations")
     
     async def disconnect(self) -> None:
         """Disconnect from Neo4J database."""
-        if self.driver:
-            await self.driver.close()
+        if self._connection_ops:
+            await self._connection_ops.disconnect()
             self.driver = None
-            logger.info("Disconnected from Neo4J database")
+            
+            # Clear operation handlers
+            self._connection_ops = None
+            self._document_ops = None
+            self._entity_ops = None
+            self._relation_ops = None
+            self._fact_ops = None
+            self._graph_ops = None
+            self._query_ops = None
 
-    async def _ensure_database_exists(self) -> None:
-        """Ensure the specified database exists, create it if it doesn't."""
-        try:
-            # First try to connect to the system database to check/create the target database
-            # This works in Neo4j Enterprise Edition
-            async with self.driver.session(database="system") as session:
-                # Check if database exists
-                result = await session.run(
-                    "SHOW DATABASES YIELD name WHERE name = $db_name",
-                    {"db_name": self.config.database}
-                )
-                databases = await result.data()
-
-                if not databases:
-                    # Database doesn't exist, create it
-                    logger.info(f"Creating Neo4j database: {self.config.database}")
-                    await session.run(f"CREATE DATABASE `{self.config.database}`")
-                    logger.info(f"Successfully created Neo4j database: {self.config.database}")
-                else:
-                    logger.info(f"Neo4j database already exists: {self.config.database}")
-
-        except Exception as e:
-            # If we can't create the database (e.g., Neo4j Community Edition or auth issues),
-            # try to connect directly to the target database
-            logger.warning(f"Could not ensure database exists via system database (this is normal for Neo4j Community Edition): {e}")
-
-            # For Community Edition or when we can't access system database,
-            # try to connect directly to the target database
-            try:
-                async with self.driver.session(database=self.config.database) as session:
-                    await session.run("RETURN 1")
-                logger.info(f"Successfully connected to existing Neo4j database: {self.config.database}")
-            except Exception as direct_error:
-                # If the database doesn't exist and we can't create it, suggest using 'neo4j' database
-                if "DatabaseNotFound" in str(direct_error):
-                    logger.error(f"Database '{self.config.database}' does not exist and cannot be created automatically. "
-                               f"Please either: 1) Create the database manually, 2) Use the default 'neo4j' database, "
-                               f"or 3) Use Neo4j Enterprise Edition for automatic database creation.")
-                raise direct_error
-
+    # Connection delegation methods
     async def create_database_if_not_exists(self, database_name: str) -> bool:
-        """
-        Manually create a database if it doesn't exist.
-
-        Args:
-            database_name: Name of the database to create
-
-        Returns:
-            True if database was created or already exists, False if creation failed
-        """
-        try:
-            async with self.driver.session(database="system") as session:
-                # Check if database exists
-                result = await session.run(
-                    "SHOW DATABASES YIELD name WHERE name = $db_name",
-                    {"db_name": database_name}
-                )
-                databases = await result.data()
-
-                if not databases:
-                    # Database doesn't exist, create it
-                    logger.info(f"Creating Neo4j database: {database_name}")
-                    await session.run(f"CREATE DATABASE `{database_name}`")
-                    logger.info(f"Successfully created Neo4j database: {database_name}")
-                    return True
-                else:
-                    logger.info(f"Neo4j database already exists: {database_name}")
-                    return True
-
-        except Exception as e:
-            logger.error(f"Failed to create database {database_name}: {e}")
-            return False
-
-    async def _execute_query(
-        self,
-        query: str,
-        parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
-        """Execute a Cypher query.
-        
-        Args:
-            query: Cypher query string
-            parameters: Query parameters
-            
-        Returns:
-            List of result records
-        """
-        if not self.driver:
-            raise RuntimeError("Not connected to Neo4J database")
-        
-        async with self.driver.session(database=self.config.database) as session:
-            result = await session.run(query, parameters or {})
-            records = []
-            async for record in result:
-                records.append(record.data())
-            return records
+        """Create a database if it doesn't exist."""
+        if not self._connection_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._connection_ops.create_database_if_not_exists(database_name)
     
+    # Document operations delegation
     async def store_document_with_unified_id(self, document: Document) -> str:
-        """Store document with unified ID format.
-        
-        Args:
-            document: Document instance with unified ID
-            
-        Returns:
-            Document ID
-        """
-        # Validate ID format
-        if not IDValidator.validate_document_id(document.id):
-            raise ValueError(f"Invalid document ID format: {document.id}")
-        
-        # Store document with unified ID
-        query = """
-        MERGE (d:Document {id: $id})
-        SET d.name = $name,
-            d.source_file = $source_file,
-            d.file_name = $file_name,
-            d.file_size = $file_size,
-            d.checksum = $checksum,
-            d.mime_type = $mime_type,
-            d.ingestion_timestamp = $ingestion_timestamp,
-            d.last_modified = $last_modified,
-            d.model = $model,
-            d.summary = $summary,
-            d.metadata = $metadata,
-            d.unified_id_format = true
-        RETURN d.id as document_id
-        """
-
-        result = await self._execute_query(
-            query,
-            {
-                "id": document.id,
-                "name": document.name,
-                "source_file": document.source_file,
-                "file_name": document.file_name,
-                "file_size": document.file_size,
-                "checksum": document.checksum,
-                "mime_type": document.mime_type,
-                "ingestion_timestamp": document.ingestion_timestamp.isoformat(),
-                "last_modified": document.last_modified.isoformat() if document.last_modified else None,
-                "model": document.model,
-                "summary": document.summary,
-                "metadata": document.metadata or {}
-            }
-        )
-        
-        return result[0]['document_id']
+        """Store document with unified ID format."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_document_with_unified_id(document)
     
     async def store_chunk_with_unified_id(self, chunk: DocumentChunk) -> str:
-        """Store document chunk with unified ID format.
-        
-        Args:
-            chunk: DocumentChunk instance with unified ID
-            
-        Returns:
-            Chunk ID
-        """
-        # Validate ID formats
-        if not IDValidator.validate_chunk_id(chunk.id):
-            raise ValueError(f"Invalid chunk ID format: {chunk.id}")
-        
-        if not IDValidator.validate_document_id(chunk.document_id):
-            raise ValueError(f"Invalid document ID format: {chunk.document_id}")
-        
-        # Verify document exists
-        doc_check = await self._execute_query(
-            "MATCH (d:Document {id: $doc_id}) RETURN d.id",
-            {"doc_id": chunk.document_id}
-        )
-        
-        if not doc_check:
-            raise ValueError(f"Document {chunk.document_id} not found")
-        
-        # Store chunk with unified ID
-        query = """
-        MATCH (d:Document {id: $document_id})
-        MERGE (c:DocumentChunk {id: $id})
-        SET c.document_id = $document_id,
-            c.chunk_index = $chunk_index,
-            c.text = $text,
-            c.metadata = $metadata,
-            c.unified_id_format = true
-        MERGE (d)-[:HAS_CHUNK]->(c)
-        RETURN c.id as chunk_id
-        """
-        
-        result = await self._execute_query(
-            query,
-            {
-                "id": chunk.id,
-                "document_id": chunk.document_id,
-                "chunk_index": chunk.chunk_index,
-                "text": chunk.text,
-                "metadata": chunk.metadata or {}
-            }
-        )
-        
-        return result[0]['chunk_id']
+        """Store document chunk with unified ID format."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_chunk_with_unified_id(chunk)
     
     async def get_document_by_unified_id(self, document_id: str) -> Optional[Document]:
-        """Retrieve document by unified ID.
-        
-        Args:
-            document_id: Unified document ID
-            
-        Returns:
-            Document instance or None
-        """
-        if not IDValidator.validate_document_id(document_id):
-            raise ValueError(f"Invalid document ID format: {document_id}")
-        
-        query = """
-        MATCH (d:Document {id: $id})
-        RETURN d.id as id,
-               d.source_file as source_file,
-               d.file_name as file_name,
-               d.checksum as checksum,
-               d.ingestion_timestamp as ingestion_timestamp,
-               d.metadata as metadata
-        """
-        
-        result = await self._execute_query(query, {"id": document_id})
-        
-        if not result:
-            return None
-        
-        doc_data = result[0]
-        return Document(
-            id=doc_data['id'],
-            source_file=doc_data['source_file'],
-            file_name=doc_data['file_name'],
-            checksum=doc_data['checksum'],
-            ingestion_timestamp=datetime.fromisoformat(doc_data['ingestion_timestamp']),
-            metadata=doc_data['metadata']
-        )
+        """Retrieve document by unified ID."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.get_document_by_unified_id(document_id)
     
     async def get_chunks_by_document_id(self, document_id: str) -> List[DocumentChunk]:
-        """Get all chunks for a document by unified ID.
-        
-        Args:
-            document_id: Unified document ID
-            
-        Returns:
-            List of DocumentChunk instances
-        """
-        if not IDValidator.validate_document_id(document_id):
-            raise ValueError(f"Invalid document ID format: {document_id}")
-        
-        query = """
-        MATCH (d:Document {id: $document_id})-[:HAS_CHUNK]->(c:DocumentChunk)
-        RETURN c.id as id,
-               c.document_id as document_id,
-               c.chunk_index as chunk_index,
-               c.text as text,
-               c.metadata as metadata
-        ORDER BY c.chunk_index
-        """
-        
-        result = await self._execute_query(query, {"document_id": document_id})
-        
-        chunks = []
-        for chunk_data in result:
-            chunks.append(DocumentChunk(
-                id=chunk_data['id'],
-                document_id=chunk_data['document_id'],
-                chunk_index=chunk_data['chunk_index'],
-                text=chunk_data['text'],
-                metadata=chunk_data['metadata']
-            ))
-        
-        return chunks
+        """Get all chunks for a document by unified ID."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.get_chunks_by_document_id(document_id)
     
     async def validate_id_consistency(self) -> Dict[str, Any]:
-        """Validate ID consistency across the database.
-        
-        Returns:
-            Validation report
-        """
-        # Check for documents with invalid ID formats
-        doc_query = """
-        MATCH (d:Document)
-        WHERE NOT d.id STARTS WITH 'doc_'
-        RETURN count(d) as invalid_docs, collect(d.id)[0..10] as sample_ids
-        """
-        
-        # Check for chunks with invalid ID formats
-        chunk_query = """
-        MATCH (c:DocumentChunk)
-        WHERE NOT c.id CONTAINS ':chunk:'
-        RETURN count(c) as invalid_chunks, collect(c.id)[0..10] as sample_ids
-        """
-        
-        # Check for orphaned chunks
-        orphan_query = """
-        MATCH (c:DocumentChunk)
-        WHERE NOT EXISTS((c)<-[:HAS_CHUNK]-(:Document))
-        RETURN count(c) as orphaned_chunks, collect(c.id)[0..10] as sample_ids
-        """
-        
-        doc_result = await self._execute_query(doc_query)
-        chunk_result = await self._execute_query(chunk_query)
-        orphan_result = await self._execute_query(orphan_query)
-        
-        return {
-            "invalid_documents": {
-                "count": doc_result[0]['invalid_docs'],
-                "sample_ids": doc_result[0]['sample_ids']
-            },
-            "invalid_chunks": {
-                "count": chunk_result[0]['invalid_chunks'],
-                "sample_ids": chunk_result[0]['sample_ids']
-            },
-            "orphaned_chunks": {
-                "count": orphan_result[0]['orphaned_chunks'],
-                "sample_ids": orphan_result[0]['sample_ids']
-            }
-        }
-    
-    async def store_entity(self, entity: Entity) -> EntityId:
-        """Store an entity in Neo4J.
-
-        Uses MERGE based on name only to prevent duplicate entities.
-        If an entity with the same name exists, it will be updated with the
-        highest confidence score and most recent type.
-
-        Args:
-            entity: Entity to store
-
-        Returns:
-            ID of the stored entity
-        """
-        properties = entity.to_neo4j_node()
-        labels = properties.pop('_labels', ['Entity'])
-
-        entity_type = str(entity.type)
-
-        # Create labels string for Cypher - use LLM-determined type as label
-        labels_str = ':'.join(labels)
-
-        # MERGE based on name only to prevent duplicate entities
-        # Use confidence to determine which type to keep
-        # Use a two-step approach: first find/create by name, then ensure proper labels
-        query = """
-        MERGE (e {name: $name})
-        ON CREATE SET
-            e += $properties,
-            e.type = $type,
-            e.id = $id
-        ON MATCH SET
-            e.confidence = CASE WHEN e.confidence > $confidence THEN e.confidence ELSE $confidence END,
-            e.attributes = $attributes,
-            e.source_doc_id = CASE WHEN e.source_doc_id IS NULL THEN $source_doc_id ELSE e.source_doc_id END,
-            e.id = CASE WHEN e.id IS NULL THEN $id ELSE e.id END,
-            e.type = CASE WHEN $confidence > e.confidence THEN $type ELSE e.type END
-        RETURN e.id as id, e.type as final_type
-        """
-
-        parameters = {
-            "name": entity.name,
-            "type": entity_type,
-            "confidence": entity.confidence,
-            "attributes": properties.get('attributes', '{}'),
-            "source_doc_id": entity.source_doc_id,
-            "id": entity.id,
-            "properties": properties
-        }
-
-        result = await self._execute_query(query, parameters)
-
-        # Ensure the entity has proper labels
-        if result and labels:
-            entity_id = result[0]["id"]
-            # Add labels to the entity (this is additive, won't remove existing labels)
-            labels_str = ':'.join(labels)
-            label_query = f"""
-            MATCH (e {{id: $entity_id}})
-            SET e:{labels_str}
-            RETURN e.id as id
-            """
-            await self._execute_query(label_query, {"entity_id": entity_id})
-
-            logger.debug("Entity stored/updated with labels",
-                        name=entity.name,
-                        final_type=result[0].get('final_type'),
-                        entity_id=entity_id,
-                        labels=labels)
-            return entity_id
-
-        if result:
-            logger.debug("Entity stored/updated without labels",
-                        name=entity.name,
-                        final_type=result[0].get('final_type'),
-                        entity_id=result[0].get('id'))
-            return result[0]["id"]
-        return entity.id
-
-    async def _create_missing_entity(self, entity_id: str, entity_name: str) -> str:
-        """Create a missing entity with minimal information.
-
-        Args:
-            entity_id: ID of the entity to create
-            entity_name: Name of the entity
-
-        Returns:
-            ID of the created entity
-        """
-        from morag_graph.models.entity import Entity
-
-        # Extract entity name from ID if not provided
-        if not entity_name and entity_id.startswith('ent_'):
-            # Try to extract name from entity ID
-            parts = entity_id.split('_')
-            if len(parts) >= 2:
-                entity_name = ' '.join(parts[1:-1]).replace('_', ' ').title()
-
-        if not entity_name:
-            entity_name = entity_id
-
-        # Create a minimal entity
-        entity = Entity(
-            id=entity_id,
-            name=entity_name,
-            type="CUSTOM",
-            confidence=0.5,  # Lower confidence for auto-created entities
-            attributes={
-                "auto_created": True,
-                "creation_reason": "missing_entity_for_relation"
-            }
-        )
-
-        # Store the entity
-        await self.store_entity(entity)
-        logger.info(f"Created missing entity: {entity_id} (name: {entity_name})")
-        return entity_id
-    
-    async def store_entities(self, entities: List[Entity]) -> List[EntityId]:
-        """Store multiple entities in Neo4J.
-        
-        Uses MERGE based on name and type to prevent duplicate entities.
-        Falls back to individual entity storage for proper deduplication.
-        
-        Args:
-            entities: List of entities to store
-            
-        Returns:
-            List of IDs of the stored entities
-        """
-        if not entities:
-            return []
-        
-        # Use individual store_entity calls to ensure proper MERGE logic
-        # This is more reliable than batch operations for deduplication
-        return [await self.store_entity(entity) for entity in entities]
-    
-    async def store_entity_with_chunk_references(self, entity: Entity, chunk_ids: List[str]) -> EntityId:
-        """Store entity with references to chunks where it's mentioned.
-        
-        Args:
-            entity: Entity instance
-            chunk_ids: List of chunk IDs where entity is mentioned
-            
-        Returns:
-            Entity ID
-        """
-        # Validate chunk IDs
-        for chunk_id in chunk_ids:
-            if not IDValidator.validate_chunk_id(chunk_id):
-                raise ValueError(f"Invalid chunk ID format: {chunk_id}")
-        
-        # Entity will be connected to chunks via Neo4j relationships
-        
-        # Store the entity
-        entity_id = await self.store_entity(entity)
-        
-        # Create relationships with chunks
-        for chunk_id in chunk_ids:
-            await self._create_entity_chunk_relationship(entity_id, chunk_id)
-        
-        return entity_id
-    
-    async def _create_entity_chunk_relationship(self, entity_id: EntityId, chunk_id: str) -> None:
-        """Create MENTIONED_IN relationship between entity and chunk.
-
-        Args:
-            entity_id: Entity ID
-            chunk_id: Chunk ID
-        """
-        query = """
-        MATCH (e {id: $entity_id})
-        WHERE e.type IS NOT NULL
-        MATCH (c:DocumentChunk {id: $chunk_id})
-        MERGE (e)-[:MENTIONED_IN]->(c)
-        RETURN e.id as entity_id, c.id as chunk_id
-        """
-
-        result = await self._execute_query(
-            query,
-            {
-                "entity_id": entity_id,
-                "chunk_id": chunk_id
-            }
-        )
-
-        if not result:
-            logger.warning(f"Failed to create entity-chunk relationship: entity {entity_id} or chunk {chunk_id} not found")
-        else:
-            logger.debug(f"Created MENTIONED_IN relationship: entity {entity_id} -> chunk {chunk_id}")
-
-    async def fix_unconnected_entities(self) -> int:
-        """DEPRECATED: Find and fix entities that are not connected to any chunks.
-
-        This method should no longer be needed with chunk-based extraction.
-        Entities are now extracted directly from chunks and automatically connected.
-
-        Returns:
-            Number of entities that were fixed (always 0 now)
-        """
-        logger.info("fix_unconnected_entities called but is deprecated with chunk-based extraction")
-        return 0
-    
-    async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
-        """Get all entities mentioned in a specific chunk.
-        
-        Args:
-            chunk_id: Chunk ID
-            
-        Returns:
-            List of Entity instances
-        """
-        if not IDValidator.validate_chunk_id(chunk_id):
-            raise ValueError(f"Invalid chunk ID format: {chunk_id}")
-        
-        query = """
-        MATCH (e)-[:MENTIONED_IN]->(c:DocumentChunk {id: $chunk_id})
-        WHERE e.name IS NOT NULL
-        RETURN e
-        """
-        
-        result = await self._execute_query(query, {"chunk_id": chunk_id})
-        
-        entities = []
-        for record in result:
-            entity_data = dict(record['e'])
-            entities.append(Entity.from_neo4j_node(entity_data))
-        
-        return entities
-    
-    async def get_chunks_by_entity_id(self, entity_id: EntityId) -> List[str]:
-        """Get all chunk IDs where an entity is mentioned.
-
-        Args:
-            entity_id: Entity ID
-
-        Returns:
-            List of chunk IDs
-        """
-        query = """
-        MATCH (c:DocumentChunk)-[:MENTIONS]->(e {id: $entity_id})
-        WHERE e.name IS NOT NULL
-        RETURN c.id as chunk_id
-        ORDER BY c.chunk_index
-        """
-
-        result = await self._execute_query(query, {"entity_id": entity_id})
-
-        return [record['chunk_id'] for record in result]
-
-    async def get_document_chunks_by_entity_names(self, entity_names: List[str]) -> List[Dict[str, Any]]:
-        """Get all DocumentChunk nodes related to specific entity names with full metadata.
-
-        Since the current graph doesn't have direct entity-chunk relationships,
-        we'll search for chunks that contain the entity names in their text.
-
-        Args:
-            entity_names: List of entity names to search for
-
-        Returns:
-            List of dictionaries containing chunk data with full metadata
-        """
-        if not entity_names:
-            return []
-
-        # Since there are no MENTIONED_IN relationships, search by text content
-        query = """
-        MATCH (c:DocumentChunk)
-        OPTIONAL MATCH (d:Document)-[:CONTAINS]->(c)
-        WHERE ANY(entity_name IN $entity_names WHERE toLower(c.text) CONTAINS toLower(entity_name))
-        WITH c, d, [entity_name IN $entity_names WHERE toLower(c.text) CONTAINS toLower(entity_name)] as matching_entities
-        RETURN DISTINCT c.id as chunk_id,
-               c.text as text,
-               c.chunk_index as chunk_index,
-               c.document_id as document_id,
-               c.metadata as chunk_metadata,
-               d.file_name as document_name,
-               d.source_file as source_file,
-               d.metadata as document_metadata,
-               matching_entities as related_entity_names,
-               [] as related_entity_types
-        ORDER BY d.file_name, c.chunk_index
-        """
-
-        result = await self._execute_query(query, {"entity_names": entity_names})
-
-        chunks = []
-        for record in result:
-            chunk_data = {
-                "chunk_id": record["chunk_id"],
-                "text": record["text"],
-                "chunk_index": record["chunk_index"],
-                "document_id": record["document_id"],
-                "document_name": record["document_name"],
-                "source_file": record["source_file"],
-                "chunk_metadata": record["chunk_metadata"] or {},
-                "document_metadata": record["document_metadata"] or {},
-                "related_entity_names": record["related_entity_names"],
-                "related_entity_types": record["related_entity_types"]
-            }
-            chunks.append(chunk_data)
-
-        return chunks
-    
-    async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
-        """Update entity's chunk references by replacing all existing relationships.
-        
-        Args:
-            entity_id: Entity ID
-            chunk_ids: New list of chunk IDs
-        """
-        # Validate chunk IDs
-        for chunk_id in chunk_ids:
-            if not IDValidator.validate_chunk_id(chunk_id):
-                raise ValueError(f"Invalid chunk ID format: {chunk_id}")
-        
-        # Remove all existing relationships
-        delete_query = """
-        MATCH (e {id: $entity_id})-[r:MENTIONED_IN]->()
-        WHERE e.type IS NOT NULL
-        DELETE r
-        """
-        
-        await self._execute_query(delete_query, {"entity_id": entity_id})
-        
-        # Create new relationships
-        for chunk_id in chunk_ids:
-            await self._create_entity_chunk_relationship(entity_id, chunk_id)
-    
-    async def get_entity(self, entity_id: EntityId) -> Optional[Entity]:
-        """Get an entity by ID.
-        
-        Args:
-            entity_id: ID of the entity to get
-            
-        Returns:
-            Entity if found, None otherwise
-        """
-        query = """
-        MATCH (e {id: $entity_id})
-        WHERE e.type IS NOT NULL
-        RETURN e
-        """
-        
-        result = await self._execute_query(query, {"entity_id": entity_id})
-        
-        if result:
-            node_data = result[0]["e"]
-            return Entity.from_neo4j_node(node_data)
-        
-        return None
-    
-    async def get_entities(self, entity_ids: List[EntityId]) -> List[Entity]:
-        """Get multiple entities by IDs.
-        
-        Args:
-            entity_ids: List of entity IDs to get
-            
-        Returns:
-            List of entities
-        """
-        if not entity_ids:
-            return []
-        
-        query = """
-        MATCH (e)
-        WHERE e.id IN $entity_ids AND e.type IS NOT NULL
-        RETURN e
-        """
-        
-        result = await self._execute_query(query, {"entity_ids": entity_ids})
-        
-        entities = []
-        for record in result:
-            try:
-                entity = Entity.from_neo4j_node(record["e"])
-                entities.append(entity)
-            except Exception as e:
-                logger.warning(f"Failed to parse entity from Neo4J: {e}")
-        
-        return entities
-    
-    async def get_all_entities(self) -> List[Entity]:
-        """Get all entities from the storage.
-        
-        Returns:
-            List of all entities
-        """
-        query = "MATCH (e) WHERE e.type IS NOT NULL RETURN e"
-        result = await self._execute_query(query)
-        
-        entities = []
-        for record in result:
-            try:
-                entity = Entity.from_neo4j_node(record["e"])
-                entities.append(entity)
-            except Exception as e:
-                logger.warning(f"Failed to parse entity: {e}")
-        
-        return entities
-    
-    async def search_entities(
-        self, 
-        query: str, 
-        entity_type: Optional[str] = None,
-        limit: int = 10
-    ) -> List[Entity]:
-        """Search for entities by name or attributes.
-        
-        Args:
-            query: Search query
-            entity_type: Optional entity type filter
-            limit: Maximum number of results
-            
-        Returns:
-            List of matching entities
-        """
-        cypher_query = """
-        MATCH (e)
-        WHERE e.name IS NOT NULL AND toLower(e.name) CONTAINS toLower($query)
-        """
-        
-        parameters = {"query": query, "limit": limit}
-        
-        if entity_type:
-            cypher_query += " AND e.type = $entity_type"
-            parameters["entity_type"] = entity_type
-        
-        cypher_query += """
-        RETURN e
-        ORDER BY e.name
-        LIMIT $limit
-        """
-        
-        result = await self._execute_query(cypher_query, parameters)
-        
-        entities = []
-        for record in result:
-            try:
-                entity = Entity.from_neo4j_node(record["e"])
-                entities.append(entity)
-            except Exception as e:
-                # Log more details about the problematic entity
-                entity_data = record.get("e", {})
-                entity_id = entity_data.get("id", "unknown")
-                entity_name = entity_data.get("name", "unknown")
-                logger.warning(
-                    "Failed to parse entity from search",
-                    entity_id=entity_id,
-                    entity_name=entity_name,
-                    error=str(e)
-                )
-        
-        return entities
-    
-    async def update_entity(self, entity: Entity) -> bool:
-        """Update an existing entity.
-        
-        Args:
-            entity: Entity with updated data
-            
-        Returns:
-            True if entity was updated, False if not found
-        """
-        properties = entity.to_neo4j_node()
-        properties.pop('_labels', None)  # Don't update labels
-        
-        query = """
-        MATCH (e {id: $id})
-        WHERE e.type IS NOT NULL
-        SET e += $properties
-        RETURN e.id as id
-        """
-        
-        result = await self._execute_query(query, {
-            "id": entity.id,
-            "properties": properties
-        })
-        
-        return len(result) > 0
-    
-    async def delete_entity(self, entity_id: EntityId) -> bool:
-        """Delete an entity and all its relations.
-        
-        Args:
-            entity_id: ID of the entity to delete
-            
-        Returns:
-            True if entity was deleted, False if not found
-        """
-        query = """
-        MATCH (e {id: $entity_id})
-        WHERE e.type IS NOT NULL
-        DETACH DELETE e
-        RETURN count(e) as deleted_count
-        """
-        
-        result = await self._execute_query(query, {"entity_id": entity_id})
-        return result[0]["deleted_count"] > 0 if result else False
-    
-    async def store_relation(self, relation: Relation) -> RelationId:
-        """Store a relation in Neo4J.
-
-        If either entity doesn't exist, it will be created automatically.
-
-        Args:
-            relation: Relation to store
-
-        Returns:
-            ID of the stored relation
-        """
-        properties = relation.to_neo4j_relationship()
-        relation_type = relation.get_neo4j_type()
-
-        # First check if both entities exist
-        check_query = """
-        OPTIONAL MATCH (source {id: $source_id})
-        WHERE source.type IS NOT NULL
-        OPTIONAL MATCH (target {id: $target_id})
-        WHERE target.type IS NOT NULL
-        RETURN source.id as source_exists, target.id as target_exists
-        """
-
-        check_result = await self._execute_query(check_query, {
-            "source_id": relation.source_entity_id,
-            "target_id": relation.target_entity_id
-        })
-
-        if not check_result:
-            logger.warning(f"Failed to check entity existence for relation {relation.id}")
-            return relation.id
-
-        source_exists = check_result[0]["source_exists"] is not None
-        target_exists = check_result[0]["target_exists"] is not None
-
-        # Create missing entities automatically
-        if not source_exists:
-            logger.info(f"Creating missing source entity {relation.source_entity_id} for relation {relation.id}")
-            await self._create_missing_entity(relation.source_entity_id, relation.attributes.get('source_entity_name', ''))
-
-        if not target_exists:
-            logger.info(f"Creating missing target entity {relation.target_entity_id} for relation {relation.id}")
-            await self._create_missing_entity(relation.target_entity_id, relation.attributes.get('target_entity_name', ''))
-
-        # Both entities now exist (or have been created), create the relation
-        query = f"""
-        MATCH (source {{id: $source_id}})
-        WHERE source.type IS NOT NULL
-        MATCH (target {{id: $target_id}})
-        WHERE target.type IS NOT NULL
-        MERGE (source)-[r:{relation_type} {{id: $relation_id}}]->(target)
-        SET r += $properties
-        RETURN r.id as id
-        """
-
-        parameters = {
-            "source_id": relation.source_entity_id,
-            "target_id": relation.target_entity_id,
-            "relation_id": relation.id,
-            "properties": properties
-        }
-
-        result = await self._execute_query(query, parameters)
-        if result:
-            logger.debug(f"Successfully stored relation {relation.id}: {relation.source_entity_id} -> {relation.target_entity_id}")
-            return result[0]["id"]
-        else:
-            logger.warning(f"Failed to store relation {relation.id}")
-            return relation.id
-    
-    async def store_relations(self, relations: List[Relation]) -> List[RelationId]:
-        """Store multiple relations in Neo4J.
-        
-        Args:
-            relations: List of relations to store
-            
-        Returns:
-            List of IDs of the stored relations
-        """
-        if not relations:
-            return []
-        
-        # For now, use individual inserts (could be optimized with batch operations)
-        return [await self.store_relation(relation) for relation in relations]
-    
-    async def get_relation(self, relation_id: RelationId) -> Optional[Relation]:
-        """Get a relation by ID.
-        
-        Args:
-            relation_id: ID of the relation to get
-            
-        Returns:
-            Relation if found, None otherwise
-        """
-        query = """
-        MATCH (source)-[r {id: $relation_id}]->(target)
-        RETURN r, source.id as source_id, target.id as target_id
-        """
-        
-        result = await self._execute_query(query, {"relation_id": relation_id})
-        
-        if result:
-            record = result[0]
-            return Relation.from_neo4j_relationship(
-                record["r"], 
-                record["source_id"], 
-                record["target_id"]
-            )
-        
-        return None
-    
-    async def get_relations(self, relation_ids: List[RelationId]) -> List[Relation]:
-        """Get multiple relations by IDs.
-        
-        Args:
-            relation_ids: List of relation IDs to get
-            
-        Returns:
-            List of relations
-        """
-        if not relation_ids:
-            return []
-        
-        query = """
-        MATCH (source)-[r]->(target)
-        WHERE r.id IN $relation_ids
-        RETURN r, source.id as source_id, target.id as target_id
-        """
-        
-        result = await self._execute_query(query, {"relation_ids": relation_ids})
-        
-        relations = []
-        for record in result:
-            try:
-                relation = Relation.from_neo4j_relationship(
-                    record["r"], 
-                    record["source_id"], 
-                    record["target_id"]
-                )
-                relations.append(relation)
-            except Exception as e:
-                logger.warning(f"Failed to parse relation from Neo4J: {e}")
-        
-        return relations
-    
-    async def get_entity_relations(
-        self, 
-        entity_id: EntityId,
-        relation_type: Optional[str] = None,
-        direction: str = "both"
-    ) -> List[Relation]:
-        """Get all relations for an entity.
-        
-        Args:
-            entity_id: ID of the entity
-            relation_type: Optional relation type filter
-            direction: Direction of relations ("in", "out", "both")
-            
-        Returns:
-            List of relations involving the entity
-        """
-        if direction == "out":
-            pattern = "(e)-[r]->(target)"
-            return_clause = "r, e.id as source_id, target.id as target_id"
-        elif direction == "in":
-            pattern = "(source)-[r]->(e)"
-            return_clause = "r, source.id as source_id, e.id as target_id"
-        else:  # both
-            pattern = "(n1)-[r]-(e)-[r2]-(n2)"
-            return_clause = "r, n1.id as source_id, e.id as target_id"
-        
-        query = f"""
-        MATCH (e {{id: $entity_id}})
-        WHERE e.name IS NOT NULL
-        MATCH {pattern}
-        """
-        
-        parameters = {"entity_id": entity_id}
-        
-        if relation_type:
-            query = query.replace("[r]", f"[r:{relation_type}]")
-        
-        query += f" RETURN {return_clause}"
-        
-        result = await self._execute_query(query, parameters)
-        
-        relations = []
-        for record in result:
-            try:
-                relation = Relation.from_neo4j_relationship(
-                    record["r"], 
-                    record["source_id"], 
-                    record["target_id"]
-                )
-                relations.append(relation)
-            except Exception as e:
-                logger.warning(f"Failed to parse relation: {e}")
-        
-        return relations
-    
-    async def get_all_relations(self) -> List[Relation]:
-        """Get all relations from the storage.
-        
-        Returns:
-            List of all relations
-        """
-        query = """
-        MATCH (source)-[r]->(target)
-        WHERE source.type IS NOT NULL AND target.type IS NOT NULL
-        RETURN r, source.id as source_id, target.id as target_id
-        """
-        
-        result = await self._execute_query(query)
-        
-        relations = []
-        for record in result:
-            try:
-                relation = Relation.from_neo4j_relationship(
-                    record["r"], 
-                    record["source_id"], 
-                    record["target_id"]
-                )
-                relations.append(relation)
-            except Exception as e:
-                logger.warning(f"Failed to parse relation: {e}")
-        
-        return relations
-    
-    async def update_relation(self, relation: Relation) -> bool:
-        """Update an existing relation.
-        
-        Args:
-            relation: Relation with updated data
-            
-        Returns:
-            True if relation was updated, False if not found
-        """
-        properties = relation.to_neo4j_relationship()
-        
-        query = """
-        MATCH ()-[r {id: $id}]->()
-        SET r += $properties
-        RETURN r.id as id
-        """
-        
-        result = await self._execute_query(query, {
-            "id": relation.id,
-            "properties": properties
-        })
-        
-        return len(result) > 0
-    
-    async def delete_relation(self, relation_id: RelationId) -> bool:
-        """Delete a relation.
-        
-        Args:
-            relation_id: ID of the relation to delete
-            
-        Returns:
-            True if relation was deleted, False if not found
-        """
-        query = """
-        MATCH ()-[r {id: $relation_id}]->()
-        DELETE r
-        RETURN count(r) as deleted_count
-        """
-        
-        result = await self._execute_query(query, {"relation_id": relation_id})
-        return result[0]["deleted_count"] > 0 if result else False
-    
-    async def get_neighbors(
-        self, 
-        entity_id: EntityId,
-        relation_type: Optional[str] = None,
-        max_depth: int = 1
-    ) -> List[Entity]:
-        """Get neighboring entities.
-        
-        Args:
-            entity_id: ID of the entity
-            relation_type: Optional relation type filter
-            max_depth: Maximum traversal depth
-            
-        Returns:
-            List of neighboring entities
-        """
-        relation_filter = f":{relation_type}" if relation_type else ""
-        
-        query = f"""
-        MATCH (e {{id: $entity_id}})
-        WHERE e.name IS NOT NULL
-        MATCH (e)-[{relation_filter}*1..{max_depth}]-(neighbor)
-        WHERE neighbor.id <> e.id AND neighbor.name IS NOT NULL
-        RETURN DISTINCT neighbor
-        """
-        
-        result = await self._execute_query(query, {"entity_id": entity_id})
-        
-        neighbors = []
-        for record in result:
-            try:
-                entity = Entity.from_neo4j_node(record["neighbor"])
-                neighbors.append(entity)
-            except Exception as e:
-                logger.warning(f"Failed to parse neighbor entity: {e}")
-        
-        return neighbors
-    
-    async def find_path(
-        self, 
-        source_entity_id: EntityId,
-        target_entity_id: EntityId,
-        max_depth: int = 3
-    ) -> List[List[EntityId]]:
-        """Find paths between two entities.
-        
-        Args:
-            source_entity_id: ID of the source entity
-            target_entity_id: ID of the target entity
-            max_depth: Maximum path length
-            
-        Returns:
-            List of paths (each path is a list of entity IDs)
-        """
-        query = f"""
-        MATCH path = (source {{id: $source_id}})
-        -[*1..{max_depth}]-
-        (target {{id: $target_id}})
-        WHERE source.name IS NOT NULL AND target.name IS NOT NULL
-        RETURN [node in nodes(path) | node.id] as path_ids
-        LIMIT 10
-        """
-        
-        result = await self._execute_query(query, {
-            "source_id": source_entity_id,
-            "target_id": target_entity_id
-        })
-        
-        return [record["path_ids"] for record in result]
-    
-    async def store_graph(self, graph: Graph) -> None:
-        """Store an entire graph.
-        
-        Args:
-            graph: Graph to store
-        """
-        # Store entities first
-        if graph.entities:
-            await self.store_entities(list(graph.entities.values()))
-        
-        # Then store relations
-        if graph.relations:
-            await self.store_relations(list(graph.relations.values()))
-    
-    async def get_graph(
-        self, 
-        entity_ids: Optional[List[EntityId]] = None
-    ) -> Graph:
-        """Get a graph or subgraph.
-        
-        Args:
-            entity_ids: Optional list of entity IDs to include (None for all)
-            
-        Returns:
-            Graph containing the requested entities and their relations
-        """
-        graph = Graph()
-        
-        # Get entities
-        if entity_ids:
-            entities = await self.get_entities(entity_ids)
-        else:
-            # Get all entities
-            query = "MATCH (e) WHERE e.type IS NOT NULL RETURN e"
-            result = await self._execute_query(query)
-            entities = []
-            for record in result:
-                try:
-                    entity = Entity.from_neo4j_node(record["e"])
-                    entities.append(entity)
-                except Exception as e:
-                    logger.warning(f"Failed to parse entity: {e}")
-        
-        # Add entities to graph
-        for entity in entities:
-            graph.add_entity(entity)
-        
-        # Get relations between these entities
-        if graph.entities:
-            entity_id_list = list(graph.entities.keys())
-            query = """
-            MATCH (source)-[r]->(target)
-            WHERE source.type IS NOT NULL AND target.type IS NOT NULL
-            AND source.id IN $entity_ids AND target.id IN $entity_ids
-            RETURN r, source.id as source_id, target.id as target_id
-            """
-            
-            result = await self._execute_query(query, {"entity_ids": entity_id_list})
-            
-            for record in result:
-                try:
-                    relation = Relation.from_neo4j_relationship(
-                        record["r"], 
-                        record["source_id"], 
-                        record["target_id"]
-                    )
-                    graph.add_relation(relation)
-                except Exception as e:
-                    logger.warning(f"Failed to parse relation: {e}")
-        
-        return graph
-    
-    async def clear(self) -> None:
-        """Clear all data from the storage."""
-        query = "MATCH (n) DETACH DELETE n"
-        await self._execute_query(query)
-        logger.info("Cleared all data from Neo4J database")
-    
-    async def get_statistics(self) -> Dict[str, Any]:
-        """Get storage statistics.
-        
-        Returns:
-            Dictionary containing statistics
-        """
-        queries = {
-            "total_nodes": "MATCH (n) RETURN count(n) as count",
-            "total_relationships": "MATCH ()-[r]->() RETURN count(r) as count",
-            "node_types": """
-                MATCH (n) 
-                RETURN labels(n)[0] as type, count(n) as count 
-                ORDER BY count DESC
-            """,
-            "relationship_types": """
-                MATCH ()-[r]->() 
-                RETURN type(r) as type, count(r) as count 
-                ORDER BY count DESC
-            """,
-            "entity_count": "MATCH (e) WHERE e.name IS NOT NULL RETURN count(e) as count",
-            "document_count": "MATCH (d:Document) RETURN count(d) as count",
-            "chunk_count": "MATCH (c:DocumentChunk) RETURN count(c) as count",
-            "entity_types": """
-                MATCH (e)
-                WHERE e.type IS NOT NULL AND e.name IS NOT NULL
-                RETURN e.type as type, count(e) as count
-                ORDER BY count DESC
-            """
-        }
-        
-        stats = {}
-        
-        for stat_name, query in queries.items():
-            try:
-                result = await self._execute_query(query)
-                if stat_name in ["total_nodes", "total_relationships", "entity_count", "document_count", "chunk_count"]:
-                    stats[stat_name] = result[0]["count"] if result else 0
-                elif stat_name in ["node_types", "relationship_types", "entity_types"]:
-                    # Convert list of dicts to dict for easier reading
-                    stats[stat_name] = {item["type"]: item["count"] for item in result} if result else {}
-                else:
-                    stats[stat_name] = result
-            except Exception as e:
-                logger.warning(f"Failed to get {stat_name}: {e}")
-                stats[stat_name] = 0 if "count" in stat_name else {}
-        
-        return stats
+        """Validate ID consistency across the database."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.validate_id_consistency()
     
     async def store_document(self, document: Document) -> str:
-        """Store a document in Neo4J.
-        
-        Args:
-            document: Document to store
-            
-        Returns:
-            ID of the stored document
-        """
-        properties = document.to_neo4j_node()
-        labels = properties.pop('_labels', ['Document'])
-        
-        # Create labels string for Cypher
-        labels_str = ':'.join(labels)
-        
-        query = f"""
-        MERGE (d:{labels_str} {{id: $id}})
-        SET d += $properties
-        RETURN d.id as id
-        """
-        
-        parameters = {
-            "id": document.id,
-            "properties": properties
-        }
-        
-        result = await self._execute_query(query, parameters)
-        return result[0]["id"] if result else document.id
+        """Store a document in Neo4J."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_document(document)
     
     async def store_document_chunk(self, chunk: DocumentChunk) -> str:
-        """Store a document chunk in Neo4J.
-        
-        Args:
-            chunk: DocumentChunk to store
-            
-        Returns:
-            ID of the stored chunk
-        """
-        properties = chunk.to_neo4j_node()
-        labels = properties.pop('_labels', ['DocumentChunk'])
-        
-        # Create labels string for Cypher
-        labels_str = ':'.join(labels)
-        
-        query = f"""
-        MERGE (c:{labels_str} {{id: $id}})
-        SET c += $properties
-        RETURN c.id as id
-        """
-        
-        parameters = {
-            "id": chunk.id,
-            "properties": properties
-        }
-        
-        result = await self._execute_query(query, parameters)
-        return result[0]["id"] if result else chunk.id
-    
+        """Store a document chunk in Neo4J."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_document_chunk(chunk)
+
+    async def store_documents(self, documents: List[Document]) -> List[str]:
+        """Store multiple documents in Neo4J."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_documents(documents)
+
+    async def store_document_chunks(self, chunks: List[DocumentChunk]) -> List[str]:
+        """Store multiple document chunks in Neo4J."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_document_chunks(chunks)
+
     async def create_document_contains_chunk_relation(self, document_id: str, chunk_id: str) -> None:
-        """Create a CONTAINS relationship between a document and a chunk.
-        
-        Args:
-            document_id: ID of the document
-            chunk_id: ID of the chunk
-        """
-        query = """
-        MATCH (d:Document {id: $document_id})
-        MATCH (c:DocumentChunk {id: $chunk_id})
-        MERGE (d)-[:CONTAINS]->(c)
-        """
-        
-        await self._execute_query(query, {
-            "document_id": document_id,
-            "chunk_id": chunk_id
-        })
-    
-    async def create_chunk_mentions_entity_relation(self, chunk_id: str, entity_id: str, context: str) -> None:
-        """Create a MENTIONS relationship between a chunk and an entity.
-        
-        Args:
-            chunk_id: ID of the chunk
-            entity_id: ID of the entity
-            context: Context where the entity is mentioned
-        """
-        query = """
-        MATCH (c:DocumentChunk {id: $chunk_id})
-        MATCH (e {id: $entity_id})
-        WHERE e.type IS NOT NULL
-        MERGE (c)-[r:MENTIONS]->(e)
-        SET r.context = $context
-        """
-        
-        await self._execute_query(query, {
-            "chunk_id": chunk_id,
-            "entity_id": entity_id,
-            "context": context
-        })
-    
-    # Checksum management methods
+        """Create a CONTAINS relationship between a document and a chunk."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.create_document_contains_chunk_relation(document_id, chunk_id)
     
     async def get_document_checksum(self, document_id: str) -> Optional[str]:
-        """Get stored checksum for a document.
-        
-        Args:
-            document_id: Document identifier
-            
-        Returns:
-            Stored checksum if found, None otherwise
-        """
-        query = """
-        MATCH (d:Document {id: $document_id})
-        RETURN d.checksum as checksum
-        """
-        
-        result = await self._execute_query(query, {"document_id": document_id})
-        return result[0]["checksum"] if result and result[0]["checksum"] else None
+        """Get stored checksum for a document."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.get_document_checksum(document_id)
     
     async def store_document_checksum(self, document_id: str, checksum: str) -> None:
-        """Store document checksum.
-        
-        Args:
-            document_id: Document identifier
-            checksum: Document checksum to store
-        """
-        query = """
-        MERGE (d:Document {id: $document_id})
-        SET d.checksum = $checksum, d.checksum_updated = datetime()
-        """
-        
-        await self._execute_query(query, {
-            "document_id": document_id,
-            "checksum": checksum
-        })
+        """Store document checksum."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.store_document_checksum(document_id, checksum)
     
     async def delete_document_checksum(self, document_id: str) -> None:
-        """Remove stored checksum for a document.
-        
-        Args:
-            document_id: Document identifier
-        """
-        query = """
-        MATCH (d:Document {id: $document_id})
-        REMOVE d.checksum, d.checksum_updated
-        """
-        
-        await self._execute_query(query, {"document_id": document_id})
+        """Remove stored checksum for a document."""
+        if not self._document_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._document_ops.delete_document_checksum(document_id)
+    
+    # Entity operations delegation
+    async def store_entity(self, entity: Entity) -> EntityId:
+        """Store an entity in Neo4J."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.store_entity(entity)
+    
+    async def store_entities(self, entities: List[Entity]) -> List[EntityId]:
+        """Store multiple entities in Neo4J."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.store_entities(entities)
+    
+    async def store_entity_with_chunk_references(self, entity: Entity, chunk_ids: List[str]) -> EntityId:
+        """Store entity with references to chunks where it's mentioned."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.store_entity_with_chunk_references(entity, chunk_ids)
+    
+    async def get_entity(self, entity_id: EntityId) -> Optional[Entity]:
+        """Get an entity by ID."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.get_entity(entity_id)
+    
+    async def get_entities(self, entity_ids: List[EntityId]) -> List[Entity]:
+        """Get multiple entities by IDs."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.get_entities(entity_ids)
+    
+    async def get_all_entities(self) -> List[Entity]:
+        """Get all entities from the storage."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.get_all_entities()
+    
+    async def search_entities(self, query: str, entity_type: Optional[str] = None, limit: int = 10) -> List[Entity]:
+        """Search for entities by name or content."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.search_entities(query, entity_type, limit)
+    
+    async def update_entity(self, entity: Entity) -> bool:
+        """Update an existing entity."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.update_entity(entity)
+    
+    async def delete_entity(self, entity_id: EntityId) -> bool:
+        """Delete an entity and all its relations."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.delete_entity(entity_id)
+    
+    async def get_entities_by_chunk_id(self, chunk_id: str) -> List[Entity]:
+        """Get all entities mentioned in a specific chunk."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.get_entities_by_chunk_id(chunk_id)
+    
+    async def get_chunks_by_entity_id(self, entity_id: EntityId) -> List[str]:
+        """Get all chunk IDs where an entity is mentioned."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.get_chunks_by_entity_id(entity_id)
+    
+    async def get_document_chunks_by_entity_names(self, entity_names: List[str]) -> List[Dict[str, Any]]:
+        """Get all DocumentChunk nodes related to specific entity names with full metadata."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.get_document_chunks_by_entity_names(entity_names)
+    
+    async def update_entity_chunk_references(self, entity_id: EntityId, chunk_ids: List[str]) -> None:
+        """Update entity's chunk references by replacing all existing relationships."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.update_entity_chunk_references(entity_id, chunk_ids)
     
     async def get_entities_by_document(self, document_id: str) -> List[Entity]:
-        """Get all entities associated with a document.
-        
-        Args:
-            document_id: Document identifier
-            
+        """Get all entities associated with a document."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.get_entities_by_document(document_id)
+    
+    async def create_chunk_mentions_entity_relation(self, chunk_id: str, entity_id: str, context: str) -> None:
+        """Create a MENTIONS relationship between a chunk and an entity."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.create_chunk_mentions_entity_relation(chunk_id, entity_id, context)
+
+    async def create_chunk_contains_fact_relation(self, chunk_id: str, fact_id: str, context: str = "") -> None:
+        """Create a CONTAINS relationship between a chunk and a fact."""
+        if not self._fact_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._fact_ops.create_chunk_contains_fact_relation(chunk_id, fact_id, context)
+
+    # Fact operations delegation
+    async def store_fact(self, fact: Fact) -> str:
+        """Store a fact in Neo4J."""
+        if not self._fact_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._fact_ops.store_fact(fact)
+
+    async def store_facts(self, facts: List[Fact]) -> List[str]:
+        """Store multiple facts in Neo4J."""
+        if not self._fact_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._fact_ops.store_facts(facts)
+
+    async def fix_unconnected_entities(self) -> int:
+        """DEPRECATED: Find and fix entities that are not connected to any chunks."""
+        if not self._entity_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._entity_ops.fix_unconnected_entities()
+
+    # Relation operations delegation
+    async def store_relation(self, relation: Relation) -> RelationId:
+        """Store a relation in Neo4J."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.store_relation(relation)
+
+    async def store_relations(self, relations: List[Relation]) -> List[RelationId]:
+        """Store multiple relations in Neo4J."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.store_relations(relations)
+
+    async def get_relation(self, relation_id: RelationId) -> Optional[Relation]:
+        """Get a relation by ID."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.get_relation(relation_id)
+
+    async def get_relations(self, relation_ids: List[RelationId]) -> List[Relation]:
+        """Get multiple relations by IDs."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.get_relations(relation_ids)
+
+    async def get_entity_relations(self, entity_id: EntityId, relation_type: Optional[str] = None, direction: str = "both") -> List[Relation]:
+        """Get all relations for an entity."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.get_entity_relations(entity_id, relation_type, direction)
+
+    async def get_all_relations(self) -> List[Relation]:
+        """Get all relations from the storage."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.get_all_relations()
+
+    async def update_relation(self, relation: Relation) -> bool:
+        """Update an existing relation."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.update_relation(relation)
+
+    async def delete_relation(self, relation_id: RelationId) -> bool:
+        """Delete a relation."""
+        if not self._relation_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._relation_ops.delete_relation(relation_id)
+
+    # Query operations delegation
+    async def get_neighbors(self, entity_id: EntityId, relation_type: Optional[str] = None, max_depth: int = 1) -> List[Entity]:
+        """Get neighboring entities."""
+        if not self._query_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._query_ops.get_neighbors(entity_id, relation_type, max_depth)
+
+    async def find_path(self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 3) -> List[List[EntityId]]:
+        """Find paths between two entities."""
+        if not self._query_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._query_ops.find_path(source_entity_id, target_entity_id, max_depth)
+
+    async def search_entities_by_content(self, search_term: str, entity_type: Optional[str] = None, limit: int = 10) -> List[Entity]:
+        """Search entities by content using full-text search."""
+        if not self._query_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._query_ops.search_entities_by_content(search_term, entity_type, limit)
+
+    async def find_related_entities(self, entity_id: EntityId, relation_types: Optional[List[str]] = None, max_depth: int = 2, limit: int = 20) -> List[Dict[str, Any]]:
+        """Find entities related to a given entity with relationship context."""
+        if not self._query_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._query_ops.find_related_entities(entity_id, relation_types, max_depth, limit)
+
+    async def get_entity_clusters(self, min_cluster_size: int = 3, max_clusters: int = 10) -> List[Dict[str, Any]]:
+        """Find clusters of highly connected entities."""
+        if not self._query_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._query_ops.get_entity_clusters(min_cluster_size, max_clusters)
+
+    async def find_shortest_paths(self, source_entity_id: EntityId, target_entity_id: EntityId, max_depth: int = 5) -> List[Dict[str, Any]]:
+        """Find shortest paths between two entities with relationship details."""
+        if not self._query_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._query_ops.find_shortest_paths(source_entity_id, target_entity_id, max_depth)
+
+    # Graph operations delegation
+    async def store_graph(self, graph: Graph) -> None:
+        """Store an entire graph."""
+        if not self._graph_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._graph_ops.store_graph(graph)
+
+    async def get_graph(self, entity_ids: Optional[List[EntityId]] = None) -> Graph:
+        """Get a graph or subgraph."""
+        if not self._graph_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._graph_ops.get_graph(entity_ids)
+
+    async def clear(self) -> None:
+        """Clear all data from the storage."""
+        if not self._graph_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._graph_ops.clear()
+
+    async def get_statistics(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+        if not self._graph_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._graph_ops.get_statistics()
+
+    async def test_connection(self) -> bool:
+        """Test the database connection.
+
         Returns:
-            List of entities from this document
+            True if connection is working
         """
-        query = """
-        MATCH (d:Document {id: $document_id})-[:CONTAINS]->(c:DocumentChunk)-[:MENTIONS]->(e)
-        WHERE e.name IS NOT NULL
-        RETURN DISTINCT e
-        UNION
-        MATCH (e {source_doc_id: $document_id})
-        WHERE e.name IS NOT NULL
-        RETURN e
-        """
-        
-        result = await self._execute_query(query, {"document_id": document_id})
-        entities = []
-        
-        for record in result:
-            entity_data = dict(record["e"])
-            # Convert Neo4j node to Entity model
-            entity = Entity(
-                id=entity_data["id"],
-                name=entity_data["name"],
-                type=entity_data["type"],
-                description=entity_data.get("description"),
-                properties=entity_data.get("properties", {}),
-                source_doc_id=entity_data.get("source_doc_id")
-            )
-            entities.append(entity)
-        
-        return entities
+        if not self._connection_ops:
+            raise RuntimeError("Connection not initialized")
+
+        # Use the connection operations to test the connection
+        result = await self._connection_ops._execute_query("RETURN 1 as test", {})
+        return len(result) > 0 and result[0].get("test") == 1
+
+    async def get_graph_metrics(self) -> Dict[str, Any]:
+        """Get advanced graph metrics."""
+        if not self._graph_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._graph_ops.get_graph_metrics()
+
+    async def optimize_database(self) -> Dict[str, Any]:
+        """Optimize database performance by creating indexes and constraints."""
+        if not self._graph_ops:
+            raise RuntimeError("Connection not initialized")
+        return await self._graph_ops.optimize_database()
+
+    # OpenIE operations removed - LangExtract handles all extraction

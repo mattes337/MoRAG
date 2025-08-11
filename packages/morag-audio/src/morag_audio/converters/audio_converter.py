@@ -1,13 +1,22 @@
-"""Audio to Markdown converter with speaker diarization and topic segmentation."""
+"""Audio document converter using markitdown framework."""
 
 import time
 from pathlib import Path
-from typing import Union, List, Dict, Any, Optional
+from typing import Union, List, Dict, Any, Optional, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
 import structlog
 
-from morag_core.exceptions import ProcessingError as ConversionError
-from morag_audio.processor import AudioProcessingResult, AudioSegment
+from morag_core.interfaces.converter import (
+    ConversionResult,
+    ConversionOptions,
+    QualityScore,
+    ConversionError,
+    UnsupportedFormatError,
+)
+from morag_core.models.document import Document, DocumentType
+from morag_document.services.markitdown_service import MarkitdownService
+if TYPE_CHECKING:
+    from morag_audio.processor import AudioProcessingResult, AudioSegment
 
 logger = structlog.get_logger(__name__)
 
@@ -18,8 +27,8 @@ class AudioConversionOptions:
     include_timestamps: bool = True
     include_speakers: bool = True
     include_topics: bool = True
-    timestamp_format: str = "[%H:%M:%S]"  # Format for timestamps
-    group_by_speaker: bool = True  # Group consecutive segments by the same speaker
+    timestamp_format: str = "[%H:%M:%S]"  # Format for timestamps (legacy, now using dynamic format)
+    group_by_speaker: bool = False  # Group consecutive segments by the same speaker (disabled for per-line timestamps)
     group_by_topic: bool = True  # Group segments by topic
     include_metadata: bool = True  # Include metadata section in markdown
     metadata_fields: List[str] = field(default_factory=lambda: [
@@ -38,19 +47,101 @@ class AudioConversionResult:
 
 
 class AudioConverter:
-    """Converts audio processing results to structured markdown."""
+    """Audio document converter using markitdown framework."""
 
     def __init__(self):
-        """Initialize the audio converter."""
+        """Initialize Audio converter."""
         self.name = "MoRAG Audio Converter"
-        self.supported_formats = ['audio', 'mp3', 'wav', 'm4a', 'flac', 'mp4', 'avi', 'mov', 'mkv']
-    
-    def supports_format(self, format_type: str) -> bool:
-        """Check if this converter supports the given format."""
-        return format_type.lower() in self.supported_formats
+        self.supported_formats: Set[str] = {
+            "audio", "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "mp4", "avi", "mov", "mkv"
+        }
+        self.markitdown_service = MarkitdownService()
+
+    async def supports_format(self, format_type: str) -> bool:
+        """Check if format is supported.
+
+        Args:
+            format_type: Format type string
+
+        Returns:
+            True if format is supported, False otherwise
+        """
+        return format_type.lower() in {
+            "audio", "mp3", "wav", "m4a", "flac", "aac", "ogg", "wma", "mp4", "avi", "mov", "mkv"
+        }
+
+    async def convert(
+        self, file_path: Union[str, Path], options: Optional[ConversionOptions] = None
+    ) -> ConversionResult:
+        """Convert audio file to text using markitdown.
+
+        Args:
+            file_path: Path to audio file
+            options: Conversion options
+
+        Returns:
+            Conversion result with document
+
+        Raises:
+            ConversionError: If conversion fails
+            UnsupportedFormatError: If audio format is not supported
+        """
+        file_path = Path(file_path)
+        options = options or ConversionOptions()
+
+        # Validate input
+        if not file_path.exists():
+            raise ConversionError(f"Audio file not found: {file_path}")
+
+        # Detect format if not specified
+        format_type = options.format_type or file_path.suffix.lower().lstrip('.')
+
+        # Check if format is supported
+        if not await self.supports_format(format_type):
+            raise UnsupportedFormatError(f"Format '{format_type}' is not supported by audio converter")
+
+        try:
+            # Use markitdown for audio transcription
+            logger.info("Converting audio file with markitdown", file_path=str(file_path))
+
+            result = await self.markitdown_service.convert_file(file_path)
+
+            # Create document
+            document = Document(
+                id=options.document_id,
+                title=options.title or file_path.stem,
+                raw_text=result.text_content,
+                document_type=DocumentType.AUDIO,
+                file_path=str(file_path),
+                metadata={
+                    "file_size": file_path.stat().st_size,
+                    "format": format_type,
+                    "conversion_method": "markitdown",
+                    **result.metadata
+                }
+            )
+
+            # Calculate quality score
+            quality_score = QualityScore(
+                overall_score=0.9,  # High score for markitdown transcription
+                text_extraction_score=0.9,
+                structure_preservation_score=0.8,
+                metadata_extraction_score=0.9,
+                issues_detected=[]
+            )
+
+            return ConversionResult(
+                document=document,
+                quality_score=quality_score,
+                warnings=[]
+            )
+
+        except Exception as e:
+            logger.error("Audio conversion failed", error=str(e), file_path=str(file_path))
+            raise ConversionError(f"Failed to convert audio file: {e}") from e
     
     async def convert_to_json(self,
-                             result: AudioProcessingResult,
+                             result: "AudioProcessingResult",
                              options: Optional[AudioConversionOptions] = None) -> Dict[str, Any]:
         """Convert audio processing result to structured JSON.
 
@@ -139,7 +230,7 @@ class AudioConverter:
             }
 
     async def convert_to_markdown(self,
-                                result: AudioProcessingResult,
+                                result: "AudioProcessingResult",
                                 options: Optional[AudioConversionOptions] = None) -> AudioConversionResult:
         """Convert audio processing result to structured markdown.
         
@@ -188,8 +279,8 @@ class AudioConverter:
                 markdown_content.append("## Detailed Transcript")
                 markdown_content.append("")
 
-                # Group segments by topic if requested and topic information is available
-                if options.group_by_topic and any(hasattr(segment, 'topic_id') and segment.topic_id is not None for segment in result.segments):
+                # Group segments by topic if both topic grouping and topic inclusion are enabled, and topic information is available
+                if options.group_by_topic and options.include_topics and any(hasattr(segment, 'topic_id') and segment.topic_id is not None for segment in result.segments):
                     topic_groups = {}
                     for segment in result.segments:
                         topic_id = getattr(segment, 'topic_id', None)
@@ -203,28 +294,46 @@ class AudioConverter:
                                 topic_groups[-1] = []
                             topic_groups[-1].append(segment)
 
+                    # Get topic information from result metadata if available
+                    topic_info_map = {}
+                    if hasattr(result, 'topic_segmentation') and result.topic_segmentation:
+                        for topic_segment in result.topic_segmentation.segments:
+                            # Extract topic ID from topic_segment.topic_id (e.g., "TOPIC_00" -> 0)
+                            if hasattr(topic_segment, 'topic_id') and topic_segment.topic_id:
+                                topic_id_str = topic_segment.topic_id
+                                if topic_id_str.startswith("TOPIC_"):
+                                    try:
+                                        topic_id = int(topic_id_str.split("_")[1])
+                                        topic_info_map[topic_id] = topic_segment
+                                    except (IndexError, ValueError):
+                                        pass
+
                     # Process each topic group
                     for topic_id, segments in sorted(topic_groups.items()):
                         if topic_id != -1:
-                            # Calculate topic timestamp range
-                            if segments:
-                                start_time = min(seg.start for seg in segments)
-                                end_time = max(seg.end for seg in segments)
+                            # Get topic information
+                            topic_segment = topic_info_map.get(topic_id)
+                            topic_title = None
+                            topic_start_seconds = None
 
-                                # Format timestamps
-                                start_hours, start_remainder = divmod(int(start_time), 3600)
-                                start_minutes, start_seconds = divmod(start_remainder, 60)
-                                end_hours, end_remainder = divmod(int(end_time), 3600)
-                                end_minutes, end_seconds = divmod(end_remainder, 60)
+                            if topic_segment:
+                                topic_title = getattr(topic_segment, 'title', None)
+                                topic_start_seconds = int(getattr(topic_segment, 'start_time', 0))
 
-                                start_formatted = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
-                                end_formatted = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
+                            # Fallback to calculating from segments if no topic info
+                            if not topic_title or topic_start_seconds is None:
+                                if segments:
+                                    start_time = min(seg.start for seg in segments)
+                                    topic_start_seconds = int(start_time)
+                                    topic_title = topic_title or f"Topic {topic_id + 1}"
+                                else:
+                                    topic_start_seconds = 0
+                                    topic_title = topic_title or f"Topic {topic_id + 1}"
 
-                                markdown_content.append(f"### Topic {topic_id + 1} ({start_formatted} - {end_formatted})")
-                            else:
-                                markdown_content.append(f"### Topic {topic_id + 1}")
+                            # Format topic header: # Topic Name [timestamp_in_seconds]
+                            markdown_content.append(f"# {topic_title} [{topic_start_seconds}]")
                         else:
-                            markdown_content.append("### Ungrouped Content")
+                            markdown_content.append("# Ungrouped Content [0]")
 
                         markdown_content.append("")
 
@@ -271,69 +380,96 @@ class AudioConverter:
                 error_message=str(e)
             )
     
-    def _format_segments(self, segments: List[AudioSegment], options: AudioConversionOptions) -> List[str]:
+    def _format_segments(self, segments: List["AudioSegment"], options: AudioConversionOptions) -> List[str]:
         """Format segments into markdown lines."""
         markdown_lines = []
 
         if options.group_by_speaker and any(segment.speaker for segment in segments):
-            # Group consecutive segments by speaker
+            # Group consecutive segments by speaker, but still use per-line timestamps
             current_speaker = None
-            current_speaker_text = []
-            current_start = None
-            current_end = None
+            current_segments = []
 
             for segment in segments:
                 speaker = segment.speaker or "Unknown"
 
                 if speaker != current_speaker:
-                    # Output the previous speaker's text
-                    if current_speaker and current_speaker_text:
-                        speaker_timestamp = ""
-                        if options.include_timestamps and current_start is not None and current_end is not None:
-                            # Format start-end range
-                            start_hours, start_remainder = divmod(int(current_start), 3600)
-                            start_minutes, start_seconds = divmod(start_remainder, 60)
-                            end_hours, end_remainder = divmod(int(current_end), 3600)
-                            end_minutes, end_seconds = divmod(end_remainder, 60)
+                    # Output the previous speaker's segments
+                    if current_speaker and current_segments:
+                        for seg in current_segments:
+                            # Skip empty segments
+                            if not seg.text or not seg.text.strip():
+                                continue
 
-                            start_time = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
-                            end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
-                            speaker_timestamp = f" ({start_time} - {end_time})"
+                            # Build line in [timecode][speaker] format
+                            line_content = ""
 
-                        # Join text without extra spaces and strip any trailing whitespace
-                        text_content = ' '.join(current_speaker_text).strip()
-                        if text_content:  # Only add non-empty content
-                            markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {text_content}")
+                            # Add timestamp if requested
+                            if options.include_timestamps:
+                                hours, remainder = divmod(int(seg.start), 3600)
+                                minutes, seconds = divmod(remainder, 60)
+
+                                # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                                if hours > 0:
+                                    timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                                else:
+                                    timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                                line_content += timestamp
+
+                            # Add speaker if available and requested
+                            if options.include_speakers:
+                                line_content += f"[{current_speaker}]"
+
+                            # Add the text
+                            text_content = seg.text.strip()
+                            if text_content:
+                                line_content += f" {text_content}"
+
+                            # Add to markdown lines if not empty
+                            if line_content.strip():
+                                markdown_lines.append(line_content)
 
                     # Start new speaker
                     current_speaker = speaker
-                    current_speaker_text = [segment.text.strip()] if segment.text.strip() else []
-                    current_start = segment.start
-                    current_end = segment.end
+                    current_segments = [segment] if segment.text.strip() else []
                 else:
                     # Continue with the same speaker
-                    if segment.text.strip():  # Only add non-empty text
-                        current_speaker_text.append(segment.text.strip())
-                    current_end = segment.end
+                    if segment.text.strip():
+                        current_segments.append(segment)
 
-            # Output the last speaker's text
-            if current_speaker and current_speaker_text:
-                speaker_timestamp = ""
-                if options.include_timestamps and current_start is not None and current_end is not None:
-                    # Format start-end range
-                    start_hours, start_remainder = divmod(int(current_start), 3600)
-                    start_minutes, start_seconds = divmod(start_remainder, 60)
-                    end_hours, end_remainder = divmod(int(current_end), 3600)
-                    end_minutes, end_seconds = divmod(end_remainder, 60)
+            # Output the last speaker's segments
+            if current_speaker and current_segments:
+                for seg in current_segments:
+                    # Skip empty segments
+                    if not seg.text or not seg.text.strip():
+                        continue
 
-                    start_time = f"{start_hours:02d}:{start_minutes:02d}:{start_seconds:02d}"
-                    end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_seconds:02d}"
-                    speaker_timestamp = f" ({start_time} - {end_time})"
+                    # Build line in [timecode][speaker] format
+                    line_content = ""
 
-                # Join text without extra spaces and strip any trailing whitespace
-                text_content = ' '.join(current_speaker_text).strip()
-                if text_content:  # Only add non-empty content
-                    markdown_lines.append(f"**{current_speaker}{speaker_timestamp}**: {text_content}")
+                    # Add timestamp if requested
+                    if options.include_timestamps:
+                        hours, remainder = divmod(int(seg.start), 3600)
+                        minutes, seconds = divmod(remainder, 60)
+
+                        # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                        if hours > 0:
+                            timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                        else:
+                            timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                        line_content += timestamp
+
+                    # Add speaker if available and requested
+                    if options.include_speakers:
+                        line_content += f"[{current_speaker}]"
+
+                    # Add the text
+                    text_content = seg.text.strip()
+                    if text_content:
+                        line_content += f" {text_content}"
+
+                    # Add to markdown lines if not empty
+                    if line_content.strip():
+                        markdown_lines.append(line_content)
         else:
             # Process each segment individually
             for segment in segments:
@@ -343,24 +479,33 @@ class AudioConverter:
 
                 line_parts = []
 
+                # Build the line in the new [timecode][speaker] format
+                line_content = ""
+
                 # Add timestamp if requested
                 if options.include_timestamps:
                     hours, remainder = divmod(int(segment.start), 3600)
                     minutes, seconds = divmod(remainder, 60)
-                    timestamp = options.timestamp_format.replace("%H", f"{hours:02d}")\
-                                                .replace("%M", f"{minutes:02d}")\
-                                                .replace("%S", f"{seconds:02d}")
-                    line_parts.append(timestamp)
 
-                # Add speaker if available and requested
+                    # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                    if hours > 0:
+                        timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                    else:
+                        timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                    line_content += timestamp
+
+                # Add speaker if available and requested (directly concatenated, no space)
                 if options.include_speakers and segment.speaker:
-                    line_parts.append(f"**{segment.speaker}**:")
+                    line_content += f"[{segment.speaker}]"
 
-                # Add the text (stripped of whitespace)
-                line_parts.append(segment.text.strip())
+                # Add the text (with a space before text content)
+                text_content = segment.text.strip()
+                if text_content:
+                    line_content += f" {text_content}"
 
-                # Join parts and add to markdown lines
-                markdown_lines.append(" ".join(line_parts))
+                # Add to markdown lines if not empty
+                if line_content.strip():
+                    markdown_lines.append(line_content)
 
         # Filter out any empty lines that might have been added
         return [line for line in markdown_lines if line.strip()]

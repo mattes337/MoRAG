@@ -17,7 +17,7 @@ from morag_core.interfaces.converter import (
     UnsupportedFormatError,
 )
 from morag_core.models.document import Document, DocumentMetadata, DocumentType
-from morag_core.utils.file_handling import get_file_info, detect_format
+from morag_core.utils.file_handling import get_file_info, detect_format, get_file_hash
 from morag_core.config import get_settings
 
 logger = structlog.get_logger(__name__)
@@ -63,6 +63,9 @@ class DocumentConverter(BaseConverter):
             # Get file info
             file_info = get_file_info(file_path)
 
+            # Calculate file checksum
+            checksum = get_file_hash(file_path, "sha256")
+
             # Create document metadata
             metadata = DocumentMetadata(
                 source_type=self._map_format_to_document_type(format_type),
@@ -70,6 +73,7 @@ class DocumentConverter(BaseConverter):
                 source_path=str(file_path),
                 mime_type=file_info["mime_type"],
                 file_size=file_info["file_size"],
+                checksum=checksum,
             )
 
             # Create document

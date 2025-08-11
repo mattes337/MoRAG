@@ -33,7 +33,7 @@ dependencies = [
     "morag-graph",
     "pydantic>=2.10.0,<3.0.0",
     "pydantic-settings>=2.7.0,<3.0.0",
-    "pydantic-ai>=0.0.14,<1.0.0",
+
     "structlog>=24.4.0,<25.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
     "qdrant-client>=1.12.0,<2.0.0",

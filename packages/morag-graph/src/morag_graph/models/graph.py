@@ -1,12 +1,32 @@
 """Graph model for graph-augmented RAG."""
 
 from typing import Dict, List, Optional, Any, Set, Iterator, Tuple
+from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
 from .entity import Entity
 from .relation import Relation
 from .types import EntityId, RelationId
+
+
+@dataclass
+class GraphNode:
+    """Generic graph node."""
+
+    id: str
+    label: str
+    properties: Dict[str, Any]
+
+
+@dataclass
+class GraphEdge:
+    """Generic graph edge."""
+
+    source: str
+    target: str
+    type: str
+    properties: Dict[str, Any]
 
 
 class Graph(BaseModel):

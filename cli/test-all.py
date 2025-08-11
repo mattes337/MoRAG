@@ -31,7 +31,7 @@ try:
     from morag_web import WebProcessor
     from morag_youtube import YouTubeProcessor
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed all MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-audio")
@@ -60,12 +60,12 @@ def print_section(title: str):
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
-    print(f"{spaces}📋 {key}: {value}")
+    print(f"{spaces}[INFO] {key}: {value}")
 
 
 def print_test_result(test_name: str, success: bool, duration: float, error: Optional[str] = None):
     """Print test result."""
-    status = "✅ PASS" if success else "❌ FAIL"
+    status = "[OK] PASS" if success else "[FAIL] FAIL"
     print(f"  {status} {test_name} ({duration:.2f}s)")
     if error and not success:
         print(f"    Error: {error}")
@@ -84,7 +84,7 @@ class SystemTester:
             # No global config needed, each processor has its own config
             return True
         except Exception as e:
-            print(f"❌ Failed to initialize configuration: {e}")
+            print(f"[FAIL] Failed to initialize configuration: {e}")
             return False
     
     async def test_component_initialization(self) -> Dict[str, bool]:
@@ -278,7 +278,7 @@ class SystemTester:
                     total_tests += 1
                     if category_results["success"]:
                         passed_tests += 1
-                    status = "✅ PASS" if category_results["success"] else "❌ FAIL"
+                    status = "[OK] PASS" if category_results["success"] else "[FAIL] FAIL"
                     print(f"  {status} {category}")
                 else:
                     # Multiple test results
@@ -286,7 +286,7 @@ class SystemTester:
                         total_tests += 1
                         if success:
                             passed_tests += 1
-                        status = "✅ PASS" if success else "❌ FAIL"
+                        status = "[OK] PASS" if success else "[FAIL] FAIL"
                         print(f"  {status} {category}.{test_name}")
         
         success_rate = (passed_tests / total_tests * 100) if total_tests > 0 else 0
@@ -298,11 +298,11 @@ class SystemTester:
         print(f"  Success Rate: {success_rate:.1f}%")
         
         if success_rate >= 80:
-            print("\n🎉 System is ready for use!")
+            print("\n[SUCCESS] System is ready for use!")
         elif success_rate >= 60:
-            print("\n⚠️  System has some issues but may be functional")
+            print("\n[WARN]  System has some issues but may be functional")
         else:
-            print("\n❌ System has significant issues and may not work properly")
+            print("\n[FAIL] System has significant issues and may not work properly")
         
         return f"Test completed: {passed_tests}/{total_tests} tests passed ({success_rate:.1f}%)"
 
@@ -323,7 +323,7 @@ async def main():
         summary = tester.generate_report(results)
         
         print(f"\n📄 Detailed results saved to: {results_file}")
-        print(f"📋 Summary: {summary}")
+        print(f"[INFO] Summary: {summary}")
         
         # Determine exit code based on results
         total_success = all(
@@ -336,10 +336,10 @@ async def main():
         sys.exit(0 if total_success else 1)
         
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

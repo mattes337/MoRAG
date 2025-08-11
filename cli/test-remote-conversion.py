@@ -26,7 +26,7 @@ sys.path.insert(0, str(project_root / "packages" / "morag" / "src"))
 
 def test_remote_job_lifecycle():
     """Test the complete remote job lifecycle."""
-    print("🔄 Testing Remote Job Lifecycle")
+    print("[PROCESSING] Testing Remote Job Lifecycle")
     print("=" * 40)
     
     try:
@@ -36,7 +36,7 @@ def test_remote_job_lifecycle():
         
         # Create temporary directory for testing
         with tempfile.TemporaryDirectory() as temp_dir:
-            print(f"📁 Using temp directory: {temp_dir}")
+            print(f"[FILES] Using temp directory: {temp_dir}")
             
             # Initialize repository and service
             repository = RemoteJobRepository(data_dir=temp_dir)
@@ -55,7 +55,7 @@ def test_remote_job_lifecycle():
             )
             
             job = service.create_job(request)
-            print(f"✅ Job created: {job.id}")
+            print(f"[OK] Job created: {job.id}")
             print(f"   Status: {job.status}")
             print(f"   Content Type: {job.content_type}")
             
@@ -71,7 +71,7 @@ def test_remote_job_lifecycle():
                 raise Exception(f"Expected 1 job, got {len(available_jobs)}")
             
             polled_job = available_jobs[0]
-            print(f"✅ Job polled: {polled_job.id}")
+            print(f"[OK] Job polled: {polled_job.id}")
             print(f"   Status: {polled_job.status}")
             print(f"   Worker: {polled_job.worker_id}")
             
@@ -95,15 +95,15 @@ def test_remote_job_lifecycle():
             if not completed_job or completed_job.status != "completed":
                 raise Exception(f"Job completion failed: {completed_job}")
             
-            print(f"✅ Result submitted successfully")
+            print(f"[OK] Result submitted successfully")
             print(f"   Final Status: {completed_job.status}")
             print(f"   Processing Time: {completed_job.processing_duration:.1f}s")
             
-            print("\n🎉 Remote job lifecycle test passed!")
+            print("\n[SUCCESS] Remote job lifecycle test passed!")
             return True
             
     except Exception as e:
-        print(f"\n❌ Test failed with error: {e}")
+        print(f"\n[FAIL] Test failed with error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -123,11 +123,11 @@ def test_api_endpoints():
         try:
             response = requests.get(f"{base_url}/health", timeout=5)
             if response.status_code == 200:
-                print("✅ Server is running")
+                print("[OK] Server is running")
             else:
-                print(f"⚠️ Server responded with status {response.status_code}")
+                print(f"[WARN] Server responded with status {response.status_code}")
         except requests.exceptions.RequestException:
-            print("❌ Server is not running. Start the server with: python -m morag.server")
+            print("[FAIL] Server is not running. Start the server with: python -m morag.server")
             return False
         
         # Test creating a remote job
@@ -143,30 +143,30 @@ def test_api_endpoints():
         if response.status_code == 200:
             job_response = response.json()
             job_id = job_response["job_id"]
-            print(f"✅ Remote job created: {job_id}")
+            print(f"[OK] Remote job created: {job_id}")
             
             # Test job status
             print("\n3️⃣ Testing job status...")
             status_response = requests.get(f"{base_url}/api/v1/remote-jobs/{job_id}/status")
             if status_response.status_code == 200:
                 status_data = status_response.json()
-                print(f"✅ Job status: {status_data['status']}")
+                print(f"[OK] Job status: {status_data['status']}")
             else:
-                print(f"❌ Failed to get job status: {status_response.status_code}")
+                print(f"[FAIL] Failed to get job status: {status_response.status_code}")
                 
         else:
-            print(f"❌ Failed to create remote job: {response.status_code}")
+            print(f"[FAIL] Failed to create remote job: {response.status_code}")
             print(f"Response: {response.text}")
             return False
         
-        print("\n🎉 API endpoints test passed!")
+        print("\n[SUCCESS] API endpoints test passed!")
         return True
         
     except ImportError:
-        print("❌ requests library not available. Install with: pip install requests")
+        print("[FAIL] requests library not available. Install with: pip install requests")
         return False
     except Exception as e:
-        print(f"❌ API test failed: {e}")
+        print(f"[FAIL] API test failed: {e}")
         return False
 
 def main():
@@ -194,10 +194,10 @@ def main():
     
     print("\n" + "=" * 50)
     if success:
-        print("🎉 All tests passed!")
+        print("[SUCCESS] All tests passed!")
         return 0
     else:
-        print("💥 Some tests failed!")
+        print("[ERROR] Some tests failed!")
         return 1
 
 if __name__ == "__main__":

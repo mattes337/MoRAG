@@ -36,7 +36,7 @@ def print_section(title: str):
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
-    print(f"{spaces}📋 {key}: {value}")
+    print(f"{spaces}[INFO] {key}: {value}")
 
 
 async def resume_from_process_result(process_result_data: Dict[str, Any], source_file: str,
@@ -46,7 +46,7 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
     """Resume processing from a process result file."""
     try:
         print_header(f"MoRAG {content_type.title()} Resume from Process Result")
-        print_result("Process Result Mode", "✅ Enabled")
+        print_result("Process Result Mode", "[OK] Enabled")
         print_result("Source File", source_file)
         
         # Import ingestion coordinator
@@ -85,7 +85,7 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
         # Extract content from process result
         content = process_result_data.get('content', '')
         if not content:
-            print("❌ Error: No content found in process result file")
+            print("[FAIL] Error: No content found in process result file")
             return False
         
         # Create processing result object
@@ -117,7 +117,7 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
         )
         
         print_section("Ingestion Results")
-        print_result("Status", "✅ Success")
+        print_result("Status", "[OK] Success")
         print_result("Document ID", result['source_info']['document_id'])
         print_result("Processing Time", f"{result['processing_time']:.2f} seconds")
         print_result("Chunks Created", str(result['embeddings_data']['chunk_count']))
@@ -127,7 +127,7 @@ async def resume_from_process_result(process_result_data: Dict[str, Any], source
         return True
         
     except Exception as e:
-        print(f"❌ Error during resume from process result: {e}")
+        print(f"[FAIL] Error during resume from process result: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -140,7 +140,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
     """Resume processing from an ingestion data file."""
     try:
         print_header(f"MoRAG {content_type.title()} Resume from Ingestion Data")
-        print_result("Ingestion Data Mode", "✅ Enabled")
+        print_result("Ingestion Data Mode", "[OK] Enabled")
         print_result("Source File", source_file)
         
         # Import ingestion coordinator
@@ -221,7 +221,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                 }
                 chunk_metadata.append(metadata)
         else:
-            print("❌ Error: Unrecognized ingestion data format")
+            print("[FAIL] Error: Unrecognized ingestion data format")
             return False
 
         # Get document ID and convert to expected format if needed
@@ -273,9 +273,18 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                 # This is ingest_result.json format
                 graph_data_section = ingestion_data.get('graph_data', {})
 
-            entities_data = graph_data_section.get('entities', [])
+            # Check for enhanced processing data first (preferred)
+            enhanced_processing = graph_data_section.get('enhanced_processing', {})
+            if enhanced_processing and enhanced_processing.get('entities'):
+                entities_data = enhanced_processing.get('entities', [])
+                print(f"🔍 DEBUG: Found {len(entities_data)} entities from enhanced processing")
+            else:
+                # Fallback to basic entities data
+                entities_data = graph_data_section.get('entities', [])
+                print(f"🔍 DEBUG: Found {len(entities_data)} entities from basic graph_data")
+
             relations_data = graph_data_section.get('relations', [])
-            print(f"🔍 DEBUG: Found {len(entities_data)} entities and {len(relations_data)} relations in graph_data")
+            print(f"🔍 DEBUG: Found {len(relations_data)} relations in graph_data")
 
             # Check if chunk_entity_mapping exists, if not, create it
             chunk_entity_mapping = graph_data_section.get('chunk_entity_mapping', {})
@@ -305,7 +314,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                     )
                     entities.append(entity)
                 except Exception as e:
-                    print(f"⚠️  Warning: Failed to create entity from {entity_dict.get('name', 'unknown')}: {e}")
+                    print(f"[WARN]  Warning: Failed to create entity from {entity_dict.get('name', 'unknown')}: {e}")
                     continue
 
             # Convert dictionary data to proper Relation objects
@@ -328,16 +337,34 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                     )
                     relations.append(relation)
                 except Exception as e:
-                    print(f"⚠️  Warning: Failed to create relation {relation_dict.get('id', 'unknown')}: {e}")
+                    print(f"[WARN]  Warning: Failed to create relation {relation_dict.get('id', 'unknown')}: {e}")
                     continue
 
+            # Include enhanced processing data and embeddings
             graph_data = {
                 'entities': entities,
-                'relations': relations
+                'relations': relations,
+                'facts': graph_data_section.get('facts', []),
+                'relationships': graph_data_section.get('relationships', []),
+                'chunk_fact_mapping': graph_data_section.get('chunk_fact_mapping', {}),
+                'enhanced_processing': enhanced_processing,
+                'entity_embeddings': graph_data_section.get('entity_embeddings', {}),
+                'fact_embeddings': graph_data_section.get('fact_embeddings', {}),
+                'extraction_metadata': graph_data_section.get('extraction_metadata', {})
             }
         else:
             # No graph data available
-            graph_data = {'entities': [], 'relations': []}
+            graph_data = {
+                'entities': [],
+                'relations': [],
+                'facts': [],
+                'relationships': [],
+                'chunk_fact_mapping': {},
+                'enhanced_processing': {},
+                'entity_embeddings': {},
+                'fact_embeddings': {},
+                'extraction_metadata': {}
+            }
 
         # Add the recreated chunk_entity_mapping to graph_data if it was created
         if 'chunk_entity_mapping' in locals() and chunk_entity_mapping:
@@ -359,7 +386,7 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
         print_section("Database Write Results")
         for db_name, result in results.items():
             if result.get('success', False):
-                print_result(f"{db_name.upper()} Status", "✅ Success")
+                print_result(f"{db_name.upper()} Status", "[OK] Success")
                 if 'documents_written' in result:
                     print_result(f"{db_name.upper()} Documents", str(result['documents_written']))
                 if 'entities_written' in result:
@@ -367,12 +394,12 @@ async def resume_from_ingestion_data(ingestion_data: Dict[str, Any], source_file
                 if 'relations_written' in result:
                     print_result(f"{db_name.upper()} Relations", str(result['relations_written']))
             else:
-                print_result(f"{db_name.upper()} Status", f"❌ Failed: {result.get('error', 'Unknown error')}")
+                print_result(f"{db_name.upper()} Status", f"[FAIL] Failed: {result.get('error', 'Unknown error')}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Error during resume from ingestion data: {e}")
+        print(f"[FAIL] Error during resume from ingestion data: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -408,30 +435,78 @@ async def _recreate_chunk_entity_mapping(chunks, entities_data, chunk_size=4000)
 
         if entities_in_chunk:
             chunk_entity_mapping[str(chunk_index)] = entities_in_chunk
-            print(f"📋 Chunk {chunk_index} contains {len(entities_in_chunk)} entities")
+            print(f"[INFO] Chunk {chunk_index} contains {len(entities_in_chunk)} entities")
 
-    print(f"✅ Found entities in {len(chunk_entity_mapping)} out of {len(chunks)} chunks")
+    print(f"[OK] Found entities in {len(chunk_entity_mapping)} out of {len(chunks)} chunks")
     return chunk_entity_mapping
+
+
+def auto_detect_resume_files(source_file: str) -> Dict[str, Optional[str]]:
+    """
+    Auto-detect existing resume files for a source file.
+
+    Args:
+        source_file: Path to the source file
+
+    Returns:
+        Dictionary with 'process_result' and 'ingestion_data' keys containing file paths or None
+    """
+    source_path = Path(source_file)
+    base_name = source_path.stem
+    source_dir = source_path.parent
+
+    # Look for process result file
+    process_result_file = source_dir / f"{base_name}.process_result.json"
+    process_result_path = process_result_file if process_result_file.exists() else None
+
+    # Look for ingestion data file
+    ingestion_data_file = source_dir / f"{base_name}.ingest_data.json"
+    ingestion_data_path = ingestion_data_file if ingestion_data_file.exists() else None
+
+    # Also check for ingest_result.json (older format)
+    if not ingestion_data_path:
+        ingest_result_file = source_dir / f"{base_name}.ingest_result.json"
+        if ingest_result_file.exists():
+            ingestion_data_path = ingest_result_file
+
+    return {
+        'process_result': str(process_result_path) if process_result_path else None,
+        'ingestion_data': str(ingestion_data_path) if ingestion_data_path else None
+    }
 
 
 def handle_resume_arguments(args, source_file: str, content_type: str, metadata: Optional[Dict[str, Any]] = None):
     """
     Handle --use-process-result and --use-ingestion-data arguments.
+    Also auto-detects existing resume files if no explicit arguments provided.
     Returns True if resume was handled, False if normal processing should continue.
     """
     import asyncio
+
+    # Auto-detect resume files if no explicit arguments provided
+    if not hasattr(args, 'use_process_result') or not args.use_process_result:
+        if not hasattr(args, 'use_ingestion_data') or not args.use_ingestion_data:
+            detected_files = auto_detect_resume_files(source_file)
+
+            # Prefer ingestion data over process result (more complete)
+            if detected_files['ingestion_data']:
+                print(f"[AUTO-DETECT] Found existing ingestion data: {detected_files['ingestion_data']}")
+                args.use_ingestion_data = detected_files['ingestion_data']
+            elif detected_files['process_result']:
+                print(f"[AUTO-DETECT] Found existing process result: {detected_files['process_result']}")
+                args.use_process_result = detected_files['process_result']
     
     # Handle --use-process-result argument
     if hasattr(args, 'use_process_result') and args.use_process_result:
         process_result_file = Path(args.use_process_result)
         if not process_result_file.exists():
-            print(f"❌ Error: Process result file not found: {process_result_file}")
+            print(f"[FAIL] Error: Process result file not found: {process_result_file}")
             sys.exit(1)
         
         try:
             with open(process_result_file, 'r', encoding='utf-8') as f:
                 process_result_data = json.load(f)
-            print(f"✅ Using existing process result from: {process_result_file}")
+            print(f"[OK] Using existing process result from: {process_result_file}")
             print("💡 Skipping processing phase, continuing from result file...")
             
             # Continue with ingestion using the process result data
@@ -446,30 +521,30 @@ def handle_resume_arguments(args, source_file: str, content_type: str, metadata:
             ))
             
             if success:
-                print(f"\n🎉 {content_type.title()} processing resumed successfully!")
+                print(f"\n[SUCCESS] {content_type.title()} processing resumed successfully!")
                 sys.exit(0)
             else:
-                print(f"\n💥 {content_type.title()} processing resume failed!")
+                print(f"\n[ERROR] {content_type.title()} processing resume failed!")
                 sys.exit(1)
                 
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in process result file: {e}")
+            print(f"[FAIL] Error: Invalid JSON in process result file: {e}")
             sys.exit(1)
         except Exception as e:
-            print(f"❌ Error reading process result file: {e}")
+            print(f"[FAIL] Error reading process result file: {e}")
             sys.exit(1)
 
     # Handle --use-ingestion-data argument
     if hasattr(args, 'use_ingestion_data') and args.use_ingestion_data:
         ingestion_data_file = Path(args.use_ingestion_data)
         if not ingestion_data_file.exists():
-            print(f"❌ Error: Ingestion data file not found: {ingestion_data_file}")
+            print(f"[FAIL] Error: Ingestion data file not found: {ingestion_data_file}")
             sys.exit(1)
         
         try:
             with open(ingestion_data_file, 'r', encoding='utf-8') as f:
                 ingestion_data = json.load(f)
-            print(f"✅ Using existing ingestion data from: {ingestion_data_file}")
+            print(f"[OK] Using existing ingestion data from: {ingestion_data_file}")
             print("💡 Skipping processing and ingestion calculation, starting database writes...")
             
             # Continue with database writes using the ingestion data
@@ -484,17 +559,17 @@ def handle_resume_arguments(args, source_file: str, content_type: str, metadata:
             ))
             
             if success:
-                print(f"\n🎉 {content_type.title()} ingestion resumed successfully!")
+                print(f"\n[SUCCESS] {content_type.title()} ingestion resumed successfully!")
                 sys.exit(0)
             else:
-                print(f"\n💥 {content_type.title()} ingestion resume failed!")
+                print(f"\n[ERROR] {content_type.title()} ingestion resume failed!")
                 sys.exit(1)
                 
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in ingestion data file: {e}")
+            print(f"[FAIL] Error: Invalid JSON in ingestion data file: {e}")
             sys.exit(1)
         except Exception as e:
-            print(f"❌ Error reading ingestion data file: {e}")
+            print(f"[FAIL] Error reading ingestion data file: {e}")
             sys.exit(1)
     
     # No resume arguments provided, continue with normal processing

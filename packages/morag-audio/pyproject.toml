@@ -14,9 +14,11 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "morag-core>=0.1.0",
+    "morag-document>=0.1.0",
     "morag-embedding>=0.1.0",
     "faster-whisper>=0.6.0",
     "pydub>=0.25.1",
+    "markitdown[all]>=0.1.0",
 
     "mutagen>=1.45.1",
     "ffmpeg-python>=0.2.0",

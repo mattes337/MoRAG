@@ -257,13 +257,17 @@ async def process_single_file(
         print(f"   Content type: {content_type}")
         print(f"   File size: {file_info['size_formatted']}")
 
+        # Auto-detect resume files using centralized functionality
+        from resume_utils import auto_detect_resume_files
+        detected_files = auto_detect_resume_files(str(file_path))
+
         # Check if ingest_data file exists (can skip processing and go straight to ingestion)
-        output_paths = get_output_file_paths(file_path)
-        if output_paths['ingest_data'].exists():
-            print(f"   [SUCCESS] Using existing ingest_data: {output_paths['ingest_data']}")
+        if detected_files['ingestion_data']:
+            ingest_data_path = detected_files['ingestion_data']
+            print(f"   [AUTO-DETECT] Using existing ingest_data: {ingest_data_path}")
             try:
                 # Load existing ingest_data and perform database writes
-                with open(output_paths['ingest_data'], 'r', encoding='utf-8') as f:
+                with open(ingest_data_path, 'r', encoding='utf-8') as f:
                     ingest_data = json.load(f)
 
                 # Use the ingestion coordinator to write to databases
@@ -296,6 +300,55 @@ async def process_single_file(
                 }
             except Exception as e:
                 print(f"   [WARNING] Failed to use existing ingest_data, will reprocess: {e}")
+                # Fall through to normal processing
+
+        # Check if process_result file exists (can skip processing but need to do ingestion)
+        elif detected_files['process_result']:
+            process_result_path = detected_files['process_result']
+            print(f"   [AUTO-DETECT] Using existing process_result: {process_result_path}")
+            try:
+                # Load existing process_result and continue with ingestion
+                with open(process_result_path, 'r', encoding='utf-8') as f:
+                    process_result_data = json.load(f)
+
+                # Use the ingestion coordinator to perform full ingestion
+                from morag.ingestion_coordinator import IngestionCoordinator
+                from morag_core.models.config import ProcessingResult
+
+                coordinator = IngestionCoordinator()
+
+                # Create ProcessingResult object from the data
+                result = ProcessingResult(
+                    success=process_result_data.get('success', True),
+                    task_id=process_result_data.get('task_id', 'folder-resume'),
+                    source_type=content_type,
+                    content=process_result_data.get('content', ''),
+                    metadata=process_result_data.get('metadata', {}),
+                    processing_time=process_result_data.get('processing_time', 0.0)
+                )
+
+                # Perform comprehensive ingestion
+                ingestion_result = await coordinator.ingest_content(
+                    content=result.content,
+                    source_path=str(file_path),
+                    content_type=content_type,
+                    metadata=metadata or {},
+                    processing_result=result,
+                    databases=database_configs,
+                    document_id=None,
+                    replace_existing=False,
+                    language=language
+                )
+
+                print(f"   [SUCCESS] Content ingested successfully from process result!")
+                return {
+                    'file': str(file_path),
+                    'status': 'success_from_process_result',
+                    'content_type': content_type,
+                    'reason': 'Used existing process_result file'
+                }
+            except Exception as e:
+                print(f"   [WARNING] Failed to use existing process_result, will reprocess: {e}")
                 # Fall through to normal processing
 
         # Check for intermediate file for audio/video content types and create mock result

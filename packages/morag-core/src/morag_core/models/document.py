@@ -22,6 +22,8 @@ class DocumentType(str, Enum):
     AUDIO = "audio"
     VIDEO = "video"
     IMAGE = "image"
+    ARCHIVE = "archive"
+    EBOOK = "ebook"
     URL = "url"
     UNKNOWN = "unknown"
 
@@ -35,6 +37,7 @@ class DocumentMetadata:
     source_url: Optional[str] = None
     mime_type: Optional[str] = None
     file_size: Optional[int] = None
+    checksum: Optional[str] = None
     created_at: Optional[datetime] = None
     modified_at: Optional[datetime] = None
     author: Optional[str] = None
@@ -43,6 +46,30 @@ class DocumentMetadata:
     page_count: Optional[int] = None
     word_count: Optional[int] = None
     custom: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary.
+
+        Returns:
+            Dictionary representation
+        """
+        return {
+            "source_type": self.source_type.value,
+            "source_name": self.source_name,
+            "source_path": self.source_path,
+            "source_url": self.source_url,
+            "mime_type": self.mime_type,
+            "file_size": self.file_size,
+            "checksum": self.checksum,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "modified_at": self.modified_at.isoformat() if self.modified_at else None,
+            "author": self.author,
+            "title": self.title,
+            "language": self.language,
+            "page_count": self.page_count,
+            "word_count": self.word_count,
+            "custom": self.custom,
+        }
 
 
 @dataclass
@@ -117,6 +144,7 @@ class Document:
                 "source_url": self.metadata.source_url,
                 "mime_type": self.metadata.mime_type,
                 "file_size": self.metadata.file_size,
+                "checksum": self.metadata.checksum,
                 "created_at": self.metadata.created_at.isoformat() if self.metadata.created_at else None,
                 "modified_at": self.metadata.modified_at.isoformat() if self.metadata.modified_at else None,
                 "author": self.metadata.author,

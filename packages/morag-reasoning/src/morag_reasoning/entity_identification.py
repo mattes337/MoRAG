@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from morag_reasoning.llm import LLMClient
 from morag_graph.storage.neo4j_storage import Neo4jStorage
+from morag_services.embedding import GeminiEmbeddingService
 
 
 class IdentifiedEntity(BaseModel):
@@ -30,6 +31,7 @@ class EntityIdentificationService:
         self,
         llm_client: LLMClient,
         graph_storage: Optional[Neo4jStorage] = None,
+        embedding_service: Optional[GeminiEmbeddingService] = None,
         min_confidence: float = 0.3,
         max_entities: int = 50,
         language: Optional[str] = None
@@ -39,12 +41,14 @@ class EntityIdentificationService:
         Args:
             llm_client: LLM client for entity extraction
             graph_storage: Neo4j storage for entity linking
+            embedding_service: Embedding service for vector similarity search
             min_confidence: Minimum confidence threshold
             max_entities: Maximum entities to extract
             language: Language code for processing (e.g., 'en', 'de', 'fr')
         """
         self.llm_client = llm_client
         self.graph_storage = graph_storage
+        self.embedding_service = embedding_service
         self.min_confidence = min_confidence
         self.max_entities = max_entities
         self.language = language
@@ -159,23 +163,37 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
             raise
     
     async def _link_to_graph_entities(self, entities: List[IdentifiedEntity]) -> None:
-        """Link identified entities to existing graph entities.
-        
+        """Link identified entities to existing graph entities using both exact search and vector similarity.
+
         Args:
             entities: List of identified entities to link
         """
         if not self.graph_storage:
             return
-        
+
         for entity in entities:
             try:
-                # Search for similar entities in the graph (without entity type filter for better matching)
+                # First try exact/fuzzy search for entities
                 candidates = await self.graph_storage.search_entities(
                     entity.name,
                     entity_type=None,  # Don't filter by type to allow cross-type matching
                     limit=10  # Get more candidates for better matching
                 )
-                
+
+                # If embedding service is available and we have few candidates, try vector search
+                if self.embedding_service and len(candidates) < 3:
+                    vector_candidates = await self._find_similar_entities_by_vector(entity)
+                    # Merge vector candidates with exact search candidates
+                    candidates.extend(vector_candidates)
+                    # Remove duplicates by entity ID
+                    seen_ids = set()
+                    unique_candidates = []
+                    for candidate in candidates:
+                        if candidate.id not in seen_ids:
+                            unique_candidates.append(candidate)
+                            seen_ids.add(candidate.id)
+                    candidates = unique_candidates[:10]  # Limit to top 10
+
                 if candidates:
                     # Debug: Log candidates found
                     self.logger.debug(
@@ -253,3 +271,72 @@ Focus on entities that are likely to exist in a knowledge graph and are essentia
         union = words1.union(words2)
 
         return len(intersection) / len(union) if union else 0.0
+
+    async def _find_similar_entities_by_vector(self, entity: IdentifiedEntity) -> List[Any]:
+        """Find similar entities using vector similarity search.
+
+        Args:
+            entity: Entity to find similar entities for
+
+        Returns:
+            List of similar entities from vector search
+        """
+        if not self.embedding_service:
+            return []
+
+        try:
+            # Generate embedding for the entity name and context
+            entity_text = f"{entity.name} ({entity.entity_type})"
+            if entity.context:
+                entity_text += f" - {entity.context}"
+
+            embedding_result = await self.embedding_service.generate_embedding(
+                entity_text, task_type="retrieval_query"
+            )
+
+            # Handle both direct list return and EmbeddingResult object
+            if isinstance(embedding_result, list):
+                query_embedding = embedding_result
+            else:
+                query_embedding = embedding_result.embedding
+
+            # Search for similar entities in Neo4j using vector similarity
+            # This requires the EntityEmbeddingService functionality
+            from morag_graph.services.entity_embedding_service import EntityEmbeddingService
+
+            entity_embedding_service = EntityEmbeddingService(
+                self.graph_storage, self.embedding_service
+            )
+
+            similar_entities = await entity_embedding_service.search_similar_entities(
+                query_embedding, limit=5, similarity_threshold=0.4
+            )
+
+            # Convert to the expected format (simplified for now)
+            candidates = []
+            for similar in similar_entities:
+                # Create a simple candidate object with both 'type' and 'entity_type' attributes
+                candidate = type('Candidate', (), {
+                    'id': similar['id'],
+                    'name': similar['name'],
+                    'type': similar.get('type', 'Unknown'),  # Add 'type' attribute
+                    'entity_type': similar.get('type', 'Unknown'),  # Keep 'entity_type' for compatibility
+                    'similarity_score': similar['similarity']
+                })()
+                candidates.append(candidate)
+
+            self.logger.debug(
+                "Vector similarity search found candidates",
+                entity_name=entity.name,
+                candidates_count=len(candidates)
+            )
+
+            return candidates
+
+        except Exception as e:
+            self.logger.warning(
+                "Vector similarity search failed",
+                entity_name=entity.name,
+                error=str(e)
+            )
+            return []

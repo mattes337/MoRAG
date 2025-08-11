@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Graph Extraction Module for MoRAG CLI Scripts
+Fact Extraction Module for MoRAG CLI Scripts
 
-This module provides common graph entity and relation extraction functionality
+This module provides common fact extraction functionality
 for all CLI scripts using the morag-graph package.
 """
 
@@ -12,15 +12,15 @@ from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
 try:
-    from morag_graph import (
-        EntityExtractor, RelationExtractor,
-        Neo4jStorage, QdrantStorage,
-        Neo4jConfig, QdrantConfig,
-        GraphBuilder
-    )
-    from morag_graph.models import Entity as GraphEntity, Relation as GraphRelation
+    from morag_graph.extraction.fact_extractor import FactExtractor
+    from morag_graph.extraction.fact_graph_builder import FactGraphBuilder
+    from morag_graph.models.fact import Fact, FactRelation
+    from morag_graph.models.document_chunk import DocumentChunk
+    from morag_graph.services.fact_extraction_service import FactExtractionService
+    from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
+    from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the morag-graph package:")
     print("  pip install -e packages/morag-graph")
     raise
@@ -28,121 +28,114 @@ except ImportError as e:
 from common_schema import Entity, Relation
 
 
-async def extract_entities_and_relations(
+async def extract_facts_and_relationships(
     text: str,
     doc_id: str,
+    domain: str = "general",
     context: Optional[str] = None
-) -> Tuple[List[Entity], List[Relation]]:
-    """Standalone function to extract entities and relations from text.
-    
+) -> Tuple[List[Fact], List[FactRelation]]:
+    """Standalone function to extract facts and relationships from text.
+
     Args:
         text: Text content to analyze
         doc_id: Document identifier
+        domain: Domain context for extraction
         context: Additional context for extraction
-        
+
     Returns:
-        Tuple of (entities, relations)
+        Tuple of (facts, relationships)
     """
-    extraction_service = GraphExtractionService()
-    return await extraction_service.extract_entities_and_relations(
+    extraction_service = FactExtractionService()
+    return await extraction_service.extract_facts_and_relationships(
         text=text,
         doc_id=doc_id,
+        domain=domain,
         context=context
     )
 
 
-class GraphExtractionService:
-    """Service for extracting entities and relations from text content."""
-    
-    def __init__(self, api_key: Optional[str] = None, model: str = "gemini-1.5-flash"):
-        """Initialize the graph extraction service.
-        
+class FactExtractionService:
+    """Service for extracting facts and relationships from text content."""
+
+    def __init__(self, api_key: Optional[str] = None, model: str = "gemini-2.0-flash", domain: str = "general"):
+        """Initialize the fact extraction service.
+
         Args:
             api_key: API key for LLM (defaults to GEMINI_API_KEY env var)
             model: LLM model to use
+            domain: Domain context for extraction
         """
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY environment variable or api_key parameter required")
-        
+
         self.model = model
-        
-        # Initialize LLM configuration
-        self.llm_config = {
-            "provider": "gemini",
-            "api_key": self.api_key,
-            "model": self.model,
-            "temperature": 0.1,  # Low temperature for consistent results
-            "max_tokens": 2000
-        }
-        
-        # Initialize extractors
-        self.entity_extractor = EntityExtractor(llm_config=self.llm_config)
-        self.relation_extractor = RelationExtractor(llm_config=self.llm_config)
+        self.domain = domain
+
+        # Initialize fact extractor
+        self.fact_extractor = FactExtractor(
+            model_id=self.model,
+            api_key=self.api_key,
+            domain=self.domain
+        )
+
+        # Initialize fact graph builder
+        self.fact_graph_builder = FactGraphBuilder(
+            model_id=self.model,
+            api_key=self.api_key
+        )
     
-    async def extract_entities_and_relations(
+    async def extract_facts_and_relationships(
         self,
         text: str,
         doc_id: str,
+        domain: Optional[str] = None,
         context: Optional[str] = None
-    ) -> Tuple[List[Entity], List[Relation]]:
-        """Extract entities and relations from text.
-        
+    ) -> Tuple[List[Fact], List[FactRelation]]:
+        """Extract facts and relationships from text.
+
         Args:
             text: Text content to analyze
             doc_id: Document identifier
+            domain: Domain context for extraction
             context: Additional context for extraction
-            
+
         Returns:
-            Tuple of (entities, relations)
+            Tuple of (facts, relationships)
         """
         try:
-            # Extract entities
-            graph_entities = await self.entity_extractor.extract(
+            # Create document chunk
+            chunk = DocumentChunk(
+                id=f"{doc_id}_chunk_0",
+                document_id=doc_id,
+                chunk_index=0,
                 text=text,
-                doc_id=doc_id,
-                context=context
+                metadata={"source": "cli_extraction"}
             )
-            
-            # Convert to common schema
-            entities = [
-                Entity(
-                    id=entity.id,
-                    name=entity.name,
-                    type=str(entity.type),  # Handle both enum and string types
-                    confidence=entity.confidence,
-                    attributes=getattr(entity, 'attributes', {}) or {},
-                    source_span=getattr(entity, 'source_span', None)
-                )
-                for entity in graph_entities
-            ]
-            
-            # Extract relations
-            graph_relations = await self.relation_extractor.extract(
-                text=text,
-                entities=graph_entities,
-                doc_id=doc_id,
-                context=context
+
+            # Extract facts
+            facts = await self.fact_extractor.extract_facts(
+                chunk_text=text,
+                chunk_id=chunk.id,
+                document_id=doc_id,
+                context={
+                    "domain": domain or self.domain,
+                    "language": "en",
+                    **(context or {})
+                }
             )
-            
-            # Convert to common schema
-            relations = [
-                Relation(
-                    id=relation.id,
-                    source_entity_id=relation.source_entity_id,
-                    target_entity_id=relation.target_entity_id,
-                    type=relation.type,  # Keep the type as-is (can be enum or string)
-                    confidence=relation.confidence,
-                    attributes=getattr(relation, 'attributes', {}) or {},
-                    source_span=getattr(relation, 'source_span', None)
-                )
-                for relation in graph_relations
-            ]
-            
-            return entities, relations
+
+            # Extract relationships if we have multiple facts
+            relationships = []
+            if len(facts) > 1:
+                fact_graph = await self.fact_graph_builder.build_fact_graph(facts)
+                if hasattr(fact_graph, 'relationships'):
+                    relationships = fact_graph.relationships
+
+            return facts, relationships
             
         except Exception as e:
-            print(f"⚠️ Warning: Graph extraction failed: {e}")
+            print(f"[WARN] Warning: Fact extraction failed: {e}")
             return [], []
 
 
@@ -198,7 +191,7 @@ class DatabaseIngestionService:
             return True
             
         except Exception as e:
-            print(f"⚠️ Warning: Failed to initialize Qdrant: {e}")
+            print(f"[WARN] Warning: Failed to initialize Qdrant: {e}")
             return False
     
     def initialize_neo4j(self, config: Optional[Dict[str, Any]] = None) -> bool:
@@ -228,7 +221,7 @@ class DatabaseIngestionService:
             return True
             
         except Exception as e:
-            print(f"⚠️ Warning: Failed to initialize Neo4j: {e}")
+            print(f"[WARN] Warning: Failed to initialize Neo4j: {e}")
             return False
     
     def initialize_graph_builder(self) -> bool:
@@ -247,14 +240,14 @@ class DatabaseIngestionService:
                 storage_backends.append(self.neo4j_storage)
             
             if not storage_backends:
-                print("⚠️ Warning: No storage backends available for graph builder")
+                print("[WARN] Warning: No storage backends available for graph builder")
                 return False
             
             self.graph_builder = GraphBuilder(storage_backends=storage_backends)
             return True
             
         except Exception as e:
-            print(f"⚠️ Warning: Failed to initialize graph builder: {e}")
+            print(f"[WARN] Warning: Failed to initialize graph builder: {e}")
             return False
     
     async def ingest_to_qdrant(
@@ -294,11 +287,11 @@ class DatabaseIngestionService:
             # In practice, you'd use the actual Qdrant storage API
             point_ids = [f"point_{i}" for i in range(len(chunks))]
             
-            print(f"✅ Stored {len(chunks)} chunks in Qdrant")
+            print(f"[OK] Stored {len(chunks)} chunks in Qdrant")
             return point_ids
             
         except Exception as e:
-            print(f"❌ Error ingesting to Qdrant: {e}")
+            print(f"[FAIL] Error ingesting to Qdrant: {e}")
             raise
     
     async def ingest_to_neo4j(
@@ -355,11 +348,11 @@ class DatabaseIngestionService:
                 'document_metadata': doc_metadata
             }
             
-            print(f"✅ Stored {len(graph_entities)} entities and {len(graph_relations)} relations in Neo4j")
+            print(f"[OK] Stored {len(graph_entities)} entities and {len(graph_relations)} relations in Neo4j")
             return result
             
         except Exception as e:
-            print(f"❌ Error ingesting to Neo4j: {e}")
+            print(f"[FAIL] Error ingesting to Neo4j: {e}")
             raise
 
 
@@ -405,7 +398,7 @@ async def extract_and_ingest(
         results['extraction']['entities'] = entities
         results['extraction']['relations'] = relations
         
-        print(f"✅ Extracted {len(entities)} entities and {len(relations)} relations")
+        print(f"[OK] Extracted {len(entities)} entities and {len(relations)} relations")
         
         # Initialize ingestion service
         ingestion_service = DatabaseIngestionService()
@@ -461,6 +454,6 @@ async def extract_and_ingest(
         return results
         
     except Exception as e:
-        print(f"❌ Error in extract_and_ingest: {e}")
+        print(f"[FAIL] Error in extract_and_ingest: {e}")
         results['error'] = str(e)
         return results

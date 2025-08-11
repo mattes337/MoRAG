@@ -7,9 +7,7 @@ from text content using the morag-graph package.
 
 import os
 from typing import Dict, List, Any, Optional
-from morag_graph.extraction.entity_extractor import EntityExtractor
-from morag_graph.extraction.relation_extractor import RelationExtractor
-from morag_graph.extraction.base import LLMConfig
+from morag_graph.extraction import EntityExtractor, RelationExtractor
 
 import structlog
 
@@ -23,40 +21,29 @@ class GraphExtractor:
         """Initialize the graph extractor."""
         self.entity_extractor = None
         self.relation_extractor = None
-        self.llm_config = None
         self._initialized = False
-        
+
     async def initialize(self):
-        """Initialize the extractors with LLM configuration."""
+        """Initialize the extractors with LangExtract configuration."""
         if self._initialized:
             return
-            
-        # Get LLM configuration from environment
-        self.llm_config = LLMConfig(
-            provider="gemini",
-            api_key=os.getenv('GEMINI_API_KEY'),
-            model=os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash'),  # Use same default as run_extraction.py
-            temperature=0.1,
-            max_tokens=2000,
-            # Retry configuration
-            max_retries=int(os.getenv('MORAG_GRAPH_MAX_RETRIES', '5')),
-            base_delay=float(os.getenv('MORAG_GRAPH_BASE_DELAY', '1.0')),
-            max_delay=float(os.getenv('MORAG_GRAPH_MAX_DELAY', '60.0')),
-            exponential_base=float(os.getenv('MORAG_GRAPH_EXPONENTIAL_BASE', '2.0')),
-            jitter=os.getenv('MORAG_GRAPH_JITTER', 'true').lower() == 'true'
+
+        # Initialize LangExtract-based extractors
+        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('LANGEXTRACT_API_KEY')
+        model_id = os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
+
+        self.entity_extractor = EntityExtractor(
+            api_key=api_key,
+            model_id=model_id,
+            dynamic_types=True,
+            domain="general"
         )
-
-        # Convert LLMConfig to dict for the extractors
-        llm_config_dict = {
-            "provider": self.llm_config.provider,
-            "api_key": self.llm_config.api_key,
-            "model": self.llm_config.model,
-            "temperature": self.llm_config.temperature,
-            "max_tokens": self.llm_config.max_tokens
-        }
-
-        self.entity_extractor = EntityExtractor(config=llm_config_dict, dynamic_types=True)
-        self.relation_extractor = RelationExtractor(config=llm_config_dict, dynamic_types=True)
+        self.relation_extractor = RelationExtractor(
+            api_key=api_key,
+            model_id=model_id,
+            dynamic_types=True,
+            domain="general"
+        )
         self._initialized = True
         
         logger.info("Graph extractor initialized")
@@ -82,21 +69,29 @@ class GraphExtractor:
             await self.initialize()
 
         try:
-            # Create extractors with language parameter if provided
+            # Use extractors with language parameter if provided
             entity_extractor = self.entity_extractor
             relation_extractor = self.relation_extractor
 
             if language:
                 # Create new extractors with language parameter
-                llm_config_dict = {
-                    "provider": self.llm_config.provider,
-                    "api_key": self.llm_config.api_key,
-                    "model": self.llm_config.model,
-                    "temperature": self.llm_config.temperature,
-                    "max_tokens": self.llm_config.max_tokens
-                }
-                entity_extractor = EntityExtractor(config=llm_config_dict, dynamic_types=True, language=language)
-                relation_extractor = RelationExtractor(config=llm_config_dict, dynamic_types=True, language=language)
+                api_key = os.getenv('GEMINI_API_KEY') or os.getenv('LANGEXTRACT_API_KEY')
+                model_id = os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
+
+                entity_extractor = EntityExtractor(
+                    api_key=api_key,
+                    model_id=model_id,
+                    dynamic_types=True,
+                    language=language,
+                    domain="general"
+                )
+                relation_extractor = RelationExtractor(
+                    api_key=api_key,
+                    model_id=model_id,
+                    dynamic_types=True,
+                    language=language,
+                    domain="general"
+                )
 
             # Extract entities
             logger.info("Extracting entities from content",
@@ -117,7 +112,7 @@ class GraphExtractor:
             relations = await relation_extractor.extract(
                 text=content,
                 entities=entities,
-                doc_id=source_path
+                source_doc_id=source_path
             )
 
             logger.info("Relations extracted", count=len(relations))
@@ -135,7 +130,7 @@ class GraphExtractor:
                     'id': entity.id,
                     'name': entity.name,
                     'type': str(entity.type),  # Handle both enum and string types
-                    'description': entity.attributes.get('context', ''),
+                    'description': entity.description if hasattr(entity, 'description') else '',
                     'attributes': entity.attributes or {},
                     'confidence': entity.confidence,
                     'source_doc_id': entity.source_doc_id
@@ -149,7 +144,8 @@ class GraphExtractor:
                     'source_entity_id': relation.source_entity_id,
                     'target_entity_id': relation.target_entity_id,
                     'relation_type': str(relation.type),  # Handle both enum and string types
-                    'description': relation.attributes.get('context', ''),
+                    'description': relation.description if hasattr(relation, 'description') else '',
+                    'context': relation.context if hasattr(relation, 'context') else '',
                     'attributes': relation.attributes or {},
                     'confidence': relation.confidence,
                     'source_doc_id': relation.source_doc_id

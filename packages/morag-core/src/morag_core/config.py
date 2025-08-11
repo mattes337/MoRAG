@@ -83,8 +83,18 @@ class Settings(BaseSettings):
     gemini_vision_model: str = Field(default="gemini-1.5-flash", alias="MORAG_GEMINI_VISION_MODEL")
 
     # Embedding Configuration
-    embedding_batch_size: int = Field(default=50, alias="MORAG_EMBEDDING_BATCH_SIZE")
+    embedding_batch_size: int = Field(default=100, alias="MORAG_EMBEDDING_BATCH_SIZE")
     enable_batch_embedding: bool = Field(default=True, alias="MORAG_ENABLE_BATCH_EMBEDDING")
+    embedding_delay_between_batches: float = Field(default=0.05, alias="MORAG_EMBEDDING_DELAY_BETWEEN_BATCHES")
+    rate_limit_per_minute: int = Field(default=200, alias="MORAG_RATE_LIMIT_PER_MINUTE")
+    enable_performance_monitoring: bool = Field(default=True, alias="MORAG_ENABLE_PERFORMANCE_MONITORING")
+
+    # LLM Batch Configuration
+    llm_batch_size: int = Field(default=10, alias="MORAG_LLM_BATCH_SIZE", ge=1, le=50, description="Number of prompts to batch together for LLM calls")
+    enable_llm_batching: bool = Field(default=True, alias="MORAG_ENABLE_LLM_BATCHING", description="Enable batching of LLM requests to reduce API calls")
+    llm_batch_delay: float = Field(default=1.0, alias="MORAG_LLM_BATCH_DELAY", ge=0.0, le=10.0, description="Delay between LLM batch requests in seconds")
+    llm_max_batch_tokens: int = Field(default=800000, alias="MORAG_LLM_MAX_BATCH_TOKENS", ge=100000, le=1000000, description="Maximum tokens per batch request (considering Gemini's 1M context limit)")
+    llm_batch_timeout: int = Field(default=120, alias="MORAG_LLM_BATCH_TIMEOUT", ge=30, le=300, description="Timeout for batch LLM requests in seconds")
 
     # Redis Configuration
     redis_url: str = Field(default="redis://localhost:6379/0", alias="MORAG_REDIS_URL")
@@ -107,6 +117,11 @@ class Settings(BaseSettings):
     retry_max_delay: float = Field(default=300.0, alias="MORAG_RETRY_MAX_DELAY")  # Maximum delay in seconds (5 minutes)
     retry_exponential_base: float = Field(default=2.0, alias="MORAG_RETRY_EXPONENTIAL_BASE")  # Exponential backoff multiplier
     retry_jitter: bool = Field(default=True, alias="MORAG_RETRY_JITTER")  # Add random jitter to delays
+
+    # Entity Extraction Retry Configuration
+    entity_extraction_max_retries: int = Field(default=20, alias="MORAG_ENTITY_EXTRACTION_MAX_RETRIES")  # Max retries for entity extraction
+    entity_extraction_retry_base_delay: float = Field(default=1.0, alias="MORAG_ENTITY_EXTRACTION_RETRY_BASE_DELAY")  # Base delay for entity extraction retries
+    entity_extraction_retry_max_delay: float = Field(default=300.0, alias="MORAG_ENTITY_EXTRACTION_RETRY_MAX_DELAY")  # Max delay for entity extraction retries
 
     # Celery Task Configuration
     celery_task_soft_time_limit: int = Field(default=120 * 60, alias="MORAG_CELERY_TASK_SOFT_TIME_LIMIT")  # 2 hours (7200 seconds) - soft limit
@@ -164,6 +179,38 @@ class Settings(BaseSettings):
         description="Maximum tokens per chunk for embedding models"
     )
 
+    # Markitdown Configuration
+    markitdown_enabled: bool = Field(
+        default=True,
+        alias="MORAG_MARKITDOWN_ENABLED",
+        description="Enable markitdown for document conversion"
+    )
+    markitdown_use_azure_doc_intel: bool = Field(
+        default=False,
+        alias="MORAG_MARKITDOWN_USE_AZURE_DOC_INTEL",
+        description="Use Azure Document Intelligence with markitdown"
+    )
+    markitdown_azure_endpoint: Optional[str] = Field(
+        default=None,
+        alias="MORAG_MARKITDOWN_AZURE_ENDPOINT",
+        description="Azure Document Intelligence endpoint URL"
+    )
+    markitdown_use_llm_image_description: bool = Field(
+        default=False,
+        alias="MORAG_MARKITDOWN_USE_LLM_IMAGE_DESCRIPTION",
+        description="Use LLM for image descriptions in markitdown"
+    )
+    markitdown_llm_model: str = Field(
+        default="gpt-4o",
+        alias="MORAG_MARKITDOWN_LLM_MODEL",
+        description="LLM model for image descriptions"
+    )
+    markitdown_enable_plugins: bool = Field(
+        default=False,
+        alias="MORAG_MARKITDOWN_ENABLE_PLUGINS",
+        description="Enable markitdown plugins"
+    )
+
     # Page-based chunking configuration
     default_chunking_strategy: str = Field(
         default="page",
@@ -183,6 +230,63 @@ class Settings(BaseSettings):
         ge=1000,  # Minimum 1000 characters
         le=32000,  # Maximum 32000 characters
         description="Maximum size for page-based chunks"
+    )
+
+    # OpenIE Configuration
+    openie_enabled: bool = Field(
+        default=True,
+        alias="MORAG_OPENIE_ENABLED",
+        description="Enable OpenIE relation extraction"
+    )
+
+    openie_implementation: str = Field(
+        default="stanford",
+        alias="MORAG_OPENIE_IMPLEMENTATION",
+        description="OpenIE implementation to use (stanford, openie5, etc.)"
+    )
+
+    openie_confidence_threshold: float = Field(
+        default=0.7,
+        alias="MORAG_OPENIE_CONFIDENCE_THRESHOLD",
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence threshold for OpenIE triplets"
+    )
+
+    openie_max_triplets_per_sentence: int = Field(
+        default=10,
+        alias="MORAG_OPENIE_MAX_TRIPLETS_PER_SENTENCE",
+        ge=1,
+        le=50,
+        description="Maximum number of triplets to extract per sentence"
+    )
+
+    openie_enable_entity_linking: bool = Field(
+        default=True,
+        alias="MORAG_OPENIE_ENABLE_ENTITY_LINKING",
+        description="Enable entity linking between OpenIE and spaCy entities"
+    )
+
+    openie_enable_predicate_normalization: bool = Field(
+        default=True,
+        alias="MORAG_OPENIE_ENABLE_PREDICATE_NORMALIZATION",
+        description="Enable predicate normalization for consistent relationships"
+    )
+
+    openie_batch_size: int = Field(
+        default=100,
+        alias="MORAG_OPENIE_BATCH_SIZE",
+        ge=1,
+        le=1000,
+        description="Batch size for OpenIE processing"
+    )
+
+    openie_timeout_seconds: int = Field(
+        default=30,
+        alias="MORAG_OPENIE_TIMEOUT_SECONDS",
+        ge=5,
+        le=300,
+        description="Timeout for OpenIE processing in seconds"
     )
 
     @field_validator('allowed_origins', mode='before')

@@ -45,7 +45,7 @@ try:
     )
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
-    print(f"❌ Error importing MoRAG components: {e}")
+    print(f"[FAIL] Error importing MoRAG components: {e}")
     COMPONENTS_AVAILABLE = False
 
 
@@ -96,7 +96,7 @@ async def test_neo4j_connection(args) -> Optional[Neo4jStorage]:
     try:
         storage = get_default_neo4j_storage()
         if not storage:
-            print("❌ Failed to create Neo4j storage from environment")
+            print("[FAIL] Failed to create Neo4j storage from environment")
             return None
             
         await storage.connect()
@@ -104,7 +104,7 @@ async def test_neo4j_connection(args) -> Optional[Neo4jStorage]:
         # Test basic query
         result = await storage._execute_query("RETURN 1 as test")
         if result and result[0].get("test") == 1:
-            print("✅ Neo4j connection successful")
+            print("[OK] Neo4j connection successful")
             
             # Get database stats
             stats_query = """
@@ -122,11 +122,11 @@ async def test_neo4j_connection(args) -> Optional[Neo4jStorage]:
                 
             return storage
         else:
-            print("❌ Neo4j connection test failed")
+            print("[FAIL] Neo4j connection test failed")
             return None
             
     except Exception as e:
-        print(f"❌ Neo4j connection error: {e}")
+        print(f"[FAIL] Neo4j connection error: {e}")
         return None
 
 
@@ -140,14 +140,14 @@ async def test_qdrant_connection(args) -> Optional[QdrantStorage]:
     try:
         storage = get_default_qdrant_storage()
         if not storage:
-            print("❌ Failed to create Qdrant storage from environment")
+            print("[FAIL] Failed to create Qdrant storage from environment")
             return None
             
         await storage.connect()
         
         # Get collection info
         info = await storage.get_collection_info()
-        print("✅ Qdrant connection successful")
+        print("[OK] Qdrant connection successful")
         print(f"📊 Collection '{info['collection_name']}' contains {info['total_points']} points")
         print(f"   Vector size: {info['vector_size']}")
         print(f"   Host: {info['host']}:{info['port']}")
@@ -155,7 +155,7 @@ async def test_qdrant_connection(args) -> Optional[QdrantStorage]:
         return storage
         
     except Exception as e:
-        print(f"❌ Qdrant connection error: {e}")
+        print(f"[FAIL] Qdrant connection error: {e}")
         return None
 
 
@@ -182,7 +182,7 @@ async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
             ]
             print(f"   Found {len(entities)} entities")
         except Exception as e:
-            print(f"   ❌ Neo4j entity search failed: {e}")
+            print(f"   [FAIL] Neo4j entity search failed: {e}")
     
     # Test Qdrant vector search
     if qdrant_storage and args.qdrant:
@@ -200,19 +200,19 @@ async def test_simple_query(query: str, neo4j_storage: Optional[Neo4jStorage],
             ]
             print(f"   Found {len(entities)} entities")
         except Exception as e:
-            print(f"   ❌ Qdrant entity search failed: {e}")
+            print(f"   [FAIL] Qdrant entity search failed: {e}")
     
     if results:
-        print("\n📋 Results:")
+        print("\n[INFO] Results:")
         print_result(results)
     else:
-        print("❌ No results found")
+        print("[FAIL] No results found")
 
 
 async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStorage], args):
     """Test entity-specific queries."""
     if not neo4j_storage:
-        print("⚠️  Entity queries require Neo4j connection")
+        print("[WARN]  Entity queries require Neo4j connection")
         return
         
     print_section(f"Entity Query: '{entity_name}'")
@@ -221,11 +221,11 @@ async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStora
         # Search for entity by name
         entities = await neo4j_storage.search_entities(entity_name, limit=5)
         if not entities:
-            print(f"❌ No entity found with name '{entity_name}'")
+            print(f"[FAIL] No entity found with name '{entity_name}'")
             return
 
         entity = entities[0]
-        print(f"✅ Found entity: {entity.name} ({entity.type})")
+        print(f"[OK] Found entity: {entity.name} ({entity.type})")
         if len(entities) > 1:
             print(f"   (Found {len(entities)} matching entities, showing first)")
 
@@ -237,7 +237,7 @@ async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStora
             for rel in relations[:5]:  # Show first 5
                 print(f"   {rel.source_entity_id} --[{rel.relation_type}]--> {rel.target_entity_id}")
         except Exception as e:
-            print(f"   ⚠️  Could not get relations: {e}")
+            print(f"   [WARN]  Could not get relations: {e}")
 
         # Find neighbors using graph traversal
         try:
@@ -248,17 +248,17 @@ async def test_entity_query(entity_name: str, neo4j_storage: Optional[Neo4jStora
             for neighbor in neighbors[:3]:  # Show first 3
                 print(f"   {neighbor.name} ({neighbor.type})")
         except Exception as e:
-            print(f"   ⚠️  Could not get neighbors: {e}")
+            print(f"   [WARN]  Could not get neighbors: {e}")
             
     except Exception as e:
-        print(f"❌ Entity query failed: {e}")
+        print(f"[FAIL] Entity query failed: {e}")
 
 
 async def test_multi_hop_reasoning(query: str, start_entities: List[str], 
                                  neo4j_storage: Optional[Neo4jStorage], args):
     """Test multi-hop reasoning capabilities."""
     if not neo4j_storage:
-        print("⚠️  Multi-hop reasoning requires Neo4j connection")
+        print("[WARN]  Multi-hop reasoning requires Neo4j connection")
         return
         
     print_section(f"Multi-Hop Reasoning: '{query}'")
@@ -285,7 +285,7 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
             "max_paths": args.max_paths
         }
         
-        print(f"🔄 Finding reasoning paths (strategy: {args.reasoning_strategy})...")
+        print(f"[PROCESSING] Finding reasoning paths (strategy: {args.reasoning_strategy})...")
         start_time = time.time()
         
         reasoning_paths = await path_finder.find_reasoning_paths(
@@ -305,14 +305,14 @@ async def test_multi_hop_reasoning(query: str, start_entities: List[str],
                 print(f"     Confidence: {path.confidence:.3f}")
                 
     except Exception as e:
-        print(f"❌ Multi-hop reasoning failed: {e}")
+        print(f"[FAIL] Multi-hop reasoning failed: {e}")
 
 
 async def test_graph_traversal(start_entity: str, end_entity: str,
                              neo4j_storage: Optional[Neo4jStorage], args):
     """Test graph traversal between entities."""
     if not neo4j_storage:
-        print("⚠️  Graph traversal requires Neo4j connection")
+        print("[WARN]  Graph traversal requires Neo4j connection")
         return
 
     print_section(f"Graph Traversal: '{start_entity}' -> '{end_entity}'")
@@ -325,10 +325,10 @@ async def test_graph_traversal(start_entity: str, end_entity: str,
         end_entities = await neo4j_storage.search_entities(end_entity, limit=1)
 
         if not start_entities:
-            print(f"❌ Start entity '{start_entity}' not found")
+            print(f"[FAIL] Start entity '{start_entity}' not found")
             return
         if not end_entities:
-            print(f"❌ End entity '{end_entity}' not found")
+            print(f"[FAIL] End entity '{end_entity}' not found")
             return
 
         start_id = start_entities[0].id
@@ -339,21 +339,21 @@ async def test_graph_traversal(start_entity: str, end_entity: str,
         # Find shortest path
         path = await traversal.find_shortest_path(start_id, end_id)
         if path:
-            print(f"✅ Shortest path found with {len(path.entities)} entities")
+            print(f"[OK] Shortest path found with {len(path.entities)} entities")
             print(f"   Path: {' -> '.join(path.entities[:10])}")  # Show first 10
             if hasattr(path, 'total_weight'):
                 print(f"   Weight: {path.total_weight:.3f}")
         else:
-            print("❌ No path found between entities")
+            print("[FAIL] No path found between entities")
 
     except Exception as e:
-        print(f"❌ Graph traversal failed: {e}")
+        print(f"[FAIL] Graph traversal failed: {e}")
 
 
 async def test_graph_analytics(neo4j_storage: Optional[Neo4jStorage], args):
     """Test graph analytics and statistics."""
     if not neo4j_storage:
-        print("⚠️  Graph analytics requires Neo4j connection")
+        print("[WARN]  Graph analytics requires Neo4j connection")
         return
 
     print_section("Graph Analytics")
@@ -439,14 +439,14 @@ async def test_graph_analytics(neo4j_storage: Optional[Neo4jStorage], args):
                 print(f"   {name} ({':'.join(labels)}): {degree} connections")
 
     except Exception as e:
-        print(f"❌ Graph analytics failed: {e}")
+        print(f"[FAIL] Graph analytics failed: {e}")
 
 
 async def test_hybrid_retrieval(query: str, neo4j_storage: Optional[Neo4jStorage],
                               qdrant_storage: Optional[QdrantStorage], args):
     """Test hybrid retrieval combining vector and graph search."""
     if not neo4j_storage or not qdrant_storage:
-        print("⚠️  Hybrid retrieval requires both Neo4j and Qdrant connections")
+        print("[WARN]  Hybrid retrieval requires both Neo4j and Qdrant connections")
         return
 
     print_section(f"Hybrid Retrieval: '{query}'")
@@ -463,7 +463,7 @@ async def test_hybrid_retrieval(query: str, neo4j_storage: Optional[Neo4jStorage
             fusion_strategy=args.fusion_strategy
         )
 
-        print(f"🔄 Running hybrid retrieval (fusion: {args.fusion_strategy})...")
+        print(f"[PROCESSING] Running hybrid retrieval (fusion: {args.fusion_strategy})...")
         start_time = time.time()
 
         # This would typically use the HybridRetrievalCoordinator
@@ -502,13 +502,13 @@ async def test_hybrid_retrieval(query: str, neo4j_storage: Optional[Neo4jStorage
             }
 
         if all_results:
-            print("\n📋 Hybrid Results:")
+            print("\n[INFO] Hybrid Results:")
             print_result(all_results)
         else:
-            print("❌ No hybrid results found")
+            print("[FAIL] No hybrid results found")
 
     except Exception as e:
-        print(f"❌ Hybrid retrieval failed: {e}")
+        print(f"[FAIL] Hybrid retrieval failed: {e}")
 
 
 def print_usage_examples():
@@ -614,12 +614,12 @@ async def main():
         args.qdrant = True
 
     if not args.neo4j and not args.qdrant:
-        print("❌ Please specify --neo4j, --qdrant, or --all-dbs")
+        print("[FAIL] Please specify --neo4j, --qdrant, or --all-dbs")
         print("\nFor examples, run: python test-query.py")
         return 1
     
     if not COMPONENTS_AVAILABLE:
-        print("❌ MoRAG components not available. Please install required packages.")
+        print("[FAIL] MoRAG components not available. Please install required packages.")
         return 1
     
     print_header("MoRAG Query Testing CLI")
@@ -631,7 +631,7 @@ async def main():
     qdrant_storage = await test_qdrant_connection(args)
     
     if not neo4j_storage and not qdrant_storage:
-        print("❌ No database connections available")
+        print("[FAIL] No database connections available")
         return 1
     
     # Set test flags for --test-all
@@ -680,15 +680,15 @@ async def main():
             if args.enable_multi_hop:
                 print(f"   Multi-hop reasoning: {args.reasoning_strategy}")
             if args.test_analytics:
-                print("   Graph analytics: ✅")
+                print("   Graph analytics: [OK]")
             if args.test_hybrid:
-                print("   Hybrid retrieval: ✅")
+                print("   Hybrid retrieval: [OK]")
 
         return 0
 
     except Exception as e:
         if not args.quiet:
-            print(f"❌ Test failed: {e}")
+            print(f"[FAIL] Test failed: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()
@@ -707,8 +707,8 @@ if __name__ == "__main__":
         exit_code = asyncio.run(main())
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         sys.exit(1)

@@ -25,6 +25,7 @@ else:
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-vector" / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src"))
 
 from morag_reasoning import (
     RecursiveFactRetrievalService,
@@ -34,7 +35,8 @@ from morag_reasoning import (
     LLMConfig
 )
 from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
-from morag_graph.storage.qdrant_storage import QdrantStorage, QdrantConfig
+from morag_services.storage import QdrantVectorStorage
+from morag_services.embedding import GeminiEmbeddingService
 
 # Configure logging
 structlog.configure(
@@ -152,22 +154,28 @@ class RecursiveFactRetrievalTester:
             await neo4j_storage.connect()
 
             # Initialize Qdrant storage
-            qdrant_config = QdrantConfig(
+            qdrant_storage = QdrantVectorStorage(
                 host=self.qdrant_host,
                 port=self.qdrant_port,
                 collection_name=self.qdrant_collection,
                 api_key=os.getenv("QDRANT_API_KEY"),
-                use_ssl=self.qdrant_use_ssl
+                verify_ssl=self.qdrant_use_ssl
             )
-            qdrant_storage = QdrantStorage(qdrant_config)
             await qdrant_storage.connect()
+
+            # Initialize embedding service
+            embedding_service = GeminiEmbeddingService(
+                api_key=os.getenv("GEMINI_API_KEY"),
+                embedding_model=os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
+            )
 
             # Initialize recursive fact retrieval service
             self.service = RecursiveFactRetrievalService(
                 llm_client=llm_client,
                 neo4j_storage=neo4j_storage,
                 qdrant_storage=qdrant_storage,
-                stronger_llm_client=stronger_llm_client
+                stronger_llm_client=stronger_llm_client,
+                embedding_service=embedding_service
             )
 
             logger.info("Recursive fact retrieval service initialized successfully")
@@ -309,13 +317,13 @@ class RecursiveFactRetrievalTester:
             verbose: Whether to print verbose output
         """
         if not results.get("success"):
-            print(f"❌ Test failed: {results.get('error', 'Unknown error')}")
+            print(f"[FAIL] Test failed: {results.get('error', 'Unknown error')}")
             if "status_code" in results:
                 print(f"   Status code: {results['status_code']}")
             return
         
         data = results["data"]
-        print(f"✅ Test successful!")
+        print(f"[OK] Test successful!")
         print(f"   Query ID: {data['query_id']}")
         print(f"   Query: {data['user_query']}")
         print(f"   Processing time: {data['processing_time_ms']:.2f}ms")
@@ -330,7 +338,7 @@ class RecursiveFactRetrievalTester:
         
         # Print traversal steps
         if data['traversal_steps'] and verbose:
-            print("\n🔄 Traversal Steps:")
+            print("\n[PROCESSING] Traversal Steps:")
             for step in data['traversal_steps']:
                 print(f"   Depth {step['depth']}: {step['node_name']} (ID: {step['node_id']})")
                 print(f"     Facts extracted: {step['facts_extracted']}")
@@ -341,7 +349,7 @@ class RecursiveFactRetrievalTester:
         
         # Print final facts
         if data['final_facts']:
-            print("\n📋 Final Facts:")
+            print("\n[INFO] Final Facts:")
             for i, fact in enumerate(data['final_facts'][:10], 1):  # Show top 10 facts
                 print(f"   {i}. {fact['fact_text']}")
                 print(f"      Score: {fact['final_decayed_score']:.3f} (original: {fact['score']:.3f})")
@@ -365,7 +373,7 @@ def show_environment_config():
     else:
         print("   📄 Loaded from: current directory or system environment")
 
-    print(f"   GEMINI_API_KEY: {'✅ Set' if os.getenv('GEMINI_API_KEY') else '❌ Not set'}")
+    print(f"   GEMINI_API_KEY: {'[OK] Set' if os.getenv('GEMINI_API_KEY') else '[FAIL] Not set'}")
     print(f"   MORAG_GEMINI_MODEL: {os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash')}")
     print(f"   NEO4J_URI: {os.getenv('NEO4J_URI', 'bolt://localhost:7687')}")
     print(f"   NEO4J_USERNAME: {os.getenv('NEO4J_USERNAME', 'neo4j')}")
@@ -409,7 +417,7 @@ async def main():
 
     # LLM configuration
     parser.add_argument("--gemini-api-key", default=os.getenv("GEMINI_API_KEY"),
-                       help=f"Gemini API key (env: GEMINI_API_KEY, {'✅ set' if os.getenv('GEMINI_API_KEY') else '❌ not set'})")
+                       help=f"Gemini API key (env: GEMINI_API_KEY, {'[OK] set' if os.getenv('GEMINI_API_KEY') else '[FAIL] not set'})")
     parser.add_argument("--gemini-model", default=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"),
                        help=f"Gemini model for GTA/FCA (env: MORAG_GEMINI_MODEL, current: {os.getenv('MORAG_GEMINI_MODEL', 'gemini-1.5-flash')})")
     parser.add_argument("--stronger-gemini-model", default=os.getenv("MORAG_STRONGER_GEMINI_MODEL", "gemini-1.5-pro"),
@@ -418,9 +426,9 @@ async def main():
     # Retrieval parameters
     parser.add_argument("--max-depth", type=int, default=3, help="Maximum traversal depth")
     parser.add_argument("--decay-rate", type=float, default=0.2, help="Rate of score decay per depth level")
-    parser.add_argument("--max-facts-per-node", type=int, default=5, help="Maximum facts to extract per node")
+    parser.add_argument("--max-facts-per-node", type=int, default=100, help="Maximum facts to extract per node")
     parser.add_argument("--min-fact-score", type=float, default=0.1, help="Minimum score threshold for facts")
-    parser.add_argument("--max-total-facts", type=int, default=50, help="Maximum total facts to collect")
+    parser.add_argument("--max-total-facts", type=int, default=100, help="Maximum total facts to collect")
     parser.add_argument("--language", help="Language for processing")
     parser.add_argument("--facts-only", action="store_true", help="Return only facts without final answer synthesis")
     parser.add_argument("--skip-fact-evaluation", action="store_true", help="Skip fact evaluation and return all raw facts without scoring")
@@ -464,7 +472,7 @@ async def main():
         # Initialize service
         print("🔧 Initializing recursive fact retrieval service...")
         if not await tester.initialize():
-            print("❌ Failed to initialize service")
+            print("[FAIL] Failed to initialize service")
             return 1
 
         # Check health if requested
@@ -474,7 +482,7 @@ async def main():
             print(f"Health status: {health.get('status', 'unknown')}")
             if health.get('services'):
                 for service, status in health['services'].items():
-                    status_icon = "✅" if status else "❌"
+                    status_icon = "[OK]" if status else "[FAIL]"
                     print(f"  {status_icon} {service}: {'available' if status else 'unavailable'}")
             if health.get('error'):
                 print(f"Error: {health['error']}")

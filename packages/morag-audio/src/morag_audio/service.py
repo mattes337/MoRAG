@@ -8,7 +8,7 @@ import structlog
 
 from morag_core.exceptions import ProcessingError as ServiceError
 from morag_core.utils import ensure_directory as ensure_directory_exists
-from morag_embedding import EmbeddingService
+from morag_embedding import GeminiEmbeddingService
 
 from morag_audio.processor import AudioProcessor, AudioConfig, AudioProcessingResult, AudioProcessingError
 from morag_audio.converters import AudioConverter, AudioConversionOptions
@@ -30,7 +30,7 @@ class AudioService:
 
     def __init__(self, 
                  config: Optional[AudioConfig] = None,
-                 embedding_service: Optional[EmbeddingService] = None,
+                 embedding_service: Optional[GeminiEmbeddingService] = None,
                  output_dir: Optional[Union[str, Path]] = None):
         """Initialize the audio service.
         
@@ -153,7 +153,9 @@ class AudioService:
                 conversion_options = AudioConversionOptions(
                     include_timestamps=True,
                     include_speakers=self.config.enable_diarization,
-                    include_topics=self.config.enable_topic_segmentation
+                    include_topics=self.config.enable_topic_segmentation,
+                    group_by_topic=self.config.enable_topic_segmentation,
+                    group_by_speaker=False  # Use per-line timestamps as per new format
                 )
 
                 if output_format == "markdown":
@@ -205,82 +207,115 @@ class AudioService:
                 "output_files": {}
             }
     
-    async def _save_output_files(self, 
-                               file_path: Path, 
+    async def _save_output_files(self,
+                               file_path: Path,
                                result: AudioProcessingResult,
                                markdown_content: Optional[str],
                                output_format: str) -> Dict[str, str]:
         """Save output files and return their paths."""
         if not self.output_dir:
             return {}
-        
+
         output_files = {}
         base_name = file_path.stem
-        
+
+        # Sanitize the base name for directory creation
+        # Remove problematic characters and limit length
+        sanitized_name = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if len(sanitized_name) > 100:  # Limit directory name length
+            sanitized_name = sanitized_name[:100].strip()
+        if not sanitized_name:  # Fallback if name becomes empty
+            sanitized_name = f"audio_{hash(base_name) % 10000}"
+
         # Create a subdirectory for this file
-        file_output_dir = self.output_dir / base_name
-        ensure_directory_exists(file_output_dir)
-        
+        file_output_dir = self.output_dir / sanitized_name
+        try:
+            ensure_directory_exists(file_output_dir)
+            logger.debug("Created output directory", output_dir=str(file_output_dir))
+        except Exception as e:
+            logger.error("Failed to create output directory",
+                        output_dir=str(file_output_dir),
+                        error=str(e))
+            raise AudioServiceError(f"Failed to create output directory: {str(e)}")
+
         # Save transcript as text
         if result.transcript:
-            transcript_path = file_output_dir / f"{base_name}_transcript.txt"
-            with open(transcript_path, "w", encoding="utf-8") as f:
-                f.write(result.transcript)
-            output_files["transcript"] = str(transcript_path)
-        
-        # Save markdown if available
-        if markdown_content:
-            markdown_path = file_output_dir / f"{base_name}.md"
-            with open(markdown_path, "w", encoding="utf-8") as f:
-                f.write(markdown_content)
-            output_files["markdown"] = str(markdown_path)
-        
-        # Save segments as JSON
+            transcript_path = file_output_dir / f"{sanitized_name}_transcript.txt"
+            try:
+                with open(transcript_path, "w", encoding="utf-8") as f:
+                    f.write(result.transcript)
+                output_files["transcript"] = str(transcript_path)
+                logger.debug("Saved transcript", path=str(transcript_path))
+            except Exception as e:
+                logger.error("Failed to save transcript",
+                           path=str(transcript_path),
+                           error=str(e))
+                raise AudioServiceError(f"Failed to save transcript: {str(e)}")
+
+        # Save segments as JSON if available
         if result.segments:
             import json
-            
-            # Convert segments to serializable format
+            segments_path = file_output_dir / f"{sanitized_name}_segments.json"
             segments_data = []
+
             for segment in result.segments:
-                segment_dict = {
-                    "start": segment.start,
-                    "end": segment.end,
-                    "text": segment.text,
-                    "confidence": segment.confidence
+                segment_data = {
+                    "start": getattr(segment, 'start', 0),
+                    "end": getattr(segment, 'end', 0),
+                    "text": getattr(segment, 'text', ''),
+                    "speaker": getattr(segment, 'speaker', None),
+                    "confidence": getattr(segment, 'confidence', None),
+                    "topic_id": getattr(segment, 'topic_id', None),
+                    "topic_label": getattr(segment, 'topic_label', None)
                 }
-                
-                if segment.speaker:
-                    segment_dict["speaker"] = segment.speaker
-                    
-                if segment.topic_id is not None:
-                    segment_dict["topic_id"] = segment.topic_id
-                    
-                if hasattr(segment, "embedding"):
-                    segment_dict["embedding"] = segment.embedding
-                    
-                segments_data.append(segment_dict)
-            
-            segments_path = file_output_dir / f"{base_name}_segments.json"
-            with open(segments_path, "w", encoding="utf-8") as f:
-                json.dump(segments_data, f, indent=2)
-            output_files["segments"] = str(segments_path)
-        
-        # Save metadata
-        if result.metadata:
-            import json
-            metadata_path = file_output_dir / f"{base_name}_metadata.json"
-            with open(metadata_path, "w", encoding="utf-8") as f:
-                # Filter out non-serializable objects
-                serializable_metadata = {}
-                for key, value in result.metadata.items():
-                    try:
-                        json.dumps({key: value})
-                        serializable_metadata[key] = value
-                    except (TypeError, OverflowError):
-                        serializable_metadata[key] = str(value)
-                        
-                json.dump(serializable_metadata, f, indent=2)
+                segments_data.append(segment_data)
+
+            try:
+                segments_path.write_text(json.dumps(segments_data, indent=2, ensure_ascii=False), encoding='utf-8')
+                output_files["segments"] = str(segments_path)
+                logger.info("Saved segments file",
+                           segments_count=len(segments_data),
+                           segments_path=str(segments_path))
+            except Exception as e:
+                logger.error("Failed to save segments",
+                           path=str(segments_path),
+                           error=str(e))
+
+        # Save markdown if available
+        if markdown_content:
+            markdown_path = file_output_dir / f"{sanitized_name}.md"
+            try:
+                with open(markdown_path, "w", encoding="utf-8") as f:
+                    f.write(markdown_content)
+                output_files["markdown"] = str(markdown_path)
+                logger.debug("Saved markdown", path=str(markdown_path))
+            except Exception as e:
+                logger.error("Failed to save markdown",
+                           path=str(markdown_path),
+                           error=str(e))
+
+        # Save metadata as JSON
+        import json
+        metadata_path = file_output_dir / f"{sanitized_name}_metadata.json"
+        metadata_dict = {
+            "file_path": str(file_path),
+            "file_size": file_path.stat().st_size,
+            "processing_time": result.processing_time,
+            "transcript_length": len(result.transcript) if result.transcript else 0,
+            "segments_count": len(result.segments) if result.segments else 0,
+            "has_speaker_diarization": any(getattr(seg, 'speaker', None) for seg in result.segments) if result.segments else False,
+            "has_topic_segmentation": any(getattr(seg, 'topic_id', None) is not None for seg in result.segments) if result.segments else False,
+            "metadata": result.metadata
+        }
+        try:
+            metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False), encoding='utf-8')
             output_files["metadata"] = str(metadata_path)
+            logger.debug("Saved metadata", path=str(metadata_path))
+        except Exception as e:
+            logger.error("Failed to save metadata",
+                       path=str(metadata_path),
+                       error=str(e))
+
         
         logger.info("Saved output files", 
                    output_dir=str(file_output_dir),

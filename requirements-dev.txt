@@ -1,0 +1,49 @@
+# ============================================================================
+# MoRAG - Development Requirements
+# ============================================================================
+
+# Include full requirements
+-r requirements-full.txt
+
+# ============================================================================
+# DEVELOPMENT AND TESTING
+# ============================================================================
+
+# Testing Framework
+pytest>=8.3.0
+pytest-asyncio>=1.0.0
+pytest-cov>=6.1.0
+coverage>=7.8.0
+
+# Code Quality and Formatting
+black>=25.1.0
+isort>=6.0.0
+flake8>=7.2.0
+mypy>=1.16.0
+
+# Pre-commit Hooks
+pre-commit>=4.2.0
+
+# Documentation
+sphinx>=7.0.0
+sphinx-rtd-theme>=2.0.0
+
+# Development Utilities
+ipython>=8.0.0
+jupyter>=1.0.0
+notebook>=7.0.0
+
+# Debugging and Profiling
+pdb-attach>=3.0.0
+memory-profiler>=0.61.0
+line-profiler>=4.0.0
+
+# Type Checking
+types-requests>=2.32.0
+types-redis>=4.6.0
+types-PyYAML>=6.0.0
+
+# Build Tools
+build>=1.0.0
+twine>=5.0.0
+wheel>=0.44.0

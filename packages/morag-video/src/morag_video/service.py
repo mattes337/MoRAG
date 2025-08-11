@@ -8,10 +8,11 @@ import structlog
 
 from morag_core.exceptions import ProcessingError as ServiceError
 from morag_core.utils import ensure_directory as ensure_directory_exists
-from morag_embedding import EmbeddingService
+from morag_embedding import GeminiEmbeddingService
 
 from morag_video.processor import VideoProcessor, VideoConfig, VideoProcessingResult, VideoProcessingError
-from morag_video.converters import VideoConverter, VideoConversionOptions
+# VideoConverter import moved to avoid circular dependency
+# from morag_video.converters import VideoConverter, VideoConversionOptions
 
 logger = structlog.get_logger(__name__)
 
@@ -30,7 +31,7 @@ class VideoService:
 
     def __init__(self, 
                  config: Optional[VideoConfig] = None,
-                 embedding_service: Optional[EmbeddingService] = None,
+                 embedding_service: Optional[GeminiEmbeddingService] = None,
                  output_dir: Optional[Union[str, Path]] = None):
         """Initialize the video service.
         
@@ -41,7 +42,7 @@ class VideoService:
         """
         self.config = config or VideoConfig()
         self.processor = VideoProcessor(self.config)
-        self.converter = VideoConverter()
+        self._converter = None  # Lazy initialization to avoid circular import
         self.embedding_service = embedding_service
         
         # Set up output directory
@@ -58,6 +59,14 @@ class VideoService:
                    enable_enhanced_audio=self.config.enable_enhanced_audio,
                    enable_ocr=self.config.enable_ocr,
                    has_embedding_service=self.embedding_service is not None)
+
+    @property
+    def converter(self):
+        """Lazy initialization of VideoConverter to avoid circular import."""
+        if self._converter is None:
+            from morag_video.converters import VideoConverter
+            self._converter = VideoConverter()
+        return self._converter
 
     async def health_check(self) -> Dict[str, Any]:
         """Check service health.
@@ -155,12 +164,19 @@ class VideoService:
             if output_format == "markdown":
                 try:
                     logger.info("Converting video processing result to markdown")
+
+                    # Import here to avoid circular imports
+                    from morag_video.converters.video import VideoConversionOptions
+
                     conversion_options = VideoConversionOptions(
                         include_metadata=True,
                         include_thumbnails=True,
                         include_keyframes=True,
                         include_transcript=True,
-                        group_by_speaker=self.config.enable_speaker_diarization,
+                        include_timestamps=True,
+                        include_speakers=self.config.enable_speaker_diarization,
+                        include_topics=self.config.enable_topic_segmentation,
+                        group_by_speaker=False,  # Use per-line timestamps as per new format
                         group_by_topic=self.config.enable_topic_segmentation
                     )
                     formatted_content = await self.converter.convert_to_markdown(result, conversion_options)
@@ -290,53 +306,93 @@ class VideoService:
             return json_result
 
     async def _save_output_files(self,
-                               file_path: Path, 
+                               file_path: Path,
                                result: VideoProcessingResult,
                                markdown_content: Optional[str],
                                output_format: str) -> Dict[str, str]:
         """Save output files and return their paths."""
         if not self.output_dir:
             return {}
-        
+
         output_files = {}
         base_name = file_path.stem
-        
+
+        # Sanitize the base name for directory creation
+        # Remove problematic characters and limit length
+        sanitized_name = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if len(sanitized_name) > 100:  # Limit directory name length
+            sanitized_name = sanitized_name[:100].strip()
+        if not sanitized_name:  # Fallback if name becomes empty
+            sanitized_name = f"video_{hash(base_name) % 10000}"
+
         # Create a subdirectory for this file
-        file_output_dir = self.output_dir / base_name
-        ensure_directory_exists(file_output_dir)
-        
+        file_output_dir = self.output_dir / sanitized_name
+        try:
+            ensure_directory_exists(file_output_dir)
+            logger.debug("Created output directory", output_dir=str(file_output_dir))
+        except Exception as e:
+            logger.error("Failed to create output directory",
+                        output_dir=str(file_output_dir),
+                        error=str(e))
+            raise VideoServiceError(f"Failed to create output directory: {str(e)}")
+
         # Save transcript as text if available
         if result.audio_processing_result and result.audio_processing_result.transcript:
-            transcript_path = file_output_dir / f"{base_name}_transcript.txt"
-            transcript_path.write_text(result.audio_processing_result.transcript)
-            output_files["transcript"] = str(transcript_path)
+            transcript_path = file_output_dir / f"{sanitized_name}_transcript.txt"
+            try:
+                transcript_path.write_text(result.audio_processing_result.transcript, encoding='utf-8')
+                output_files["transcript"] = str(transcript_path)
+                logger.debug("Saved transcript", path=str(transcript_path))
+            except Exception as e:
+                logger.error("Failed to save transcript",
+                           path=str(transcript_path),
+                           error=str(e))
+                raise VideoServiceError(f"Failed to save transcript: {str(e)}")
         
         # Save markdown if available
         if markdown_content:
-            markdown_path = file_output_dir / f"{base_name}.md"
-            markdown_path.write_text(markdown_content)
-            output_files["markdown"] = str(markdown_path)
-        
+            markdown_path = file_output_dir / f"{sanitized_name}.md"
+            try:
+                markdown_path.write_text(markdown_content, encoding='utf-8')
+                output_files["markdown"] = str(markdown_path)
+                logger.debug("Saved markdown", path=str(markdown_path))
+            except Exception as e:
+                logger.error("Failed to save markdown",
+                           path=str(markdown_path),
+                           error=str(e))
+
         # Save segments as JSON if available
-        if result.audio_processing_result and result.audio_processing_result.segments:
+        if result.audio_processing_result and hasattr(result.audio_processing_result, 'segments') and result.audio_processing_result.segments:
             import json
-            segments_path = file_output_dir / f"{base_name}_segments.json"
-            segments_data = [
-                {
-                    "start": segment.start,
-                    "end": segment.end,
-                    "text": segment.text,
-                    "speaker": segment.speaker if hasattr(segment, "speaker") else None,
-                    "topic": segment.topic if hasattr(segment, "topic") else None
+            segments_path = file_output_dir / f"{sanitized_name}_segments.json"
+            segments_data = []
+
+            for segment in result.audio_processing_result.segments:
+                segment_data = {
+                    "start": getattr(segment, 'start', 0),
+                    "end": getattr(segment, 'end', 0),
+                    "text": getattr(segment, 'text', ''),
+                    "speaker": getattr(segment, 'speaker', None),
+                    "topic": getattr(segment, 'topic', None),
+                    "topic_id": getattr(segment, 'topic_id', None),
+                    "topic_label": getattr(segment, 'topic_label', None)
                 }
-                for segment in result.audio_processing_result.segments
-            ]
-            segments_path.write_text(json.dumps(segments_data, indent=2))
-            output_files["segments"] = str(segments_path)
-        
+                segments_data.append(segment_data)
+
+            try:
+                segments_path.write_text(json.dumps(segments_data, indent=2, ensure_ascii=False), encoding='utf-8')
+                output_files["segments"] = str(segments_path)
+                logger.info("Saved segments file",
+                           segments_count=len(segments_data),
+                           segments_path=str(segments_path))
+            except Exception as e:
+                logger.error("Failed to save segments",
+                           path=str(segments_path),
+                           error=str(e))
+
         # Save metadata as JSON
         import json
-        metadata_path = file_output_dir / f"{base_name}_metadata.json"
+        metadata_path = file_output_dir / f"{sanitized_name}_metadata.json"
         metadata_dict = {
             "duration": result.metadata.duration,
             "width": result.metadata.width,
@@ -350,8 +406,14 @@ class VideoService:
             "audio_codec": result.metadata.audio_codec,
             "creation_time": result.metadata.creation_time
         }
-        metadata_path.write_text(json.dumps(metadata_dict, indent=2))
-        output_files["metadata"] = str(metadata_path)
+        try:
+            metadata_path.write_text(json.dumps(metadata_dict, indent=2), encoding='utf-8')
+            output_files["metadata"] = str(metadata_path)
+            logger.debug("Saved metadata", path=str(metadata_path))
+        except Exception as e:
+            logger.error("Failed to save metadata",
+                       path=str(metadata_path),
+                       error=str(e))
         
         # Save thumbnails
         if result.thumbnails:
@@ -381,10 +443,16 @@ class VideoService:
         
         # Save OCR results if available
         if result.ocr_results:
-            ocr_path = file_output_dir / f"{base_name}_ocr.json"
+            ocr_path = file_output_dir / f"{sanitized_name}_ocr.json"
             import json
-            ocr_path.write_text(json.dumps(result.ocr_results, indent=2))
-            output_files["ocr"] = str(ocr_path)
+            try:
+                ocr_path.write_text(json.dumps(result.ocr_results, indent=2), encoding='utf-8')
+                output_files["ocr"] = str(ocr_path)
+                logger.debug("Saved OCR results", path=str(ocr_path))
+            except Exception as e:
+                logger.error("Failed to save OCR results",
+                           path=str(ocr_path),
+                           error=str(e))
         
         logger.info("Output files saved", 
                    output_dir=str(file_output_dir),

@@ -15,8 +15,10 @@ from morag_reasoning.recursive_fact_models import (
 from morag_reasoning.graph_traversal_agent import GraphTraversalAgent
 from morag_reasoning.fact_critic_agent import FactCriticAgent
 from morag_reasoning.entity_identification import EntityIdentificationService
+from morag_reasoning.enhanced_fact_extraction import EnhancedFactExtractionService
 from morag_graph.storage.neo4j_storage import Neo4jStorage
 from morag_graph.storage.qdrant_storage import QdrantStorage
+from morag_services.embedding import GeminiEmbeddingService
 
 
 class RecursiveFactRetrievalService:
@@ -27,19 +29,22 @@ class RecursiveFactRetrievalService:
         llm_client: LLMClient,
         neo4j_storage: Neo4jStorage,
         qdrant_storage: QdrantStorage,
+        embedding_service: Optional[GeminiEmbeddingService] = None,
         stronger_llm_client: Optional[LLMClient] = None
     ):
         """Initialize the recursive fact retrieval service.
-        
+
         Args:
             llm_client: LLM client for GTA and FCA operations
             neo4j_storage: Neo4j storage for graph operations
             qdrant_storage: Qdrant storage for vector operations
+            embedding_service: Embedding service for vector similarity search
             stronger_llm_client: Optional stronger LLM for final synthesis
         """
         self.llm_client = llm_client
         self.neo4j_storage = neo4j_storage
         self.qdrant_storage = qdrant_storage
+        self.embedding_service = embedding_service
         self.stronger_llm_client = stronger_llm_client or llm_client
         self.logger = structlog.get_logger(__name__)
         
@@ -78,10 +83,11 @@ class RecursiveFactRetrievalService:
         )
         
         try:
-            # Initialize request-specific services with language parameter
+            # Initialize request-specific services with language parameter and embedding support
             self.entity_service = EntityIdentificationService(
                 llm_client=self.llm_client,
                 graph_storage=self.neo4j_storage,
+                embedding_service=self.embedding_service,
                 min_confidence=0.2,
                 max_entities=20,
                 language=request.language
@@ -91,7 +97,15 @@ class RecursiveFactRetrievalService:
                 llm_client=self.llm_client,
                 neo4j_storage=self.neo4j_storage,
                 qdrant_storage=self.qdrant_storage,
+                embedding_service=self.embedding_service,
                 max_facts_per_node=request.max_facts_per_node
+            )
+
+            # Initialize enhanced fact extraction service
+            self.enhanced_fact_service = EnhancedFactExtractionService(
+                llm_client=self.llm_client,
+                neo4j_storage=self.neo4j_storage,
+                embedding_service=self.embedding_service
             )
 
             # Step 1: Extract initial entities from user query
@@ -276,7 +290,15 @@ class RecursiveFactRetrievalService:
             max_depth_reached = max(max_depth_reached, current_depth)
 
             try:
-                # Extract facts from DocumentChunks related to these entities
+                # Extract facts using enhanced fact extraction (combines graph + vector search)
+                enhanced_facts = await self.enhanced_fact_service.extract_facts_for_query(
+                    user_query=request.user_query,
+                    entity_names=new_entities,
+                    max_facts=request.max_facts_per_node,
+                    language=request.language
+                )
+
+                # Also extract facts from DocumentChunks (existing approach) for comparison
                 gta_response = await self.graph_traversal_agent.extract_facts_from_entity_chunks(
                     user_query=request.user_query,
                     entity_names=new_entities,
@@ -284,19 +306,22 @@ class RecursiveFactRetrievalService:
                     language=request.language
                 )
 
+                # Combine enhanced facts with GTA facts
+                combined_facts = enhanced_facts + gta_response.extracted_facts
+
                 # Record traversal step
                 step = TraversalStep(
                     node_id=f"entities_depth_{current_depth}",  # Use a descriptive ID
                     node_name=f"Entities: {', '.join(new_entities[:3])}{'...' if len(new_entities) > 3 else ''}",
                     depth=current_depth,
-                    facts_extracted=len(gta_response.extracted_facts),
+                    facts_extracted=len(combined_facts),
                     next_nodes_decision=gta_response.next_nodes_to_explore,
-                    reasoning=gta_response.reasoning
+                    reasoning=f"Enhanced extraction: {len(enhanced_facts)} facts, GTA: {len(gta_response.extracted_facts)} facts. {gta_response.reasoning}"
                 )
                 traversal_steps.append(step)
 
                 # Collect facts
-                all_raw_facts.extend(gta_response.extracted_facts)
+                all_raw_facts.extend(combined_facts)
 
                 # Plan next traversal - parse entity names from response
                 if gta_response.next_nodes_to_explore not in ["STOP_TRAVERSAL", "NONE"]:
@@ -358,23 +383,52 @@ class RecursiveFactRetrievalService:
         """Generate the final answer using the stronger LLM."""
         if not final_facts:
             return "I could not find enough relevant information to answer your query.", 0.0
-        
-        # Prepare context for final LLM
+
+        # First pass: collect unique documents and assign reference numbers
+        document_to_ref_num = {}
+        ref_counter = 1
+
+        for fact in final_facts:
+            doc_name = fact.source_metadata.document_name
+            if doc_name and doc_name not in document_to_ref_num:
+                document_to_ref_num[doc_name] = ref_counter
+                ref_counter += 1
+
+        # Prepare context for final LLM with reference numbers
         formatted_facts = []
         for fact in final_facts:
-            # Create detailed source information
-            source_details = fact.source_description
-            if fact.source_metadata.document_name:
-                source_parts = [fact.source_metadata.document_name]
-                if fact.source_metadata.chunk_index is not None:
-                    source_parts.append(f"chunk {fact.source_metadata.chunk_index}")
-                if fact.source_metadata.page_number:
-                    source_parts.append(f"page {fact.source_metadata.page_number}")
-                if fact.source_metadata.section:
-                    source_parts.append(f"section '{fact.source_metadata.section}'")
+            # Get reference number for this document
+            doc_name = fact.source_metadata.document_name
+            ref_num = document_to_ref_num.get(doc_name, "?")
+
+            # Create detailed source information with reference number and metadata
+            source_parts = []
+            if doc_name:
+                source_parts.append(f"[{ref_num}")
+
+                # Add metadata to the reference
+                metadata_parts = []
+
+                # For video/audio content, prioritize timestamp and skip section/chapter info
                 if fact.source_metadata.timestamp:
-                    source_parts.append(f"at {fact.source_metadata.timestamp}")
-                source_details = ", ".join(source_parts)
+                    metadata_parts.append(f"{fact.source_metadata.timestamp}")
+                else:
+                    # For non-video/audio content, include page, section, and chapter info
+                    if fact.source_metadata.page_number:
+                        metadata_parts.append(f"page {fact.source_metadata.page_number}")
+                    if fact.source_metadata.section:
+                        metadata_parts.append(f"section '{fact.source_metadata.section}'")
+                    if fact.source_metadata.additional_metadata.get("chapter"):
+                        metadata_parts.append(f"chapter {fact.source_metadata.additional_metadata['chapter']}")
+
+                if metadata_parts:
+                    source_parts.append(f", {', '.join(metadata_parts)}]")
+                else:
+                    source_parts.append("]")
+
+                source_details = "".join(source_parts)
+            else:
+                source_details = fact.source_description
 
             formatted_facts.append(
                 f"Fact (Score: {fact.final_decayed_score:.2f}, Source: {source_details}): {fact.fact_text}"
@@ -401,6 +455,13 @@ class RecursiveFactRetrievalService:
             language_name = language_names.get(language, language)
             language_instruction = f"\n\nIMPORTANT: Please respond in {language_name} ({language}). The entire response must be in {language_name}."
 
+        # Create references list from the already collected documents
+        references = []
+        for doc_name, ref_num in sorted(document_to_ref_num.items(), key=lambda x: x[1]):
+            references.append(f"[{ref_num}] {doc_name}")
+
+        references_section = "\n\n**References:**\n" + "\n".join(references) if references else ""
+
         prompt = f"""Based on the following facts extracted from a knowledge graph, please provide a comprehensive answer to the user's question.
 
 User Question: "{user_query}"
@@ -408,21 +469,113 @@ User Question: "{user_query}"
 Relevant Facts:
 {context}
 
-Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from the facts. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}"""
+CRITICAL CITATION REQUIREMENTS:
+1. You MUST use ALL references provided in the references section below
+2. When referencing information from the facts, use the exact reference format shown in the source information
+3. For example, if a fact shows "Source: [8, page 4, chapter 3]", use exactly "[8, page 4, chapter 3]" in your answer
+4. If a fact shows "Source: [5, 3:23]", use exactly "[5, 3:23]" in your answer
+5. Always include the metadata (page numbers, timestamps, chapters, etc.) in your citations
+6. Every reference number from the references section must appear at least once in your answer text
+7. Your answer must end with the complete references section listing all source documents
+
+Please synthesize these facts into a coherent, well-structured answer. Focus on directly addressing the user's question while incorporating the most relevant information from ALL the facts provided. Make sure to cite information from each source document. If the facts don't fully answer the question, acknowledge what information is available and what might be missing.{language_instruction}
+
+MANDATORY: Your response must end with exactly this references section:
+{references_section}"""
         
         try:
             # Use the stronger LLM for final synthesis
             response = await self.stronger_llm_client.generate(prompt)
-            
+
+            # Verify that all references are used in the response
+            response = self._ensure_all_references_used(response, document_to_ref_num, final_facts, user_query, language)
+
             # Calculate confidence based on fact scores and coverage
             avg_score = sum(fact.final_decayed_score for fact in final_facts) / len(final_facts)
             confidence_score = min(1.0, avg_score * (len(final_facts) / 10))  # Boost confidence with more facts
-            
+
             return response, confidence_score
             
         except Exception as e:
             self.logger.error("Failed to generate final answer", error=str(e))
             return f"An error occurred while generating the final answer: {str(e)}", 0.0
+
+    def _ensure_all_references_used(
+        self,
+        response: str,
+        document_to_ref_num: dict,
+        final_facts: List[FinalFact],
+        user_query: str,
+        language: Optional[str] = None
+    ) -> str:
+        """Ensure all references are used in the response text."""
+        import re
+
+        # Find which references are actually used in the response
+        used_refs = set()
+        for ref_num in document_to_ref_num.values():
+            # Look for reference patterns like [1], [1, page 5], [1, 2:30], etc.
+            pattern = rf'\[{ref_num}(?:[^\]]*)\]'
+            if re.search(pattern, response):
+                used_refs.add(ref_num)
+
+        # Find unused references
+        all_refs = set(document_to_ref_num.values())
+        unused_refs = all_refs - used_refs
+
+        if not unused_refs:
+            # All references are used, return as is
+            return response
+
+        # Find facts from unused references and add them to the response
+        unused_facts = []
+        for fact in final_facts:
+            doc_name = fact.source_metadata.document_name
+            ref_num = document_to_ref_num.get(doc_name)
+            if ref_num in unused_refs:
+                unused_facts.append((fact, ref_num))
+
+        if unused_facts:
+            # Add a section with the unused facts
+            additional_info = []
+
+            # Group facts by reference
+            ref_to_facts = {}
+            for fact, ref_num in unused_facts:
+                if ref_num not in ref_to_facts:
+                    ref_to_facts[ref_num] = []
+                ref_to_facts[ref_num].append(fact)
+
+            for ref_num in sorted(ref_to_facts.keys()):
+                facts_for_ref = ref_to_facts[ref_num]
+                for fact in facts_for_ref:
+                    # Create proper citation with metadata
+                    source_parts = [str(ref_num)]
+
+                    # Add metadata to the citation
+                    if hasattr(fact.source_metadata, 'page_number') and fact.source_metadata.page_number:
+                        source_parts.append(f"page {fact.source_metadata.page_number}")
+                    if hasattr(fact.source_metadata, 'chapter') and fact.source_metadata.chapter:
+                        source_parts.append(f"chapter {fact.source_metadata.chapter}")
+                    if hasattr(fact.source_metadata, 'timestamp') and fact.source_metadata.timestamp:
+                        source_parts.append(str(fact.source_metadata.timestamp))
+
+                    citation = f"[{', '.join(source_parts)}]"
+                    additional_info.append(f"{fact.fact_text} {citation}")
+
+            # Insert additional information before the references section
+            if "**References:**" in response:
+                # Insert before references
+                parts = response.split("**References:**")
+                if len(parts) == 2:
+                    additional_section = "\n\nAdditional relevant information:\n" + "\n".join(f"- {info}" for info in additional_info)
+                    response = parts[0].rstrip() + additional_section + "\n\n**References:**" + parts[1]
+            else:
+                # Append at the end
+                additional_section = "\n\nAdditional relevant information:\n" + "\n".join(f"- {info}" for info in additional_info)
+                response += additional_section
+
+        return response
     
     def _create_error_response(
         self,

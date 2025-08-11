@@ -15,13 +15,21 @@ logger = structlog.get_logger()
 class ImageService(BaseService):
     """Service for processing images with OCR and captioning."""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, output_dir: Optional[Path] = None):
         """Initialize the image service.
 
         Args:
             api_key: Optional API key for Gemini vision model
+            output_dir: Directory to store processed files
         """
         self.processor = ImageProcessor(api_key=api_key)
+
+        # Set up output directory
+        if output_dir:
+            self.output_dir = Path(output_dir)
+            self.output_dir.mkdir(exist_ok=True)
+        else:
+            self.output_dir = None
 
     async def initialize(self) -> bool:
         """Initialize the service.
@@ -42,9 +50,74 @@ class ImageService(BaseService):
             Dictionary with health status information
         """
         return {"status": "healthy", "processor": "ready"}
-    
-    async def process_image(self, 
-                          file_path: Path, 
+
+    async def process_file(
+        self,
+        file_path: Path,
+        save_output: bool = True,
+        output_format: str = "markdown"
+    ) -> Dict[str, Any]:
+        """Process an image file and optionally save output files.
+
+        Args:
+            file_path: Path to the image file
+            save_output: Whether to save output files
+            output_format: Output format ('markdown', 'json', or 'both')
+
+        Returns:
+            Dictionary containing processing results and output file paths
+        """
+        file_path = Path(file_path)
+
+        if not file_path.exists():
+            raise ProcessingError(f"File not found: {file_path}")
+
+        logger.info("Processing image file", file_path=str(file_path))
+
+        try:
+            # Create default config
+            config = ImageConfig(
+                extract_metadata=True,
+                extract_text=True,
+                generate_caption=True
+            )
+
+            # Process the image
+            result = await self.processor.process_image(file_path, config)
+
+            # Create markdown content
+            markdown_content = self._create_markdown_content(file_path, result)
+
+            # Prepare response
+            response = {
+                "success": True,
+                "processing_time": result.processing_time,
+                "result": {
+                    "caption": result.caption,
+                    "extracted_text": result.extracted_text,
+                    "metadata": result.metadata.__dict__ if result.metadata else {},
+                    "confidence_scores": result.confidence_scores
+                },
+                "content": markdown_content
+            }
+
+            # Save output files if requested
+            if save_output and self.output_dir:
+                output_files = await self._save_output_files(file_path, result, markdown_content, output_format)
+                response["output_files"] = output_files
+
+            return response
+
+        except Exception as e:
+            logger.error("Image processing failed", error=str(e), file_path=str(file_path))
+            return {
+                "success": False,
+                "error": str(e),
+                "processing_time": 0
+            }
+
+    async def process_image(self,
+                          file_path: Path,
                           config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process a single image file.
         
@@ -182,3 +255,122 @@ class ImageService(BaseService):
         except Exception as e:
             logger.warning(f"Failed to calculate checksum for {file_path}: {e}")
             return None
+
+    def _create_markdown_content(self, file_path: Path, result: ImageProcessingResult) -> str:
+        """Create unified markdown content for the image."""
+        lines = []
+
+        # Title
+        lines.append(f"# {file_path.stem}")
+        lines.append("")
+
+        # Image Information
+        lines.append("## Image Information")
+        lines.append("| Property | Value |")
+        lines.append("|----------|-------|")
+
+        if result.metadata:
+            lines.append(f"| Dimensions | {result.metadata.width}x{result.metadata.height} |")
+            lines.append(f"| Format | {result.metadata.format} |")
+            lines.append(f"| Mode | {result.metadata.mode} |")
+            lines.append(f"| File Size | {result.metadata.file_size} bytes |")
+
+            if result.metadata.camera_make:
+                lines.append(f"| Camera Make | {result.metadata.camera_make} |")
+            if result.metadata.camera_model:
+                lines.append(f"| Camera Model | {result.metadata.camera_model} |")
+            if result.metadata.creation_time:
+                lines.append(f"| Creation Time | {result.metadata.creation_time} |")
+
+        lines.append("")
+
+        # Caption
+        if result.caption:
+            lines.append("## Image Caption")
+            lines.append(result.caption)
+            lines.append("")
+
+        # Extracted Text (OCR)
+        if result.extracted_text and result.extracted_text.strip():
+            lines.append("## Extracted Text")
+            lines.append(result.extracted_text)
+            lines.append("")
+
+        # Confidence Scores
+        if result.confidence_scores:
+            lines.append("## Confidence Scores")
+            for key, score in result.confidence_scores.items():
+                lines.append(f"- **{key.title()}**: {score:.3f}")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    async def _save_output_files(
+        self,
+        file_path: Path,
+        result: ImageProcessingResult,
+        markdown_content: str,
+        output_format: str
+    ) -> Dict[str, str]:
+        """Save processing results to output files."""
+        output_files = {}
+        base_name = file_path.stem
+
+        # Sanitize the base name for directory creation
+        # Remove problematic characters and limit length
+        sanitized_name = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if len(sanitized_name) > 100:  # Limit directory name length
+            sanitized_name = sanitized_name[:100].strip()
+        if not sanitized_name:  # Fallback if name becomes empty
+            sanitized_name = f"image_{hash(base_name) % 10000}"
+
+        # Create output directory for this file
+        file_output_dir = self.output_dir / sanitized_name
+        try:
+            file_output_dir.mkdir(exist_ok=True, parents=True)
+            logger.debug("Created output directory", output_dir=str(file_output_dir))
+        except Exception as e:
+            logger.error("Failed to create output directory",
+                        output_dir=str(file_output_dir),
+                        error=str(e))
+            raise ProcessingError(f"Failed to create output directory: {str(e)}")
+
+        # Save markdown content
+        if output_format in ["markdown", "both"]:
+            markdown_path = file_output_dir / f"{sanitized_name}.md"
+            try:
+                with open(markdown_path, "w", encoding="utf-8") as f:
+                    f.write(markdown_content)
+                output_files["markdown"] = str(markdown_path)
+                logger.debug("Saved markdown", path=str(markdown_path))
+            except Exception as e:
+                logger.error("Failed to save markdown",
+                           path=str(markdown_path),
+                           error=str(e))
+
+        # Save metadata as JSON
+        import json
+        metadata_path = file_output_dir / f"{sanitized_name}_metadata.json"
+        metadata_dict = {
+            "file_path": str(file_path),
+            "file_size": file_path.stat().st_size,
+            "processing_time": result.processing_time,
+            "caption": result.caption,
+            "extracted_text": result.extracted_text,
+            "confidence_scores": result.confidence_scores,
+            "image_metadata": result.metadata.__dict__ if result.metadata else {}
+        }
+        try:
+            metadata_path.write_text(json.dumps(metadata_dict, indent=2, ensure_ascii=False), encoding='utf-8')
+            output_files["metadata"] = str(metadata_path)
+            logger.debug("Saved metadata", path=str(metadata_path))
+        except Exception as e:
+            logger.error("Failed to save metadata",
+                       path=str(metadata_path),
+                       error=str(e))
+
+        logger.info("Saved image output files",
+                   output_dir=str(file_output_dir),
+                   files_created=list(output_files.keys()))
+
+        return output_files

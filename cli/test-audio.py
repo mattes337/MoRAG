@@ -46,11 +46,11 @@ env_path = project_root / '.env'
 load_dotenv(env_path)
 
 try:
-    from morag_audio import AudioProcessor, AudioConfig
+    from morag_audio import AudioProcessor, AudioConfig, AudioService
     from morag_core.models import ProcessingConfig
     from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-audio")
@@ -75,7 +75,7 @@ def print_section(title: str):
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
-    print(f"{spaces}📋 {key}: {value}")
+    print(f"{spaces}[INFO] {key}: {value}")
 
 
 async def test_audio_processing(audio_file: Path, model_size: str = "base",
@@ -84,7 +84,7 @@ async def test_audio_processing(audio_file: Path, model_size: str = "base",
     print_header("MoRAG Audio Processing Test")
 
     if not audio_file.exists():
-        print(f"❌ Error: Audio file not found: {audio_file}")
+        print(f"[FAIL] Error: Audio file not found: {audio_file}")
         return False
 
     print_result("Input File", str(audio_file))
@@ -101,90 +101,119 @@ async def test_audio_processing(audio_file: Path, model_size: str = "base",
             word_timestamps=True,
             include_metadata=True
         )
-        print_result("Audio Configuration", "✅ Created successfully")
+        print_result("Audio Configuration", "[OK] Created successfully")
         print_result("Model Size", model_size)
-        print_result("Speaker Diarization", "✅ Enabled" if enable_diarization else "❌ Disabled")
-        print_result("Topic Segmentation", "✅ Enabled" if enable_topics else "❌ Disabled")
+        print_result("Speaker Diarization", "[OK] Enabled" if enable_diarization else "[FAIL] Disabled")
+        print_result("Topic Segmentation", "[OK] Enabled" if enable_topics else "[FAIL] Disabled")
 
-        # Initialize audio processor
-        processor = AudioProcessor(config)
-        print_result("Audio Processor", "✅ Initialized successfully")
+        # Use AudioService for proper markdown output
+        service = AudioService(config=config, output_dir=audio_file.parent)
+        print_result("Audio Service", "[OK] Initialized successfully")
 
         print_section("Processing Audio File")
-        print("🔄 Starting audio processing...")
+        print("[PROCESSING] Starting audio processing...")
+        print("   This may take a while for large audio files...")
 
-        # Process the audio file
-        result = await processor.process(audio_file)
+        # Process the audio file using AudioService
+        service_result = await service.process_file(
+            file_path=audio_file,
+            save_output=True,
+            output_format="markdown"
+        )
 
-        if result.success:
-            print("✅ Audio processing completed successfully!")
+        if service_result.get('success', False):
+            print("[OK] Audio processing completed successfully!")
+
+            # Extract result data from service result
+            result_data = service_result.get('result', {})
 
             print_section("Processing Results")
-            print_result("Status", "✅ Success")
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
-            print_result("Transcript Length", f"{len(result.transcript)} characters")
-            print_result("Segments Count", f"{len(result.segments)}")
+            print_result("Status", "[OK] Success")
+            print_result("Processing Time", f"{service_result.get('processing_time', 0):.2f} seconds")
 
-            if result.metadata:
+            # Check for audio processing results
+            if result_data:
+                print_result("Transcript Length", f"{len(result_data.get('transcript', ''))}")
+                print_result("Segments Count", f"{len(result_data.get('segments', []))}")
+
+                # Check for speaker diarization
+                segments = result_data.get('segments', [])
+                if segments:
+                    has_speakers = any(seg.get('speaker') for seg in segments)
+                    has_topics = any(seg.get('topic_id') is not None for seg in segments)
+                    print_result("Speaker Diarization", "[OK] Enabled" if has_speakers else "[INFO] No speakers detected")
+                    print_result("Topic Segmentation", "[OK] Enabled" if has_topics else "[INFO] No topics detected")
+
+            metadata = result_data.get('metadata', {})
+            if metadata:
                 print_section("Metadata")
-                for key, value in result.metadata.items():
+                for key, value in metadata.items():
                     if isinstance(value, (dict, list)):
                         print_result(key, json.dumps(value, indent=2))
                     else:
                         print_result(key, str(value))
 
-            if result.transcript:
+            transcript = result_data.get('transcript', '')
+            if transcript:
                 print_section("Transcript Preview")
-                transcript_preview = result.transcript[:500] + "..." if len(result.transcript) > 500 else result.transcript
-                print(f"📄 Transcript ({len(result.transcript)} characters):")
+                transcript_preview = transcript[:500] + "..." if len(transcript) > 500 else transcript
+                print(f"📄 Transcript ({len(transcript)} characters):")
                 print(transcript_preview)
 
-            if result.segments:
+            segments = result_data.get('segments', [])
+            if segments:
                 print_section("Segments Preview (first 3)")
-                for i, segment in enumerate(result.segments[:3]):
-                    print(f"  Segment {i+1}: [{segment.start:.2f}s - {segment.end:.2f}s]")
-                    print(f"    Text: {segment.text[:100]}{'...' if len(segment.text) > 100 else ''}")
-                    if segment.speaker:
-                        print(f"    Speaker: {segment.speaker}")
-                    if segment.confidence:
-                        print(f"    Confidence: {segment.confidence:.3f}")
+                for i, segment in enumerate(segments[:3]):
+                    start = segment.get('start', 0)
+                    end = segment.get('end', 0)
+                    text = segment.get('text', '')
+                    print(f"  Segment {i+1}: [{start:.2f}s - {end:.2f}s]")
+                    print(f"    Text: {text[:100]}{'...' if len(text) > 100 else ''}")
+                    if segment.get('speaker'):
+                        print(f"    Speaker: {segment['speaker']}")
+                    if segment.get('confidence'):
+                        print(f"    Confidence: {segment['confidence']:.3f}")
 
-            # Save results to file
+            # Save comprehensive results to JSON file
             output_file = audio_file.parent / f"{audio_file.stem}_test_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     'mode': 'processing',
-                    'success': result.success,
-                    'processing_time': result.processing_time,
-                    'transcript': result.transcript,
-                    'segments': [
-                        {
-                            'start': seg.start,
-                            'end': seg.end,
-                            'text': seg.text,
-                            'speaker': seg.speaker,
-                            'confidence': seg.confidence,
-                            'topic_id': seg.topic_id,
-                            'topic_label': seg.topic_label
-                        } for seg in result.segments
-                    ],
-                    'metadata': result.metadata,
-                    'file_path': result.file_path,
-                    'error_message': result.error_message
+                    'success': service_result.get('success', False),
+                    'processing_time': service_result.get('processing_time', 0),
+                    'enable_diarization': enable_diarization,
+                    'enable_topic_segmentation': enable_topics,
+                    'model_size': model_size,
+                    'transcript': result_data.get('transcript', ''),
+                    'segments': result_data.get('segments', []),
+                    'metadata': result_data.get('metadata', {}),
+                    'output_files': service_result.get('output_files', {})
                 }, f, indent=2, ensure_ascii=False)
 
-            print_section("Output")
-            print_result("Results saved to", str(output_file))
+            # Create intermediate markdown file for ingestion
+            if service_result.get('content'):
+                intermediate_file = audio_file.parent / f"{audio_file.stem}_intermediate.md"
+                with open(intermediate_file, 'w', encoding='utf-8') as f:
+                    f.write(service_result['content'])
+                print_result("Intermediate Markdown File", str(intermediate_file))
+
+            print_section("Output Files")
+            print_result("JSON Results", str(output_file))
+
+            # Show all output files created by AudioService
+            output_files = service_result.get('output_files', {})
+            for file_type, file_path in output_files.items():
+                print_result(f"{file_type.title()} File", str(file_path))
 
             return True
 
         else:
-            print("❌ Audio processing failed!")
-            print_result("Error", result.error_message or "Unknown error")
+            print("[FAIL] Audio processing failed!")
+            print_result("Error", service_result.get('error', 'Unknown error'))
             return False
 
     except Exception as e:
-        print(f"❌ Error during audio processing: {e}")
+        print(f"[FAIL] Error during audio processing: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -197,7 +226,7 @@ async def store_content_in_vector_db(
 ) -> list:
     """Store processed content in vector database."""
     if not content.strip():
-        print("⚠️  Warning: Empty content provided for vector storage")
+        print("[WARN]  Warning: Empty content provided for vector storage")
         return []
 
     try:
@@ -268,12 +297,12 @@ async def store_content_in_vector_db(
             collection_name
         )
 
-        print_result("Vector Storage", f"✅ Stored {len(chunks)} chunks with {len(point_ids)} vectors")
+        print_result("Vector Storage", f"[OK] Stored {len(chunks)} chunks with {len(point_ids)} vectors")
 
         return point_ids
 
     except Exception as e:
-        print(f"❌ Error storing content in vector database: {e}")
+        print(f"[FAIL] Error storing content in vector database: {e}")
         raise
 
 
@@ -293,21 +322,21 @@ async def test_audio_ingestion(
     print_header("MoRAG Audio Ingestion Test")
 
     if not audio_file.exists():
-        print(f"❌ Error: Audio file not found: {audio_file}")
+        print(f"[FAIL] Error: Audio file not found: {audio_file}")
         return False
 
     print_result("Input File", str(audio_file))
     print_result("File Size", f"{audio_file.stat().st_size / 1024 / 1024:.2f} MB")
     print_result("Webhook URL", webhook_url or "Not provided")
     print_result("Custom Metadata", json.dumps(metadata, indent=2) if metadata else "None")
-    print_result("Qdrant Storage", "✅ Enabled" if use_qdrant else "❌ Disabled")
-    print_result("Neo4j Storage", "✅ Enabled" if use_neo4j else "❌ Disabled")
+    print_result("Qdrant Storage", "[OK] Enabled" if use_qdrant else "[FAIL] Disabled")
+    print_result("Neo4j Storage", "[OK] Enabled" if use_neo4j else "[FAIL] Disabled")
 
     import time
     start_time = time.time()
     
     try:
-        print("🔄 Starting audio processing and ingestion...")
+        print("[PROCESSING] Starting audio processing and ingestion...")
 
         # Initialize audio configuration
         config = AudioConfig(
@@ -327,18 +356,18 @@ async def test_audio_ingestion(
         result = await processor.process(audio_file)
 
         if not result.success:
-            print("❌ Audio processing failed!")
+            print("[FAIL] Audio processing failed!")
             print_result("Error", result.error_message or "Unknown error")
             return False
 
-        print("✅ Audio processing completed successfully!")
+        print("[OK] Audio processing completed successfully!")
         processing_time = time.time() - start_time
         print_result("Processing Time", f"{result.processing_time:.2f} seconds")
         print_result("Transcript Length", f"{len(result.transcript)} characters")
 
         # Extract entities and relations
         print_section("Graph Extraction")
-        print("🔄 Extracting entities and relations...")
+        print("[PROCESSING] Extracting entities and relations...")
         
         try:
             from graph_extraction import extract_entities_and_relations
@@ -350,7 +379,7 @@ async def test_audio_ingestion(
             print_result("Entities Extracted", f"{len(entities)}")
             print_result("Relations Extracted", f"{len(relations)}")
         except Exception as e:
-            print(f"⚠️ Warning: Graph extraction failed: {e}")
+            print(f"[WARN] Warning: Graph extraction failed: {e}")
             entities, relations = [], []
 
         # Create intermediate files
@@ -422,7 +451,7 @@ async def test_audio_ingestion(
         ingestion_results = {'qdrant': None, 'neo4j': None}
         
         if use_qdrant or use_neo4j:
-            print("🔄 Starting database ingestion...")
+            print("[PROCESSING] Starting database ingestion...")
             
             # Prepare metadata for ingestion
             ingestion_metadata = {
@@ -479,27 +508,27 @@ async def test_audio_ingestion(
                 
                 if use_qdrant and ingestion_results.get('qdrant'):
                     if ingestion_results['qdrant'].get('success'):
-                        print_result("Qdrant Ingestion", "✅ Success")
+                        print_result("Qdrant Ingestion", "[OK] Success")
                         print_result("Qdrant Chunks", str(ingestion_results['qdrant'].get('chunks_count', 0)))
                     else:
-                        print_result("Qdrant Ingestion", f"❌ Failed: {ingestion_results['qdrant'].get('error', 'Unknown error')}")
+                        print_result("Qdrant Ingestion", f"[FAIL] Failed: {ingestion_results['qdrant'].get('error', 'Unknown error')}")
                 
                 if use_neo4j and ingestion_results.get('neo4j'):
                     if ingestion_results['neo4j'].get('success'):
-                        print_result("Neo4j Ingestion", "✅ Success")
+                        print_result("Neo4j Ingestion", "[OK] Success")
                         print_result("Neo4j Entities", str(ingestion_results['neo4j'].get('entities_stored', 0)))
                         print_result("Neo4j Relations", str(ingestion_results['neo4j'].get('relations_stored', 0)))
                     else:
-                        print_result("Neo4j Ingestion", f"❌ Failed: {ingestion_results['neo4j'].get('error', 'Unknown error')}")
+                        print_result("Neo4j Ingestion", f"[FAIL] Failed: {ingestion_results['neo4j'].get('error', 'Unknown error')}")
                         
             except Exception as e:
-                print(f"⚠️ Warning: Database ingestion failed: {e}")
+                print(f"[WARN] Warning: Database ingestion failed: {e}")
                 ingestion_results = {'error': str(e)}
         
-        print("✅ Audio ingestion completed successfully!")
+        print("[OK] Audio ingestion completed successfully!")
 
         print_section("Ingestion Results")
-        print_result("Status", "✅ Success")
+        print_result("Status", "[OK] Success")
         print_result("Total Processing Time", f"{processing_time:.2f} seconds")
         print_result("Transcript Length", str(len(result.transcript)))
         print_result("Segments Count", str(len(result.segments)))
@@ -535,7 +564,7 @@ async def test_audio_ingestion(
         return True
 
     except Exception as e:
-        print(f"❌ Error during audio ingestion: {e}")
+        print(f"[FAIL] Error during audio ingestion: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -601,7 +630,7 @@ Examples:
         try:
             metadata = json.loads(args.metadata)
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in metadata: {e}")
+            print(f"[FAIL] Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
 
     # Handle resume arguments
@@ -624,11 +653,11 @@ Examples:
                 neo4j_database_name=args.neo4j_database
             ))
             if success:
-                print("\n🎉 Audio ingestion test completed successfully!")
+                print("\n[SUCCESS] Audio ingestion test completed successfully!")
                 print("💡 Use the task ID to monitor progress and retrieve results.")
                 sys.exit(0)
             else:
-                print("\n💥 Audio ingestion test failed!")
+                print("\n[ERROR] Audio ingestion test failed!")
                 sys.exit(1)
         else:
             # Processing mode
@@ -639,16 +668,16 @@ Examples:
                 enable_topics=args.enable_topics
             ))
             if success:
-                print("\n🎉 Audio processing test completed successfully!")
+                print("\n[SUCCESS] Audio processing test completed successfully!")
                 sys.exit(0)
             else:
-                print("\n💥 Audio processing test failed!")
+                print("\n[ERROR] Audio processing test failed!")
                 sys.exit(1)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         sys.exit(1)
 
 

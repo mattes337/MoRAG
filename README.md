@@ -2,19 +2,21 @@
 
 A comprehensive, modular system for processing and indexing various types of content for retrieval-augmented generation (RAG) applications.
 
-## 🚀 PydanticAI Integration Complete!
+## 🚀 Latest Enhancements Complete!
 
-MoRAG has been enhanced with **PydanticAI integration** for superior AI-powered processing:
+MoRAG has been enhanced with **PydanticAI integration** and **unified citation formats** for superior AI-powered processing:
 
 ### ✅ Completed Enhancements
 
 - **🤖 PydanticAI Foundation**: Complete migration to PydanticAI for all LLM interactions
-- **🧠 Enhanced Entity Extraction**: Hybrid AI + pattern matching for 20% better accuracy
+- **🧠 Structured Fact Extraction**: Advanced AI-powered extraction of actionable facts with detailed source attribution
 - **📝 Semantic Chunking**: Intelligent content segmentation across all content types
-- **🔗 Relation Extraction**: Advanced relationship detection with confidence scoring
+- **🔗 Fact Relationships**: Automatic detection of relationships between extracted facts
 - **⚡ Structured Outputs**: Type-safe, validated responses from all AI agents
 - **🛡️ Error Handling**: Robust retry logic and circuit breaker patterns
 - **📊 Pattern Matching**: Curated knowledge bases for technology, organizations, locations, dates, and more
+- **📋 Unified Citation Format**: Standardized structured citations across all content types
+- **🔧 Graph Tool Controller**: Gemini function calling interface for graph operations
 
 ## 🎉 Modular Architecture Complete!
 
@@ -38,10 +40,10 @@ packages/
 
 ### 🤖 AI-Powered Processing
 - **PydanticAI Integration**: Type-safe, structured AI interactions with validation
-- **Hybrid Entity Extraction**: AI + pattern matching for superior accuracy
+- **Structured Fact Extraction**: AI-powered extraction of actionable facts with subject-object-approach-solution patterns
 - **Semantic Chunking**: Intelligent content segmentation based on meaning
-- **Advanced Relation Extraction**: Context-aware relationship detection
-- **Query Analysis**: Intent detection and entity extraction from user queries
+- **Fact Relationship Detection**: Context-aware relationship detection between facts
+- **Query Analysis**: Intent detection and fact-based query processing
 - **Content Summarization**: Structured summaries with key points and metadata
 
 ### 🏗️ Architecture & Design
@@ -53,12 +55,31 @@ packages/
 - **Multiple Interfaces**: REST API, CLI, and Python API
 
 ### 📊 Processing Capabilities
-- **Universal Document Conversion**: Unified framework for converting any document format to structured markdown
+- **Universal Document Conversion**: Unified framework powered by markitdown for converting 47+ file formats to structured markdown
+- **Specialized Converters**: Domain-specific converters organized by file type:
+  - **Documents**: PDF, Word, Excel, PowerPoint, Text, Archives (in `morag-document`)
+  - **Images**: JPG, PNG, GIF, BMP, TIFF, WEBP, SVG with OCR (in `morag-image`)
+  - **Audio**: MP3, WAV, M4A, FLAC, AAC, OGG with transcription (in `morag-audio`)
+  - **Video**: MP4, AVI, MOV, MKV, WEBM with transcription (in `morag-video`)
 - **Intelligent Chunking**: Multiple strategies (semantic, page, sentence, paragraph) with AI-powered boundary detection
 - **Quality Assessment**: Comprehensive quality scoring for conversion results with fallback mechanisms
 - **Batch Embedding**: Optimized batch processing using Gemini's native batch API for 4x faster embeddings
 - **Remote Processing**: Offload computationally intensive tasks (audio/video) to remote workers with GPU support
 - **Production Ready**: Docker support, logging, monitoring, and deployment configurations
+
+### 📋 Citation System
+- **Structured Citations**: Unified citation format across all content types: `[source_type:source_name:source_index:metadata]`
+- **Source Traceability**: Complete provenance tracking from original sources to extracted facts
+- **Multi-format Support**: Citations for documents, audio, video, web content, and extracted facts
+- **Metadata Preservation**: Rich metadata including page numbers, timestamps, sections, and fact IDs
+
+### 🔧 Graph Operations
+- **Gemini Function Calling**: Secure interface for graph operations with policy enforcement
+- **Entity Operations**: Extract, match, and traverse entities in the knowledge graph
+- **Fact Extraction**: AI-powered structured fact extraction with confidence scoring
+- **Neighbor Expansion**: Graph traversal with configurable depth and relationship filtering
+- **Content Retrieval**: Fetch entity-associated content chunks with relevance scoring
+- **Action Tracing**: Complete audit trail of all graph operations for monitoring and debugging
 
 ## Quick Start
 
@@ -142,28 +163,40 @@ uvicorn morag.api.main:app --reload
 
 ## 🤖 PydanticAI Features
 
-### Enhanced Entity Extraction
+### Structured Fact Extraction
 
 ```python
-from morag_graph.extraction import HybridEntityExtractor
+from morag_graph.extraction.fact_extractor import FactExtractor
 
-# Create hybrid extractor (AI + Pattern Matching)
-extractor = HybridEntityExtractor(
+# Create fact extractor with domain specialization
+extractor = FactExtractor(
+    model_id="gemini-2.0-flash",
+    api_key="your-api-key",
+    domain="technology",
     min_confidence=0.7,
-    enable_pattern_matching=True,
-    pattern_confidence_boost=0.1
+    max_facts_per_chunk=10
 )
 
-# Extract entities with enhanced accuracy
-text = "I'm using Python and React to build applications for Microsoft."
-entities = await extractor.extract(text)
+# Extract structured facts
+text = "Python and React are used together to build full-stack applications. This approach enables rapid development with strong type safety."
+facts = await extractor.extract_facts(
+    chunk_text=text,
+    chunk_id="chunk_1",
+    document_id="doc_1",
+    context={'domain': 'technology', 'language': 'en'}
+)
 
-for entity in entities:
-    print(f"{entity.name} ({entity.type}): {entity.confidence:.2f}")
-    print(f"  Method: {entity.attributes.get('extraction_method')}")
+for fact in facts:
+    print(f"Subject: {fact.subject}")
+    print(f"Object: {fact.object}")
+    print(f"Approach: {fact.approach}")
+    print(f"Solution: {fact.solution}")
+    print(f"Confidence: {fact.extraction_confidence:.2f}")
+    print(f"Citation: {fact.get_citation()}")
+    print("---")
 ```
 
-**Note**: Entity types are now dynamically generated by the LLM based on content, providing domain-agnostic extraction without hardcoded classifications.
+**Note**: Facts provide structured, actionable knowledge with complete source attribution, making them more useful than generic entities for downstream applications.
 
 ### Semantic Chunking
 
@@ -316,6 +349,66 @@ python tests/cli/test-docker-fixes.py
 ```
 
 For detailed Docker deployment instructions, see [Docker Deployment Guide](docs/DOCKER_DEPLOYMENT.md).
+
+### Maintenance: Keyword Hierarchization (Standalone)
+
+- Build image:
+```bash
+docker build -f Dockerfile.maintenance -t morag-maintenance:latest .
+```
+- Run (dry-run by default):
+```bash
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  morag-maintenance:latest
+```
+- Apply with detachment:
+```bash
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  -e MORAG_KWH_APPLY=true -e MORAG_KWH_DETACH_MOVED=true \
+  morag-maintenance:latest
+```
+- CLI (no Docker):
+```bash
+python -m morag_graph.maintenance.keyword_hierarchization --threshold 50 --limit-keywords 5 --apply --detach-moved
+```
+
+
+#### Generalized maintenance runner (multi-job)
+- The maintenance image uses a generic runner. Select jobs via MORAG_MAINT_JOBS (comma-separated). Currently supported: keyword_hierarchization.
+```bash
+# Run keyword hierarchization (dry-run by default)
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  -e MORAG_MAINT_JOBS=keyword_hierarchization \
+  morag-maintenance:latest
+
+# Apply with common tuning overrides
+# If proposals are empty, lower the share and/or min-new thresholds
+# (See maintenance/KEYWORD_HIERARCHIZATION.md for details)
+docker run --rm \
+  -e NEO4J_URI -e NEO4J_USERNAME -e NEO4J_PASSWORD -e NEO4J_DATABASE \
+  -e MORAG_MAINT_JOBS=keyword_hierarchization \
+  -e MORAG_KWH_APPLY=true \
+  -e MORAG_KWH_DETACH_MOVED=true \
+  -e MORAG_KWH_SHARE=0.08 \
+  -e MORAG_KWH_MIN_NEW=2 \
+  morag-maintenance:latest
+```
+
+Environment overrides for keyword hierarchization:
+- MORAG_KWH_THRESHOLD: minimum facts on a keyword (default 50)
+- MORAG_KWH_MIN_NEW / MORAG_KWH_MAX_NEW: min/max number of proposed keywords (defaults 3/6)
+- MORAG_KWH_MIN_PER: minimum facts per proposed keyword (default 5)
+- MORAG_KWH_MAX_MOVE_RATIO: cap on fraction of facts to move (default 0.8)
+- MORAG_KWH_SHARE: minimum co-occurrence share for a proposal (default 0.18)
+- MORAG_KWH_BATCH_SIZE: batch size for writes (default 200)
+- MORAG_KWH_DETACH_MOVED: true to delete the original edges after reattach
+- MORAG_KWH_APPLY: true to apply (false = dry-run)
+- MORAG_KWH_JOB_TAG: optional tag stored on created relationships
+- MORAG_KWH_LIMIT_KEYWORDS: process up to N keywords per run (default 5)
+
 
 ### CPU Compatibility (NEW)
 

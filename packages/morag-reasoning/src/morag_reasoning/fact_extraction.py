@@ -34,7 +34,7 @@ class FactExtractionService:
         self,
         llm_client: LLMClient,
         min_confidence: float = 0.5,
-        max_facts: int = 20
+        max_facts: int = 10000
     ):
         """Initialize the fact extraction service.
         

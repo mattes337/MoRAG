@@ -10,6 +10,10 @@ from morag.server import create_app, main as server_main
 from morag.worker import main as worker_main
 from morag.orchestrator import MoRAGOrchestrator
 
+# Pipeline orchestration components
+from .agents import MoRAGPipelineAgent, IngestionOptions, ResolutionOptions
+from .pipeline import IntermediateFileManager, PipelineStateManager
+
 # Re-export key components from sub-packages
 from morag_core.models import Document, DocumentChunk, ProcessingResult
 from morag_services import MoRAGServices, ServiceConfig, ContentType

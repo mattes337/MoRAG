@@ -7,6 +7,16 @@ __version__ = "0.1.0"
 
 # Core components
 from .llm import LLMClient, LLMConfig
+from .batch_processor import (
+    BatchProcessor,
+    BatchItem,
+    BatchResult,
+    TextAnalysisBatchProcessor,
+    DocumentChunkBatchProcessor,
+    batch_llm_calls,
+    batch_text_analysis,
+    batch_document_chunks
+)
 from .path_selection import PathSelectionAgent, ReasoningPathFinder, PathRelevanceScore, ReasoningStrategy
 from .iterative_retrieval import IterativeRetriever, ContextGap, ContextAnalysis, RetrievalContext
 
@@ -35,9 +45,27 @@ from .graph_traversal_agent import GraphTraversalAgent
 from .fact_critic_agent import FactCriticAgent
 from .recursive_fact_retrieval_service import RecursiveFactRetrievalService
 
+# Enhanced fact gathering and scoring components
+from .graph_fact_extractor import GraphFactExtractor, ExtractedFact, FactType
+from .fact_scorer import FactRelevanceScorer, ScoredFact as EnhancedScoredFact, ScoringDimensions, ScoringStrategy
+from .citation_manager import CitationManager, CitedFact, SourceReference, CitationFormat
+
+# Response generation components
+from .response_generator import ResponseGenerator, GeneratedResponse, ResponseFormat, ResponseOptions
+from .citation_integrator import CitationIntegrator, CitedResponse, CitationStyle, CitationOptions
+from .response_assessor import ResponseQualityAssessor, QualityAssessment, QualityMetrics, AssessmentOptions
+
 __all__ = [
     "LLMClient",
     "LLMConfig",
+    "BatchProcessor",
+    "BatchItem",
+    "BatchResult",
+    "TextAnalysisBatchProcessor",
+    "DocumentChunkBatchProcessor",
+    "batch_llm_calls",
+    "batch_text_analysis",
+    "batch_document_chunks",
     "PathSelectionAgent",
     "ReasoningPathFinder",
     "PathRelevanceScore",
@@ -71,4 +99,29 @@ __all__ = [
     "GraphTraversalAgent",
     "FactCriticAgent",
     "RecursiveFactRetrievalService",
+    # Enhanced fact gathering and scoring
+    "GraphFactExtractor",
+    "ExtractedFact",
+    "FactType",
+    "FactRelevanceScorer",
+    "EnhancedScoredFact",
+    "ScoringDimensions",
+    "ScoringStrategy",
+    "CitationManager",
+    "CitedFact",
+    "SourceReference",
+    "CitationFormat",
+    # Response generation components
+    "ResponseGenerator",
+    "GeneratedResponse",
+    "ResponseFormat",
+    "ResponseOptions",
+    "CitationIntegrator",
+    "CitedResponse",
+    "CitationStyle",
+    "CitationOptions",
+    "ResponseQualityAssessor",
+    "QualityAssessment",
+    "QualityMetrics",
+    "AssessmentOptions",
 ]

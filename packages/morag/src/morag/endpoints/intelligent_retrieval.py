@@ -9,9 +9,10 @@ import httpx
 
 from morag_reasoning import (
     IntelligentRetrievalRequest, IntelligentRetrievalResponse,
-    IntelligentRetrievalService
+    IntelligentRetrievalService, RecursiveFactRetrievalRequest,
+    RecursiveFactRetrievalResponse, RecursiveFactRetrievalService
 )
-from morag.dependencies import get_llm_client
+from morag.dependencies import get_llm_client, get_recursive_fact_retrieval_service
 from morag.database_factory import (
     get_default_neo4j_storage, get_default_qdrant_storage,
     get_connected_default_neo4j_storage, get_connected_default_qdrant_storage,
@@ -199,21 +200,24 @@ async def intelligent_retrieval(
     request: IntelligentRetrievalRequest
 ):
     """Perform intelligent entity-based retrieval with recursive path following.
-    
+
     This endpoint:
     1. Identifies entities from the user prompt
     2. Retrieves entity nodes/chunks from Neo4j/Qdrant
     3. Uses LLM to decide which paths to follow recursively
     4. Extracts key facts from retrieved chunks with source information
     5. Returns structured JSON with facts and sources
+
+    Note: This endpoint maintains backward compatibility. For new applications,
+    consider using /intelligent-query/facts which uses the improved fact-based system.
     """
     try:
         logger.info(
-            "Starting intelligent retrieval",
+            "Starting intelligent retrieval (legacy)",
             query=request.query,
             max_iterations=request.max_iterations
         )
-        
+
         # Get service with specified databases
         service = await get_intelligent_retrieval_service(request)
 
@@ -228,16 +232,16 @@ async def intelligent_retrieval(
             max_delay=request.retry_max_delay,
             jitter=request.retry_jitter
         )
-        
+
         logger.info(
-            "Intelligent retrieval completed",
+            "Intelligent retrieval completed (legacy)",
             query_id=response.query_id,
             key_facts=len(response.key_facts),
             processing_time_ms=response.processing_time_ms
         )
-        
+
         return response
-        
+
     except Exception as e:
         logger.error(
             "Intelligent retrieval failed",
@@ -248,6 +252,66 @@ async def intelligent_retrieval(
         raise HTTPException(
             status_code=500,
             detail=f"Intelligent retrieval failed: {str(e)}"
+        )
+
+
+@router.post("/intelligent-query/facts", response_model=RecursiveFactRetrievalResponse)
+async def intelligent_fact_retrieval(
+    request: RecursiveFactRetrievalRequest
+):
+    """Perform intelligent fact-based retrieval using the new graph structure.
+
+    This endpoint uses the RecursiveFactRetrievalService to:
+    1. Extract entities from the user query
+    2. Perform recursive graph traversal with fact extraction
+    3. Score and filter facts based on relevance
+    4. Return structured facts with source attribution
+    """
+    try:
+        logger.info(
+            "Starting intelligent fact retrieval",
+            query=request.user_query,
+            max_depth=request.max_depth
+        )
+
+        # Get fact retrieval service
+        service = await get_recursive_fact_retrieval_service()
+        if not service:
+            raise HTTPException(
+                status_code=503,
+                detail="Recursive fact retrieval service not available"
+            )
+
+        # Perform fact retrieval with retry logic for model overload
+        async def perform_retrieval():
+            return await service.retrieve_facts_recursively(request)
+
+        response = await retry_on_overload(
+            perform_retrieval,
+            max_retries=8,
+            base_delay=2.0,
+            max_delay=120.0
+        )
+
+        logger.info(
+            "Intelligent fact retrieval completed",
+            query_id=response.query_id,
+            total_facts=len(response.final_facts),
+            processing_time_ms=response.processing_time_ms
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(
+            "Intelligent fact retrieval failed",
+            error=str(e),
+            error_type=type(e).__name__,
+            query=request.user_query
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Intelligent fact retrieval failed: {str(e)}"
         )
 
 

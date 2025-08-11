@@ -4,12 +4,13 @@ This package provides video processing capabilities for the MoRAG (Modular Retri
 
 ## Features
 
-- Video transcription and audio extraction
-- Scene detection and keyframe extraction
-- Thumbnail generation
-- Text extraction from video frames (OCR)
-- Video metadata extraction
-- Integration with MoRAG core services
+- **Video Transcription**: High-quality audio transcription using markitdown framework
+- **Format Support**: MP4, AVI, MOV, MKV, WEBM, FLV, WMV video formats
+- **Document Conversion**: Convert videos to structured markdown with transcripts
+- **Scene Detection**: Keyframe extraction and thumbnail generation
+- **Text Extraction**: OCR from video frames
+- **Video Metadata**: Comprehensive metadata extraction
+- **Integration**: Seamless integration with MoRAG document processing pipeline
 
 ## Installation
 
@@ -39,14 +40,41 @@ pip install "morag-video[scene,ocr]"
 
 ## Usage
 
+### Document Conversion (Recommended)
+
+```python
+from morag_video.converters.video import VideoConverter
+from morag_core.interfaces.converter import ConversionOptions
+
+# Create video converter
+converter = VideoConverter()
+
+# Convert video to markdown document
+options = ConversionOptions(title="My Video")
+result = await converter.convert("path/to/video.mp4", options)
+
+# Access the converted document
+document = result.document
+print(f"Title: {document.title}")
+print(f"Transcript: {document.raw_text}")
+```
+
+### Advanced Video Processing
+
 ```python
 from morag_video import VideoProcessor, VideoConfig
 
-# Create processor with default configuration
-processor = VideoProcessor()
+# Create processor with custom configuration
+config = VideoConfig(
+    extract_audio=True,
+    generate_thumbnails=True,
+    extract_keyframes=True,
+    enable_enhanced_audio=True
+)
+processor = VideoProcessor(config)
 
 # Process a video file
-result = await processor.process("path/to/video.mp4")
+result = await processor.process_video("path/to/video.mp4")
 
 # Access the transcription
 print(result.transcript)

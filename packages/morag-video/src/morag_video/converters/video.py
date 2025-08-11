@@ -1,13 +1,22 @@
-"""Video converter module for MoRAG."""
+"""Video converter module for MoRAG using markitdown framework."""
 
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Set
 
 import structlog
 
-from morag_core.converters import ConversionResult, ConversionQualityValidator
+from morag_core.interfaces.converter import (
+    ConversionResult,
+    ConversionOptions,
+    QualityScore,
+    ConversionError,
+    UnsupportedFormatError,
+)
+from morag_core.models.document import Document, DocumentType
+from morag_core.converters import ConversionQualityValidator
+from morag_document.services.markitdown_service import MarkitdownService
 from morag_video.processor import VideoProcessingResult
 
 logger = structlog.get_logger(__name__)
@@ -20,6 +29,9 @@ class VideoConversionOptions:
     include_thumbnails: bool = True
     include_keyframes: bool = True
     include_transcript: bool = True
+    include_timestamps: bool = True
+    include_speakers: bool = True
+    include_topics: bool = True
     group_by_speaker: bool = False
     group_by_topic: bool = False
     max_thumbnails: int = 5
@@ -28,58 +40,97 @@ class VideoConversionOptions:
 
 
 class VideoConverter:
-    """Converts video processing results to structured formats."""
-
-    SUPPORTED_FORMATS = ["mp4", "avi", "mov", "mkv", "webm"]
+    """Video document converter using markitdown framework."""
 
     def __init__(self):
-        """Initialize the video converter."""
+        """Initialize Video converter."""
+        self.supported_formats: Set[str] = {
+            "video", "mp4", "avi", "mov", "mkv", "webm", "flv", "wmv"
+        }
+        self.markitdown_service = MarkitdownService()
         self.quality_validator = ConversionQualityValidator()
         logger.info("Video converter initialized")
 
-    async def convert(self, 
-                     file_path: Union[str, Path], 
-                     options: Optional[VideoConversionOptions] = None) -> ConversionResult:
-        """Convert a video file to structured markdown.
-        
+    async def supports_format(self, format_type: str) -> bool:
+        """Check if format is supported.
+
         Args:
-            file_path: Path to the video file
-            options: Conversion options
-            
+            format_type: Format type string
+
         Returns:
-            ConversionResult with structured markdown
+            True if format is supported, False otherwise
         """
-        from morag_video.processor import VideoProcessor, VideoConfig
-        
+        return format_type.lower() in self.supported_formats
+
+    async def convert(self,
+                     file_path: Union[str, Path],
+                     options: Optional[ConversionOptions] = None) -> ConversionResult:
+        """Convert video file to text using markitdown.
+
+        Args:
+            file_path: Path to video file
+            options: Conversion options
+
+        Returns:
+            Conversion result with document
+
+        Raises:
+            ConversionError: If conversion fails
+            UnsupportedFormatError: If video format is not supported
+        """
         file_path = Path(file_path)
-        options = options or VideoConversionOptions()
-        
-        # Configure video processor based on conversion options
-        config = VideoConfig(
-            extract_audio=options.include_transcript,
-            generate_thumbnails=options.include_thumbnails,
-            extract_keyframes=options.include_keyframes,
-            enable_enhanced_audio=options.group_by_speaker or options.group_by_topic,
-            enable_speaker_diarization=options.group_by_speaker,
-            enable_topic_segmentation=options.group_by_topic,
-            enable_ocr=options.include_ocr
-        )
-        
-        processor = VideoProcessor(config)
-        
+        options = options or ConversionOptions()
+
+        # Validate input
+        if not file_path.exists():
+            raise ConversionError(f"Video file not found: {file_path}")
+
+        # Detect format if not specified
+        format_type = options.format_type or file_path.suffix.lower().lstrip('.')
+
+        # Check if format is supported
+        if not await self.supports_format(format_type):
+            raise UnsupportedFormatError(f"Format '{format_type}' is not supported by video converter")
+
         try:
-            # Process the video
-            logger.info("Processing video for conversion", file_path=str(file_path))
-            result = await processor.process_video(file_path)
-            
-            # Create structured markdown
-            markdown = await self.convert_to_markdown(result, options)
-            
+            # Use markitdown for video transcription
+            logger.info("Converting video file with markitdown", file_path=str(file_path))
+
+            result = await self.markitdown_service.convert_file(file_path)
+
+            # Create document
+            document = Document(
+                id=options.document_id,
+                title=options.title or file_path.stem,
+                raw_text=result.text_content,
+                document_type=DocumentType.VIDEO,
+                file_path=str(file_path),
+                metadata={
+                    "file_size": file_path.stat().st_size,
+                    "format": format_type,
+                    "conversion_method": "markitdown",
+                    **result.metadata
+                }
+            )
+
             # Calculate quality score
-            quality_score = self._calculate_quality_score(result, options)
-            
-            # Clean up temporary files
-            processor.cleanup_temp_files(result.temp_files)
+            quality_score = QualityScore(
+                overall_score=0.9,  # High score for markitdown transcription
+                text_extraction_score=0.9,
+                structure_preservation_score=0.8,
+                metadata_extraction_score=0.9,
+                issues_detected=[]
+            )
+
+            return ConversionResult(
+                document=document,
+                quality_score=quality_score,
+                warnings=[]
+            )
+
+        except Exception as e:
+            logger.error("Video conversion failed", error=str(e), file_path=str(file_path))
+            raise ConversionError(f"Failed to convert video file: {e}") from e
             
             return ConversionResult(
                 content=markdown,
@@ -119,30 +170,29 @@ class VideoConverter:
         # Create markdown content
         markdown_parts = []
         
-        # Add title
+        # Add title in format: Video Analysis: filename.ext
         if hasattr(result, "file_path") and result.file_path:
-            title = Path(result.file_path).stem
-            markdown_parts.append(f"# {title}\n")
+            filename = Path(result.file_path).name
+            markdown_parts.append(f"# Video Analysis: {filename}\n")
         else:
             markdown_parts.append("# Video Analysis\n")
         
-        # Add metadata section
+        # Add metadata section (standardized bullet point format)
         if options.include_metadata:
             markdown_parts.append("## Video Information\n")
-            markdown_parts.append("| Property | Value |\n|----------|-------|")
-            markdown_parts.append(f"| Duration | {self._format_duration(result.metadata.duration)} |")
-            markdown_parts.append(f"| Resolution | {result.metadata.width}x{result.metadata.height} |")
-            markdown_parts.append(f"| FPS | {result.metadata.fps} |")
-            markdown_parts.append(f"| Format | {result.metadata.format} |")
-            markdown_parts.append(f"| Video Codec | {result.metadata.codec} |")
-            
+            markdown_parts.append(f"- **Duration**: {self._format_duration(result.metadata.duration)}")
+            markdown_parts.append(f"- **Resolution**: {result.metadata.width}x{result.metadata.height}")
+            markdown_parts.append(f"- **FPS**: {result.metadata.fps}")
+            markdown_parts.append(f"- **Format**: {result.metadata.format}")
+            markdown_parts.append(f"- **Video Codec**: {result.metadata.codec}")
+
             if result.metadata.has_audio:
-                markdown_parts.append(f"| Audio | Yes ({result.metadata.audio_codec}) |")
+                markdown_parts.append(f"- **Audio**: Yes ({result.metadata.audio_codec})")
             else:
-                markdown_parts.append("| Audio | No |")
-                
+                markdown_parts.append("- **Audio**: No")
+
             if result.metadata.creation_time:
-                markdown_parts.append(f"| Creation Time | {result.metadata.creation_time} |")
+                markdown_parts.append(f"- **Creation Time**: {result.metadata.creation_time}")
                 
             markdown_parts.append("\n")
         
@@ -157,22 +207,48 @@ class VideoConverter:
                     markdown_parts.append(f"{text.strip()}\n\n")
         
         # Add transcript section if available
-        if options.include_transcript and result.audio_processing_result and result.audio_processing_result.transcript:
+        if options.include_transcript and result.audio_processing_result:
             markdown_parts.append("## Transcript\n")
 
-            # Handle different transcript formats based on options
-            if options.group_by_speaker and result.audio_processing_result.segments:
-                # Group by speaker using segments
-                markdown_parts.append(self._format_segments_by_speaker(result.audio_processing_result.segments))
-            elif options.group_by_topic and result.audio_processing_result.segments:
-                # Group by topic using segments
-                markdown_parts.append(self._format_segments_by_topic(result.audio_processing_result.segments))
-            elif result.audio_processing_result.segments:
-                # Use regular segments
-                markdown_parts.append(self._format_segments(result.audio_processing_result.segments))
-            else:
-                # Use full transcript
+            # Check if we have segments with proper attributes
+            has_segments = (hasattr(result.audio_processing_result, 'segments') and
+                          result.audio_processing_result.segments and
+                          len(result.audio_processing_result.segments) > 0)
+
+            if has_segments:
+                segments = result.audio_processing_result.segments
+
+                # Check if segments have speaker information
+                has_speakers = any(hasattr(seg, 'speaker') and seg.speaker and seg.speaker.strip() for seg in segments)
+
+                # Check if segments have topic information
+                has_topics = any(hasattr(seg, 'topic_id') and seg.topic_id is not None for seg in segments)
+
+                logger.info("Processing segments for markdown",
+                           segments_count=len(segments),
+                           has_speakers=has_speakers,
+                           has_topics=has_topics,
+                           group_by_speaker=options.group_by_speaker,
+                           group_by_topic=options.group_by_topic)
+
+                # Handle different transcript formats based on options and available data
+                if options.group_by_topic and options.include_topics and has_topics:
+                    # Group by topic using segments
+                    markdown_parts.append(self._format_segments_by_topic(segments, options))
+                elif options.group_by_speaker and options.include_speakers and has_speakers:
+                    # Group by speaker using segments
+                    markdown_parts.append(self._format_segments_by_speaker(segments, options))
+                else:
+                    # Use regular segments with timestamps
+                    logger.info("Using timestamped segments format")
+                    markdown_parts.append(self._format_segments(segments, options))
+            elif result.audio_processing_result.transcript:
+                # Fallback to full transcript
+                logger.warning("No segments available, using full transcript")
                 markdown_parts.append(result.audio_processing_result.transcript)
+            else:
+                logger.warning("No transcript or segments available")
+                markdown_parts.append("*No transcript available*")
 
             markdown_parts.append("\n")
         
@@ -317,21 +393,53 @@ class VideoConverter:
         
         return ""
 
-    def _format_segments(self, segments: List[Any]) -> str:
-        """Format transcript segments."""
+    def _format_segments(self, segments: List[Any], options: Optional[VideoConversionOptions] = None) -> str:
+        """Format transcript segments with new [timecode][speaker] format."""
+        options = options or VideoConversionOptions()
         result = []
 
         for segment in segments:
             # Skip empty segments
-            if not segment.text or not segment.text.strip():
+            if not hasattr(segment, 'text') or not segment.text or not segment.text.strip():
                 continue
-            timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-            result.append(f"{timestamp} {segment.text.strip()}")
+
+            # Build line in [timecode][speaker] format
+            line_content = ""
+
+            # Add timestamp if requested (single start time, not range)
+            if options.include_timestamps:
+                start_time = getattr(segment, 'start', 0)
+                hours, remainder = divmod(int(start_time), 3600)
+                minutes, seconds = divmod(remainder, 60)
+
+                # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                if hours > 0:
+                    timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                else:
+                    timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                line_content += timestamp
+
+            # Add speaker if available and requested (directly concatenated, no space)
+            if options.include_speakers:
+                speaker = getattr(segment, 'speaker', None)
+                if speaker:
+                    line_content += f"[{speaker}]"
+
+            # Add the text (with a space before text content)
+            text_content = segment.text.strip()
+            if text_content:
+                line_content += f" {text_content}"
+
+            # Add to result if not empty
+            if line_content.strip():
+                result.append(line_content)
 
         return "\n".join(result)
 
-    def _format_segments_by_speaker(self, segments: List[Any]) -> str:
+    def _format_segments_by_speaker(self, segments: List[Any], options: Optional[VideoConversionOptions] = None) -> str:
         """Format transcript segments grouped by speaker."""
+        options = options or VideoConversionOptions()
+
         # Group segments by speaker
         speaker_groups = {}
         for segment in segments:
@@ -342,21 +450,49 @@ class VideoConverter:
 
         result = []
         for speaker, speaker_segments in speaker_groups.items():
-            # Calculate speaker timestamp range
+            # Calculate speaker start timestamp (single timestamp in seconds)
             if speaker_segments:
-                start_time = min(seg.start for seg in speaker_segments)
-                end_time = max(seg.end for seg in speaker_segments)
-                speaker_timestamp = f"({self._format_duration(start_time)} - {self._format_duration(end_time)})"
-                result.append(f"### {speaker} {speaker_timestamp}")
+                start_time = min(getattr(seg, 'start', 0) for seg in speaker_segments)
+                speaker_start_seconds = int(start_time)
+                result.append(f"# {speaker} [{speaker_start_seconds}]")
             else:
-                result.append(f"### {speaker}")
+                result.append(f"# {speaker} [0]")
+
+            result.append("")  # Empty line after header
 
             for segment in speaker_segments:
                 # Skip empty segments
-                if not segment.text or not segment.text.strip():
+                if not hasattr(segment, 'text') or not segment.text or not segment.text.strip():
                     continue
-                timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-                result.append(f"{timestamp} {segment.text.strip()}")
+
+                # Build line in [timecode][speaker] format
+                line_content = ""
+
+                # Add timestamp if requested (single start time, not range)
+                if options.include_timestamps:
+                    start_time = getattr(segment, 'start', 0)
+                    hours, remainder = divmod(int(start_time), 3600)
+                    minutes, seconds = divmod(remainder, 60)
+
+                    # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                    if hours > 0:
+                        timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                    else:
+                        timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                    line_content += timestamp
+
+                # Add speaker if requested (directly concatenated, no space)
+                if options.include_speakers:
+                    line_content += f"[{speaker}]"
+
+                # Add the text (with a space before text content)
+                text_content = segment.text.strip()
+                if text_content:
+                    line_content += f" {text_content}"
+
+                # Add to result if not empty
+                if line_content.strip():
+                    result.append(line_content)
 
             result.append("")  # Single empty line between speakers
 
@@ -364,8 +500,10 @@ class VideoConverter:
         filtered_result = [line for line in result if line is not None]
         return "\n".join(filtered_result)
 
-    def _format_segments_by_topic(self, segments: List[Any]) -> str:
+    def _format_segments_by_topic(self, segments: List[Any], options: Optional[VideoConversionOptions] = None) -> str:
         """Format transcript segments grouped by topic."""
+        options = options or VideoConversionOptions()
+
         # Group segments by topic
         topic_groups = {}
         for segment in segments:
@@ -377,21 +515,51 @@ class VideoConverter:
 
         result = []
         for topic, topic_segments in topic_groups.items():
-            # Calculate topic timestamp range
+            # Calculate topic start timestamp (single timestamp in seconds)
             if topic_segments:
-                start_time = min(seg.start for seg in topic_segments)
-                end_time = max(seg.end for seg in topic_segments)
-                topic_timestamp = f"({self._format_duration(start_time)} - {self._format_duration(end_time)})"
-                result.append(f"### {topic} {topic_timestamp}")
+                start_time = min(getattr(seg, 'start', 0) for seg in topic_segments)
+                topic_start_seconds = int(start_time)
+                result.append(f"# {topic} [{topic_start_seconds}]")
             else:
-                result.append(f"### {topic}")
+                result.append(f"# {topic} [0]")
+
+            result.append("")  # Empty line after header
 
             for segment in topic_segments:
                 # Skip empty segments
-                if not segment.text or not segment.text.strip():
+                if not hasattr(segment, 'text') or not segment.text or not segment.text.strip():
                     continue
-                timestamp = f"[{self._format_duration(segment.start)} - {self._format_duration(segment.end)}]"
-                result.append(f"{timestamp} {segment.text.strip()}")
+
+                # Build line in [timecode][speaker] format
+                line_content = ""
+
+                # Add timestamp if requested (single start time, not range)
+                if options.include_timestamps:
+                    start_time = getattr(segment, 'start', 0)
+                    hours, remainder = divmod(int(start_time), 3600)
+                    minutes, seconds = divmod(remainder, 60)
+
+                    # Use MM:SS format for content under 1 hour, HH:MM:SS for longer content
+                    if hours > 0:
+                        timestamp = f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+                    else:
+                        timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                    line_content += timestamp
+
+                # Add speaker if available and requested (directly concatenated, no space)
+                if options.include_speakers:
+                    speaker = getattr(segment, 'speaker', None)
+                    if speaker:
+                        line_content += f"[{speaker}]"
+
+                # Add the text (with a space before text content)
+                text_content = segment.text.strip()
+                if text_content:
+                    line_content += f" {text_content}"
+
+                # Add to result if not empty
+                if line_content.strip():
+                    result.append(line_content)
 
             result.append("")  # Single empty line between topics
 

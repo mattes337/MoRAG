@@ -11,6 +11,7 @@ from morag_core.interfaces.converter import BaseConverter, ConversionOptions, Co
 from morag_core.exceptions import ProcessingError, ValidationError
 
 from .processor import WebProcessor, WebScrapingConfig
+from .web_formatter import WebFormatter
 
 logger = structlog.get_logger(__name__)
 
@@ -50,6 +51,7 @@ class WebConverter(BaseConverter):
         super().__init__()
         self.name = "Enhanced MoRAG Web Converter"
         self.supported_formats = ['web', 'html', 'htm', 'url']
+        self.formatter = WebFormatter()
 
         # Initialize extraction methods
         self.extraction_methods = []
@@ -217,107 +219,30 @@ class WebConverter(BaseConverter):
         )
     
     async def _create_structured_markdown(self, web_result, options: ConversionOptions) -> str:
-        """Create structured markdown from web scraping result."""
-        sections = []
-        
-        # Document header
-        title = web_result.metadata.get('title', 'Web Page')
-        sections.append(f"# {title}")
-        sections.append("")
-        
-        # Metadata section
-        if options.include_metadata:
-            sections.append("## Page Information")
-            sections.append("")
-            
-            metadata_items = [
-                ("**URL**", web_result.metadata.get('url', 'Unknown')),
-                ("**Title**", web_result.metadata.get('title', 'Unknown')),
-                ("**Author**", web_result.metadata.get('author', 'Unknown')),
-                ("**Published**", web_result.metadata.get('published_date', 'Unknown')),
-                ("**Language**", web_result.metadata.get('language', 'Unknown')),
-                ("**Extraction Method**", web_result.metadata.get('extraction_method', 'MoRAG Web Scraper'))
-            ]
-            
-            for label, value in metadata_items:
-                if value and value != 'Unknown':
-                    sections.append(f"{label}: {value}")
-            
-            sections.append("")
-        
-        # Table of contents (if requested)
-        if options.include_toc:
-            sections.append("## Table of Contents")
-            sections.append("")
-            sections.append("- [Main Content](#main-content)")
-            
-            if hasattr(web_result, 'links') and web_result.links:
-                sections.append("- [Links](#links)")
-            
-            if hasattr(web_result, 'images') and web_result.images:
-                sections.append("- [Images](#images)")
-            
-            sections.append("- [Page Information](#page-information)")
-            sections.append("")
-        
-        # Main content
-        sections.append("## Main Content")
-        sections.append("")
-        
-        if hasattr(web_result, 'content') and web_result.content:
-            sections.append(web_result.content)
-        else:
-            sections.append("*No content extracted*")
-        
-        sections.append("")
-        
-        # Links section
-        if hasattr(web_result, 'links') and web_result.links and options.format_options.get('include_links', True):
-            sections.append("## Links")
-            sections.append("")
-            
-            for link in web_result.links[:20]:  # Limit to first 20 links
-                link_text = link.get('text', 'Link')
-                link_url = link.get('url', '#')
-                sections.append(f"- [{link_text}]({link_url})")
-            
-            if len(web_result.links) > 20:
-                sections.append(f"- *... and {len(web_result.links) - 20} more links*")
-            
-            sections.append("")
-        
-        # Images section
-        if hasattr(web_result, 'images') and web_result.images and options.extract_images:
-            sections.append("## Images")
-            sections.append("")
-            
-            for i, image in enumerate(web_result.images[:10], 1):  # Limit to first 10 images
-                alt_text = image.get('alt', f'Image {i}')
-                image_url = image.get('src', '#')
-                sections.append(f"### Image {i}")
-                sections.append(f"![{alt_text}]({image_url})")
-                
-                if image.get('caption'):
-                    sections.append(f"**Caption**: {image['caption']}")
-                
-                sections.append("")
-            
-            if len(web_result.images) > 10:
-                sections.append(f"*... and {len(web_result.images) - 10} more images*")
-                sections.append("")
-        
-        # Processing details
-        sections.append("## Processing Details")
-        sections.append("")
-        sections.append(f"**Extraction Method**: {web_result.metadata.get('extraction_method', 'MoRAG Web Scraper')}")
-        
-        if 'word_count' in web_result.metadata:
-            sections.append(f"**Word Count**: {web_result.metadata['word_count']}")
-        
-        if 'extraction_time' in web_result.metadata:
-            sections.append(f"**Extraction Time**: {web_result.metadata['extraction_time']:.2f} seconds")
-        
-        return "\n".join(sections)
+        """Create structured markdown from web scraping result using formatter."""
+        # Clean the raw content
+        raw_content = web_result.content if hasattr(web_result, 'content') else ''
+        cleaned_content = self.formatter.clean_web_content(raw_content)
+
+        # Extract additional metadata from content
+        url = web_result.metadata.get('url', '')
+        content_metadata = self.formatter.extract_web_metadata(url, cleaned_content)
+
+        # Merge metadata
+        combined_metadata = {**web_result.metadata, **content_metadata}
+
+        # Add links to metadata if available
+        if hasattr(web_result, 'links') and web_result.links:
+            combined_metadata['links'] = web_result.links
+
+        # Format content according to LLM documentation specifications
+        formatted_content = self.formatter.format_web_content(
+            cleaned_content,
+            url,
+            combined_metadata
+        )
+
+        return formatted_content
     
     def _enhance_metadata(self, original_metadata: dict, file_path: Union[str, Path]) -> dict:
         """Enhance metadata with additional information."""

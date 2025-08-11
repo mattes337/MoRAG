@@ -13,7 +13,9 @@ logger = structlog.get_logger(__name__)
 
 # Try to import graph components, but handle gracefully if not available
 try:
-    from morag_graph import HybridRetrievalCoordinator, ContextExpansionEngine, QueryEntityExtractor
+    # Import components directly to avoid circular import issues
+    from morag_graph.retrieval import HybridRetrievalCoordinator, ContextExpansionEngine
+    from morag_graph.query import QueryEntityExtractor
     from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
     from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
     GRAPH_AVAILABLE = True
@@ -36,7 +38,7 @@ except ImportError as e:
 try:
     from morag_reasoning import (
         LLMClient, LLMConfig, PathSelectionAgent, ReasoningPathFinder,
-        IterativeRetriever, RetrievalContext
+        IterativeRetriever, RetrievalContext, RecursiveFactRetrievalService
     )
     REASONING_AVAILABLE = True
 except ImportError as e:
@@ -49,6 +51,7 @@ except ImportError as e:
     ReasoningPathFinder = None
     IterativeRetriever = None
     RetrievalContext = None
+    RecursiveFactRetrievalService = None
 
 logger = structlog.get_logger(__name__)
 
@@ -365,6 +368,61 @@ def get_llm_client() -> Optional[LLMClient]:
         return None
 
 
+async def get_recursive_fact_retrieval_service() -> Optional[RecursiveFactRetrievalService]:
+    """Get recursive fact retrieval service instance."""
+    if not REASONING_AVAILABLE:
+        return None
+
+    try:
+        # Get LLM client
+        llm_client = get_llm_client()
+        if not llm_client:
+            return None
+
+        # Get storage instances
+        neo4j_storage = await get_connected_default_neo4j_storage()
+        qdrant_storage = await get_connected_default_qdrant_storage()
+
+        if not neo4j_storage or not qdrant_storage:
+            logger.warning("Storage instances not available for recursive fact retrieval")
+            return None
+
+        # Create stronger LLM client for final synthesis (could use a different model)
+        stronger_llm_config = LLMConfig(
+            provider=os.getenv("MORAG_LLM_PROVIDER", "gemini"),
+            model=os.getenv("MORAG_GEMINI_MODEL_STRONG", os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash")),
+            api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=float(os.getenv("MORAG_LLM_TEMPERATURE", "0.1")),
+            max_tokens=int(os.getenv("MORAG_LLM_MAX_TOKENS", "4000")),
+            max_retries=int(os.getenv("MORAG_LLM_MAX_RETRIES", "5")),
+        )
+        stronger_llm_client = LLMClient(stronger_llm_config)
+
+        # Initialize embedding service for enhanced retrieval
+        embedding_service = None
+        try:
+            from morag_services.embedding import GeminiEmbeddingService
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                embedding_service = GeminiEmbeddingService(api_key=api_key)
+                logger.info("Embedding service initialized for enhanced retrieval")
+            else:
+                logger.warning("GEMINI_API_KEY not found - enhanced retrieval disabled")
+        except Exception as e:
+            logger.warning("Failed to initialize embedding service", error=str(e))
+
+        return RecursiveFactRetrievalService(
+            llm_client=llm_client,
+            neo4j_storage=neo4j_storage,
+            qdrant_storage=qdrant_storage,
+            embedding_service=embedding_service,
+            stronger_llm_client=stronger_llm_client
+        )
+    except Exception as e:
+        logger.warning("Recursive fact retrieval service not available", error=str(e))
+        return None
+
+
 @lru_cache()
 def get_path_selection_agent() -> Optional[PathSelectionAgent]:
     """Get path selection agent instance."""
@@ -461,7 +519,7 @@ def create_dynamic_graph_engine(database_servers: Optional[List[Dict[str, Any]]]
                     self.available = True
                     # Initialize components with custom storage
                     try:
-                        from morag_graph import GraphCRUD, GraphTraversal, GraphAnalytics
+                        from morag_graph.operations import GraphCRUD, GraphTraversal, GraphAnalytics
                         self.crud = GraphCRUD(storage)
                         self.traversal = GraphTraversal(storage)
                         self.analytics = GraphAnalytics(storage)

@@ -47,11 +47,11 @@ env_path = project_root / '.env'
 load_dotenv(env_path)
 
 try:
-    from morag_image import ImageProcessor
+    from morag_image import ImageProcessor, ImageService
     from morag_image.processor import ImageConfig
     from morag_core.interfaces.processor import ProcessingConfig
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-image")
@@ -65,7 +65,7 @@ try:
     )
     from graph_extraction import extract_and_ingest
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure the common schema and graph extraction modules are available.")
     sys.exit(1)
 
@@ -87,7 +87,7 @@ def print_section(title: str):
 def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
-    print(f"{spaces}📋 {key}: {value}")
+    print(f"{spaces}[INFO] {key}: {value}")
 
 
 async def test_image_processing(
@@ -98,7 +98,7 @@ async def test_image_processing(
     print_header("MoRAG Image Processing Test")
     
     if not image_file.exists():
-        print(f"❌ Error: Image file not found: {image_file}")
+        print(f"[FAIL] Error: Image file not found: {image_file}")
         return False
     
     print_result("Input File", str(image_file))
@@ -108,46 +108,65 @@ async def test_image_processing(
     start_time = time.time()
     
     try:
-        # Initialize image processor (no API key for basic functionality)
-        processor = ImageProcessor()
-        print_result("Image Processor", "✅ Initialized successfully")
-
-        # Create image configuration (disable OCR since tesseract is not installed)
-        image_config = ImageConfig(
-            generate_caption=False,  # Requires API key
-            extract_text=False,  # Requires tesseract
-            extract_metadata=True,
-            resize_max_dimension=1024
-        )
-        print_result("Image Config", "✅ Created successfully")
+        # Use ImageService for proper markdown output
+        api_key = os.getenv('GOOGLE_API_KEY')  # Get API key from environment
+        service = ImageService(api_key=api_key, output_dir=image_file.parent)
+        await service.initialize()
+        print_result("Image Service", "[OK] Initialized successfully")
+        print_result("API Key Available", "[OK] Yes" if api_key else "[INFO] No (limited functionality)")
 
         print_section("Processing Image File")
-        print("🔄 Starting image processing...")
+        print("[PROCESSING] Starting image processing...")
+        print("   This may take a while for large images...")
 
-        # Process the image file
-        result = await processor.process_image(image_file, image_config)
+        # Process the image file using ImageService
+        service_result = await service.process_file(
+            file_path=image_file,
+            save_output=True,
+            output_format="markdown"
+        )
 
-        if not result or not hasattr(result, 'processing_time'):
-            print("❌ Image processing failed!")
+        if not service_result.get('success', False):
+            print("[FAIL] Image processing failed!")
+            print_result("Error", service_result.get('error', 'Unknown error'))
             return False
 
-        print("✅ Image processing completed successfully!")
+        print("[OK] Image processing completed successfully!")
         processing_time = time.time() - start_time
 
+        # Extract result data from service result
+        result_data = service_result.get('result', {})
+
         print_section("Processing Results")
-        print_result("Status", "✅ Success")
-        print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+        print_result("Status", "[OK] Success")
+        print_result("Processing Time", f"{service_result.get('processing_time', 0):.2f} seconds")
+
+        # Check for image processing results
+        if result_data:
+            caption = result_data.get('caption', '')
+            extracted_text = result_data.get('extracted_text', '')
+            metadata = result_data.get('metadata', {})
+            confidence_scores = result_data.get('confidence_scores', {})
+
+            print_result("Caption Available", "[OK] Yes" if caption else "[INFO] No")
+            print_result("Text Extracted", "[OK] Yes" if extracted_text else "[INFO] No")
+            print_result("Metadata Extracted", "[OK] Yes" if metadata else "[INFO] No")
+
+            if metadata:
+                print_result("Image Dimensions", f"{metadata.get('width', 'N/A')}x{metadata.get('height', 'N/A')} pixels")
+                print_result("Image Format", metadata.get('format', 'N/A'))
 
         # Prepare text content for graph extraction
         text_content = ""
-        if result.caption:
-            text_content += f"Image Caption: {result.caption}\n"
-        if result.extracted_text:
-            text_content += f"Extracted Text: {result.extracted_text}\n"
-        
+        if result_data.get('caption'):
+            text_content += f"Image Caption: {result_data['caption']}\n"
+        if result_data.get('extracted_text'):
+            text_content += f"Extracted Text: {result_data['extracted_text']}\n"
+
         # Add metadata as text
-        metadata = result.metadata
-        text_content += f"Image Dimensions: {metadata.width}x{metadata.height} pixels\n"
+        metadata = result_data.get('metadata', {})
+        if metadata:
+            text_content += f"Image Dimensions: {metadata.get('width', 'N/A')}x{metadata.get('height', 'N/A')} pixels\n"
         text_content += f"Image Format: {metadata.format}\n"
         if metadata.camera_make:
             text_content += f"Camera: {metadata.camera_make}"
@@ -159,7 +178,7 @@ async def test_image_processing(
 
         # Extract entities and relations
         print_section("Graph Extraction")
-        print("🔄 Extracting entities and relations...")
+        print("[PROCESSING] Extracting entities and relations...")
         
         entities, relations = [], []
         if text_content.strip():
@@ -174,7 +193,7 @@ async def test_image_processing(
                 print_result("Entities Extracted", f"{len(entities)}")
                 print_result("Relations Extracted", f"{len(relations)}")
             except Exception as e:
-                print(f"⚠️ Warning: Graph extraction failed: {e}")
+                print(f"[WARN] Warning: Graph extraction failed: {e}")
         else:
             print_result("Text Content", "No text content available for extraction")
 
@@ -281,7 +300,7 @@ async def test_image_processing(
         print_result("Format", metadata.format)
         print_result("Mode", metadata.mode)
         print_result("File Size", f"{metadata.file_size / 1024:.2f} KB")
-        print_result("Has EXIF", "✅ Yes" if metadata.has_exif else "❌ No")
+        print_result("Has EXIF", "[OK] Yes" if metadata.has_exif else "[FAIL] No")
 
         if metadata.camera_make:
             print_result("Camera Make", metadata.camera_make)
@@ -311,7 +330,7 @@ async def test_image_processing(
         return True
 
     except Exception as e:
-        print(f"❌ Error during image processing: {e}")
+        print(f"[FAIL] Error during image processing: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -330,7 +349,7 @@ async def test_image_ingestion(
     print_header("MoRAG Image Ingestion Test")
 
     if not image_file.exists():
-        print(f"❌ Error: Image file not found: {image_file}")
+        print(f"[FAIL] Error: Image file not found: {image_file}")
         return False
 
     print_result("Input File", str(image_file))
@@ -338,13 +357,13 @@ async def test_image_ingestion(
     print_result("File Extension", image_file.suffix.lower())
     print_result("Webhook URL", webhook_url or "Not provided")
     print_result("Custom Metadata", json.dumps(metadata, indent=2) if metadata else "None")
-    print_result("Qdrant Storage", "✅ Enabled" if use_qdrant else "❌ Disabled")
-    print_result("Neo4j Storage", "✅ Enabled" if use_neo4j else "❌ Disabled")
+    print_result("Qdrant Storage", "[OK] Enabled" if use_qdrant else "[FAIL] Disabled")
+    print_result("Neo4j Storage", "[OK] Enabled" if use_neo4j else "[FAIL] Disabled")
 
     start_time = time.time()
 
     try:
-        print("🔄 Starting image processing and ingestion...")
+        print("[PROCESSING] Starting image processing and ingestion...")
 
         # Initialize image processor
         processor = ImageProcessor()
@@ -361,10 +380,10 @@ async def test_image_ingestion(
         result = await processor.process_image(image_file, image_config)
 
         if not result or not hasattr(result, 'processing_time'):
-            print("❌ Image processing failed!")
+            print("[FAIL] Image processing failed!")
             return False
 
-        print("✅ Image processing completed successfully!")
+        print("[OK] Image processing completed successfully!")
         processing_time = time.time() - start_time
         print_result("Processing Time", f"{result.processing_time:.2f} seconds")
 
@@ -389,7 +408,7 @@ async def test_image_ingestion(
 
         # Extract entities and relations
         print_section("Graph Extraction")
-        print("🔄 Extracting entities and relations...")
+        print("[PROCESSING] Extracting entities and relations...")
         
         entities, relations = [], []
         if text_content.strip():
@@ -404,7 +423,7 @@ async def test_image_ingestion(
                 print_result("Entities Extracted", f"{len(entities)}")
                 print_result("Relations Extracted", f"{len(relations)}")
             except Exception as e:
-                print(f"⚠️ Warning: Graph extraction failed: {e}")
+                print(f"[WARN] Warning: Graph extraction failed: {e}")
         else:
             print_result("Text Content", "No text content available for extraction")
 
@@ -476,7 +495,7 @@ async def test_image_ingestion(
         ingestion_results = {'qdrant': None, 'neo4j': None}
         
         if (use_qdrant or use_neo4j) and text_content.strip():
-            print("🔄 Starting database ingestion...")
+            print("[PROCESSING] Starting database ingestion...")
             
             # Prepare metadata for ingestion
             ingestion_metadata = {
@@ -532,29 +551,29 @@ async def test_image_ingestion(
                 
                 if use_qdrant and ingestion_results.get('qdrant'):
                     if ingestion_results['qdrant'].get('success'):
-                        print_result("Qdrant Ingestion", "✅ Success")
+                        print_result("Qdrant Ingestion", "[OK] Success")
                         print_result("Qdrant Chunks", str(ingestion_results['qdrant'].get('chunks_count', 0)))
                     else:
-                        print_result("Qdrant Ingestion", f"❌ Failed: {ingestion_results['qdrant'].get('error', 'Unknown error')}")
+                        print_result("Qdrant Ingestion", f"[FAIL] Failed: {ingestion_results['qdrant'].get('error', 'Unknown error')}")
                 
                 if use_neo4j and ingestion_results.get('neo4j'):
                     if ingestion_results['neo4j'].get('success'):
-                        print_result("Neo4j Ingestion", "✅ Success")
+                        print_result("Neo4j Ingestion", "[OK] Success")
                         print_result("Neo4j Entities", str(ingestion_results['neo4j'].get('entities_stored', 0)))
                         print_result("Neo4j Relations", str(ingestion_results['neo4j'].get('relations_stored', 0)))
                     else:
-                        print_result("Neo4j Ingestion", f"❌ Failed: {ingestion_results['neo4j'].get('error', 'Unknown error')}")
+                        print_result("Neo4j Ingestion", f"[FAIL] Failed: {ingestion_results['neo4j'].get('error', 'Unknown error')}")
                         
             except Exception as e:
-                print(f"⚠️ Warning: Database ingestion failed: {e}")
+                print(f"[WARN] Warning: Database ingestion failed: {e}")
                 ingestion_results = {'error': str(e)}
         elif not text_content.strip():
             print_result("Database Ingestion", "Skipped - no text content available")
         
-        print("✅ Image ingestion completed successfully!")
+        print("[OK] Image ingestion completed successfully!")
 
         print_section("Ingestion Results")
-        print_result("Status", "✅ Success")
+        print_result("Status", "[OK] Success")
         print_result("Total Processing Time", f"{processing_time:.2f} seconds")
         print_result("Text Content Length", str(len(text_content)))
         print_result("Entities Extracted", str(len(entities)))
@@ -594,7 +613,7 @@ async def test_image_ingestion(
         return True
 
     except Exception as e:
-        print(f"❌ Error during image ingestion: {e}")
+        print(f"[FAIL] Error during image ingestion: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -650,7 +669,7 @@ Examples:
         try:
             metadata = json.loads(args.metadata)
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in metadata: {e}")
+            print(f"[FAIL] Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
 
     # Handle resume arguments
@@ -674,11 +693,11 @@ Examples:
                 neo4j_database_name=args.neo4j_database
             ))
             if success:
-                print("\n🎉 Image ingestion test completed successfully!")
+                print("\n[SUCCESS] Image ingestion test completed successfully!")
                 print("💡 Check the output files for detailed results and debugging information.")
                 sys.exit(0)
             else:
-                print("\n💥 Image ingestion test failed!")
+                print("\n[ERROR] Image ingestion test failed!")
                 sys.exit(1)
         else:
             # Processing mode
@@ -687,17 +706,17 @@ Examples:
                 custom_metadata=metadata
             ))
             if success:
-                print("\n🎉 Image processing test completed successfully!")
+                print("\n[SUCCESS] Image processing test completed successfully!")
                 print("💡 Check the output files for detailed results and debugging information.")
                 sys.exit(0)
             else:
-                print("\n💥 Image processing test failed!")
+                print("\n[ERROR] Image processing test failed!")
                 sys.exit(1)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
+        print(f"\n[FAIL] Fatal error: {e}")
         sys.exit(1)
 
 

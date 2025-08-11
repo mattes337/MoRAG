@@ -47,12 +47,14 @@ env_path = project_root / '.env'
 load_dotenv(env_path)
 
 try:
-    from morag_document import DocumentProcessor
+    from morag_document import DocumentProcessor, DocumentService
     from morag_core.interfaces.processor import ProcessingConfig
-    from morag_services import QdrantVectorStorage, GeminiEmbeddingService
+    from morag_core.interfaces.service import ServiceConfig
+    from morag_services import QdrantVectorStorage
+    from morag_embedding import GeminiEmbeddingService
     from morag_core.models import Document, DocumentChunk
 except ImportError as e:
-    print(f"❌ Import error: {e}")
+    print(f"[FAIL] Import error: {e}")
     print("Make sure you have installed the MoRAG packages:")
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-document")
@@ -78,7 +80,7 @@ def print_result(key: str, value: str, indent: int = 0):
     """Print a formatted key-value result."""
     spaces = "  " * indent
     try:
-        print(f"{spaces}📋 {key}: {value}")
+        print(f"{spaces}[INFO] {key}: {value}")
     except UnicodeEncodeError:
         # Fallback for terminals that don't support Unicode
         print(f"{spaces}[INFO] {key}: {value}")
@@ -90,7 +92,7 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
     print_header("MoRAG Document Processing Test")
 
     if not document_file.exists():
-        print(f"❌ Error: Document file not found: {document_file}")
+        print(f"[FAIL] Error: Document file not found: {document_file}")
         return False
 
     print_result("Input File", str(document_file))
@@ -98,116 +100,146 @@ async def test_document_processing(document_file: Path, chunking_strategy: str =
     print_result("File Extension", document_file.suffix.lower())
 
     try:
-        # Initialize document processor (no config needed)
-        processor = DocumentProcessor()
-        print_result("Document Processor", "✅ Initialized successfully")
+        # Use DocumentService for proper markdown output
+        config = ServiceConfig()
+        service = DocumentService(config=config, output_dir=document_file.parent)
+        await service.initialize()
+        print_result("Document Service", "[OK] Initialized successfully")
         print_result("Chunking Strategy", chunking_strategy)
         print_result("Chunk Size", f"{chunk_size} characters")
         print_result("Chunk Overlap", f"{chunk_overlap} characters")
 
         print_section("Processing Document File")
-        print("🔄 Starting document processing...")
+        print("[PROCESSING] Starting document processing...")
+        print("   This may take a while for large documents...")
 
-        # Process the document file with options
-        result = await processor.process_file(
-            document_file,
-            extract_metadata=True,
-            chunking_strategy=chunking_strategy,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+        # Process the document file using DocumentService
+        service_result = await service.process_file(
+            file_path=document_file,
+            save_output=True,
+            output_format="markdown"
         )
 
-        if result.success:
+        if service_result.get('success', False):
             try:
-                print("✅ Document processing completed successfully!")
+                print("[OK] Document processing completed successfully!")
             except UnicodeEncodeError:
                 print("[SUCCESS] Document processing completed successfully!")
 
+            # Extract result data from service result
+            result_data = service_result.get('result', {})
+
             print_section("Processing Results")
             try:
-                print_result("Status", "✅ Success")
+                print_result("Status", "[OK] Success")
             except UnicodeEncodeError:
                 print_result("Status", "[SUCCESS]")
-            print_result("Processing Time", f"{result.processing_time:.2f} seconds")
+            print_result("Processing Time", f"{service_result.get('processing_time', 0):.2f} seconds")
 
-            if result.metadata:
+            # Check for document processing results
+            if result_data:
+                content = result_data.get('content', '')
+                chunks = result_data.get('chunks', [])
+                print_result("Content Length", f"{len(content)} characters")
+                print_result("Chunks Count", f"{len(chunks)}")
+
+            metadata = result_data.get('metadata', {})
+            if metadata:
                 print_section("Metadata")
-                for key, value in result.metadata.items():
+                for key, value in metadata.items():
                     if isinstance(value, (dict, list)):
                         print_result(key, json.dumps(value, indent=2))
                     else:
                         print_result(key, str(value))
 
-            if result.document:
-                print_section("Document Information")
-                doc = result.document
-                print_result("Title", doc.metadata.title or "N/A")
-                print_result("Author", doc.metadata.author or "N/A")
-                print_result("Page Count", str(doc.metadata.page_count or "N/A"))
-                print_result("Word Count", str(doc.metadata.word_count or "N/A"))
-                print_result("Chunks Count", str(len(doc.chunks)))
+            content = result_data.get('content', '')
+            chunks = result_data.get('chunks', [])
 
-                if doc.raw_text:
+            if content or chunks:
+                print_section("Document Information")
+                print_result("Content Available", "[OK] Yes" if content else "[INFO] No")
+                print_result("Chunks Available", "[OK] Yes" if chunks else "[INFO] No")
+
+                if content:
                     print_section("Content Preview")
-                    content_preview = doc.raw_text[:500] + "..." if len(doc.raw_text) > 500 else doc.raw_text
-                    print(f"📄 Raw Text ({len(doc.raw_text)} characters):")
+                    content_preview = content[:500] + "..." if len(content) > 500 else content
+                    print(f"📄 Content ({len(content)} characters):")
                     print(content_preview)
 
-                if doc.chunks:
+                if chunks:
                     print_section("Chunks Preview (first 3)")
-                    for i, chunk in enumerate(doc.chunks[:3]):
-                        print(f"  Chunk {i+1}:")
-                        print(f"    Content: {chunk.content[:100]}{'...' if len(chunk.content) > 100 else ''}")
-                        if chunk.page_number:
-                            print(f"    Page: {chunk.page_number}")
-                        if chunk.metadata:
-                            print(f"    Metadata: {chunk.metadata}")
+                    for i, chunk in enumerate(chunks[:3]):
+                        # Handle both dict and object chunks
+                        if hasattr(chunk, 'content'):
+                            chunk_content = chunk.content
+                            chunk_index = getattr(chunk, 'chunk_index', None)
+                            chunk_metadata = getattr(chunk, 'metadata', None)
+                        else:
+                            chunk_content = chunk.get('content', '')
+                            chunk_index = chunk.get('chunk_index')
+                            chunk_metadata = chunk.get('metadata')
 
-            # Save results to file
+                        print(f"  Chunk {i+1}:")
+                        print(f"    Content: {chunk_content[:100]}{'...' if len(chunk_content) > 100 else ''}")
+                        if chunk_index is not None:
+                            print(f"    Index: {chunk_index}")
+                        if chunk_metadata:
+                            print(f"    Metadata: {chunk_metadata}")
+
+            # Convert chunks to serializable format
+            serializable_chunks = []
+            for chunk in chunks:
+                if hasattr(chunk, 'content'):
+                    # DocumentChunk object
+                    chunk_dict = {
+                        'content': chunk.content,
+                        'chunk_index': getattr(chunk, 'chunk_index', None),
+                        'metadata': getattr(chunk, 'metadata', {}),
+                        'start_char': getattr(chunk, 'start_char', None),
+                        'end_char': getattr(chunk, 'end_char', None)
+                    }
+                else:
+                    # Already a dict
+                    chunk_dict = chunk
+                serializable_chunks.append(chunk_dict)
+
+            # Save comprehensive results to JSON file
             output_file = document_file.parent / f"{document_file.stem}_test_result.json"
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     'mode': 'processing',
-                    'success': result.success,
-                    'processing_time': result.processing_time,
+                    'success': service_result.get('success', False),
+                    'processing_time': service_result.get('processing_time', 0),
                     'chunking_strategy': chunking_strategy,
                     'chunk_size': chunk_size,
                     'chunk_overlap': chunk_overlap,
-                    'metadata': result.metadata,
-                    'document': {
-                        'title': result.document.metadata.title if result.document else None,
-                        'author': result.document.metadata.author if result.document else None,
-                        'page_count': result.document.metadata.page_count if result.document else None,
-                        'word_count': result.document.metadata.word_count if result.document else None,
-                        'raw_text': result.document.raw_text if result.document else None,
-                        'chunks_count': len(result.document.chunks) if result.document else 0,
-                        'chunks': [
-                            {
-                                'content': chunk.content,
-                                'page_number': chunk.page_number,
-                                'metadata': chunk.metadata
-                            } for chunk in result.document.chunks
-                        ] if result.document else []
-                    },
-                    'error_message': result.error_message
+                    'content': result_data.get('content', ''),
+                    'chunks': serializable_chunks,
+                    'metadata': result_data.get('metadata', {}),
+                    'output_files': service_result.get('output_files', {})
                 }, f, indent=2, ensure_ascii=False)
 
-            print_section("Output")
-            print_result("Results saved to", str(output_file))
+            print_section("Output Files")
+            print_result("JSON Results", str(output_file))
+
+            # Show all output files created by DocumentService
+            output_files = service_result.get('output_files', {})
+            for file_type, file_path in output_files.items():
+                print_result(f"{file_type.title()} File", str(file_path))
 
             return True
 
         else:
             try:
-                print("❌ Document processing failed!")
+                print("[FAIL] Document processing failed!")
             except UnicodeEncodeError:
                 print("[ERROR] Document processing failed!")
-            print_result("Error", result.error_message or "Unknown error")
+            print_result("Error", service_result.get('error', 'Unknown error'))
             return False
 
     except Exception as e:
         try:
-            print(f"❌ Error during document processing: {e}")
+            print(f"[FAIL] Error during document processing: {e}")
         except UnicodeEncodeError:
             print(f"[ERROR] Error during document processing: {e}")
         import traceback
@@ -222,7 +254,7 @@ async def store_content_in_vector_db(
 ) -> list:
     """Store processed content in vector database."""
     if not content.strip():
-        print("⚠️  Warning: Empty content provided for vector storage")
+        print("[WARN]  Warning: Empty content provided for vector storage")
         return []
 
     try:
@@ -293,12 +325,12 @@ async def store_content_in_vector_db(
             collection_name
         )
 
-        print_result("Vector Storage", f"✅ Stored {len(chunks)} chunks with {len(point_ids)} vectors")
+        print_result("Vector Storage", f"[OK] Stored {len(chunks)} chunks with {len(point_ids)} vectors")
 
         return point_ids
 
     except Exception as e:
-        print(f"❌ Error storing content in vector database: {e}")
+        print(f"[FAIL] Error storing content in vector database: {e}")
         raise
 
 
@@ -313,7 +345,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
     print_header("MoRAG Document Ingestion Test")
 
     if not document_file.exists():
-        print(f"❌ Error: Document file not found: {document_file}")
+        print(f"[FAIL] Error: Document file not found: {document_file}")
         return False
 
     print_result("Input File", str(document_file))
@@ -324,15 +356,15 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
     print_result("Chunking Strategy", chunking_strategy)
     print_result("Chunk Size", f"{chunk_size} characters")
     print_result("Chunk Overlap", f"{chunk_overlap} characters")
-    print_result("Use Qdrant", "✅ Yes" if use_qdrant else "❌ No")
-    print_result("Use Neo4j", "✅ Yes" if use_neo4j else "❌ No")
+    print_result("Use Qdrant", "[OK] Yes" if use_qdrant else "[FAIL] No")
+    print_result("Use Neo4j", "[OK] Yes" if use_neo4j else "[FAIL] No")
 
     try:
         from morag.ingestion_coordinator import IngestionCoordinator, DatabaseConfig, DatabaseType
         import uuid
 
         print_section("Processing Document")
-        print("🔄 Starting document processing...")
+        print("[PROCESSING] Starting document processing...")
 
         # Initialize document processor
         processor = DocumentProcessor()
@@ -347,11 +379,11 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         )
 
         if not result.success:
-            print("❌ Document processing failed!")
+            print("[FAIL] Document processing failed!")
             print_result("Error", result.error_message or "Unknown error")
             return False
 
-        print("✅ Document processing completed successfully!")
+        print("[OK] Document processing completed successfully!")
         print_result("Processing Time", f"{result.processing_time:.2f} seconds")
 
         print_section("Ingesting to Databases")
@@ -412,34 +444,39 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
             replace_existing=False
         )
 
-        print("✅ Document ingestion completed successfully!")
+        print("[OK] Document ingestion completed successfully!")
 
         print_section("Ingestion Results")
-        print_result("Status", "✅ Success")
+        print_result("Status", "[OK] Success")
         print_result("Ingestion ID", ingestion_result['ingestion_id'])
         print_result("Document ID", ingestion_result['source_info']['document_id'])
         print_result("Content Length", f"{ingestion_result['processing_result']['content_length']} characters")
         print_result("Processing Time", f"{ingestion_result['processing_time']:.2f} seconds")
         print_result("Chunks Created", str(ingestion_result['embeddings_data']['chunk_count']))
-        print_result("Entities Extracted", str(ingestion_result['graph_data']['entities_count']))
-        print_result("Relations Extracted", str(ingestion_result['graph_data']['relations_count']))
+        print_result("Facts Extracted", str(ingestion_result['graph_data']['facts_count']))
+        print_result("Relationships Extracted", str(ingestion_result['graph_data']['relationships_count']))
 
         # Show database results
         if 'database_results' in ingestion_result:
             for db_type, db_result in ingestion_result['database_results'].items():
                 if db_result.get('success'):
-                    print_result(f"{db_type.title()} Storage", "✅ Success")
+                    print_result(f"{db_type.title()} Storage", "[OK] Success")
                     if db_type == 'qdrant' and 'points_stored' in db_result:
                         print_result(f"  Points Stored", str(db_result['points_stored']))
                     elif db_type == 'neo4j':
                         if 'chunks_stored' in db_result:
                             print_result(f"  Chunks Stored", str(db_result['chunks_stored']))
+                        if 'facts_processed' in db_result:
+                            print_result(f"  Facts Processed", str(db_result['facts_processed']))
+                        if 'relationships_processed' in db_result:
+                            print_result(f"  Relationships Processed", str(db_result['relationships_processed']))
+                        # Legacy support for old entity/relation fields
                         if 'entities_stored' in db_result:
                             print_result(f"  Entities Stored", str(db_result['entities_stored']))
                         if 'relations_stored' in db_result:
                             print_result(f"  Relations Stored", str(db_result['relations_stored']))
                 else:
-                    print_result(f"{db_type.title()} Storage", f"❌ Failed: {db_result.get('error', 'Unknown error')}")
+                    print_result(f"{db_type.title()} Storage", f"[FAIL] Failed: {db_result.get('error', 'Unknown error')}")
 
         print_section("Output Files")
         # The ingestion coordinator automatically creates the files
@@ -454,7 +491,7 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
         return True
 
     except Exception as e:
-        print(f"❌ Error during document ingestion: {e}")
+        print(f"[FAIL] Error during document ingestion: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -520,7 +557,7 @@ Examples:
         try:
             metadata = json.loads(args.metadata)
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Invalid JSON in metadata: {e}")
+            print(f"[FAIL] Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
 
     # Handle resume arguments
@@ -543,11 +580,11 @@ Examples:
                 neo4j_database_name=args.neo4j_database
             ))
             if success:
-                print("\n🎉 Document ingestion test completed successfully!")
+                print("\n[SUCCESS] Document ingestion test completed successfully!")
                 print("💡 Check the .ingest_result.json and .ingest_data.json files for details.")
                 sys.exit(0)
             else:
-                print("\n💥 Document ingestion test failed!")
+                print("\n[ERROR] Document ingestion test failed!")
                 sys.exit(1)
         else:
             # Processing mode
@@ -558,17 +595,17 @@ Examples:
                 chunk_overlap=args.chunk_overlap
             ))
             if success:
-                print("\n🎉 Document processing test completed successfully!")
+                print("\n[SUCCESS] Document processing test completed successfully!")
                 sys.exit(0)
             else:
-                print("\n💥 Document processing test failed!")
+                print("\n[ERROR] Document processing test failed!")
                 sys.exit(1)
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n[STOP]  Test interrupted by user")
         sys.exit(1)
     except Exception as e:
         try:
-            print(f"\n❌ Fatal error: {e}")
+            print(f"\n[FAIL] Fatal error: {e}")
         except UnicodeEncodeError:
             print(f"\n[FATAL ERROR]: {e}")
         sys.exit(1)

@@ -27,6 +27,12 @@ class ProcessingError(MoRAGException):
     def __init__(self, message: str):
         super().__init__(message, status_code=422, error_type="processing_error")
 
+class ConversionError(MoRAGException):
+    """Raised when document conversion fails."""
+
+    def __init__(self, message: str):
+        super().__init__(message, status_code=422, error_type="conversion_error")
+
 class UnsupportedFormatError(MoRAGException):
     """Raised when an unsupported file format is encountered."""
 
