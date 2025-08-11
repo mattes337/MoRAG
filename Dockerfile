@@ -53,9 +53,9 @@ COPY packages/ ./packages/
 # Install MoRAG packages in dependency order (non-editable for Docker)
 RUN pip install /build/packages/morag-core && \
     pip install /build/packages/morag-embedding && \
+    pip install /build/packages/morag-document && \
     pip install /build/packages/morag-audio && \
     pip install /build/packages/morag-video && \
-    pip install /build/packages/morag-document && \
     pip install /build/packages/morag-image && \
     pip install /build/packages/morag-web && \
     pip install /build/packages/morag-youtube && \
