@@ -108,24 +108,58 @@ morag-worker --broker redis://localhost:6379/1 --concurrency 2
 morag-server --host 0.0.0.0 --port 8000
 ```
 
-### API Endpoints
+### Unified Processing Endpoint
 
-#### Process Content
+MoRAG provides a single unified endpoint for all processing needs:
+
+#### Convert Mode - Fast Markdown Conversion
 
 ```bash
-# Process URL
-curl -X POST "http://localhost:8000/process/url" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://example.com"}'
+# Convert document to markdown
+curl -X POST "http://localhost:8000/api/v1/process" \
+     -F "file=@document.pdf" \
+     -F 'request_data={"mode":"convert","source_type":"file"}'
+```
 
-# Process file upload
-curl -X POST "http://localhost:8000/process/file" \
-     -F "file=@document.pdf"
+#### Process Mode - Full Processing with Immediate Results
 
-# Process YouTube video
-curl -X POST "http://localhost:8000/process/youtube" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://youtube.com/watch?v=VIDEO_ID"}'
+```bash
+# Process URL with immediate results
+curl -X POST "http://localhost:8000/api/v1/process" \
+     -F 'request_data={
+       "mode": "process",
+       "source_type": "url",
+       "url": "https://example.com"
+     }'
+
+# Process file upload with immediate results
+curl -X POST "http://localhost:8000/api/v1/process" \
+     -F "file=@document.pdf" \
+     -F 'request_data={"mode":"process","source_type":"file"}'
+
+# Process YouTube video with immediate results
+curl -X POST "http://localhost:8000/api/v1/process" \
+     -F 'request_data={
+       "mode": "process",
+       "source_type": "url",
+       "url": "https://youtube.com/watch?v=VIDEO_ID",
+       "content_type": "youtube"
+     }'
+```
+
+#### Ingest Mode - Background Processing + Vector Storage
+
+```bash
+# Ingest document with webhook notifications
+curl -X POST "http://localhost:8000/api/v1/process" \
+     -F "file=@document.pdf" \
+     -F 'request_data={
+       "mode": "ingest",
+       "source_type": "file",
+       "webhook_config": {
+         "url": "https://your-app.com/webhook"
+       }
+     }'
 ```
 
 #### Search Content
@@ -154,18 +188,32 @@ MoRAG supports remote processing for computationally intensive tasks (audio and 
 
 ```bash
 # Upload audio file with remote processing enabled
-curl -X POST "http://localhost:8000/api/v1/ingest/file" \
+curl -X POST "http://localhost:8000/api/v1/process" \
      -F "file=@audio.mp3" \
-     -F "remote=true" \
-     -F "content_type=audio" \
-     -F "webhook_url=http://my-app.com/webhook"
+     -F 'request_data={
+       "mode": "ingest",
+       "source_type": "file",
+       "content_type": "audio",
+       "webhook_config": {
+         "url": "http://my-app.com/webhook"
+       },
+       "metadata": {
+         "remote": true
+       }
+     }'
 
 # Upload video file with remote processing
-curl -X POST "http://localhost:8000/api/v1/ingest/file" \
+curl -X POST "http://localhost:8000/api/v1/process" \
      -F "file=@video.mp4" \
-     -F "remote=true" \
-     -F "content_type=video" \
-     -F "fallback_to_local=true"
+     -F 'request_data={
+       "mode": "ingest",
+       "source_type": "file",
+       "content_type": "video",
+       "metadata": {
+         "remote": true,
+         "fallback_to_local": true
+       }
+     }'
 ```
 
 #### Python API with Remote Processing

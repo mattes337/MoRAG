@@ -124,36 +124,57 @@ print(f"Metadata: {quality_score.metadata_preservation:.2f}")
 ### Convert Document
 
 ```http
-POST /api/v1/conversion/convert
+POST /api/v1/process
 Content-Type: multipart/form-data
 
 file: document.pdf
-chunking_strategy: page
-preserve_formatting: true
-generate_embeddings: true
+request_data: {
+  "mode": "convert",
+  "source_type": "file",
+  "processing_options": {
+    "chunking_strategy": "page",
+    "include_metadata": true
+  }
+}
 ```
 
-### Batch Conversion
+### Process Document with Full Pipeline
 
 ```http
-POST /api/v1/conversion/convert-batch
+POST /api/v1/process
 Content-Type: multipart/form-data
 
-files[]: document1.pdf
-files[]: document2.docx
-chunking_strategy: page
+file: document.pdf
+request_data: {
+  "mode": "process",
+  "source_type": "file",
+  "processing_options": {
+    "chunking_strategy": "page",
+    "include_metadata": true
+  }
+}
 ```
 
-### Get Supported Formats
+### Batch Processing
 
 ```http
-GET /api/v1/conversion/formats
+POST /api/v1/process
+Content-Type: multipart/form-data
+
+request_data: {
+  "mode": "process",
+  "source_type": "batch",
+  "items": [
+    {"url": "https://example.com/doc1.pdf", "type": "document"},
+    {"url": "https://example.com/doc2.pdf", "type": "document"}
+  ]
+}
 ```
 
-### Conversion Statistics
+### Health Check
 
 ```http
-GET /api/v1/conversion/statistics
+GET /health
 ```
 
 ## Format-Specific Features

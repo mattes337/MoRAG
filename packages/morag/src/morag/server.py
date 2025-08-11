@@ -42,6 +42,7 @@ from morag.api_models.endpoints.tasks import setup_task_endpoints, setup_task_ma
 from morag.api_models.endpoints.admin import setup_admin_endpoints
 from morag.api_models.endpoints.conversion import setup_conversion_endpoints
 from morag.api_models.endpoints.temp_files import setup_temp_files_endpoints
+from morag.api_models.endpoints.unified import setup_unified_endpoints
 from morag.api_models.openapi_schemas import OPENAPI_TAGS, OPENAPI_SERVERS, OPENAPI_SECURITY_SCHEMES
 
 logger = structlog.get_logger(__name__)
@@ -169,6 +170,8 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
 
     # Setup modular endpoints
+    # NOTE: Legacy endpoints kept for backward compatibility
+    # New unified endpoint is the recommended approach
     processing_router = setup_processing_endpoints(get_morag_api)
     search_router = setup_search_endpoints(get_morag_api)
     ingestion_router = setup_ingestion_endpoints(get_morag_api)
@@ -178,7 +181,14 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
     conversion_router = setup_conversion_endpoints()
     temp_files_router = setup_temp_files_endpoints()
 
+    # Setup new unified endpoint (recommended)
+    unified_router = setup_unified_endpoints(get_morag_api)
+
     # Include routers
+    # New unified endpoint first (takes precedence)
+    app.include_router(unified_router)
+
+    # Legacy endpoints for backward compatibility
     app.include_router(processing_router)
     app.include_router(search_router)
     app.include_router(ingestion_router)

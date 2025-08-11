@@ -1,6 +1,6 @@
 """Pydantic models for MoRAG API."""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union, Literal
 from pydantic import BaseModel, Field
 
 
@@ -161,3 +161,98 @@ class TaskStatus(BaseModel):
     progress: Optional[float] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+# ============================================================================
+# UNIFIED API MODELS - New consolidated models for unified processing endpoint
+# ============================================================================
+
+class DatabaseConfig(BaseModel):
+    """Database configuration for ingestion."""
+    neo4j_uri: Optional[str] = None
+    neo4j_user: Optional[str] = None
+    neo4j_password: Optional[str] = None
+    qdrant_url: Optional[str] = None
+    qdrant_api_key: Optional[str] = None
+    collection_name: Optional[str] = None
+
+
+class ProcessingOptions(BaseModel):
+    """Processing configuration options."""
+    language: Optional[str] = Field(default=None, description="Language hint for processing")
+    chunking_strategy: Optional[str] = Field(default=None, description="Chunking strategy to use")
+    chunk_size: Optional[int] = Field(default=None, description="Chunk size for text splitting")
+    chunk_overlap: Optional[int] = Field(default=None, description="Overlap between chunks")
+    include_thumbnails: bool = Field(default=False, description="Include thumbnails for video content")
+    include_metadata: bool = Field(default=True, description="Include metadata in response")
+
+
+class WebhookConfig(BaseModel):
+    """Webhook configuration for async processing."""
+    url: str = Field(description="Webhook URL for progress notifications")
+    auth_token: Optional[str] = Field(default=None, description="Optional bearer token for webhook authentication")
+
+
+class UnifiedProcessRequest(BaseModel):
+    """Unified request model for all processing operations."""
+
+    # Processing mode - determines the type of processing
+    mode: Literal["convert", "process", "ingest"] = Field(
+        description="Processing mode: 'convert' for markdown only, 'process' for full processing, 'ingest' for processing + storage"
+    )
+
+    # Source type - determines input method
+    source_type: Literal["file", "url", "batch"] = Field(
+        description="Source type: 'file' for uploads, 'url' for web content, 'batch' for multiple items"
+    )
+
+    # Input data (one of these will be used based on source_type)
+    url: Optional[str] = Field(default=None, description="URL to process (for source_type='url')")
+    items: Optional[List[Dict[str, Any]]] = Field(default=None, description="Batch items to process (for source_type='batch')")
+
+    # Content type hint
+    content_type: Optional[str] = Field(default=None, description="Content type hint for processing")
+
+    # Document identification and deduplication
+    document_id: Optional[str] = Field(default=None, description="Optional document ID for deduplication")
+    replace_existing: bool = Field(default=False, description="Replace existing document if document_id matches")
+
+    # Processing configuration
+    processing_options: Optional[ProcessingOptions] = Field(default=None, description="Processing configuration options")
+
+    # Database configuration (for mode='ingest')
+    database_config: Optional[DatabaseConfig] = Field(default=None, description="Database configuration for ingestion")
+
+    # Webhook configuration (for async processing)
+    webhook_config: Optional[WebhookConfig] = Field(default=None, description="Webhook configuration for progress notifications")
+
+    # Additional metadata
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata to store with document")
+
+
+class UnifiedProcessResponse(BaseModel):
+    """Unified response model for all processing operations."""
+
+    success: bool = Field(description="Whether the operation was successful")
+    mode: str = Field(description="Processing mode that was used")
+
+    # Immediate response data (for mode='convert' and mode='process')
+    content: Optional[str] = Field(default=None, description="Processed content (markdown, full text, etc.)")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Processing metadata")
+    processing_time_ms: Optional[float] = Field(default=None, description="Processing time in milliseconds")
+
+    # Async response data (for mode='ingest')
+    task_id: Optional[str] = Field(default=None, description="Background task ID for tracking progress")
+    estimated_time_seconds: Optional[int] = Field(default=None, description="Estimated processing time in seconds")
+    status_url: Optional[str] = Field(default=None, description="URL to check processing status")
+
+    # Document identification
+    document_id: Optional[str] = Field(default=None, description="Document ID (user-provided or generated)")
+
+    # Error handling
+    error_message: Optional[str] = Field(default=None, description="Error message if operation failed")
+    warnings: Optional[List[str]] = Field(default=None, description="Warning messages")
+
+    # Additional response data
+    thumbnails: Optional[List[str]] = Field(default=None, description="Base64 encoded thumbnails for video content")
+    message: Optional[str] = Field(default=None, description="Human-readable status message")

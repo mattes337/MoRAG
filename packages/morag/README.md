@@ -185,19 +185,54 @@ Create a configuration file (JSON format):
 - `GET /api/v1/migration-guide` - Migration guidance from v1 to v2
 - `GET /api/v1/health` - Legacy health check with deprecation notice
 
-### Processing (Immediate Results)
+### Unified Processing Endpoint (Recommended)
 
+**`POST /api/v1/process`** - Single endpoint for all processing needs
+
+**Modes:**
+- `mode=convert` - Fast markdown conversion for UI preview
+- `mode=process` - Full processing with immediate results
+- `mode=ingest` - Full processing + vector storage (background)
+
+**Source Types:**
+- `source_type=file` - Upload file via multipart form
+- `source_type=url` - Process content from URL
+- `source_type=batch` - Process multiple items
+
+**Example Usage:**
+```bash
+# Convert file to markdown
+curl -X POST "/api/v1/process" \
+  -F "file=@document.pdf" \
+  -F 'request_data={"mode":"convert","source_type":"file"}'
+
+# Process URL with full pipeline
+curl -X POST "/api/v1/process" \
+  -F 'request_data={"mode":"process","source_type":"url","url":"https://example.com"}'
+
+# Ingest with webhook notifications
+curl -X POST "/api/v1/process" \
+  -F "file=@document.pdf" \
+  -F 'request_data={"mode":"ingest","source_type":"file","webhook_config":{"url":"https://webhook.example.com"}}'
+```
+
+### Legacy Endpoints (Backward Compatibility)
+
+**Processing (Immediate Results):**
 - `POST /process/url` - Process content from URL (returns results immediately)
 - `POST /process/file` - Process uploaded file (returns results immediately)
 - `POST /process/web` - Process web page (returns results immediately)
 - `POST /process/youtube` - Process YouTube video (returns results immediately)
 - `POST /process/batch` - Process multiple items (returns results immediately)
 
-### Ingestion (Background Processing + Vector Storage)
-
+**Ingestion (Background Processing + Vector Storage):**
 - `POST /api/v1/ingest/file` - Ingest file (background processing, stores in vector DB)
 - `POST /api/v1/ingest/url` - Ingest URL content (background processing, stores in vector DB)
 - `POST /api/v1/ingest/batch` - Ingest multiple items (background processing, stores in vector DB)
+
+**Conversion:**
+- `POST /api/convert/markdown` - Fast markdown conversion
+- `POST /api/convert/process-ingest` - Full processing + ingestion with webhooks
 
 ### Task Management
 
