@@ -32,6 +32,58 @@ class ProcessingResultResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     processing_time: Optional[float] = None
     warnings: Optional[List[str]] = None
+    error_message: Optional[str] = None
+    thumbnails: Optional[List[str]] = None
+
+
+class MarkdownConversionRequest(BaseModel):
+    """Request model for markdown conversion."""
+    include_metadata: bool = Field(default=True, description="Include file metadata in response")
+    language: Optional[str] = Field(default=None, description="Language hint for processing")
+
+
+class MarkdownConversionResponse(BaseModel):
+    """Response model for markdown conversion."""
+    success: bool
+    markdown: str = Field(description="Converted markdown content")
+    metadata: Dict[str, Any] = Field(description="File metadata and conversion info")
+    processing_time_ms: float = Field(description="Processing time in milliseconds")
+    error_message: Optional[str] = None
+
+
+class ProcessIngestRequest(BaseModel):
+    """Request model for processing with ingestion and webhooks."""
+    document_id: Optional[str] = Field(default=None, description="Optional document ID for deduplication")
+    webhook_url: str = Field(description="URL for webhook progress notifications")
+    webhook_auth_token: Optional[str] = Field(default=None, description="Optional bearer token for webhook authentication")
+    collection_name: Optional[str] = Field(default=None, description="Target collection name")
+    language: Optional[str] = Field(default=None, description="Language hint for processing")
+    chunking_strategy: Optional[str] = Field(default=None, description="Chunking strategy to use")
+    chunk_size: Optional[int] = Field(default=None, description="Chunk size for text splitting")
+    chunk_overlap: Optional[int] = Field(default=None, description="Overlap between chunks")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+
+
+class ProcessIngestResponse(BaseModel):
+    """Response model for processing with ingestion."""
+    success: bool
+    task_id: str = Field(description="Background task ID for tracking progress")
+    document_id: Optional[str] = Field(description="Document ID (user-provided or generated)")
+    estimated_time_seconds: int = Field(description="Estimated processing time in seconds")
+    status_url: str = Field(description="URL to check task status")
+    message: str = Field(description="Human-readable status message")
+
+
+class WebhookProgressNotification(BaseModel):
+    """Model for webhook progress notifications."""
+    task_id: str = Field(description="Background task ID")
+    document_id: Optional[str] = Field(description="Document ID if provided")
+    step: str = Field(description="Current processing step")
+    status: str = Field(description="Step status: started|completed|failed")
+    progress_percent: float = Field(description="Overall progress percentage (0-100)")
+    timestamp: str = Field(description="ISO8601 timestamp")
+    data: Optional[Dict[str, Any]] = Field(default=None, description="Step-specific data")
+    error_message: Optional[str] = Field(default=None, description="Error message if status is failed")
 
 
 class IngestFileRequest(BaseModel):
