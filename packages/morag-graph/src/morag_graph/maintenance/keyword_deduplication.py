@@ -198,13 +198,11 @@ class KeywordDeduplicationService(MaintenanceJobBase):
             # Get total count of all entities and eligible entities using optimized queries
             total_count_query = """
             MATCH (e:Entity)
-            USING INDEX e:Entity(name)
             RETURN count(e) AS total_count
             """
 
             eligible_count_query = """
             MATCH (e:Entity)
-            USING INDEX e:Entity(name)
             WHERE e.confidence < $max_confidence OR e.confidence IS NULL
             RETURN count(e) AS eligible_count
             """

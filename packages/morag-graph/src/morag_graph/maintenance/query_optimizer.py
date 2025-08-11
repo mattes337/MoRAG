@@ -37,11 +37,10 @@ class QueryOptimizer:
     QUERIES = {
         'find_entities_by_fact_count': """
             MATCH (e:Entity)
-            USING INDEX e:Entity(name)
             OPTIONAL MATCH (f:Fact)-[r]->(e)
             WITH e, count(DISTINCT f) AS fact_count
             WHERE fact_count >= $min_facts
-            RETURN e.id AS entity_id, e.name AS entity_name, fact_count
+            RETURN e.id AS k_id, e.name AS k_name, fact_count
             ORDER BY fact_count DESC
             LIMIT $limit
         """,

@@ -94,16 +94,16 @@ class RelationshipCleanupService(MaintenanceJobBase):
 
     def __init__(self, storage: Neo4jStorage, config: Optional[RelationshipCleanupConfig] = None):
         self.neo4j_storage = storage
-        self.config = config or RelationshipCleanupConfig()
-        self.config.ensure_defaults()
+        self.cleanup_config = config or RelationshipCleanupConfig()
+        self.cleanup_config.ensure_defaults()
 
         # Initialize base class with config dict
         config_dict = {
-            'job_tag': self.config.job_tag,
-            'dry_run': self.config.dry_run,
-            'batch_size': self.config.batch_size,
-            'circuit_breaker_threshold': self.config.circuit_breaker_threshold,
-            'circuit_breaker_timeout': self.config.circuit_breaker_timeout,
+            'job_tag': self.cleanup_config.job_tag,
+            'dry_run': self.cleanup_config.dry_run,
+            'batch_size': self.cleanup_config.batch_size,
+            'circuit_breaker_threshold': self.cleanup_config.circuit_breaker_threshold,
+            'circuit_breaker_timeout': self.cleanup_config.circuit_breaker_timeout,
         }
         super().__init__(config_dict)
 
@@ -144,11 +144,11 @@ class RelationshipCleanupService(MaintenanceJobBase):
         errors = []
 
         # Validate integer parameters
-        errors.extend(validate_positive_int(self.config.batch_size, "batch_size", min_value=1, max_value=10000))
+        errors.extend(validate_positive_int(self.cleanup_config.batch_size, "batch_size", min_value=1, max_value=10000))
 
         # Validate float parameters
-        errors.extend(validate_float_range(self.config.min_confidence, "min_confidence", min_value=0.0, max_value=1.0))
-        errors.extend(validate_float_range(self.config.similarity_threshold, "similarity_threshold", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.cleanup_config.min_confidence, "min_confidence", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.cleanup_config.similarity_threshold, "similarity_threshold", min_value=0.0, max_value=1.0))
 
         return errors
 
@@ -166,10 +166,10 @@ class RelationshipCleanupService(MaintenanceJobBase):
             raise ValueError(f"Configuration errors: {'; '.join(config_errors)}")
 
         start_time = time.time()
-        result = RelationshipCleanupResult(dry_run=self.config.dry_run)
+        result = RelationshipCleanupResult(dry_run=self.cleanup_config.dry_run)
 
         logger.info("Starting relationship cleanup",
-                   dry_run=self.config.dry_run)
+                   dry_run=self.cleanup_config.dry_run)
 
         try:
             # Always use the optimized type-based approach
@@ -432,7 +432,7 @@ Respond with JSON:
         """Remove all relationships of specified types."""
         for rel_type in remove_types:
             # Also check for relationships where r.type property matches (not just Neo4j type)
-            if self.config.dry_run:
+            if self.cleanup_config.dry_run:
                 # Count relationships that would be removed (both Neo4j type and r.type property)
                 count_query = f"""
                 MATCH ()-[r]->()
@@ -476,7 +476,7 @@ Respond with JSON:
             merge_types = pair["merge_into"]
 
             for merge_type in merge_types:
-                if self.config.dry_run:
+                if self.cleanup_config.dry_run:
                     # Count relationships that would be merged
                     count_query = f"""
                     MATCH (a)-[r:{merge_type}]->(b)
@@ -502,7 +502,7 @@ Respond with JSON:
                     RETURN count(*) as merged
                     """
                     merge_result = await self.neo4j_storage._connection_ops._execute_query(
-                        merge_query, {"job_tag": self.config.job_tag}
+                        merge_query, {"job_tag": self.cleanup_config.job_tag}
                     )
                     merged = merge_result[0]["merged"] if merge_result else 0
                     logger.info(f"Merged {merged} relationships from {merge_type} to {primary_type}")
@@ -512,7 +512,7 @@ Respond with JSON:
     async def _cleanup_remaining_issues(self, result: RelationshipCleanupResult) -> None:
         """Handle remaining cleanup issues (orphaned, low confidence, etc.)."""
         # Remove orphaned relationships (pointing to non-existent entities)
-        if self.config.dry_run:
+        if self.cleanup_config.dry_run:
             orphaned_query = """
             MATCH (start)-[r]->(end)
             WHERE start.id IS NULL OR end.id IS NULL
@@ -537,15 +537,15 @@ Respond with JSON:
             result.details["orphaned_removed"] += orphaned_deleted
 
         # Remove low confidence relationships
-        if self.config.min_confidence > 0:
-            if self.config.dry_run:
+        if self.cleanup_config.min_confidence > 0:
+            if self.cleanup_config.dry_run:
                 low_conf_query = """
                 MATCH ()-[r]->()
                 WHERE r.confidence < $min_confidence
                 RETURN count(r) as count
                 """
                 low_conf_result = await self.neo4j_storage._connection_ops._execute_query(
-                    low_conf_query, {"min_confidence": self.config.min_confidence}
+                    low_conf_query, {"min_confidence": self.cleanup_config.min_confidence}
                 )
                 low_conf_count = low_conf_result[0]["count"] if low_conf_result else 0
                 logger.info(f"[DRY RUN] Would remove {low_conf_count} low confidence relationships")
@@ -559,7 +559,7 @@ Respond with JSON:
                 RETURN count(*) as deleted
                 """
                 low_conf_result = await self.neo4j_storage._connection_ops._execute_query(
-                    low_conf_query, {"min_confidence": self.config.min_confidence}
+                    low_conf_query, {"min_confidence": self.cleanup_config.min_confidence}
                 )
                 low_conf_deleted = low_conf_result[0]["deleted"] if low_conf_result else 0
                 logger.info(f"Removed {low_conf_deleted} low confidence relationships")

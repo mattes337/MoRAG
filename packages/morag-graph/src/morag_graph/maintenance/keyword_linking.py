@@ -45,16 +45,16 @@ class KeywordLinkingService(MaintenanceJobBase):
 
     def __init__(self, storage: Neo4jStorage, config: Optional[KeywordLinkingConfig] = None):
         self.storage = storage
-        self.config = config or KeywordLinkingConfig()
-        self.config.ensure_defaults()
+        self.link_config = config or KeywordLinkingConfig()
+        self.link_config.ensure_defaults()
 
         # Initialize base class with config dict
         config_dict = {
-            'job_tag': self.config.job_tag,
-            'dry_run': self.config.dry_run,
-            'batch_size': self.config.batch_size,
-            'circuit_breaker_threshold': self.config.circuit_breaker_threshold,
-            'circuit_breaker_timeout': self.config.circuit_breaker_timeout,
+            'job_tag': self.link_config.job_tag,
+            'dry_run': self.link_config.dry_run,
+            'batch_size': self.link_config.batch_size,
+            'circuit_breaker_threshold': self.link_config.circuit_breaker_threshold,
+            'circuit_breaker_timeout': self.link_config.circuit_breaker_timeout,
         }
         super().__init__(config_dict)
 
@@ -66,12 +66,12 @@ class KeywordLinkingService(MaintenanceJobBase):
         errors = []
 
         # Validate integer parameters
-        errors.extend(validate_positive_int(self.config.limit_parents, "limit_parents", min_value=1, max_value=100))
-        errors.extend(validate_positive_int(self.config.max_links_per_parent, "max_links_per_parent", min_value=1, max_value=50))
-        errors.extend(validate_positive_int(self.config.batch_size, "batch_size", min_value=1, max_value=10000))
+        errors.extend(validate_positive_int(self.link_config.limit_parents, "limit_parents", min_value=1, max_value=100))
+        errors.extend(validate_positive_int(self.link_config.max_links_per_parent, "max_links_per_parent", min_value=1, max_value=50))
+        errors.extend(validate_positive_int(self.link_config.batch_size, "batch_size", min_value=1, max_value=10000))
 
         # Validate float parameters
-        errors.extend(validate_float_range(self.config.cooccurrence_min_share, "cooccurrence_min_share", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.link_config.cooccurrence_min_share, "cooccurrence_min_share", min_value=0.0, max_value=1.0))
 
         return errors
 
@@ -97,9 +97,9 @@ class KeywordLinkingService(MaintenanceJobBase):
         if config_errors:
             raise ValueError(f"Configuration errors: {'; '.join(config_errors)}")
 
-        parents = await self._find_parent_candidates(limit=self.config.limit_parents)
+        parents = await self._find_parent_candidates(limit=self.link_config.limit_parents)
         summary: Dict[str, Any] = {
-            "job_tag": self.config.job_tag,
+            "job_tag": self.link_config.job_tag,
             "processed": [],
             "total_parents": len(parents),
             "errors": [],
@@ -109,7 +109,7 @@ class KeywordLinkingService(MaintenanceJobBase):
         async def process_parent(row):
             parent_id, parent_name, total_facts = row["k_id"], row["k_name"], row["fact_count"]
             proposals = await self._propose_links(parent_id, total_facts)
-            proposals = proposals[: self.config.max_links_per_parent]
+            proposals = proposals[: self.link_config.max_links_per_parent]
             if not proposals:
                 return {
                     "parent": parent_name,
@@ -128,7 +128,7 @@ class KeywordLinkingService(MaintenanceJobBase):
     async def _find_parent_candidates(self, limit: int) -> List[Dict[str, Any]]:
         """Find entity candidates with sufficient fact counts using optimized query."""
         return await self.query_optimizer.find_entities_by_fact_count(
-            min_fact_count=10,
+            min_facts=10,
             limit=limit
         )
 
@@ -148,14 +148,14 @@ class KeywordLinkingService(MaintenanceJobBase):
         params = {
             "k_id": k_id,
             "total_facts": max(1, total_facts),
-            "min_share": self.config.cooccurrence_min_share,
+            "min_share": self.link_config.cooccurrence_min_share,
         }
         rows = await self.storage._connection_ops._execute_query(q, params)
         logger.info(
             "Keyword linking proposals evaluated",
             keyword_id=k_id,
             total_facts=total_facts,
-            min_share=self.config.cooccurrence_min_share,
+            min_share=self.link_config.cooccurrence_min_share,
             found=len(rows),
         )
         return rows
@@ -163,7 +163,7 @@ class KeywordLinkingService(MaintenanceJobBase):
     async def _infer_type(self, parent_name: str, child_name: str, samples: List[str]) -> str:
         client = await self._get_llm_client()
         if not client:
-            return f"{self.config.fallback_link_type}|A_TO_B"
+            return f"{self.link_config.fallback_link_type}|A_TO_B"
 
         async def llm_inference():
             sample_text = "\n\n".join(samples[:3]) if samples else ""
@@ -233,7 +233,7 @@ class KeywordLinkingService(MaintenanceJobBase):
             direction = str(data.get("direction", "A_TO_B")).strip().upper()
 
             if not rtype:
-                rtype = self.config.fallback_link_type
+                rtype = self.link_config.fallback_link_type
             if direction not in {"A_TO_B", "B_TO_A"}:
                 direction = "A_TO_B"
             # Convert generic relationship types to more specific ones
@@ -285,7 +285,7 @@ class KeywordLinkingService(MaintenanceJobBase):
             type_and_dir = await self._infer_type(parent_name, child_name, samples)
             rtype, direction = type_and_dir.split("|", 1)
 
-            if self.config.dry_run:
+            if self.link_config.dry_run:
                 planned.append({"parent": parent_name, "child": child_name, "type": rtype, "direction": direction})
                 continue
 
@@ -298,7 +298,7 @@ class KeywordLinkingService(MaintenanceJobBase):
                 SET h.job_tag = $job_tag, h.created_from = 'keyword_linking'
                 RETURN count(h) AS linked
                 """
-                params = {"a": parent_id, "b": child_id, "job_tag": self.config.job_tag}
+                params = {"a": parent_id, "b": child_id, "job_tag": self.link_config.job_tag}
             else:
                 q = f"""
                 MATCH (a:Entity {{id: $a}}), (b:Entity {{id: $b}})
@@ -307,7 +307,7 @@ class KeywordLinkingService(MaintenanceJobBase):
                 SET h.job_tag = $job_tag, h.created_from = 'keyword_linking'
                 RETURN count(h) AS linked
                 """
-                params = {"a": parent_id, "b": child_id, "job_tag": self.config.job_tag}
+                params = {"a": parent_id, "b": child_id, "job_tag": self.link_config.job_tag}
             res = await self.storage._connection_ops._execute_query(q, params)
             created += (res[0]["linked"] if res else 0)
             planned.append({"parent": parent_name, "child": child_name, "type": rtype, "direction": direction})

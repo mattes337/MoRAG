@@ -110,18 +110,18 @@ class RelationshipMerger(MaintenanceJobBase):
     """Handles relationship merging operations."""
 
     def __init__(self, config: RelationshipMergerConfig, neo4j_storage: Neo4jStorage, llm_client: LLMClient):
-        self.config = config
+        self.merger_config = config
         self.neo4j_storage = neo4j_storage
         self.llm_client = llm_client
         self.logger = logger.bind(component="relationship_merger")
 
         # Initialize base class with config dict
         config_dict = {
-            'job_tag': self.config.job_tag,
-            'dry_run': self.config.dry_run,
-            'batch_size': self.config.batch_size,
-            'circuit_breaker_threshold': self.config.circuit_breaker_threshold,
-            'circuit_breaker_timeout': self.config.circuit_breaker_timeout,
+            'job_tag': self.merger_config.job_tag,
+            'dry_run': self.merger_config.dry_run,
+            'batch_size': self.merger_config.batch_size,
+            'circuit_breaker_threshold': self.merger_config.circuit_breaker_threshold,
+            'circuit_breaker_timeout': self.merger_config.circuit_breaker_timeout,
         }
         super().__init__(config_dict)
 
@@ -132,12 +132,12 @@ class RelationshipMerger(MaintenanceJobBase):
         errors = []
 
         # Validate integer parameters
-        errors.extend(validate_positive_int(self.config.batch_size, "batch_size", min_value=1, max_value=10000))
-        errors.extend(validate_positive_int(self.config.limit_relations, "limit_relations", min_value=1, max_value=100000))
+        errors.extend(validate_positive_int(self.merger_config.batch_size, "batch_size", min_value=1, max_value=10000))
+        errors.extend(validate_positive_int(self.merger_config.limit_relations, "limit_relations", min_value=1, max_value=100000))
 
         # Validate float parameters
-        errors.extend(validate_float_range(self.config.similarity_threshold, "similarity_threshold", min_value=0.0, max_value=1.0))
-        errors.extend(validate_float_range(self.config.min_confidence, "min_confidence", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.merger_config.similarity_threshold, "similarity_threshold", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.merger_config.min_confidence, "min_confidence", min_value=0.0, max_value=1.0))
 
         return errors
 
@@ -167,7 +167,7 @@ class RelationshipMerger(MaintenanceJobBase):
             raise ValueError(f"Configuration errors: {'; '.join(config_errors)}")
 
         start_time = time.time()
-        self.config.ensure_defaults()
+        self.merger_config.ensure_defaults()
 
         self.logger.info("Starting relationship merger", config=self.config)
 
@@ -186,8 +186,8 @@ class RelationshipMerger(MaintenanceJobBase):
                 transitive_merges=0,
                 total_merges=0,
                 processing_time=time.time() - start_time,
-                dry_run=self.config.dry_run,
-                job_tag=self.config.job_tag
+                dry_run=self.merger_config.dry_run,
+                job_tag=self.merger_config.job_tag
             )
 
         self.logger.info(f"Found {total_relationships} relationships for potential merging")
@@ -202,7 +202,7 @@ class RelationshipMerger(MaintenanceJobBase):
         transitive_merges = 0
 
         for merge_candidate in merge_candidates:
-            if not self.config.dry_run:
+            if not self.merger_config.dry_run:
                 await self._apply_merge(merge_candidate)
             else:
                 # In dry run mode, just log what would be merged
@@ -235,8 +235,8 @@ class RelationshipMerger(MaintenanceJobBase):
             transitive_merges=transitive_merges,
             total_merges=total_merges,
             processing_time=processing_time,
-            dry_run=self.config.dry_run,
-            job_tag=self.config.job_tag
+            dry_run=self.merger_config.dry_run,
+            job_tag=self.merger_config.job_tag
         )
 
         self.logger.info("Relationship merger completed", result=result)
@@ -246,9 +246,9 @@ class RelationshipMerger(MaintenanceJobBase):
         """Get relationships that are candidates for merging."""
         # Calculate offset for rotation if enabled
         offset = 0
-        if self.config.enable_rotation and self.config.job_tag:
+        if self.merger_config.enable_rotation and self.merger_config.job_tag:
             # Use job_tag hash for deterministic offset
-            offset = hash(self.config.job_tag) % 1000
+            offset = hash(self.merger_config.job_tag) % 1000
 
         query = """
         MATCH ()-[r]->()
@@ -261,9 +261,9 @@ class RelationshipMerger(MaintenanceJobBase):
         """
 
         result = await self.neo4j_storage._connection_ops._execute_query(query, {
-            "min_confidence": self.config.min_confidence,
+            "min_confidence": self.merger_config.min_confidence,
             "offset": offset,
-            "limit": self.config.limit_relations
+            "limit": self.merger_config.limit_relations
         })
 
         relationships = []
@@ -297,11 +297,11 @@ class RelationshipMerger(MaintenanceJobBase):
         merge_candidates.extend(await self._find_semantic_equivalents(relationships))
 
         # 3. Find bidirectional redundancy
-        if self.config.merge_bidirectional:
+        if self.merger_config.merge_bidirectional:
             merge_candidates.extend(await self._find_bidirectional_redundancy(relationships))
 
         # 4. Find transitive redundancy
-        if self.config.merge_transitive:
+        if self.merger_config.merge_transitive:
             merge_candidates.extend(await self._find_transitive_redundancy(relationships))
 
         return merge_candidates
@@ -467,7 +467,7 @@ class RelationshipMerger(MaintenanceJobBase):
 
     async def _apply_merge(self, merge_candidate: MergeCandidate) -> None:
         """Apply a relationship merge."""
-        if self.config.dry_run:
+        if self.merger_config.dry_run:
             # In dry run mode, don't actually apply changes
             return
 
@@ -498,7 +498,7 @@ class RelationshipMerger(MaintenanceJobBase):
         if "merged_from" not in merged_metadata:
             merged_metadata["merged_from"] = []
         merged_metadata["merged_from"].append(duplicate.id)
-        merged_metadata["job_tag"] = self.config.job_tag
+        merged_metadata["job_tag"] = self.merger_config.job_tag
         merged_metadata["merged_at"] = datetime.utcnow().isoformat()
 
         # Update primary relationship

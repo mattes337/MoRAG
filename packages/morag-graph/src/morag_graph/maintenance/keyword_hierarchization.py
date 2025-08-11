@@ -58,16 +58,16 @@ class KeywordHierarchizationService(MaintenanceJobBase):
 
     def __init__(self, storage: Neo4jStorage, config: Optional[HierarchizationConfig] = None):
         self.storage = storage
-        self.config = config or HierarchizationConfig()
-        self.config.ensure_defaults()
+        self.hier_config = config or HierarchizationConfig()
+        self.hier_config.ensure_defaults()
 
         # Initialize base class with config dict
         config_dict = {
-            'job_tag': self.config.job_tag,
-            'dry_run': self.config.dry_run,
-            'batch_size': self.config.batch_size,
-            'circuit_breaker_threshold': self.config.circuit_breaker_threshold,
-            'circuit_breaker_timeout': self.config.circuit_breaker_timeout,
+            'job_tag': self.hier_config.job_tag,
+            'dry_run': self.hier_config.dry_run,
+            'batch_size': self.hier_config.batch_size,
+            'circuit_breaker_threshold': self.hier_config.circuit_breaker_threshold,
+            'circuit_breaker_timeout': self.hier_config.circuit_breaker_timeout,
         }
         super().__init__(config_dict)
 
@@ -79,18 +79,18 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         errors = []
 
         # Validate integer parameters
-        errors.extend(validate_positive_int(self.config.threshold_min_facts, "threshold_min_facts", min_value=1, max_value=10000))
-        errors.extend(validate_positive_int(self.config.min_new_keywords, "min_new_keywords", min_value=1, max_value=20))
-        errors.extend(validate_positive_int(self.config.max_new_keywords, "max_new_keywords", min_value=1, max_value=50))
-        errors.extend(validate_positive_int(self.config.min_per_new_keyword, "min_per_new_keyword", min_value=1, max_value=1000))
-        errors.extend(validate_positive_int(self.config.batch_size, "batch_size", min_value=1, max_value=10000))
+        errors.extend(validate_positive_int(self.hier_config.threshold_min_facts, "threshold_min_facts", min_value=1, max_value=10000))
+        errors.extend(validate_positive_int(self.hier_config.min_new_keywords, "min_new_keywords", min_value=1, max_value=20))
+        errors.extend(validate_positive_int(self.hier_config.max_new_keywords, "max_new_keywords", min_value=1, max_value=50))
+        errors.extend(validate_positive_int(self.hier_config.min_per_new_keyword, "min_per_new_keyword", min_value=1, max_value=1000))
+        errors.extend(validate_positive_int(self.hier_config.batch_size, "batch_size", min_value=1, max_value=10000))
 
         # Validate float parameters
-        errors.extend(validate_float_range(self.config.max_move_ratio, "max_move_ratio", min_value=0.0, max_value=1.0))
-        errors.extend(validate_float_range(self.config.cooccurrence_min_share, "cooccurrence_min_share", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.hier_config.max_move_ratio, "max_move_ratio", min_value=0.0, max_value=1.0))
+        errors.extend(validate_float_range(self.hier_config.cooccurrence_min_share, "cooccurrence_min_share", min_value=0.0, max_value=1.0))
 
         # Validate logical constraints
-        if self.config.min_new_keywords > self.config.max_new_keywords:
+        if self.hier_config.min_new_keywords > self.hier_config.max_new_keywords:
             errors.append("min_new_keywords must be <= max_new_keywords")
 
         return errors
@@ -122,7 +122,7 @@ class KeywordHierarchizationService(MaintenanceJobBase):
 
         candidates = await self._find_candidates(limit_keywords)
         summary: Dict[str, Any] = {
-            "job_tag": self.config.job_tag,
+            "job_tag": self.hier_config.job_tag,
             "processed": [],
             "total_candidates": len(candidates),
             "errors": [],
@@ -142,9 +142,8 @@ class KeywordHierarchizationService(MaintenanceJobBase):
 
     async def _find_candidates(self, limit_keywords: int) -> List[Dict[str, Any]]:
         """Find entity candidates with high fact counts using optimized query."""
-        params = {"threshold": self.config.threshold_min_facts, "limit_keywords": limit_keywords}
         return await self.query_optimizer.find_entities_by_fact_count(
-            min_fact_count=self.config.threshold_min_facts,
+            min_facts=self.hier_config.threshold_min_facts,
             limit=limit_keywords
         )
 
@@ -174,7 +173,7 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         assignments = self._enforce_balance(assignments, total_facts)
 
         moved_count = sum(len(v) for v in assignments.values())
-        if self.config.dry_run:
+        if self.hier_config.dry_run:
             logger.info("[DRY-RUN] Hierarchization plan", keyword=k_name, proposals=[p["e_name"] for p in proposals], moved=moved_count, kept=total_facts - moved_count)
             return {
                 "keyword": k_name,
@@ -182,13 +181,13 @@ class KeywordHierarchizationService(MaintenanceJobBase):
                 "proposals": [p["e_name"] for p in proposals],
                 "moved": moved_count,
                 "kept": total_facts - moved_count,
-                "job_tag": self.config.job_tag,
+                "job_tag": self.hier_config.job_tag,
             }
 
         # Apply changes in small batches
-        await self._apply_rewiring(k_id, assignments, reltypes, detach=self.config.detach_moved)
+        await self._apply_rewiring(k_id, assignments, reltypes, detach=self.hier_config.detach_moved)
         # Optionally create entity-to-entity links from parent to proposals that received assignments
-        if self.config.link_entities:
+        if self.hier_config.link_entities:
             await self._link_parent_to_proposals(k_id, proposals, assignments)
 
         return {
@@ -197,7 +196,7 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             "proposals": [p["e_name"] for p in proposals],
             "moved": moved_count,
             "kept": total_facts - moved_count,
-            "job_tag": self.config.job_tag,
+            "job_tag": self.hier_config.job_tag,
         }
 
     async def _propose_keywords(self, k_id: str, total_facts: int) -> List[Dict[str, Any]]:
@@ -216,7 +215,7 @@ class KeywordHierarchizationService(MaintenanceJobBase):
         params = {
             "k_id": k_id,
             "total_facts": max(1, total_facts),
-            "min_share": self.config.cooccurrence_min_share,
+            "min_share": self.hier_config.cooccurrence_min_share,
         }
         rows = await self.storage._connection_ops._execute_query(q, params)
         # Log diagnostics for visibility when no proposals are produced
@@ -224,17 +223,17 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             "Co-occurrence proposals evaluated",
             keyword_id=k_id,
             total_facts=total_facts,
-            min_share=self.config.cooccurrence_min_share,
+            min_share=self.hier_config.cooccurrence_min_share,
             found=len(rows),
         )
         # Trim and diversify simply by taking top N for now
-        trimmed = rows[: self.config.max_new_keywords]
-        if len(trimmed) < self.config.min_new_keywords:
+        trimmed = rows[: self.hier_config.max_new_keywords]
+        if len(trimmed) < self.hier_config.min_new_keywords:
             logger.info(
                 "Insufficient proposals after trimming",
-                required=self.config.min_new_keywords,
+                required=self.hier_config.min_new_keywords,
                 found=len(trimmed),
-                max_new=self.config.max_new_keywords,
+                max_new=self.hier_config.max_new_keywords,
                 keyword_id=k_id,
             )
             return []
@@ -263,9 +262,9 @@ class KeywordHierarchizationService(MaintenanceJobBase):
 
     def _enforce_balance(self, assignments: Dict[str, List[str]], total_facts: int) -> Dict[str, List[str]]:
         # Remove proposals that do not meet minimum assigned facts
-        filtered = {pid: facts for pid, facts in assignments.items() if len(facts) >= self.config.min_per_new_keyword}
+        filtered = {pid: facts for pid, facts in assignments.items() if len(facts) >= self.hier_config.min_per_new_keyword}
         # Enforce max move ratio
-        max_moves = int(self.config.max_move_ratio * total_facts)
+        max_moves = int(self.hier_config.max_move_ratio * total_facts)
         moved_so_far = 0
         balanced: Dict[str, List[str]] = {pid: [] for pid in filtered.keys()}
         # Round-robin through proposals to keep distribution even
@@ -297,14 +296,14 @@ class KeywordHierarchizationService(MaintenanceJobBase):
     ) -> None:
         # Create new edges in batches, using same reltype as (f)->(k)
         for pid, fids in assignments.items():
-            for i in range(0, len(fids), self.config.batch_size):
-                batch = fids[i : i + self.config.batch_size]
+            for i in range(0, len(fids), self.hier_config.batch_size):
+                batch = fids[i : i + self.hier_config.batch_size]
                 await self._batch_attach(k_id, pid, batch, reltypes)
         # Optionally detach from parent for moved facts
         if detach:
             for pid, fids in assignments.items():
-                for i in range(0, len(fids), self.config.batch_size):
-                    batch = fids[i : i + self.config.batch_size]
+                for i in range(0, len(fids), self.hier_config.batch_size):
+                    batch = fids[i : i + self.hier_config.batch_size]
                     await self._batch_detach_from_keyword(k_id, batch)
 
     async def _link_parent_to_proposals(
@@ -396,7 +395,7 @@ class KeywordHierarchizationService(MaintenanceJobBase):
                 SET h.job_tag = $job_tag, h.created_from = 'keyword_hierarchization'
                 RETURN count(h) AS linked
                 """
-            res = await self.storage._connection_ops._execute_query(q, {"parent": k_id, "child": pid, "job_tag": self.config.job_tag})
+            res = await self.storage._connection_ops._execute_query(q, {"parent": k_id, "child": pid, "job_tag": self.hier_config.job_tag})
             total_linked += (res[0]["linked"] if res else 0)
 
         logger.info(
@@ -427,7 +426,7 @@ class KeywordHierarchizationService(MaintenanceJobBase):
             SET r.job_tag = $job_tag, r.created_from = 'keyword_hierarchization'
             RETURN count(r) AS created
             """
-            await self.storage._connection_ops._execute_query(q, {"items": items, "job_tag": self.config.job_tag})
+            await self.storage._connection_ops._execute_query(q, {"items": items, "job_tag": self.hier_config.job_tag})
 
     async def _batch_detach_from_keyword(self, k_id: str, fid_batch: List[str]) -> None:
         q = """
