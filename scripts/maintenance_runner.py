@@ -8,6 +8,7 @@ Currently supported jobs:
 - keyword_linking
 - relationship_merger
 - relationship_cleanup
+- isolated_nodes_cleanup
 
 Exit code is non-zero if any selected job fails (respecting fail-fast behavior).
 """
@@ -317,11 +318,19 @@ async def run_relationship_cleanup_job() -> Dict[str, Any]:
     return {"job": "relationship_cleanup", "result": result}
 
 
+async def run_isolated_nodes_cleanup_job() -> Dict[str, Any]:
+    from morag_graph.maintenance.isolated_nodes_cleanup import run_isolated_nodes_cleanup
+
+    logger.info("Running job: isolated_nodes_cleanup")
+    result = await run_isolated_nodes_cleanup()
+    return {"job": "isolated_nodes_cleanup", "result": result}
+
+
 async def main_async() -> int:
     # Jobs to run; if not set, run all (deduplication first for optimal order)
     jobs_env = os.getenv("MORAG_MAINT_JOBS")
     if not jobs_env:
-        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking", "relationship_merger", "relationship_cleanup"]
+        jobs = ["keyword_deduplication", "keyword_hierarchization", "keyword_linking", "relationship_merger", "relationship_cleanup", "isolated_nodes_cleanup"]
     else:
         jobs = [j.strip() for j in jobs_env.split(",") if j.strip()]
 
@@ -334,6 +343,7 @@ async def main_async() -> int:
         "keyword_linking": run_keyword_linking_job,
         "relationship_merger": run_relationship_merger_job,
         "relationship_cleanup": run_relationship_cleanup_job,
+        "isolated_nodes_cleanup": run_isolated_nodes_cleanup_job,
     }
 
     summaries: List[Dict[str, Any]] = []

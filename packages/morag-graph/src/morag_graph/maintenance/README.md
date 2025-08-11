@@ -47,12 +47,21 @@ Performs comprehensive cleanup of problematic relationships in the knowledge gra
 - **Duplicate Cleanup**: Identifies and removes exact and semantic duplicates
 - **Consolidation**: Merges similar relationships with confidence aggregation
 
+### 6. Isolated Nodes Cleanup (`isolated_nodes_cleanup`)
+Identifies and removes completely isolated nodes (entities with no relationships).
+
+**Features:**
+- **Complete Isolation Detection**: Finds nodes with no incoming or outgoing relationships
+- **Batch Processing**: Efficiently processes isolated nodes in configurable batches
+- **Safety Checks**: Double verification before deletion to prevent race conditions
+- **Comprehensive Logging**: Detailed logging and progress tracking
+
 ## Running Maintenance Jobs
 
 ### Using the Maintenance Runner
 
 ```bash
-# Run all jobs (default order: deduplication, hierarchization, linking, relationship_merger, relationship_cleanup)
+# Run all jobs (default order: deduplication, hierarchization, linking, relationship_merger, relationship_cleanup, isolated_nodes_cleanup)
 python scripts/maintenance_runner.py
 
 # Run specific jobs
@@ -95,6 +104,14 @@ All jobs support environment variable configuration:
 | `MORAG_REL_CLEANUP_JOB_TAG` | `""` | Job tag for tracking and idempotency |
 | `MORAG_REL_CLEANUP_ENABLE_ROTATION` | `false` | Enable rotation to prevent processing same relationships |
 
+#### Isolated Nodes Cleanup
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MORAG_ISOLATED_CLEANUP_DRY_RUN` | `true` | Preview changes without applying them |
+| `MORAG_ISOLATED_CLEANUP_BATCH_SIZE` | `100` | Number of nodes to process in each batch |
+| `MORAG_ISOLATED_CLEANUP_JOB_TAG` | `""` | Job tag for tracking and idempotency |
+
 #### Example: Relationship Merger
 
 ```bash
@@ -125,6 +142,21 @@ python scripts/maintenance_runner.py
 MORAG_MAINT_JOBS="relationship_cleanup" \
 MORAG_REL_CLEANUP_DRY_RUN="true" \
 MORAG_REL_CLEANUP_REMOVE_UNRELATED="true" \
+python scripts/maintenance_runner.py
+```
+
+#### Example: Isolated Nodes Cleanup
+
+```bash
+# Apply changes (default behavior)
+MORAG_MAINT_JOBS="isolated_nodes_cleanup" \
+MORAG_ISOLATED_CLEANUP_DRY_RUN="false" \
+MORAG_ISOLATED_CLEANUP_BATCH_SIZE="50" \
+python scripts/maintenance_runner.py
+
+# Dry run (preview only)
+MORAG_MAINT_JOBS="isolated_nodes_cleanup" \
+MORAG_ISOLATED_CLEANUP_DRY_RUN="true" \
 python scripts/maintenance_runner.py
 ```
 
