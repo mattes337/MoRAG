@@ -1,0 +1,58 @@
+# ============================================================================
+# MoRAG CLI - Minimal Requirements File
+# Essential packages for CLI operations only
+# ============================================================================
+
+# Core Web Framework (minimal)
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic>=2.5.0,<2.10.0
+pydantic-settings>=2.1.0,<2.7.0
+
+# Task Queue
+celery==5.3.4
+redis==5.0.1
+
+# Vector Database
+qdrant-client==1.7.0
+
+# LLM Services
+google-generativeai>=0.3.2,<0.8.0
+
+# HTTP and Network
+httpx==0.25.2
+aiofiles==23.2.1
+requests>=2.31.0,<2.33.0
+
+# Configuration
+python-dotenv==1.0.0
+structlog==23.2.0
+
+# System Utilities
+psutil==5.9.6
+click>=8.1.0,<9.0.0
+
+# Document Processing (essential only)
+markitdown>=0.0.1,<0.1.0
+pypdf>=3.0.0,<4.0.0
+python-docx>=0.8.11,<1.2.0
+beautifulsoup4>=4.12.0,<4.13.0
+
+# Text Processing
+spacy>=3.7.0,<3.8.0
+nltk>=3.8.0,<3.9.0
+
+# Audio Processing (minimal)
+pydub>=0.25.1,<0.26.0
+ffmpeg-python>=0.2.0,<0.3.0
+faster-whisper>=0.10.0,<1.1.0
+
+# Scientific Computing (minimal)
+numpy>=1.24.0,<2.1.0
+
+# WebDAV Client
+webdavclient3
+
+# gRPC (already installed separately)
+# protobuf>=4.25.0,<5.0.0
+# grpcio>=1.60.0,<1.73.0

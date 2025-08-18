@@ -10,14 +10,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
+# Install system dependencies and clean up in same layer
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
     ffmpeg \
     libsndfile1 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
 
 # Create virtual environment
 RUN python -m venv /opt/venv
@@ -29,8 +32,8 @@ RUN pip install --upgrade pip
 # Set working directory
 WORKDIR /app
 
-# Copy requirements file
-COPY requirements-docker.txt ./requirements.txt
+# Copy minimal CLI requirements file
+COPY requirements-cli.txt ./requirements.txt
 
 # Install PyTorch CPU-only version first for compatibility
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
@@ -38,11 +41,8 @@ RUN pip install torch torchvision torchaudio --index-url https://download.pytorc
 # Install protobuf and grpcio packages first to avoid conflicts
 RUN pip install "protobuf>=4.25.0,<5.0.0" "grpcio>=1.60.0,<1.73.0" "grpcio-status>=1.60.0,<1.73.0" "grpcio-tools>=1.60.0,<1.73.0"
 
-# Install base requirements
-RUN pip install -r requirements.txt
-
-# Install WebDAV client for CLI scripts
-RUN pip install webdavclient3
+# Install minimal CLI requirements
+RUN pip install -r requirements.txt && pip cache purge
 
 # Download spaCy model (optional, will fallback if not available)
 RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
@@ -50,19 +50,18 @@ RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed
 # Copy package files and install MoRAG packages
 COPY packages/ ./packages/
 
-# Install MoRAG packages in development mode
+# Install only essential MoRAG packages for CLI operations
+# Install core packages first
 RUN pip install -e packages/morag-core
-RUN pip install -e packages/morag-services
-RUN pip install -e packages/morag-embedding
 RUN pip install -e packages/morag-document
 RUN pip install -e packages/morag-audio
-RUN pip install -e packages/morag-video
-RUN pip install -e packages/morag-image
-RUN pip install -e packages/morag-web
-RUN pip install -e packages/morag-youtube
-RUN pip install -e packages/morag-graph
-RUN pip install -e packages/morag-reasoning
-RUN pip install -e packages/morag
+
+# Install additional packages needed for webdav-processor
+RUN pip install -e packages/morag-web || echo "morag-web installation failed, continuing..."
+RUN pip install -e packages/morag-services || echo "morag-services installation failed, continuing..."
+
+# Clean up after package installation
+RUN pip cache purge
 
 # Copy CLI scripts
 COPY cli/ ./cli/

@@ -7,8 +7,11 @@ This document explains how to build and use the MoRAG CLI Docker container for r
 ### 1. Build the CLI Docker Image
 
 ```bash
+# Build the CLI-optimized Docker image (uses minimal requirements)
 docker build -f Dockerfile.cli -t morag-cli .
 ```
+
+> **Note**: The CLI Docker image uses `requirements-cli.txt` which contains only essential packages needed for CLI operations, significantly reducing build time and image size compared to the full MoRAG installation.
 
 ### 2. Prepare Environment Variables
 
