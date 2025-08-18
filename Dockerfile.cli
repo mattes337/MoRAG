@@ -1,0 +1,125 @@
+# MoRAG CLI Docker Image
+# Optimized for running CLI scripts like webdav-processor.py
+# Usage: docker run -it --rm --env-file .env morag-cli webdav-processor.py [args]
+
+FROM python:3.11-slim AS base
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements file
+COPY requirements-docker.txt ./requirements.txt
+
+# Install PyTorch CPU-only version first for compatibility
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install protobuf and grpcio packages first to avoid conflicts
+RUN pip install "protobuf>=4.25.0,<5.0.0" "grpcio>=1.60.0,<1.73.0" "grpcio-status>=1.60.0,<1.73.0" "grpcio-tools>=1.60.0,<1.73.0"
+
+# Install base requirements
+RUN pip install -r requirements.txt
+
+# Install WebDAV client for CLI scripts
+RUN pip install webdavclient3
+
+# Download spaCy model (optional, will fallback if not available)
+RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
+
+# Copy package files and install MoRAG packages
+COPY packages/ ./packages/
+
+# Install MoRAG packages in development mode
+RUN pip install -e packages/morag-core
+RUN pip install -e packages/morag-services
+RUN pip install -e packages/morag-embedding
+RUN pip install -e packages/morag-document
+RUN pip install -e packages/morag-audio
+RUN pip install -e packages/morag-video
+RUN pip install -e packages/morag-image
+RUN pip install -e packages/morag-web
+RUN pip install -e packages/morag-youtube
+RUN pip install -e packages/morag-graph
+RUN pip install -e packages/morag-reasoning
+RUN pip install -e packages/morag
+
+# Copy CLI scripts
+COPY cli/ ./cli/
+
+# Copy .env.example as template
+COPY .env.example ./.env.example
+
+# Make CLI scripts executable
+RUN chmod +x cli/*.py
+
+# Set Python path to include the app directory
+ENV PYTHONPATH=/app:$PYTHONPATH
+
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# Check if .env file exists, if not copy from example\n\
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then\n\
+    echo "No .env file found, copying from .env.example"\n\
+    cp .env.example .env\n\
+fi\n\
+\n\
+# If no arguments provided, show available CLI scripts\n\
+if [ $# -eq 0 ]; then\n\
+    echo "Available CLI scripts:"\n\
+    ls -1 cli/*.py | sed "s|cli/||" | sed "s|\.py$||"\n\
+    echo ""\n\
+    echo "Usage: docker run -it --rm --env-file .env morag-cli <script.py> [args]"\n\
+    echo "Example: docker run -it --rm --env-file .env morag-cli webdav-processor.py --help"\n\
+    exit 0\n\
+fi\n\
+\n\
+# Get the script name\n\
+SCRIPT_NAME="$1"\n\
+shift\n\
+\n\
+# Add .py extension if not present\n\
+if [[ "$SCRIPT_NAME" != *.py ]]; then\n\
+    SCRIPT_NAME="${SCRIPT_NAME}.py"\n\
+fi\n\
+\n\
+# Check if script exists\n\
+if [ ! -f "cli/$SCRIPT_NAME" ]; then\n\
+    echo "Error: Script cli/$SCRIPT_NAME not found"\n\
+    echo "Available scripts:"\n\
+    ls -1 cli/*.py | sed "s|cli/||"\n\
+    exit 1\n\
+fi\n\
+\n\
+# Run the script\n\
+exec python "cli/$SCRIPT_NAME" "$@"' > /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+# Default command shows help
+CMD []
