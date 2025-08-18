@@ -33,7 +33,7 @@ RUN pip install --upgrade pip
 WORKDIR /app
 
 # Copy minimal CLI requirements file
-COPY requirements-cli.txt ./requirements.txt
+COPY requirements-cli-no-spacy.txt ./requirements-cli-no-spacy.txt
 
 # Install PyTorch CPU-only version first for compatibility
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
@@ -41,8 +41,18 @@ RUN pip install torch torchvision torchaudio --index-url https://download.pytorc
 # Install protobuf and grpcio packages first to avoid conflicts
 RUN pip install "protobuf>=4.25.0,<5.0.0" "grpcio>=1.60.0,<1.73.0" "grpcio-status>=1.60.0,<1.73.0" "grpcio-tools>=1.60.0,<1.73.0"
 
-# Install minimal CLI requirements
-RUN pip install -r requirements.txt && pip cache purge
+# Install numpy first to prevent binary incompatibility issues
+RUN pip install "numpy>=1.24.0,<2.0.0"
+
+# Install spacy and thinc dependencies with compatible versions
+RUN pip install "catalogue>=2.0.0,<2.1.0" "cymem>=2.0.2,<2.1.0" "murmurhash>=1.0.2,<1.1.0" "preshed>=3.0.2,<3.1.0" "wasabi>=0.9.1,<1.2.0" "srsly>=2.4.3,<3.0.0"
+
+# Install thinc and spacy with --no-deps to avoid numpy conflicts
+RUN pip install "thinc>=8.1.0,<8.3.0" --no-deps
+RUN pip install "spacy>=3.7.0,<3.8.0" --no-deps
+
+# Install minimal CLI requirements (excluding spacy since we installed it separately)
+RUN pip install -r requirements-cli-no-spacy.txt
 
 # Download spaCy model (optional, will fallback if not available)
 RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
@@ -51,17 +61,21 @@ RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed
 COPY packages/ ./packages/
 
 # Install only essential MoRAG packages for CLI operations
-# Install core packages first
+# Install MoRAG packages in correct dependency order
 RUN pip install -e packages/morag-core
+RUN pip install -e packages/morag-embedding
 RUN pip install -e packages/morag-document
 RUN pip install -e packages/morag-audio
+RUN pip install -e packages/morag-video
+RUN pip install -e packages/morag-image
+RUN pip install -e packages/morag-web
+RUN pip install -e packages/morag-youtube
+RUN pip install -e packages/morag-graph
+RUN pip install -e packages/morag-reasoning
+RUN pip install -e packages/morag-services
 
-# Install additional packages needed for webdav-processor
-RUN pip install -e packages/morag-web || echo "morag-web installation failed, continuing..."
-RUN pip install -e packages/morag-services || echo "morag-services installation failed, continuing..."
-
-# Clean up after package installation
-RUN pip cache purge
+RUN pip install pydantic_ai
+# Package installation complete
 
 # Copy CLI scripts
 COPY cli/ ./cli/
@@ -73,7 +87,7 @@ COPY .env.example ./.env.example
 RUN chmod +x cli/*.py
 
 # Set Python path to include the app directory
-ENV PYTHONPATH=/app:$PYTHONPATH
+ENV PYTHONPATH=/app
 
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\

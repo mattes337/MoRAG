@@ -1,0 +1,143 @@
+# ============================================================================
+# MoRAG - Multimodal RAG Ingestion Pipeline
+# CLI Requirements File (without spacy - installed separately)
+# ============================================================================
+
+# ============================================================================
+# CORE DEPENDENCIES (Required for basic functionality)
+# ============================================================================
+
+# FastAPI and Web Framework
+fastapi==0.115.4
+uvicorn==0.32.1
+python-multipart==0.0.17
+starlette==0.41.3
+
+# Pydantic and Data Validation
+pydantic>=2.10.0,<2.11.2
+pydantic-settings>=2.7.0,<3.0.0
+pydantic-ai>=0.3.4,<1.0.0
+
+# Task Queue and Background Processing
+celery==5.3.6
+redis==5.2.1
+
+# Vector Database and Search
+qdrant-client==1.12.1
+
+# LLM and AI Services
+google-genai>=1.15.0,<1.18.0
+google-generativeai>=0.3.2,<1.0.0
+
+# gRPC and Protocol Buffers (version compatibility fixes)
+grpcio>=1.73.0,<2.0.0
+grpcio-status>=1.62.3,<2.0.0
+grpcio-tools>=1.73.0,<2.0.0
+protobuf>=6.30.0,<7.0.0
+
+# HTTP and Network
+httpx==0.28.1
+aiofiles==24.1.0
+requests>=2.32.0
+
+# Configuration and Environment
+python-dotenv==1.0.1
+structlog==24.4.0
+
+# System and Utilities
+psutil==6.1.0
+click>=8.1.0
+
+# ============================================================================
+# DOCUMENT PROCESSING
+# ============================================================================
+
+# PDF Processing
+PyPDF2>=3.0.1
+pdfplumber>=0.11.4
+pymupdf>=1.24.0
+
+# Office Documents
+python-docx>=1.1.2
+python-pptx>=1.0.2
+
+# Text Processing and NLP (excluding spacy)
+nltk>=3.9.0
+langdetect>=1.0.9
+
+# Markdown and HTML
+markdown>=3.7,<4.0.0
+markdownify>=0.11.6,<1.0.0
+beautifulsoup4>=4.13.0,<5.0.0
+
+# ============================================================================
+# AUDIO PROCESSING
+# ============================================================================
+
+# Audio Processing
+librosa>=0.10.2
+soundfile>=0.12.1
+pydub>=0.25.1
+
+# Speech Recognition
+openai-whisper>=20240930
+faster-whisper>=1.0.3
+
+# ============================================================================
+# IMAGE AND VIDEO PROCESSING
+# ============================================================================
+
+# Image Processing
+Pillow>=10.4.0
+opencv-python>=4.10.0.84
+
+# Video Processing
+moviepy>=1.0.3
+
+# ============================================================================
+# WEB SCRAPING AND CRAWLING
+# ============================================================================
+
+# Web Scraping
+selenium>=4.27.1
+webdriver-manager>=4.0.2
+scrapy>=2.11.2
+
+# ============================================================================
+# SCIENTIFIC COMPUTING
+# ============================================================================
+
+# Scientific Computing (numpy installed separately)
+scipy>=1.14.1
+scikit-learn>=1.5.2
+pandas>=2.2.3
+
+# ============================================================================
+# WEBDAV CLIENT
+# ============================================================================
+
+# WebDAV Client
+webdavclient3>=3.14.6
+
+# ============================================================================
+# DEVELOPMENT AND TESTING
+# ============================================================================
+
+# Testing
+pytest>=8.3.3
+pytest-asyncio>=0.24.0
+
+# Code Quality
+black>=24.10.0
+isort>=5.13.2
+flake8>=7.1.1
+
+# ============================================================================
+# OPTIONAL DEPENDENCIES
+# ============================================================================
+
+# YouTube Processing
+yt-dlp>=2024.11.18
+
+# Graph Processing
+networkx>=3.4.2
