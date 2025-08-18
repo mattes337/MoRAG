@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Any
 import aiohttp
 import aiofiles
 
-from .processor import AudioSegment, AudioConfig
+from .models import AudioSegment, AudioConfig
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ class RestTranscriptionService:
         Raises:
             RestTranscriptionError: If transcription fails
         """
+
         try:
             # Prepare the API request
             url = f"{self.config.api_base_url}/audio/transcriptions"
@@ -102,6 +103,7 @@ class RestTranscriptionService:
         Returns:
             List of AudioSegment objects
         """
+
         segments = []
         
         for segment in api_segments:
@@ -151,7 +153,7 @@ class RestTranscriptionService:
         return "\n".join(markdown_lines)
     
     def _format_timestamp(self, seconds: float) -> str:
-        """Format timestamp in MM:SS.mmm format.
+        """Format timestamp in MM:SS format.
         
         Args:
             seconds: Time in seconds
@@ -160,5 +162,20 @@ class RestTranscriptionService:
             Formatted timestamp string
         """
         minutes = int(seconds // 60)
-        remaining_seconds = seconds % 60
-        return f"{minutes:02d}:{remaining_seconds:06.3f}"
+        remaining_seconds = int(seconds % 60)
+        return f"{minutes:02d}:{remaining_seconds:02d}"
+    
+    def _logprob_to_confidence(self, logprob: float) -> float:
+        """Convert log probability to confidence score.
+        
+        Args:
+            logprob: Log probability value
+            
+        Returns:
+            Confidence score between 0 and 1
+        """
+        import math
+        if logprob == 0.0:
+            return 1.0
+        # Convert log probability to confidence using exponential
+        return max(0.0, min(1.0, math.exp(logprob)))

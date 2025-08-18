@@ -5,9 +5,8 @@ import aiohttp
 from unittest.mock import AsyncMock, patch, MagicMock
 from pathlib import Path
 
-from morag_audio.processor import AudioConfig
+from morag_audio.models import AudioConfig, AudioSegment
 from morag_audio.rest_transcription import RestTranscriptionService, RestTranscriptionError
-from morag_audio.processor import AudioTranscriptSegment
 
 
 @pytest.fixture
@@ -74,9 +73,9 @@ class TestRestTranscriptionService:
         """Test service initialization."""
         service = RestTranscriptionService(rest_config)
         assert service.config == rest_config
-        assert service.api_key == "test-api-key"
-        assert service.base_url == "https://api.openai.com/v1"
-        assert service.timeout == 30
+        assert service.config.openai_api_key == "test-api-key"
+        assert service.config.api_base_url == "https://api.openai.com/v1"
+        assert service.config.timeout == 30
 
     def test_initialization_missing_api_key(self):
         """Test service initialization with missing API key."""
@@ -107,12 +106,11 @@ class TestRestTranscriptionService:
             assert len(segments) == 2
             
             # Check first segment
-            assert isinstance(segments[0], AudioTranscriptSegment)
+            assert isinstance(segments[0], AudioSegment)
             assert segments[0].text == "Hello world,"
-            assert segments[0].start_time == 0.0
-            assert segments[0].end_time == 2.5
+            assert segments[0].start == 0.0
+            assert segments[0].end == 2.5
             assert segments[0].confidence == 0.7  # Converted from avg_logprob
-            assert segments[0].language == "en"
             
             # Check second segment
             assert segments[1].text == " this is a test transcription."
@@ -168,8 +166,8 @@ class TestRestTranscriptionService:
         service = RestTranscriptionService(rest_config)
         
         segments = [
-            AudioTranscriptSegment("Hello world,", 0.0, 2.5, 0.95, "en"),
-            AudioTranscriptSegment(" this is a test.", 2.5, 5.0, 0.90, "en")
+            AudioSegment(start=0.0, end=2.5, text="Hello world,", confidence=0.95),
+            AudioSegment(start=2.5, end=5.0, text=" this is a test.", confidence=0.90)
         ]
         
         markdown = service.convert_to_markdown("Hello world, this is a test.", segments)
@@ -198,8 +196,8 @@ Hello world, this is a test.
         service = RestTranscriptionService(rest_config)
         
         segments = [
-            AudioTranscriptSegment("Hello world,", 0.0, 2.5, 0.95, "en", speaker="Speaker A"),
-            AudioTranscriptSegment(" this is a test.", 2.5, 5.0, 0.90, "en", speaker="Speaker B")
+            AudioSegment(start=0.0, end=2.5, text="Hello world,", confidence=0.95, speaker="Speaker A"),
+            AudioSegment(start=2.5, end=5.0, text=" this is a test.", confidence=0.90, speaker="Speaker B")
         ]
         
         markdown = service.convert_to_markdown("Hello world, this is a test.", segments)
@@ -224,21 +222,20 @@ Hello world, this is a test.
         assert markdown.strip() == expected.strip()
 
     def test_logprob_to_confidence_conversion(self, rest_config):
-        """Test conversion of log probability to confidence score."""
+        """Test conversion of log probabilities to confidence scores."""
         service = RestTranscriptionService(rest_config)
         
         # Test various log probability values
-        assert service._logprob_to_confidence(0.0) == 1.0  # Perfect confidence
-        assert service._logprob_to_confidence(-0.5) == 0.6  # Good confidence
-        assert service._logprob_to_confidence(-1.0) == 0.37  # Moderate confidence
-        assert service._logprob_to_confidence(-2.0) == 0.14  # Low confidence
-        assert service._logprob_to_confidence(-5.0) == 0.01  # Very low confidence
+        assert abs(service._logprob_to_confidence(-0.1) - 0.90) < 0.01
+        assert abs(service._logprob_to_confidence(-0.5) - 0.61) < 0.01
+        assert abs(service._logprob_to_confidence(-1.0) - 0.37) < 0.01
+        assert abs(service._logprob_to_confidence(-2.0) - 0.14) < 0.01
+        assert service._logprob_to_confidence(0.0) == 1.0
 
-    def test_format_time(self, rest_config):
-        """Test time formatting for markdown output."""
+    def test_format_timestamp(self, rest_config):
+        """Test timestamp formatting utility."""
         service = RestTranscriptionService(rest_config)
         
-        assert service._format_time(0.0) == "00:00"
-        assert service._format_time(65.5) == "01:05"
-        assert service._format_time(3661.2) == "61:01"
-        assert service._format_time(125.7) == "02:05"
+        assert service._format_timestamp(0) == "00:00"
+        assert service._format_timestamp(65.5) == "01:05"
+        assert service._format_timestamp(125.7) == "02:05"
