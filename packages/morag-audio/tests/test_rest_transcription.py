@@ -75,13 +75,22 @@ class TestRestTranscriptionService:
         assert service.config == rest_config
         assert service.config.openai_api_key == "test-api-key"
         assert service.config.api_base_url == "https://api.openai.com/v1"
-        assert service.config.timeout == 30
+        assert service.config.timeout == 30  # Explicitly set in test config
 
     def test_initialization_missing_api_key(self):
         """Test service initialization with missing API key."""
         config = AudioConfig(use_rest_api=True)
         with pytest.raises(RestTranscriptionError, match="OpenAI API key is required"):
             RestTranscriptionService(config)
+    
+    def test_default_timeout_value(self):
+        """Test that default timeout is 60 minutes (3600 seconds)."""
+        config = AudioConfig(
+            use_rest_api=True,
+            openai_api_key="test-api-key"
+        )
+        service = RestTranscriptionService(config)
+        assert service.config.timeout == 3600  # 60 minutes for long transcriptions
 
     @pytest.mark.asyncio
     async def test_transcribe_audio_success(self, rest_config, mock_audio_file, mock_openai_response):

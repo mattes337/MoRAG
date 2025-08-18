@@ -41,7 +41,7 @@ class AudioConfig:
     use_rest_api: bool = False  # Use REST API instead of local whisper
     openai_api_key: Optional[str] = None  # OpenAI API key for REST calls
     api_base_url: str = "https://api.openai.com/v1"  # OpenAI API base URL
-    timeout: int = 300  # API request timeout in seconds
+    timeout: int = 3600  # API request timeout in seconds (60 minutes for long transcriptions)
 
     def __post_init__(self):
         """Load configuration from environment variables if not explicitly set."""
@@ -90,3 +90,11 @@ class AudioConfig:
         env_api_base = os.environ.get("OPENAI_API_BASE")
         if env_api_base and self.api_base_url == "https://api.openai.com/v1":
             self.api_base_url = env_api_base
+        
+        # Override timeout setting
+        env_timeout = os.environ.get("MORAG_REST_TIMEOUT")
+        if env_timeout and self.timeout == 3600:  # Only override if using default
+            try:
+                self.timeout = int(env_timeout)
+            except ValueError:
+                pass  # Keep default if invalid value
