@@ -133,24 +133,79 @@ class TopicSegmentationService:
     def _initialize_embedding_model(self):
         """Initialize the sentence transformer model with safe device configuration."""
         try:
+            # Verify numpy availability before model loading
+            try:
+                import numpy as np
+                logger.debug("NumPy is available for model loading", version=np.__version__)
+            except ImportError as numpy_error:
+                logger.error("NumPy not available for SentenceTransformer model loading", error=str(numpy_error))
+                self.embedding_model = None
+                self.model_loaded = False
+                return
+
             safe_device = get_safe_device(self.preferred_device)
             logger.info("Initializing sentence embedding model",
                        model=self.embedding_model_name,
                        device=safe_device)
 
             try:
+                # Clear any existing cache that might cause deserialization issues
+                import os
+                cache_dir = os.path.expanduser("~/.cache/torch/sentence_transformers")
+                if os.path.exists(cache_dir):
+                    logger.debug("SentenceTransformer cache directory exists", path=cache_dir)
+                
                 self.embedding_model = SentenceTransformer(self.embedding_model_name, device=safe_device)
                 self.model_loaded = True
                 logger.info("Sentence embedding model initialized successfully", device=safe_device)
             except Exception as init_error:
+                error_msg = str(init_error)
+                logger.warning("Model initialization failed", error=error_msg, device=safe_device)
+                
+                # Check if it's a numpy deserialization error
+                if "numpy" in error_msg.lower() and "deserialization" in error_msg.lower():
+                    logger.info("Detected numpy deserialization error, clearing cache and retrying")
+                    try:
+                        # Clear sentence transformers cache
+                        import shutil
+                        cache_dir = os.path.expanduser("~/.cache/torch/sentence_transformers")
+                        if os.path.exists(cache_dir):
+                            shutil.rmtree(cache_dir)
+                            logger.info("Cleared SentenceTransformer cache directory", path=cache_dir)
+                        
+                        # Also clear huggingface cache if it exists
+                        hf_cache_dir = os.path.expanduser("~/.cache/huggingface")
+                        if os.path.exists(hf_cache_dir):
+                            # Only clear sentence transformer models, not all HF models
+                            st_cache_path = os.path.join(hf_cache_dir, "hub")
+                            if os.path.exists(st_cache_path):
+                                for item in os.listdir(st_cache_path):
+                                    if "sentence-transformers" in item.lower() or self.embedding_model_name.replace("/", "--") in item:
+                                        item_path = os.path.join(st_cache_path, item)
+                                        if os.path.isdir(item_path):
+                                            shutil.rmtree(item_path)
+                                            logger.info("Cleared cached model", path=item_path)
+                        
+                        # Retry model loading after cache clear
+                        self.embedding_model = SentenceTransformer(self.embedding_model_name, device=safe_device)
+                        self.model_loaded = True
+                        logger.info("Sentence embedding model initialized successfully after cache clear", device=safe_device)
+                        return
+                    except Exception as cache_clear_error:
+                        logger.warning("Failed to clear cache and retry", error=str(cache_clear_error))
+                
+                # Try CPU fallback if not already on CPU
                 if safe_device != "cpu":
-                    logger.warning("GPU model initialization failed, trying CPU", error=str(init_error))
-                    # Force CPU initialization
-                    self.embedding_model = SentenceTransformer(self.embedding_model_name, device="cpu")
-                    self.model_loaded = True
-                    logger.info("Sentence embedding model initialized on CPU fallback")
-                else:
-                    raise
+                    logger.warning("GPU model initialization failed, trying CPU", error=error_msg)
+                    try:
+                        self.embedding_model = SentenceTransformer(self.embedding_model_name, device="cpu")
+                        self.model_loaded = True
+                        logger.info("Sentence embedding model initialized on CPU fallback")
+                        return
+                    except Exception as cpu_error:
+                        logger.error("CPU fallback also failed", error=str(cpu_error))
+                
+                raise init_error
 
         except Exception as e:
             logger.warning("Failed to initialize sentence embedding model",

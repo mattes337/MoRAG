@@ -139,10 +139,41 @@ class FactRelevanceScorer:
         # Initialize embedding model
         if self.semantic_enabled and not self._embedding_model:
             try:
+                # Verify numpy availability before model loading
+                try:
+                    import numpy as np
+                    logger.debug("NumPy is available for embedding model loading", version=np.__version__)
+                except ImportError as numpy_error:
+                    logger.error("NumPy not available for SentenceTransformer model loading", error=str(numpy_error))
+                    self.semantic_enabled = False
+                    return
+
                 self._embedding_model = SentenceTransformer(self.embedding_model_name)
                 logger.info("Embedding model initialized for fact scoring")
             except Exception as e:
-                logger.warning(f"Failed to initialize embedding model: {e}")
+                error_msg = str(e)
+                logger.warning(f"Failed to initialize embedding model: {error_msg}")
+                
+                # Check if it's a numpy deserialization error and try cache clear
+                if "numpy" in error_msg.lower() and "deserialization" in error_msg.lower():
+                    logger.info("Detected numpy deserialization error, clearing cache and retrying")
+                    try:
+                        import os
+                        import shutil
+                        
+                        # Clear sentence transformers cache
+                        cache_dir = os.path.expanduser("~/.cache/torch/sentence_transformers")
+                        if os.path.exists(cache_dir):
+                            shutil.rmtree(cache_dir)
+                            logger.info("Cleared SentenceTransformer cache directory", path=cache_dir)
+                        
+                        # Retry model loading
+                        self._embedding_model = SentenceTransformer(self.embedding_model_name)
+                        logger.info("Embedding model initialized for fact scoring after cache clear")
+                        return
+                    except Exception as cache_error:
+                        logger.warning(f"Failed to clear cache and retry: {cache_error}")
+                
                 self.semantic_enabled = False
     
     async def score_facts(
