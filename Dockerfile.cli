@@ -52,7 +52,6 @@ COPY packages/ ./packages/
 
 # Install MoRAG packages in development mode
 RUN pip install -e packages/morag-core
-RUN pip install -e packages/morag-services
 RUN pip install -e packages/morag-embedding
 RUN pip install -e packages/morag-document
 RUN pip install -e packages/morag-audio
@@ -62,7 +61,9 @@ RUN pip install -e packages/morag-web
 RUN pip install -e packages/morag-youtube
 RUN pip install -e packages/morag-graph
 RUN pip install -e packages/morag-reasoning
-RUN pip install -e packages/morag
+RUN pip install -e packages/morag-services
+
+RUN pip install pydantic_ai
 
 # Copy CLI scripts
 COPY cli/ ./cli/
