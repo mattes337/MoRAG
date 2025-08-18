@@ -72,7 +72,7 @@ class RemoteJobCreator:
     def __init__(self):
         self.api_base_url = os.getenv('MORAG_API_BASE_URL', 'http://localhost:8000')
         self.timeout_config = {
-            'audio': int(os.getenv('MORAG_REMOTE_TIMEOUT_AUDIO', '1800')),  # 30 minutes
+            'audio': int(os.getenv('MORAG_REMOTE_TIMEOUT_AUDIO', '3600')),  # 60 minutes
             'video': int(os.getenv('MORAG_REMOTE_TIMEOUT_VIDEO', '3600')),  # 60 minutes
             'document': int(os.getenv('MORAG_REMOTE_TIMEOUT_DOCUMENT', '600')),  # 10 minutes
             'image': int(os.getenv('MORAG_REMOTE_TIMEOUT_IMAGE', '300')),  # 5 minutes

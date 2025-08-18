@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from morag_audio.processor import AudioProcessor, AudioConfig, AudioProcessingError, AudioSegment
+from morag_audio.processor import AudioProcessingResult, AudioTranscriptSegment
 
 
 @pytest.fixture
@@ -17,6 +18,18 @@ def audio_config():
         enable_topic_segmentation=False,
         device="cpu",
         vad_filter=True
+    )
+
+
+@pytest.fixture
+def rest_audio_config():
+    """Return a REST API audio config for testing."""
+    return AudioConfig(
+        model_size="whisper-1",
+        use_rest_api=True,
+        openai_api_key="test-api-key",
+        api_base_url="https://api.openai.com/v1",
+        timeout=30
     )
 
 
@@ -46,6 +59,16 @@ async def test_processor_initialization(audio_config):
         processor = AudioProcessor(audio_config)
         assert processor.config == audio_config
         assert processor.transcriber is not None
+
+
+@pytest.mark.asyncio
+async def test_processor_initialization_rest_api(rest_audio_config):
+    """Test that the processor initializes correctly with REST API."""
+    with patch("morag_audio.processor.RestTranscriptionService") as mock_rest_service:
+        processor = AudioProcessor(rest_audio_config)
+        assert processor.config == rest_audio_config
+        assert processor.rest_transcription_service is not None
+        mock_rest_service.assert_called_once_with(rest_audio_config)
 
 
 @pytest.mark.asyncio
@@ -113,6 +136,58 @@ async def test_transcribe_audio(mock_transcriber):
 
 
 @pytest.mark.asyncio
+async def test_transcribe_audio_rest_api(rest_audio_config):
+    """Test audio transcription with REST API."""
+    with patch("morag_audio.processor.RestTranscriptionService") as mock_rest_service_class:
+        # Mock the service instance
+        mock_service = AsyncMock()
+        mock_rest_service_class.return_value = mock_service
+        
+        # Mock transcription response
+        mock_segments = [
+            AudioTranscriptSegment("Hello world", 0.0, 2.0, 0.95, "en"),
+            AudioTranscriptSegment("from REST API", 2.0, 4.0, 0.90, "en")
+        ]
+        mock_service.transcribe_audio.return_value = (
+            "Hello world from REST API",
+            mock_segments,
+            "en"
+        )
+        mock_service.convert_to_markdown.return_value = "# Transcript\n\nHello world from REST API"
+        
+        processor = AudioProcessor(rest_audio_config)
+        mock_file = MagicMock()
+        mock_file.exists.return_value = True
+        
+        result = await processor._transcribe_audio(mock_file, rest_audio_config)
+        
+        assert isinstance(result, AudioProcessingResult)
+        assert result.text == "Hello world from REST API"
+        assert result.language == "en"
+        assert len(result.segments) == 2
+        assert result.markdown_transcript == "# Transcript\n\nHello world from REST API"
+        mock_service.transcribe_audio.assert_called_once_with(mock_file)
+        mock_service.convert_to_markdown.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_transcribe_audio_rest_api_error(rest_audio_config):
+    """Test audio transcription with REST API error."""
+    with patch("morag_audio.processor.RestTranscriptionService") as mock_rest_service_class:
+        # Mock the service instance to raise an error
+        mock_service = AsyncMock()
+        mock_rest_service_class.return_value = mock_service
+        mock_service.transcribe_audio.side_effect = Exception("REST API failed")
+        
+        processor = AudioProcessor(rest_audio_config)
+        mock_file = MagicMock()
+        mock_file.exists.return_value = True
+        
+        with pytest.raises(Exception, match="REST API failed"):
+            await processor._transcribe_audio(mock_file, rest_audio_config)
+
+
+@pytest.mark.asyncio
 async def test_process_success():
     """Test successful audio processing."""
     with patch("morag_audio.processor.WhisperModel", return_value=MagicMock()), \
@@ -142,6 +217,52 @@ async def test_process_success():
         assert result.metadata["word_count"] == 15  # 5 words per segment
         assert result.metadata["segment_count"] == 3
         assert result.metadata["duration"] == 60.0
+
+
+@pytest.mark.asyncio
+async def test_process_success_rest_api(rest_audio_config):
+    """Test successful audio processing with REST API."""
+    with patch("morag_audio.processor.RestTranscriptionService") as mock_rest_service_class, \
+         patch("pathlib.Path.exists", return_value=True), \
+         patch.object(AudioProcessor, "_extract_metadata", new_callable=AsyncMock) as mock_extract:
+        
+        # Mock the service instance
+        mock_service = AsyncMock()
+        mock_rest_service_class.return_value = mock_service
+        
+        # Set up mocks
+        mock_extract.return_value = {"duration": 60.0, "channels": 2}
+        
+        # Mock transcription result
+        mock_result = AudioProcessingResult(
+            text="Hello world from REST API",
+            language="en",
+            confidence=0.95,
+            duration=60.0,
+            segments=[
+                AudioTranscriptSegment("Hello world", 0.0, 2.0, 0.95, "en"),
+                AudioTranscriptSegment("from REST API", 2.0, 4.0, 0.90, "en")
+            ],
+            metadata={"duration": 60.0, "channels": 2},
+            processing_time=2.0,
+            model_used="whisper-1",
+            markdown_transcript="# Transcript\n\nHello world from REST API"
+        )
+        
+        # Mock _transcribe_audio to return the result directly
+        with patch.object(AudioProcessor, "_transcribe_audio", new_callable=AsyncMock) as mock_transcribe:
+            mock_transcribe.return_value = mock_result
+            
+            # Create processor and process file
+            processor = AudioProcessor(rest_audio_config)
+            result = await processor.process("test.mp3")
+            
+            # Check result
+            assert result.success is True
+            assert result.transcript == "Hello world from REST API"
+            assert result.language == "en"
+            assert len(result.segments) == 2
+            assert result.markdown_transcript == "# Transcript\n\nHello world from REST API"
 
 
 @pytest.mark.asyncio

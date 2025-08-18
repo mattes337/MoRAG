@@ -59,7 +59,7 @@ Or manually install:
 ```bash
 sudo apt-get update
 sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
-sudo apt-get install -y libsm6 libxext6 libxrender-dev libgl1-mesa-glx
+sudo apt-get install -y libsm6 libxext6 libxrender-dev libgl1-mesa-dri
 sudo apt-get install -y python3-dev
 ```
 

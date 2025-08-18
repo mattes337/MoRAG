@@ -1,0 +1,32 @@
+# Docker Compose for MoRAG CLI
+# Usage: docker-compose -f docker-compose.cli.yml run --rm morag-cli webdav-processor.py [args]
+
+version: '3.8'
+
+services:
+  morag-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    image: morag-cli:latest
+    container_name: morag-cli
+    env_file:
+      - .env
+    volumes:
+      # Mount local directories for file processing
+      - ./temp_storage:/app/temp_storage
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Mount .env file if it exists
+      - ./.env:/app/.env:ro
+    working_dir: /app
+    # Remove container after execution
+    profiles:
+      - cli
+    networks:
+      - morag-network
+
+networks:
+  morag-network:
+    driver: bridge
