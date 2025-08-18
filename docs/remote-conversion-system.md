@@ -171,7 +171,7 @@ while True:
 
 ### Job Timeouts
 
-- Audio jobs: 30 minutes
+- Audio jobs: 60 minutes
 - Video jobs: 1 hour  
 - Document jobs: 15 minutes
 

@@ -209,7 +209,7 @@ class RemoteJobRepository:
 ## Error Handling and Failure Recovery
 
 ### Timeout Handling
-- Jobs have configurable timeout periods (default: 30 minutes for audio, 60 minutes for video)
+- Jobs have configurable timeout periods (default: 60 minutes for audio, 60 minutes for video)
 - Timed-out jobs are marked as failed and can be retried
 - Workers must send periodic heartbeats during processing
 
@@ -274,7 +274,7 @@ class RemoteJobRepository:
 ```bash
 # Remote conversion settings
 MORAG_REMOTE_CONVERSION_ENABLED=true
-MORAG_REMOTE_JOB_TIMEOUT_AUDIO=1800  # 30 minutes
+MORAG_REMOTE_JOB_TIMEOUT_AUDIO=3600  # 60 minutes
 MORAG_REMOTE_JOB_TIMEOUT_VIDEO=3600  # 60 minutes
 MORAG_REMOTE_FALLBACK_TIMEOUT=300    # 5 minutes
 MORAG_REMOTE_MAX_RETRIES=3

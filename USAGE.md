@@ -360,7 +360,7 @@ result = await api.ingest_file(
 
 #### Job Timeouts
 
-- **Audio jobs**: 30 minutes default
+- **Audio jobs**: 60 minutes default
 - **Video jobs**: 1 hour default
 - **Configurable**: Set custom timeouts in task options
 

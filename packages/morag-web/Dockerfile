@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libpangocairo-1.0-0 \
     libcairo-gobject2 \
-    libgdk-pixbuf2.0-0 \
+    libgdk-pixbuf-xlib-2.0-0 \
     git \
     && rm -rf /var/lib/apt/lists/*
 
