@@ -41,15 +41,16 @@ RUN pip install torch torchvision torchaudio --index-url https://download.pytorc
 # Install protobuf and grpcio packages first to avoid conflicts
 RUN pip install "protobuf>=4.25.0,<5.0.0" "grpcio>=1.60.0,<1.73.0" "grpcio-status>=1.60.0,<1.73.0" "grpcio-tools>=1.60.0,<1.73.0"
 
-# Install numpy first to prevent binary incompatibility issues
-RUN pip install "numpy>=1.24.0,<2.0.0"
+# Install numpy first to prevent binary incompatibility issues (matching main requirements)
+RUN pip install "numpy>=2.1.0,<2.2.0" --force-reinstall --no-cache-dir
 
-# Install spacy and thinc dependencies with compatible versions
-RUN pip install "catalogue>=2.0.0,<2.1.0" "cymem>=2.0.2,<2.1.0" "murmurhash>=1.0.2,<1.1.0" "preshed>=3.0.2,<3.1.0" "wasabi>=0.9.1,<1.2.0" "srsly>=2.4.3,<3.0.0"
+# Install spacy and thinc dependencies with compatible versions for spaCy 3.8+ and thinc 9.x
+RUN pip install "catalogue>=2.0.6,<2.1.0" "cymem>=2.0.2,<2.1.0" "murmurhash>=1.0.2,<1.1.0" "preshed>=3.0.2,<3.1.0" "wasabi>=0.9.1,<1.2.0" "srsly>=2.4.3,<3.0.0" "spacy-legacy>=3.0.11,<3.1.0" "spacy-loggers>=1.0.0,<2.0.0"
 
-# Install thinc and spacy with --no-deps to avoid numpy conflicts
-RUN pip install "thinc>=8.1.0,<8.3.0" --no-deps
-RUN pip install "spacy>=3.7.0,<3.8.0" --no-deps
+# Install thinc and spacy with --no-deps and force reinstall to avoid numpy conflicts
+# Using latest versions that support numpy 2.0
+RUN pip install "thinc>=9.0.0,<10.0.0" --no-deps --force-reinstall --no-cache-dir
+RUN pip install "spacy>=3.8.0,<4.0.0" --no-deps --force-reinstall --no-cache-dir
 
 # Install minimal CLI requirements (excluding spacy since we installed it separately)
 RUN pip install -r requirements-cli-no-spacy.txt
