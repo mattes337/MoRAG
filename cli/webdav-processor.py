@@ -19,6 +19,7 @@ import os
 import sys
 import asyncio
 import tempfile
+import gc
 from pathlib import Path
 from typing import List, Optional
 from webdav3.client import Client
@@ -40,6 +41,96 @@ except ImportError as e:
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-services")
     sys.exit(1)
+
+
+class CUDAOutOfMemoryError(Exception):
+    """Custom exception for CUDA out of memory errors."""
+    pass
+
+
+def is_cuda_oom_error(error: Exception) -> bool:
+    """Check if an error is a CUDA out of memory error.
+    
+    Args:
+        error: Exception to check
+        
+    Returns:
+        True if the error is a CUDA OOM error
+    """
+    error_msg = str(error).lower()
+    oom_patterns = [
+        'cuda out of memory',
+        'torch.cuda.outofmemoryerror',
+        'gpu memory allocation failed',
+        'cuda kernel launch failed',
+        'out of memory'
+    ]
+    
+    return any(pattern in error_msg for pattern in oom_patterns)
+
+
+def cleanup_cuda_memory():
+    """Clean up CUDA memory and force garbage collection.
+    
+    This function attempts to free up GPU memory by:
+    1. Clearing CUDA cache
+    2. Running garbage collection
+    3. Clearing MPS cache if available
+    """
+    try:
+        import torch
+        
+        # Force garbage collection first
+        gc.collect()
+        
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            print("  🧹 Cleared CUDA memory cache")
+        
+        # Clear MPS cache if available (for Apple Silicon)
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+            print("  🧹 Cleared MPS memory cache")
+            
+    except ImportError:
+        # PyTorch not available, just run garbage collection
+        gc.collect()
+        print("  🧹 Ran garbage collection (PyTorch not available)")
+    except Exception as e:
+        print(f"  ⚠️  Warning: Could not clean up GPU memory: {e}")
+        gc.collect()
+
+
+def get_cuda_memory_info() -> dict:
+    """Get current CUDA memory usage information.
+    
+    Returns:
+        Dictionary with memory information or empty dict if CUDA unavailable
+    """
+    try:
+        import torch
+        
+        if not torch.cuda.is_available():
+            return {}
+            
+        device = torch.cuda.current_device()
+        total_memory = torch.cuda.get_device_properties(device).total_memory
+        allocated_memory = torch.cuda.memory_allocated(device)
+        cached_memory = torch.cuda.memory_reserved(device)
+        free_memory = total_memory - allocated_memory
+        
+        return {
+            'total_mb': total_memory // (1024 * 1024),
+            'allocated_mb': allocated_memory // (1024 * 1024),
+            'cached_mb': cached_memory // (1024 * 1024),
+            'free_mb': free_memory // (1024 * 1024),
+            'usage_percent': (allocated_memory / total_memory) * 100
+        }
+        
+    except Exception:
+        return {}
 
 
 class MoRAGWebDAVProcessor:
@@ -452,8 +543,19 @@ class MoRAGWebDAVProcessor:
             return str(markdown_file_path)
             
         except Exception as e:
-            print(f"  ✗ Error processing {remote_file_path}: {e}")
-            return None
+                # Check if this is a CUDA OOM error
+                if is_cuda_oom_error(e):
+                    print(f"  🚨 CUDA Out of Memory Error detected: {e}")
+                    print(f"  🛑 Stopping all processing to prevent system instability")
+                    
+                    # Attempt to clean up memory
+                    cleanup_cuda_memory()
+                    
+                    # Raise custom OOM exception to stop the entire process
+                    raise CUDAOutOfMemoryError(f"CUDA out of memory while processing {remote_file_path}: {e}")
+                
+                print(f"  ✗ Error processing {remote_file_path}: {e}")
+                return None
 
     def upload_processed_files(self, original_file_path: str, processed_files: List[str], folder_path: str) -> bool:
         """
@@ -509,6 +611,9 @@ class MoRAGWebDAVProcessor:
         
         Args:
             folder_path: Path to the folder on WebDAV server to process
+            
+        Raises:
+            CUDAOutOfMemoryError: If CUDA runs out of memory during processing
         """
         print(f"\n🚀 Starting MoRAG processing of folder: {folder_path}")
         print(f"📁 Processing files with extension: .{self.file_extension}")
@@ -541,9 +646,14 @@ class MoRAGWebDAVProcessor:
         skipped_count = 0
         upload_failed_count = 0
         
+        # Show initial memory status if CUDA is available
+        memory_info = get_cuda_memory_info()
+        if memory_info:
+            print(f"🖥️  Initial GPU Memory: {memory_info['allocated_mb']} MB / {memory_info['total_mb']} MB ({memory_info['usage_percent']:.1f}% used)")
+        
         # Process each file
-        for file_path in all_files:
-            print(f"\n📁 Checking file: {file_path}")
+        for i, file_path in enumerate(all_files, 1):
+            print(f"\n📁 [{i}/{len(all_files)}] Checking file: {file_path}")
             
             # Check if file should be processed
             if not self.should_process_file(file_path, folder_path, all_files):
@@ -551,6 +661,13 @@ class MoRAGWebDAVProcessor:
                     print(f"  ⏭️  Skipping {file_path} - wrong extension (looking for .{self.file_extension})")
                 skipped_count += 1
                 continue
+            
+            # Show memory status before processing each file
+            memory_info = get_cuda_memory_info()
+            if memory_info and memory_info['usage_percent'] > 80:
+                print(f"  ⚠️  High GPU memory usage ({memory_info['usage_percent']:.1f}%) before processing {file_path}")
+                print(f"     Attempting to clean up memory...")
+                cleanup_cuda_memory()
 
             try:
                 # Process the file using MoRAG
@@ -570,6 +687,35 @@ class MoRAGWebDAVProcessor:
                         processed_count += 1
                 else:
                     print(f"  ✗ Failed to process {file_path}")
+                
+            except CUDAOutOfMemoryError as cuda_error:
+                print(f"\n🚨 CUDA Out of Memory Error - Stopping all processing")
+                print(f"Error occurred while processing: {file_path}")
+                print(f"Error details: {cuda_error}")
+                
+                # Show final memory info if available
+                memory_info = get_cuda_memory_info()
+                if memory_info:
+                    print(f"\n🖥️  GPU Memory Status at failure:")
+                    print(f"     Total: {memory_info['total_mb']} MB")
+                    print(f"     Allocated: {memory_info['allocated_mb']} MB ({memory_info['usage_percent']:.1f}%)")
+                    print(f"     Free: {memory_info['free_mb']} MB")
+                
+                print(f"\n💡 Suggestions to resolve CUDA OOM:")
+                print(f"   1. Reduce batch size or model size in MoRAG configuration")
+                print(f"   2. Process files individually instead of in batch")
+                print(f"   3. Use CPU-only processing if available")
+                print(f"   4. Restart the script to clear GPU memory")
+                print(f"   5. Process smaller files first")
+                
+                print(f"\n📊 Processing stopped at file {i} of {len(all_files)}")
+                print(f"   ✅ Successfully processed: {processed_count} files")
+                print(f"   ⏭️  Skipped: {skipped_count} files")
+                print(f"   ❌ Failed: {upload_failed_count} files")
+                print(f"   🚫 Not processed due to OOM: {len(all_files) - i + 1} files")
+                
+                # Exit with error code
+                sys.exit(2)
                 
             except Exception as e:
                 print(f"  ✗ Error processing {file_path}: {e}")
@@ -665,8 +811,18 @@ Examples:
     # Initialize processor and run
     processor = MoRAGWebDAVProcessor(args.url, args.subdirectory, args.username, args.password, args.extension)
     
-    # Run the async processing
-    asyncio.run(processor.process_folder(args.folder))
+    # Run the async processing with proper error handling
+    try:
+        asyncio.run(processor.process_folder(args.folder))
+    except CUDAOutOfMemoryError as cuda_error:
+        print(f"\n🚨 FATAL: CUDA Out of Memory Error")
+        print(f"The processing has been stopped to prevent system instability.")
+        print(f"No further files will be processed or uploaded.")
+        print(f"\nTo resolve this issue:")
+        print(f"  • Restart the script to clear GPU memory")
+        print(f"  • Consider processing fewer/smaller files at once")
+        print(f"  • Check MoRAG configuration for memory optimization settings")
+        sys.exit(2)  # Exit code 2 for OOM errors
 
 
 if __name__ == '__main__':
