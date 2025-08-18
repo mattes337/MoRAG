@@ -304,34 +304,29 @@ class MoRAGServices:
             # Backward compatibility: check for enable_graph_processing
             enable_graph_processing = options.get('enable_graph_processing', False)
 
-            # Get both formats: markdown for Qdrant, JSON for API response
-            markdown_result = await self.document_service.process_document(
-                Path(document_path),
-                progress_callback=progress_callback,
-                **{k: v for k, v in options.items() if k not in ['progress_callback', 'databases', 'enable_graph_processing']}
-            )
-
+            # Process document once to get JSON result, then convert to markdown for Qdrant storage
             json_result = await self.document_service.process_document_to_json(
                 Path(document_path),
                 progress_callback=progress_callback,
                 **{k: v for k, v in options.items() if k not in ['progress_callback', 'databases', 'enable_graph_processing']}
             )
 
-            # Use markdown content for text_content (Qdrant storage)
+            # Convert JSON result to markdown content for text_content (Qdrant storage)
             text_content = ""
-            if markdown_result.document:
-                if markdown_result.document.chunks:
-                    # Create markdown from chunks
-                    markdown_parts = []
-                    for chunk in markdown_result.document.chunks:
-                        if chunk.section:
-                            markdown_parts.append(f"## {chunk.section}\n\n{chunk.content}")
-                        else:
-                            markdown_parts.append(chunk.content)
-                    text_content = "\n\n".join(markdown_parts)
-                else:
-                    # Use raw text if no chunks
-                    text_content = markdown_result.document.raw_text or ""
+            if json_result.get("chapters"):
+                # Create markdown from chapters
+                markdown_parts = []
+                for chapter in json_result["chapters"]:
+                    chapter_title = chapter.get("title", "")
+                    chapter_content = chapter.get("content", "")
+                    if chapter_title and chapter_title != json_result.get("title", ""):
+                        markdown_parts.append(f"## {chapter_title}\n\n{chapter_content}")
+                    else:
+                        markdown_parts.append(chapter_content)
+                text_content = "\n\n".join(markdown_parts)
+            elif json_result.get("title"):
+                # Fallback: use title as content if no chapters
+                text_content = f"# {json_result['title']}\n\nNo content available."
 
             # Process graph extraction with multiple databases
             graph_result = None
@@ -416,29 +411,72 @@ class MoRAGServices:
             # Extract progress callback from options if available
             progress_callback = (options or {}).get('progress_callback')
 
-            # Get both markdown (for Qdrant) and JSON (for API response)
-            markdown_result = await self.audio_service.process_file(
-                Path(audio_path),
-                save_output=False,  # Don't save files, just return content
-                output_format="markdown",  # Use markdown format for Qdrant storage
-                progress_callback=progress_callback
-            )
-
+            # Process audio once to get JSON result with all metadata and timecodes
             json_result = await self.audio_service.process_file(
                 Path(audio_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="json",  # Use JSON format for API response
+                output_format="json",  # Get JSON with all metadata
                 progress_callback=progress_callback
             )
 
-            # Use markdown content for text_content (Qdrant storage)
+            # Convert JSON result to markdown format using the converter directly
             text_content = ""
-            if "content" in markdown_result:
-                text_content = markdown_result["content"]
-            elif "markdown" in markdown_result:
-                text_content = markdown_result["markdown"]
-            elif "transcript" in markdown_result:
-                text_content = markdown_result["transcript"]
+            if json_result.get("success", False):
+                try:
+                    # Import here to avoid circular imports
+                    from morag_audio.converters import AudioConversionOptions
+                    from morag_audio.processor import AudioProcessingResult
+                    
+                    # Create AudioProcessingResult from JSON data for conversion
+                    # This is a simplified approach - in practice, we'd need to reconstruct the full result
+                    # For now, extract the transcript from JSON content
+                    content = json_result.get("content", {})
+                    if isinstance(content, dict):
+                        # Extract transcript and segments for markdown conversion
+                        transcript = content.get("transcript", "")
+                        segments = content.get("segments", [])
+                        
+                        # Create basic markdown content with timestamps
+                        markdown_parts = []
+                        file_name = Path(audio_path).name
+                        markdown_parts.append(f"# Audio Transcription: {file_name}\n")
+                        
+                        # Add metadata if available
+                        metadata = json_result.get("metadata", {})
+                        if metadata:
+                            markdown_parts.append("## Metadata\n")
+                            for key, value in metadata.items():
+                                if key not in ["transcript_embedding"]:
+                                    markdown_parts.append(f"- **{key.replace('_', ' ').title()}**: {value}")
+                            markdown_parts.append("")
+                        
+                        # Add transcript with timestamps if segments are available
+                        if segments:
+                            markdown_parts.append("## Detailed Transcript\n")
+                            for segment in segments:
+                                if isinstance(segment, dict):
+                                    start_time = segment.get("start", 0)
+                                    text = segment.get("text", "")
+                                    # Format timestamp
+                                    minutes = int(start_time // 60)
+                                    seconds = int(start_time % 60)
+                                    timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                                    markdown_parts.append(f"{timestamp} {text}")
+                        elif transcript:
+                            markdown_parts.append("## Full Transcript\n")
+                            markdown_parts.append(transcript)
+                        
+                        text_content = "\n".join(markdown_parts)
+                    elif isinstance(content, str):
+                        text_content = content
+                except Exception as e:
+                    logger.warning(f"Failed to convert audio result to markdown: {e}")
+                    # Fallback to basic transcript
+                    content = json_result.get("content", {})
+                    if isinstance(content, dict):
+                        text_content = content.get("transcript", "")
+                    elif isinstance(content, str):
+                        text_content = content
 
             return ProcessingResult(
                 content_type=ContentType.AUDIO,
@@ -483,23 +521,27 @@ class MoRAGServices:
                 original_config = self.video_service.config.generate_thumbnails
                 self.video_service.config.generate_thumbnails = False
 
-            # Process video once to get JSON result
+            # Process video once to get JSON result with all metadata and timecodes
             json_result = await self.video_service.process_file(
                 Path(video_path),
                 save_output=False,  # Don't save files, just return content
-                output_format="json",  # Process once in JSON format
+                output_format="json",  # Get JSON with all metadata
                 progress_callback=progress_callback
             )
+
+            # Convert JSON result to markdown format to preserve timecodes
+            markdown_result = await self.video_service.convert_result_to_markdown(json_result)
 
             # Restore original config
             if not include_thumbnails:
                 self.video_service.config.generate_thumbnails = original_config
 
-            # Extract markdown content for text_content (Qdrant storage)
-            # For now, we'll use a simple conversion from JSON to text
+            # Use markdown content for text_content (preserves timecodes)
             text_content = ""
-            if json_result.get("success", False):
-                # Extract text from the JSON structure
+            if markdown_result.get("success", False) and "content" in markdown_result:
+                text_content = markdown_result["content"]
+            elif json_result.get("success", False):
+                # Fallback to JSON conversion if markdown failed
                 content = json_result.get("content", {})
                 if isinstance(content, dict):
                     # Extract title and topics text
@@ -534,12 +576,12 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.VIDEO,
                 content_path=video_path,
-                text_content=text_content,  # Markdown for Qdrant
+                text_content=text_content,  # Markdown with timecodes for Qdrant
                 metadata=json_result.get("metadata", {}),
                 extracted_files=(json_result.get("thumbnails", []) or []) + (json_result.get("keyframes", []) or []),
                 processing_time=json_result.get("processing_time", 0.0),
-                success=json_result.get("success", False),
-                error_message=json_result.get("error"),
+                success=markdown_result.get("success", False) or json_result.get("success", False),
+                error_message=markdown_result.get("error") or json_result.get("error"),
                 raw_result=json_result  # JSON for API response
             )
         except Exception as e:
@@ -623,8 +665,8 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.WEB,
                 content_url=url,
-                text_content=result.content,
-                metadata=result.metadata,
+                text_content=result.content.content if result.content else "",
+                metadata=result.content.metadata if result.content else {},
                 processing_time=result.processing_time,
                 success=result.success,
                 error_message=result.error_message,

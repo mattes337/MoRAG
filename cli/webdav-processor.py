@@ -198,13 +198,14 @@ class MoRAGWebDAVProcessor:
         print(f"✓ Found {len(all_files)} files in {folder_path}")
         return all_files
 
-    def should_process_file(self, file_path: str, folder_path: str) -> bool:
+    def should_process_file(self, file_path: str, folder_path: str, all_files: List[str]) -> bool:
         """
         Check if the file should be processed.
         
         Args:
             file_path: Relative path to the file
             folder_path: Base folder path on WebDAV server
+            all_files: List of all files in the directory (used to check for existing .md files)
             
         Returns:
             True if file should be processed, False otherwise
@@ -213,24 +214,28 @@ class MoRAGWebDAVProcessor:
         if not file_path.lower().endswith(f'.{self.file_extension}'):
             return False
         
-        # Check if markdown file already exists
+        # Check if markdown or intermediate markdown files already exist by looking in the all_files list
         file_stem = Path(file_path).stem
         markdown_filename = f"{file_stem}.md"
+        intermediate_filename = f"{file_stem}_intermediate.md"
         
-        # Construct the path where the markdown file would be
+        # Construct the expected file paths
         file_dir = os.path.dirname(file_path)
         if file_dir:
-            markdown_path = f"{folder_path.rstrip('/')}/{file_dir}/{markdown_filename}"
+            expected_markdown_path = f"{file_dir}/{markdown_filename}"
+            expected_intermediate_path = f"{file_dir}/{intermediate_filename}"
         else:
-            markdown_path = f"{folder_path.rstrip('/')}/{markdown_filename}"
+            expected_markdown_path = markdown_filename
+            expected_intermediate_path = intermediate_filename
         
-        # Check if markdown file exists on WebDAV server
-        try:
-            if self.client.check(markdown_path):
+        # Check if either markdown file exists in our file list
+        for existing_file in all_files:
+            if existing_file == expected_markdown_path:
                 print(f"  ⏭️  Skipping {file_path} - markdown file already exists: {markdown_filename}")
                 return False
-        except Exception as e:
-            print(f"  ⚠️  Warning: Could not check for existing markdown file: {e}")
+            elif existing_file == expected_intermediate_path:
+                print(f"  ⏭️  Skipping {file_path} - intermediate markdown file already exists: {intermediate_filename}")
+                return False
         
         return True
 
@@ -266,43 +271,150 @@ class MoRAGWebDAVProcessor:
         # Create local temporary file path
         local_filename = os.path.basename(remote_file_path)
         
-        # Use a temporary directory for processing
-        with tempfile.TemporaryDirectory() as temp_dir:
-            local_temp_path = Path(temp_dir) / local_filename
+        # Use current working directory for processing to avoid file deletion
+        current_dir = Path.cwd()
+        local_temp_path = current_dir / local_filename
+        
+        try:
+            # Download file locally using direct HTTP approach
+            print(f"  ⬇️  Downloading {webdav_remote_path}...")
             
-            try:
-                # Download file locally using direct HTTP approach
-                print(f"  ⬇️  Downloading {webdav_remote_path}...")
+            # Use direct HTTP request to bypass webdavclient3 path issues
+            import requests
+            from requests.auth import HTTPBasicAuth
+            
+            # Construct the direct URL
+            file_url = f"{self.webdav_url}/{webdav_remote_path}"
+            
+            # Make direct HTTP request
+            response = requests.get(
+                file_url,
+                auth=HTTPBasicAuth(self.username, self.password),
+                verify=False,
+                stream=True,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                with open(local_temp_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                print(f"  ✓ Downloaded to {local_temp_path}")
+            else:
+                raise Exception(f"HTTP download failed with status code: {response.status_code}")
+            
+            # Process the file using MoRAG Services
+            print(f"  🔄 Processing {remote_file_path} with MoRAG...")
+            
+            # Determine file type and use appropriate service method
+            file_extension = Path(remote_file_path).suffix.lower()
+            markdown_filename = Path(remote_file_path).stem + ".md"
+            markdown_file_path = current_dir / markdown_filename
+            
+            if file_extension in ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v']:
+                # Use VideoService for proper markdown output with timecodes
+                from morag_video import VideoService, VideoConfig
                 
-                # Use direct HTTP request to bypass webdavclient3 path issues
-                import requests
-                from requests.auth import HTTPBasicAuth
-                
-                # Construct the direct URL
-                file_url = f"{self.webdav_url}/{webdav_remote_path}"
-                
-                # Make direct HTTP request
-                response = requests.get(
-                    file_url,
-                    auth=HTTPBasicAuth(self.username, self.password),
-                    verify=False,
-                    stream=True,
-                    timeout=30
+                # Create video configuration similar to test-video.py
+                config = VideoConfig(
+                    enable_speaker_diarization=True,
+                    enable_topic_segmentation=True,
+                    audio_model_size="base",
+                    enable_ocr=False,
+                    language=None  # Auto-detect language (None for auto-detection)
                 )
                 
-                if response.status_code == 200:
-                    with open(local_temp_path, 'wb') as f:
-                        for chunk in response.iter_content(chunk_size=8192):
-                            if chunk:
-                                f.write(chunk)
-                    print(f"  ✓ Downloaded to {local_temp_path}")
+                service = VideoService(config=config, output_dir=current_dir)
+                service_result = await service.process_file(
+                    file_path=local_temp_path,
+                    save_output=True,
+                    output_format="markdown"
+                )
+                
+                if not service_result or not service_result.get('success', False):
+                    print(f"  ✗ Video processing failed for {remote_file_path}")
+                    return None
+                    
+                print(f"  ✓ Video processing completed for {remote_file_path}")
+                
+                # Get the actual markdown file path from service output
+                output_files = service_result.get('output_files', {})
+                if 'markdown' in output_files:
+                    markdown_file_path = Path(output_files['markdown'])
+                    print(f"  ✓ Found generated markdown file: {markdown_file_path.name}")
                 else:
-                    raise Exception(f"HTTP download failed with status code: {response.status_code}")
+                    print(f"  ✗ No markdown file found in service output for {remote_file_path}")
+                    return None
                 
-                # Process the file using MoRAG Services
-                print(f"  🔄 Processing {remote_file_path} with MoRAG...")
+            elif file_extension in ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma']:
+                # Use AudioService for proper markdown output with timecodes
+                from morag_audio import AudioService, AudioConfig
                 
-                # Process the file using appropriate MoRAG service based on file extension
+                # Create audio configuration
+                config = AudioConfig(
+                    enable_speaker_diarization=True,
+                    enable_topic_segmentation=True,
+                    audio_model_size="base",
+                    language=None  # Auto-detect language (None for auto-detection)
+                )
+                
+                service = AudioService(config=config, output_dir=current_dir)
+                service_result = await service.process_file(
+                    file_path=local_temp_path,
+                    save_output=True,
+                    output_format="markdown"
+                )
+                
+                if not service_result or not service_result.get('success', False):
+                    print(f"  ✗ Audio processing failed for {remote_file_path}")
+                    return None
+                    
+                print(f"  ✓ Audio processing completed for {remote_file_path}")
+                
+                # Get the actual markdown file path from service output
+                output_files = service_result.get('output_files', {})
+                if 'markdown' in output_files:
+                    markdown_file_path = Path(output_files['markdown'])
+                    print(f"  ✓ Found generated markdown file: {markdown_file_path.name}")
+                else:
+                    print(f"  ✗ No markdown file found in service output for {remote_file_path}")
+                    return None
+                
+            elif file_extension in ['.pdf', '.docx', '.doc', '.txt', '.rtf', '.odt']:
+                # Use DocumentService for proper markdown output
+                from morag_document import DocumentService, DocumentConfig
+                
+                # Create document configuration
+                config = DocumentConfig(
+                    enable_ocr=True,
+                    language=None  # Auto-detect language (None for auto-detection)
+                )
+                
+                service = DocumentService(config=config, output_dir=current_dir)
+                service_result = await service.process_file(
+                    file_path=local_temp_path,
+                    save_output=True,
+                    output_format="markdown"
+                )
+                
+                if not service_result or not service_result.get('success', False):
+                    print(f"  ✗ Document processing failed for {remote_file_path}")
+                    return None
+                    
+                print(f"  ✓ Document processing completed for {remote_file_path}")
+                
+                # Get the actual markdown file path from service output
+                output_files = service_result.get('output_files', {})
+                if 'markdown' in output_files:
+                    markdown_file_path = Path(output_files['markdown'])
+                    print(f"  ✓ Found generated markdown file: {markdown_file_path.name}")
+                else:
+                    print(f"  ✗ No markdown file found in service output for {remote_file_path}")
+                    return None
+                
+            else:
+                # Fallback to generic processing for other file types
                 processing_result = await self.morag_services.process_content(
                     path_or_url=str(local_temp_path)
                 )
@@ -313,11 +425,7 @@ class MoRAGWebDAVProcessor:
                 
                 print(f"  ✓ MoRAG processing completed for {remote_file_path}")
                 
-                # Create markdown file from processing result
-                markdown_filename = Path(remote_file_path).stem + ".md"
-                markdown_file_path = Path(temp_dir) / markdown_filename
-                
-                # Write the extracted text content to markdown file
+                # For generic files, create markdown file from processing result
                 with open(markdown_file_path, 'w', encoding='utf-8') as f:
                     f.write(f"# {Path(remote_file_path).name}\n\n")
                     if processing_result.metadata:
@@ -327,19 +435,27 @@ class MoRAGWebDAVProcessor:
                         f.write("\n")
                     f.write("## Content\n\n")
                     f.write(processing_result.text_content)
-                
-                if not markdown_file_path.exists():
-                    print(f"  ✗ Failed to create markdown file for {remote_file_path}")
-                    return None
-                
                 print(f"  ✓ Generated markdown file: {markdown_file_path.name}")
-                return str(markdown_file_path)
-                
-            except Exception as e:
-                print(f"  ✗ Error processing {remote_file_path}: {e}")
+            
+            # Final check if markdown file exists
+            if not markdown_file_path.exists():
+                print(f"  ✗ Failed to create markdown file for {remote_file_path}")
                 return None
+            
+            # Clean up downloaded file after processing
+            try:
+                local_temp_path.unlink()
+                print(f"  🗑️  Cleaned up downloaded file: {local_filename}")
+            except Exception as cleanup_error:
+                print(f"  ⚠️  Warning: Could not clean up {local_filename}: {cleanup_error}")
+            
+            return str(markdown_file_path)
+            
+        except Exception as e:
+            print(f"  ✗ Error processing {remote_file_path}: {e}")
+            return None
 
-    def upload_processed_files(self, original_file_path: str, processed_files: List[str], folder_path: str):
+    def upload_processed_files(self, original_file_path: str, processed_files: List[str], folder_path: str) -> bool:
         """
         Upload processed files back to WebDAV server alongside the original file.
         
@@ -347,40 +463,45 @@ class MoRAGWebDAVProcessor:
             original_file_path: Relative path of the original file on WebDAV server
             processed_files: List of local paths to processed files
             folder_path: Base folder path on WebDAV server
+            
+        Returns:
+            bool: True if all uploads succeeded, False if any failed
         """
         if not processed_files:
-            return
+            return True
         
-        # Ensure folder path ends with /
-        if not folder_path.endswith('/'):
-            folder_path += '/'
-            
-        # Get the directory of the original file
-        original_dir = os.path.dirname(original_file_path)
+        upload_success = True
         
         for local_file in processed_files:
             try:
                 # Get just the filename for upload
                 filename = os.path.basename(local_file)
                 
-                # Construct remote path including subdirectory
-                path_parts = []
-                if self.subdirectory:
-                    path_parts.append(self.subdirectory.strip('/'))
-                if folder_path and folder_path not in ['.', './']:
-                    path_parts.append(folder_path.strip('/'))
+                # The original_file_path already contains the full path including subdirectory
+                # We just need to replace the original filename with the new filename
+                original_dir = os.path.dirname(original_file_path)
+                
                 if original_dir:
-                    path_parts.append(original_dir.strip('/'))
-                path_parts.append(filename)
+                    remote_path = f"{original_dir}/{filename}"
+                else:
+                    remote_path = filename
                 
-                remote_path = '/'.join(path_parts)
-                
-                # Upload the file
-                self.client.upload_sync(remote_path=remote_path, local_path=local_file)
+                # Upload the file using the correct webdav3 client method
+                self.client.upload(remote_path=remote_path, local_path=local_file)
                 print(f"  ✓ Uploaded {filename} to {remote_path}")
+                
+                # Clean up local file after successful upload
+                try:
+                    os.remove(local_file)
+                    print(f"  🗑️  Cleaned up local file: {filename}")
+                except Exception as cleanup_error:
+                    print(f"  ⚠️  Warning: Could not clean up {filename}: {cleanup_error}")
                 
             except Exception as e:
                 print(f"  ✗ Failed to upload {local_file}: {e}")
+                upload_success = False
+                
+        return upload_success
 
     async def process_folder(self, folder_path: str):
         """
@@ -418,26 +539,35 @@ class MoRAGWebDAVProcessor:
         
         processed_count = 0
         skipped_count = 0
+        upload_failed_count = 0
         
         # Process each file
         for file_path in all_files:
             print(f"\n📁 Checking file: {file_path}")
             
             # Check if file should be processed
-            if not self.should_process_file(file_path, folder_path):
+            if not self.should_process_file(file_path, folder_path, all_files):
                 if not file_path.lower().endswith(f'.{self.file_extension}'):
                     print(f"  ⏭️  Skipping {file_path} - wrong extension (looking for .{self.file_extension})")
                 skipped_count += 1
                 continue
-            
+
             try:
                 # Process the file using MoRAG
                 processed_file = await self.process_file(file_path, folder_path)
                 
                 if processed_file:
                     # Upload processed file back to WebDAV
-                    self.upload_processed_files(file_path, [processed_file], folder_path)
-                    processed_count += 1
+                    upload_success = self.upload_processed_files(file_path, [processed_file], folder_path)
+                    
+                    if upload_success:
+                        print(f"  ✅ Successfully processed and uploaded {file_path}")
+                        processed_count += 1
+                    else:
+                        print(f"  ⚠️  Processing succeeded but upload failed for {file_path}")
+                        upload_failed_count += 1
+                        # Still count as processed since the processing itself succeeded
+                        processed_count += 1
                 else:
                     print(f"  ✗ Failed to process {file_path}")
                 
@@ -445,9 +575,21 @@ class MoRAGWebDAVProcessor:
                 print(f"  ✗ Error processing {file_path}: {e}")
         
         print(f"\n✅ Processing complete!")
-        print(f"📊 Processed: {processed_count} files")
+        print(f"📊 Successfully processed and uploaded: {processed_count - upload_failed_count} files")
+        if upload_failed_count > 0:
+            print(f"⚠️  Processed but upload failed: {upload_failed_count} files")
+        print(f"📊 Total processed: {processed_count} files")
         print(f"📊 Skipped: {skipped_count} files")
         print(f"📊 Total files found: {len(all_files)}")
+        
+        # Return appropriate exit code
+        if upload_failed_count > 0:
+            print(f"\n⚠️  Warning: Some files were processed successfully but failed to upload to WebDAV")
+            print(f"Check the markdown files in the current directory and upload them manually if needed.")
+        elif processed_count == 0 and skipped_count == len(all_files):
+            print(f"\nℹ️  No files were processed (all were skipped)")
+        elif processed_count > 0:
+            print(f"\n🎉 All files processed and uploaded successfully!")
 
 
 def main():

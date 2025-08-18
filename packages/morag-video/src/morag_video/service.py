@@ -286,10 +286,14 @@ class VideoService:
                 options = VideoConversionOptions()
                 markdown_content = await self.converter.convert_to_markdown(content, options)
             elif isinstance(content, dict):
-                # Try to reconstruct VideoProcessingResult from dict
-                # For now, just return the original result
-                logger.warning("Cannot convert dict content to markdown, returning original")
-                return json_result
+                # Create markdown directly from dictionary content
+                logger.info("Converting dictionary content to markdown")
+                markdown_content = await self._convert_dict_to_markdown(content, json_result.get("metadata", {}))
+                
+                # Return the same structure but with markdown content
+                markdown_result = json_result.copy()
+                markdown_result["content"] = markdown_content
+                return markdown_result
             else:
                 logger.warning(f"Unknown content type: {type(content)}, returning original")
                 return json_result
@@ -304,6 +308,83 @@ class VideoService:
             logger.error("Failed to convert result to markdown", error=str(e))
             # Return original result if conversion fails
             return json_result
+
+    async def _convert_dict_to_markdown(self, content: Dict[str, Any], metadata: Dict[str, Any]) -> str:
+        """Convert dictionary content to markdown format with transcription and timecodes.
+        
+        Args:
+            content: Dictionary containing video processing results
+            metadata: Metadata dictionary
+            
+        Returns:
+            Markdown formatted string
+        """
+        markdown_parts = []
+        
+        # Add title
+        title = content.get("title", "Video Analysis")
+        markdown_parts.append(f"# {title}\n")
+        
+        # Add metadata section
+        if metadata:
+            markdown_parts.append("## Metadata\n")
+            for key, value in metadata.items():
+                if key not in ["transcript_embedding", "segments_embedding"]:
+                    formatted_key = key.replace('_', ' ').title()
+                    markdown_parts.append(f"- **{formatted_key}**: {value}")
+            markdown_parts.append("")
+        
+        # Add content section with transcription
+        if "audio_processing_result" in content:
+            audio_result = content["audio_processing_result"]
+            
+            # Add transcript with segments and timecodes
+            if isinstance(audio_result, dict) and "segments" in audio_result:
+                segments = audio_result["segments"]
+                if segments:
+                    markdown_parts.append("## Content\n")
+                    
+                    for segment in segments:
+                        if isinstance(segment, dict):
+                            start_time = segment.get("start", 0)
+                            text = segment.get("text", "").strip()
+                            
+                            if text:
+                                # Format timestamp as [MM:SS]
+                                minutes = int(start_time // 60)
+                                seconds = int(start_time % 60)
+                                timestamp = f"[{minutes:02d}:{seconds:02d}]"
+                                markdown_parts.append(f"{timestamp} {text}")
+                    
+                    markdown_parts.append("")
+            elif isinstance(audio_result, dict) and "transcript" in audio_result:
+                # Fallback to full transcript if no segments
+                transcript = audio_result["transcript"]
+                if transcript:
+                    markdown_parts.append("## Content\n")
+                    markdown_parts.append(transcript)
+                    markdown_parts.append("")
+        
+        # Add topics if available
+        if "topics" in content:
+            topics = content["topics"]
+            if topics and isinstance(topics, list):
+                for topic in topics:
+                    if isinstance(topic, dict):
+                        topic_title = topic.get("title", "")
+                        if topic_title:
+                            markdown_parts.append(f"## {topic_title}\n")
+                            
+                            sentences = topic.get("sentences", [])
+                            for sentence in sentences:
+                                if isinstance(sentence, dict):
+                                    text = sentence.get("text", "").strip()
+                                    if text:
+                                        markdown_parts.append(text)
+                            
+                            markdown_parts.append("")
+        
+        return "\n".join(markdown_parts)
 
     async def _save_output_files(self,
                                file_path: Path,
