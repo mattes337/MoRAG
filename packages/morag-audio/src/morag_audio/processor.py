@@ -11,6 +11,12 @@ import structlog
 from morag_core.exceptions import ProcessingError
 from morag_core.utils import get_safe_device
 
+try:
+    from .rest_transcription import RestTranscriptionService, RestTranscriptionError
+except ImportError:
+    RestTranscriptionService = None
+    RestTranscriptionError = None
+
 logger = structlog.get_logger(__name__)
 
 
@@ -46,6 +52,11 @@ class AudioConfig:
     })
     word_timestamps: bool = True
     include_metadata: bool = True
+    # REST API configuration
+    use_rest_api: bool = False  # Use REST API instead of local whisper
+    openai_api_key: Optional[str] = None  # OpenAI API key for REST calls
+    api_base_url: str = "https://api.openai.com/v1"  # OpenAI API base URL
+    timeout: int = 300  # API request timeout in seconds
 
     def __post_init__(self):
         """Load configuration from environment variables if not explicitly set."""
@@ -79,6 +90,21 @@ class AudioConfig:
         env_topic_seg = os.environ.get("MORAG_ENABLE_TOPIC_SEGMENTATION")
         if env_topic_seg is not None:
             self.enable_topic_segmentation = env_topic_seg.lower() in ("true", "1", "yes", "on")
+        
+        # Override REST API settings
+        env_use_rest = os.environ.get("MORAG_USE_REST_TRANSCRIPTION")
+        if env_use_rest is not None:
+            self.use_rest_api = env_use_rest.lower() in ("true", "1", "yes", "on")
+        
+        # Override OpenAI API key
+        env_openai_key = os.environ.get("OPENAI_API_KEY")
+        if env_openai_key and self.openai_api_key is None:
+            self.openai_api_key = env_openai_key
+        
+        # Override API base URL
+        env_api_base = os.environ.get("OPENAI_API_BASE")
+        if env_api_base and self.api_base_url == "https://api.openai.com/v1":
+            self.api_base_url = env_api_base
 
 
 @dataclass
@@ -91,6 +117,7 @@ class AudioProcessingResult:
     processing_time: float
     success: bool = True
     error_message: Optional[str] = None
+    markdown_transcript: Optional[str] = None
 
 
 class AudioProcessingError(ProcessingError):
@@ -109,7 +136,12 @@ class AudioProcessor:
         """
         self.config = config or AudioConfig()
         self.metadata = {}
-        self._initialize_components()
+        self.rest_transcription_service = None
+        
+        if self.config.use_rest_api:
+            self._initialize_rest_transcription()
+        else:
+            self._initialize_components()
         
     def _initialize_components(self):
         """Initialize the required components based on configuration."""
@@ -196,6 +228,18 @@ class AudioProcessor:
                 logger.warning(f"Failed to initialize topic segmentation: {e}")
                 self.config.enable_topic_segmentation = False
     
+    def _initialize_rest_transcription(self):
+        """Initialize REST transcription service."""
+        if RestTranscriptionService is None:
+            raise AudioProcessingError("REST transcription service not available. Please install required dependencies.")
+        
+        try:
+            self.rest_transcription_service = RestTranscriptionService(self.config)
+            logger.info("REST transcription service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize REST transcription service: {e}")
+            raise AudioProcessingError(f"Failed to initialize REST transcription service: {e}")
+    
     async def process(self, file_path: Union[str, Path], progress_callback: callable = None) -> AudioProcessingResult:
         """Process an audio file to extract transcription and metadata.
 
@@ -279,12 +323,18 @@ class AudioProcessor:
                        segment_count=self.metadata["segment_count"],
                        num_speakers=self.metadata.get("num_speakers", 0))
             
+            # Generate markdown if using REST API
+            markdown_transcript = None
+            if self.config.use_rest_api and self.rest_transcription_service:
+                markdown_transcript = self.rest_transcription_service.convert_to_markdown(transcript, segments)
+            
             return AudioProcessingResult(
                 transcript=transcript,
                 segments=segments,
                 metadata=self.metadata,
                 file_path=str(file_path),
-                processing_time=processing_time
+                processing_time=processing_time,
+                markdown_transcript=markdown_transcript
             )
             
         except Exception as e:
@@ -389,7 +439,10 @@ class AudioProcessor:
         return metadata
     
     async def _transcribe_audio(self, file_path: Path) -> tuple[List[AudioSegment], str]:
-        """Transcribe audio file using Whisper."""
+        """Transcribe audio file using configured transcription method."""
+        if self.config.use_rest_api:
+            return await self._transcribe_with_rest_api(file_path)
+        
         if not self.transcriber:
             raise AudioProcessingError("Transcriber not initialized")
 
@@ -470,6 +523,26 @@ class AudioProcessor:
             full_transcript += segment_data.text + " "
 
         return segments, full_transcript.strip()
+    
+    async def _transcribe_with_rest_api(self, file_path: Path) -> tuple[List[AudioSegment], str]:
+        """Transcribe audio file using REST API."""
+        if not self.rest_transcription_service:
+            raise AudioProcessingError("REST transcription service not initialized")
+        
+        try:
+            transcript_text, segments, detected_language = await self.rest_transcription_service.transcribe_audio(file_path)
+            
+            # Store language information in metadata
+            self.metadata["language"] = detected_language or self.config.language or "unknown"
+            
+            return segments, transcript_text
+            
+        except RestTranscriptionError as e:
+            logger.error(f"REST transcription failed: {e}")
+            raise AudioProcessingError(f"REST transcription failed: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error in REST transcription: {e}")
+            raise AudioProcessingError(f"Unexpected error in REST transcription: {e}")
 
     async def _transcribe_with_openai_whisper(self, file_path: Path) -> tuple[List[AudioSegment], str]:
         """Transcribe audio file using OpenAI whisper."""
