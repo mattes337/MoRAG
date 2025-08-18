@@ -38,7 +38,7 @@ For Tesseract OCR functionality:
 ### OpenCV Dependencies
 
 For OpenCV functionality:
-- libgl1-mesa-glx: OpenGL support
+- libgl1-mesa-dri: OpenGL support
 - libglib2.0-0: GLib library
 - libsm6: Session Management library
 - libxext6: X11 extension library

@@ -85,7 +85,7 @@ RUN apt-get update && apt-get install -y \
     poppler-utils \
     chromium \
     chromium-driver \
-    libgl1-mesa-glx \
+    libgl1-mesa-dri \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
@@ -105,7 +105,7 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libpangocairo-1.0-0 \
     libcairo-gobject2 \
-    libgdk-pixbuf2.0-0 \
+    libgdk-pixbuf-xlib-2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Chrome/Chromium path for web scraping

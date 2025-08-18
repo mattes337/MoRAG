@@ -30,7 +30,7 @@ if [[ "$OS" == *"Ubuntu"* ]] || [[ "$OS" == *"Debian"* ]]; then
     
     # Install OpenCV dependencies
     echo "Installing OpenCV dependencies..."
-    sudo apt-get install -y libsm6 libxext6 libxrender-dev libgl1-mesa-glx
+    sudo apt-get install -y libsm6 libxext6 libxrender-dev libgl1-mesa-dri
     
     # Install Python development headers (needed for some packages)
     sudo apt-get install -y python3-dev
