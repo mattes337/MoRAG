@@ -13,13 +13,13 @@ from ..exceptions import StageExecutionError, StageValidationError
 # Import services with graceful fallback
 try:
     from morag_core.ai import create_agent, AgentConfig
-    from morag_embedding import EmbeddingService
+    from morag_embedding import GeminiEmbeddingService
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
     create_agent = None
     AgentConfig = None
-    EmbeddingService = None
+    GeminiEmbeddingService = None
 
 logger = structlog.get_logger(__name__)
 
@@ -34,7 +34,7 @@ class ChunkerStage(Stage):
         if not SERVICES_AVAILABLE:
             logger.warning("Services not available for chunking")
         
-        self.embedding_service = EmbeddingService() if EmbeddingService else None
+        self.embedding_service = GeminiEmbeddingService() if GeminiEmbeddingService else None
         self.summarization_agent = None
     
     async def execute(self, 
