@@ -18,15 +18,46 @@ MoRAG has been enhanced with **PydanticAI integration** and **unified citation f
 - **📋 Unified Citation Format**: Standardized structured citations across all content types
 - **🔧 Graph Tool Controller**: Gemini function calling interface for graph operations
 
-## 🎉 Modular Architecture Complete!
+## 🎉 Stage-Based Processing Architecture Complete!
 
-MoRAG features a modular architecture with separate, independently deployable packages:
+MoRAG has been completely refactored to use a **stage-based processing architecture** with canonical stage names for better modularity, reusability, and control over the processing pipeline.
+
+### 🚨 Breaking Changes
+
+**This is a complete rewrite with NO backward compatibility.**
+
+- All previous API endpoints have been removed
+- All previous CLI commands have been replaced
+- New canonical stage names are used throughout
+- New file naming conventions
+- New configuration structure
+
+### Stage-Based Architecture
+
+#### Canonical Stage Names
+
+The system uses these exact canonical stage names:
+
+1. **`markdown-conversion`** - Convert input files to unified markdown format
+2. **`markdown-optimizer`** - LLM-based text improvement and error correction (optional)
+3. **`chunker`** - Create summary, chunks, and contextual embeddings
+4. **`fact-generator`** - Extract facts, entities, relations, and keywords
+5. **`ingestor`** - Database ingestion and storage
+
+#### Stage Flow
+
+```
+Input File → markdown-conversion → [markdown-optimizer] → chunker → fact-generator → ingestor
+```
+
+The `markdown-optimizer` stage is optional and can be skipped.
 
 ### Package Structure
 ```
 packages/
 ├── morag-core/          # Core interfaces and models
 ├── morag-services/      # AI and storage services
+├── morag-stages/        # Stage-based processing system
 ├── morag-audio/         # Audio processing
 ├── morag-document/      # Document processing
 ├── morag-video/         # Video processing
@@ -82,6 +113,44 @@ packages/
 - **Action Tracing**: Complete audit trail of all graph operations for monitoring and debugging
 
 ## Quick Start
+
+### Stage-Based Processing
+
+#### CLI Usage
+
+```bash
+# List available stages
+python cli/morag-stages.py list
+
+# Execute a single stage
+python cli/morag-stages.py stage markdown-conversion input.pdf --output-dir ./output
+
+# Execute a chain of stages
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+
+# Execute full pipeline
+python cli/morag-stages.py process input.pdf --optimize --output-dir ./output
+```
+
+#### REST API Usage
+
+```bash
+# Start the server
+python -m morag.server
+
+# List available stages
+curl http://localhost:8000/api/v1/stages/
+
+# Execute a single stage
+curl -X POST http://localhost:8000/api/v1/stages/markdown-conversion/execute \
+  -F "file=@input.pdf" \
+  -F "request={\"output_dir\": \"./output\"}"
+
+# Execute stage chain
+curl -X POST http://localhost:8000/api/v1/stages/chain \
+  -F "file=@input.pdf" \
+  -F "request={\"stages\": [\"markdown-conversion\", \"chunker\", \"fact-generator\"]}"
+```
 
 ### Prerequisites
 
@@ -288,6 +357,55 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here  # Optional
 
 **Note**: Use `GEMINI_API_KEY` for consistency. The deprecated `GOOGLE_API_KEY` is still supported for backward compatibility.
 
+### Stage-Based Configuration
+
+#### File Naming Conventions
+
+Each stage produces files with standardized naming:
+
+- **markdown-conversion**: `filename.md`
+- **markdown-optimizer**: `filename.opt.md`
+- **chunker**: `filename.chunks.json`
+- **fact-generator**: `filename.facts.json`
+- **ingestor**: `filename.ingestion.json`
+
+#### Stage-Specific Configuration
+
+```json
+{
+  "markdown-conversion": {
+    "include_timestamps": true,
+    "speaker_diarization": true,
+    "topic_segmentation": true
+  },
+  "markdown-optimizer": {
+    "fix_transcription_errors": true,
+    "improve_readability": true,
+    "preserve_timestamps": true
+  },
+  "chunker": {
+    "chunk_strategy": "semantic",
+    "chunk_size": 2000,
+    "generate_summary": true
+  },
+  "fact-generator": {
+    "extract_entities": true,
+    "extract_relations": true,
+    "domain": "general"
+  },
+  "ingestor": {
+    "databases": ["qdrant", "neo4j"],
+    "collection_name": "my_collection"
+  }
+}
+```
+
+#### Chunking Strategies
+
+- **`semantic`** - Intelligent semantic boundaries (default for documents)
+- **`page-level`** - Split by pages (default for PDFs)
+- **`topic-based`** - Split by topics with timestamps (default for audio/video)
+
 ### Database Setup
 
 MoRAG automatically creates Qdrant collections and Neo4j databases when needed. However, for Neo4j Community Edition or when you want to pre-create databases, use the database creation utility:
@@ -311,6 +429,61 @@ python cli/create-databases.py --list-existing
 - **Neo4j Community**: Requires manual database creation or using the utility script
 - **Qdrant**: Always supports automatic collection creation
 - **Collection/Database Names**: Use `--qdrant-collection` and `--neo4j-database` arguments in test scripts
+
+### Stage-Based API Endpoints
+
+#### Stage Execution
+
+- `GET /api/v1/stages/` - List available stages
+- `POST /api/v1/stages/{stage-name}/execute` - Execute single stage
+- `POST /api/v1/stages/chain` - Execute stage chain
+- `GET /api/v1/stages/status` - Check execution status
+- `GET /api/v1/stages/health` - Health check
+
+#### File Management
+
+- `GET /api/v1/files/list` - List output files
+- `GET /api/v1/files/download/{file_path}` - Download file
+- `GET /api/v1/files/info/{file_path}` - Get file metadata
+- `DELETE /api/v1/files/delete/{file_path}` - Delete file
+- `DELETE /api/v1/files/cleanup` - Cleanup old files
+
+### Webhook Notifications
+
+Configure webhooks to receive notifications when stages complete:
+
+```json
+{
+  "webhook_config": {
+    "url": "https://your-webhook-url.com/notifications",
+    "auth_token": "your-token",
+    "headers": {"Custom-Header": "value"},
+    "retry_count": 3,
+    "timeout": 30
+  }
+}
+```
+
+Webhook payload example:
+```json
+{
+  "event_type": "stage_completed",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "stage": {
+    "name": "chunker",
+    "status": "completed",
+    "execution_time": 15.5
+  },
+  "source_file": "/path/to/input.pdf",
+  "output_files": [
+    {
+      "filename": "input.chunks.json",
+      "file_id": "abc123",
+      "download_url": "/api/v1/files/download/abc123"
+    }
+  ]
+}
+```
 
 ### Testing Docker Setup
 
@@ -427,6 +600,39 @@ Environment overrides for keyword hierarchization:
 - Comprehensive logging and debugging for CPU-related issues
 
 For detailed information, see [CPU Compatibility Guide](docs/CPU_COMPATIBILITY.md).
+
+### Resume Capability
+
+The system automatically detects existing output files and skips stages that have already been completed:
+
+```bash
+# First run - executes all stages
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+
+# Second run - skips completed stages
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+```
+
+### Migration from Previous Version
+
+#### CLI Migration
+
+| Old Command | New Command |
+|-------------|-------------|
+| `morag process file.pdf` | `python cli/morag-stages.py process file.pdf` |
+| `morag ingest file.pdf` | `python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator,ingestor" file.pdf` |
+
+#### API Migration
+
+| Old Endpoint | New Endpoint |
+|--------------|--------------|
+| `POST /api/v1/process` | `POST /api/v1/stages/chain` |
+| `POST /api/v1/ingest` | `POST /api/v1/stages/ingestor/execute` |
+| `GET /health` | `GET /api/v1/stages/health` |
+
+#### Configuration Migration
+
+Old configuration files need to be restructured to use canonical stage names as top-level keys.
 
 ## Remote Processing (NEW)
 
