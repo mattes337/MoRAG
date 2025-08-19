@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from .stage import StageType
 
@@ -16,10 +16,11 @@ class StageConfig(BaseModel):
     timeout_seconds: Optional[float] = Field(default=None, description="Stage timeout in seconds")
     retry_count: int = Field(default=0, description="Number of retries on failure")
     
-    class Config:
-        json_encoders = {
+    model_config = {
+        "json_encoders": {
             StageType: lambda v: v.value
         }
+    }
 
 
 class MarkdownConversionConfig(BaseModel):
@@ -85,7 +86,8 @@ class ChunkerConfig(BaseModel):
     include_context: bool = Field(default=True, description="Include surrounding context in chunks")
     context_window: int = Field(default=2, description="Number of surrounding chunks for context")
     
-    @validator('chunk_strategy')
+    @field_validator('chunk_strategy')
+    @classmethod
     def validate_chunk_strategy(cls, v):
         valid_strategies = ['semantic', 'page-level', 'topic-based', 'fixed-size']
         if v not in valid_strategies:
@@ -135,15 +137,17 @@ class IngestorConfig(BaseModel):
     # Conflict resolution
     conflict_resolution: str = Field(default="merge", description="How to handle conflicts")
     
-    @validator('databases')
+    @field_validator('databases')
+    @classmethod
     def validate_databases(cls, v):
         valid_dbs = ['qdrant', 'neo4j', 'elasticsearch', 'pinecone']
         for db in v:
             if db not in valid_dbs:
                 raise ValueError(f"Database '{db}' not supported. Valid options: {valid_dbs}")
         return v
-    
-    @validator('conflict_resolution')
+
+    @field_validator('conflict_resolution')
+    @classmethod
     def validate_conflict_resolution(cls, v):
         valid_strategies = ['merge', 'replace', 'skip', 'error']
         if v not in valid_strategies:
@@ -170,10 +174,11 @@ class PipelineConfig(BaseModel):
     fact_generator: FactGeneratorConfig = Field(default_factory=FactGeneratorConfig)
     ingestor: IngestorConfig = Field(default_factory=IngestorConfig)
     
-    class Config:
-        json_encoders = {
+    model_config = {
+        "json_encoders": {
             Path: lambda v: str(v)
         }
+    }
     
     def get_stage_config(self, stage_type: StageType) -> Optional[StageConfig]:
         """Get configuration for a specific stage.

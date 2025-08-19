@@ -11,7 +11,7 @@ from .models import (
 )
 
 from .manager import StageManager
-from .registry import StageRegistry, register_stage
+from .registry import StageRegistry, register_stage, get_global_registry
 from .exceptions import (
     StageError,
     StageValidationError,
@@ -61,6 +61,7 @@ __all__ = [
     "StageManager",
     "StageRegistry",
     "register_stage",
+    "get_global_registry",
 
     # Stage implementations
     "MarkdownConversionStage",

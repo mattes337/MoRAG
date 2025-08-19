@@ -32,7 +32,23 @@ class StageRegistry:
             stage_type = temp_instance.stage_type
         except TypeError:
             # Fallback for stages that require stage_type parameter
-            temp_instance = stage_class(StageType.MARKDOWN_CONVERSION)
+            # Try to infer stage type from class name
+            class_name = stage_class.__name__.lower()
+            if 'markdown_conversion' in class_name or 'markdownconversion' in class_name:
+                stage_type = StageType.MARKDOWN_CONVERSION
+            elif 'markdown_optimizer' in class_name or 'markdownoptimizer' in class_name:
+                stage_type = StageType.MARKDOWN_OPTIMIZER
+            elif 'chunker' in class_name:
+                stage_type = StageType.CHUNKER
+            elif 'fact_generator' in class_name or 'factgenerator' in class_name:
+                stage_type = StageType.FACT_GENERATOR
+            elif 'ingestor' in class_name:
+                stage_type = StageType.INGESTOR
+            else:
+                # Default fallback
+                stage_type = StageType.MARKDOWN_CONVERSION
+
+            temp_instance = stage_class(stage_type)
             stage_type = temp_instance.stage_type
         
         if stage_type in self._stages:

@@ -311,7 +311,6 @@ class FactGeneratorStage(Stage):
 
             # Parse response (expecting JSON format)
             try:
-                import json
                 results = json.loads(response_text)
 
                 # Add source chunk information
