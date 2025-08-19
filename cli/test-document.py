@@ -340,7 +340,8 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
                                  chunk_size: int = 1000, chunk_overlap: int = 200,
                                  use_qdrant: bool = True, use_neo4j: bool = True,
                                  qdrant_collection_name: Optional[str] = None,
-                                 neo4j_database_name: Optional[str] = None) -> bool:
+                                 neo4j_database_name: Optional[str] = None,
+                                 language: str = "en") -> bool:
     """Test document ingestion using the proper ingestion coordinator."""
     print_header("MoRAG Document Ingestion Test")
 
@@ -441,7 +442,8 @@ async def test_document_ingestion(document_file: Path, webhook_url: Optional[str
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             document_id=None,  # Let coordinator generate unified document ID
-            replace_existing=False
+            replace_existing=False,
+            language=language  # Pass language parameter for fact extraction
         )
 
         print("[OK] Document ingestion completed successfully!")
@@ -560,6 +562,12 @@ Examples:
             print(f"[FAIL] Error: Invalid JSON in metadata: {e}")
             sys.exit(1)
 
+    # Validate database flags require ingestion mode
+    if (args.qdrant or args.neo4j) and not args.ingest:
+        print(f"[FAIL] Error: --neo4j and --qdrant flags require --ingest mode")
+        print("To store entities and relations in databases, use: --ingest --neo4j --qdrant")
+        sys.exit(1)
+
     # Handle resume arguments
     from resume_utils import handle_resume_arguments
     handle_resume_arguments(args, str(document_file), 'document', metadata)
@@ -577,7 +585,8 @@ Examples:
                 use_qdrant=args.qdrant,
                 use_neo4j=args.neo4j,
                 qdrant_collection_name=args.qdrant_collection,
-                neo4j_database_name=args.neo4j_database
+                neo4j_database_name=args.neo4j_database,
+                language=args.language  # Pass language parameter
             ))
             if success:
                 print("\n[SUCCESS] Document ingestion test completed successfully!")

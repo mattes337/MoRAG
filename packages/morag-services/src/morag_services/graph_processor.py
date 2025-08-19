@@ -129,6 +129,7 @@ class GraphProcessingResult(BaseModel):
     error_message: Optional[str] = None
     metadata: Dict[str, Any] = {}
     database_results: List[Dict[str, Any]] = []  # Results for each database
+    data_file_path: Optional[str] = None  # Path to the data file written before database operations
 
     # OpenIE-specific metrics
     openie_enabled: bool = False
@@ -141,11 +142,12 @@ class GraphProcessingResult(BaseModel):
 class GraphProcessor:
     """Processor for extracting entities and relations from documents."""
     
-    def __init__(self, config: Optional[GraphProcessingConfig] = None):
+    def __init__(self, config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
         """Initialize the graph processor.
         
         Args:
             config: Graph processing configuration
+            data_output_dir: Directory to write data files to before database operations
         """
         self.config = config or GraphProcessingConfig.from_env()
         self._entity_extractor = None
@@ -155,6 +157,13 @@ class GraphProcessor:
         self._file_ingestion = None
         self._llm_config = None
         self._llm_client = None
+        
+        # Initialize data file writer if output directory is provided
+        try:
+            from .data_file_writer import DataFileWriter
+            self._data_writer = DataFileWriter(data_output_dir) if data_output_dir else None
+        except ImportError:
+            self._data_writer = None
         
         if not GRAPH_AVAILABLE:
             self.config.enabled = False
@@ -396,6 +405,21 @@ Provide only the intention summary (maximum {max_length} characters):
             entities = await self._entity_extractor.extract_entities(content, source_doc_id, intention=intention)
             relations = await self._relation_extractor.extract_relations(content, entities, source_doc_id, intention=intention)
             
+            # Write data to file before database operations
+            data_file_path = None
+            if self._data_writer:
+                try:
+                    data_file_path = self._data_writer.write_processing_data(
+                        source_path=source_doc_id,
+                        entities=entities,
+                        relations=relations,
+                        metadata=metadata,
+                        summary=f"Document processed with {len(entities)} entities and {len(relations)} relations"
+                    )
+                    logger.info(f"Data file written before database operations: {data_file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to write data file: {str(e)}")
+            
             # Process each database configuration
             for db_config in database_configs:
                 db_start_time = asyncio.get_event_loop().time()
@@ -486,6 +510,7 @@ Provide only the intention summary (maximum {max_length} characters):
                 chunks_processed=1,
                 processing_time=total_processing_time,
                 database_results=database_results,
+                data_file_path=str(data_file_path) if data_file_path else None,
                 metadata={
                     "successful_databases": successful_dbs,
                     "total_databases": len(database_configs),
@@ -502,7 +527,8 @@ Provide only the intention summary (maximum {max_length} characters):
                 success=False,
                 processing_time=total_processing_time,
                 error_message=error_msg,
-                database_results=database_results
+                database_results=database_results,
+                data_file_path=str(data_file_path) if data_file_path else None
             )
     
     def _chunk_by_structure(self, markdown_content: str) -> List[Tuple[str, Dict[str, Any]]]:
@@ -855,6 +881,22 @@ Provide only the intention summary (maximum {max_length} characters):
                                          error=str(e))
                             continue
 
+                # Write data to file before database operations
+                data_file_path = None
+                if self._data_writer and (all_entities or all_relations):
+                    try:
+                        data_file_path = self._data_writer.write_processing_data(
+                            source_path=document_path or "unknown_document",
+                            entities=all_entities,
+                            relations=all_relations,
+                            chunks=chunks,
+                            metadata=document_metadata,
+                            summary=f"Document processed with {len(all_entities)} entities and {len(all_relations)} relations"
+                        )
+                        logger.info(f"Data file written before database operations: {data_file_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to write data file: {str(e)}")
+                
                 # Store in Neo4j
                 if all_entities or all_relations:
                     await self._storage.store_entities(all_entities)
@@ -884,6 +926,7 @@ Provide only the intention summary (maximum {max_length} characters):
                 openie_triplets_processed=openie_triplets_processed,
                 openie_entity_matches=openie_entity_matches,
                 openie_normalized_predicates=openie_normalized_predicates,
+                data_file_path=str(data_file_path) if data_file_path else None,
                 metadata={
                     'document_path': document_path,
                     'chunk_strategy': 'structure' if self.config.chunk_by_structure else 'size',
@@ -900,7 +943,8 @@ Provide only the intention summary (maximum {max_length} characters):
             return GraphProcessingResult(
                 success=False,
                 processing_time=processing_time,
-                error_message=str(e)
+                error_message=str(e),
+                data_file_path=str(data_file_path) if 'data_file_path' in locals() and data_file_path else None
             )
     
     async def close(self):

@@ -75,7 +75,7 @@ class FactValidator:
                 "Fact validation failed",
                 fact_id=fact.id,
                 issues=issues,
-                subject=fact.subject[:50] + "..." if len(fact.subject) > 50 else fact.subject
+                fact_text=fact.fact_text[:50] + "..." if len(fact.fact_text) > 50 else fact.fact_text
             )
         
         return is_valid, issues
@@ -91,18 +91,16 @@ class FactValidator:
         """
         issues = []
 
-        if not fact.subject or not fact.subject.strip():
-            issues.append("Missing or empty subject")
-
-        if not fact.object or not fact.object.strip():
-            issues.append("Missing or empty object")
+        if not fact.fact_text or not fact.fact_text.strip():
+            issues.append("Missing or empty fact text")
 
         # Check minimum length requirements
-        if fact.subject and len(fact.subject.strip()) < 3:
-            issues.append("Subject too short (minimum 3 characters)")
+        if fact.fact_text and len(fact.fact_text.strip()) < 10:
+            issues.append("Fact text too short (minimum 10 characters)")
 
-        if fact.object and len(fact.object.strip()) < 3:
-            issues.append("Object too short (minimum 3 characters)")
+        # Check if structured metadata has primary entities
+        if not fact.structured_metadata.primary_entities:
+            issues.append("No primary entities identified in structured metadata")
 
         return issues
     
@@ -131,25 +129,15 @@ class FactValidator:
             r'\b(might|could|may|possibly|potentially)\b'
         ]
         
-        combined_text = f"{fact.subject} {fact.object}"
-        if fact.approach:
-            combined_text += f" {fact.approach}"
-        if fact.solution:
-            combined_text += f" {fact.solution}"
+        fact_text = fact.fact_text
         
         for pattern in vague_patterns:
-            if re.search(pattern, combined_text.lower()):
+            if re.search(pattern, fact_text.lower()):
                 issues.append(f"Contains vague language: {pattern}")
                 break  # Only report one vague language issue
         
         # Check for sufficient detail
-        total_length = len(fact.subject) + len(fact.object)
-        if fact.approach:
-            total_length += len(fact.approach)
-        if fact.solution:
-            total_length += len(fact.solution)
-        
-        if total_length < 20:
+        if len(fact_text) < 20:
             issues.append("Fact too brief - lacks sufficient detail")
         
         return issues
@@ -231,16 +219,10 @@ class FactValidator:
         """
         issues = []
         
-        combined_text = f"{fact.subject} {fact.object}"
-        if fact.approach:
-            combined_text += f" {fact.approach}"
-        if fact.solution:
-            combined_text += f" {fact.solution}"
-        
-        combined_lower = combined_text.lower()
+        fact_text_lower = fact.fact_text.lower()
         
         for meta_indicator in self.meta_indicators:
-            if meta_indicator in combined_lower:
+            if meta_indicator in fact_text_lower:
                 issues.append(f"Contains meta-commentary: '{meta_indicator}'")
                 break  # Only report one meta-commentary issue
         

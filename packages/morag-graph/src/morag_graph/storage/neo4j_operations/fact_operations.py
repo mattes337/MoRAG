@@ -48,7 +48,7 @@ class FactOperations(BaseOperations):
             self.logger.debug(
                 "Fact stored successfully",
                 fact_id=fact.id,
-                subject=fact.subject[:50] + "..." if len(fact.subject) > 50 else fact.subject
+                fact_text=fact.fact_text[:50] + "..." if len(fact.fact_text) > 50 else fact.fact_text
             )
             return results[0]["fact_id"]
 

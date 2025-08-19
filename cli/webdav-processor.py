@@ -134,7 +134,7 @@ def get_cuda_memory_info() -> dict:
 
 
 class MoRAGWebDAVProcessor:
-    def __init__(self, webdav_url: str, subdirectory: str, username: str, password: str, file_extension: str):
+    def __init__(self, webdav_url: str, subdirectory: str, username: str, password: str, file_extension: str, resume_mode: bool = False):
         """
         Initialize the MoRAG WebDAV processor.
         
@@ -144,12 +144,14 @@ class MoRAGWebDAVProcessor:
             username: WebDAV username
             password: WebDAV password
             file_extension: File extension to filter (e.g., 'mp4')
+            resume_mode: If True, use existing markdown files to recreate data files
         """
         self.webdav_url = webdav_url.rstrip('/')
         self.subdirectory = subdirectory.strip('/') if subdirectory else ''
         self.username = username
         self.password = password
         self.file_extension = file_extension.lower().lstrip('.')
+        self.resume_mode = resume_mode
         
         # Initialize WebDAV client with base URL (without subdirectory)
         # We'll include the subdirectory in the paths instead
@@ -172,10 +174,14 @@ class MoRAGWebDAVProcessor:
             print(f"✗ Failed to connect to WebDAV server: {e}")
             sys.exit(1)
         
-        # Initialize MoRAG Services
+        # Create data output directory for processing data files
+        self.data_output_dir = Path.cwd() / "data_files"
+        self.data_output_dir.mkdir(exist_ok=True)
+        
+        # Initialize MoRAG Services with data output directory
         try:
-            self.morag_services = MoRAGServices()
-            print(f"✓ Successfully initialized MoRAG Services")
+            self.morag_services = MoRAGServices(data_output_dir=str(self.data_output_dir))
+            print(f"✓ Successfully initialized MoRAG Services with data output directory: {self.data_output_dir}")
         except Exception as e:
             print(f"✗ Failed to initialize MoRAG Services: {e}")
             sys.exit(1)
@@ -301,6 +307,10 @@ class MoRAGWebDAVProcessor:
         Returns:
             True if file should be processed, False otherwise
         """
+        # In resume mode, only process markdown files
+        if self.resume_mode:
+            return file_path.lower().endswith('.md')
+        
         # Check if file has the correct extension
         if not file_path.lower().endswith(f'.{self.file_extension}'):
             return False
@@ -309,17 +319,20 @@ class MoRAGWebDAVProcessor:
         file_stem = Path(file_path).stem
         markdown_filename = f"{file_stem}.md"
         intermediate_filename = f"{file_stem}_intermediate.md"
+        data_filename = f"{file_stem}.json"  # Check for data files too
         
         # Construct the expected file paths
         file_dir = os.path.dirname(file_path)
         if file_dir:
             expected_markdown_path = f"{file_dir}/{markdown_filename}"
             expected_intermediate_path = f"{file_dir}/{intermediate_filename}"
+            expected_data_path = f"{file_dir}/{data_filename}"
         else:
             expected_markdown_path = markdown_filename
             expected_intermediate_path = intermediate_filename
+            expected_data_path = data_filename
         
-        # Check if either markdown file exists in our file list
+        # Check if either markdown file or data file exists in our file list
         for existing_file in all_files:
             if existing_file == expected_markdown_path:
                 print(f"  ⏭️  Skipping {file_path} - markdown file already exists: {markdown_filename}")
@@ -327,10 +340,13 @@ class MoRAGWebDAVProcessor:
             elif existing_file == expected_intermediate_path:
                 print(f"  ⏭️  Skipping {file_path} - intermediate markdown file already exists: {intermediate_filename}")
                 return False
+            elif existing_file == expected_data_path:
+                print(f"  ⏭️  Skipping {file_path} - data file already exists: {data_filename}")
+                return False
         
         return True
 
-    async def process_file(self, remote_file_path: str, folder_path: str) -> Optional[str]:
+    async def process_file(self, remote_file_path: str, folder_path: str) -> Optional[tuple]:
         """
         Process the file using MoRAG by downloading it locally first, then processing.
         
@@ -339,8 +355,12 @@ class MoRAGWebDAVProcessor:
             folder_path: Base folder path on WebDAV server
             
         Returns:
-            Path to the created markdown file (local path) or None if processing failed
+            Tuple of (markdown_file_path, data_files_list) or None if processing failed
         """
+        # In resume mode, handle markdown files differently
+        if self.resume_mode and remote_file_path.lower().endswith('.md'):
+            return await self.process_markdown_for_resume(remote_file_path, folder_path)
+        
         # Construct full remote path using base URL + subdirectory + folder + file
         path_parts = []
         
@@ -533,6 +553,15 @@ class MoRAGWebDAVProcessor:
                 print(f"  ✗ Failed to create markdown file for {remote_file_path}")
                 return None
             
+            # Collect data files generated during processing
+            data_files = []
+            if self.data_output_dir.exists():
+                # Look for JSON data files that match the processed file
+                file_stem = Path(remote_file_path).stem
+                for data_file in self.data_output_dir.glob(f"{file_stem}*.json"):
+                    data_files.append(str(data_file))
+                    print(f"  📄 Found data file: {data_file.name}")
+            
             # Clean up downloaded file after processing
             try:
                 local_temp_path.unlink()
@@ -540,7 +569,7 @@ class MoRAGWebDAVProcessor:
             except Exception as cleanup_error:
                 print(f"  ⚠️  Warning: Could not clean up {local_filename}: {cleanup_error}")
             
-            return str(markdown_file_path)
+            return (str(markdown_file_path), data_files)
             
         except Exception as e:
                 # Check if this is a CUDA OOM error
@@ -556,25 +585,99 @@ class MoRAGWebDAVProcessor:
                 
                 print(f"  ✗ Error processing {remote_file_path}: {e}")
                 return None
-
-    def upload_processed_files(self, original_file_path: str, processed_files: List[str], folder_path: str) -> bool:
+    
+    async def process_markdown_for_resume(self, remote_file_path: str, folder_path: str) -> Optional[tuple]:
         """
-        Upload processed files back to WebDAV server alongside the original file.
+        Process existing markdown files to recreate data files and populate databases.
+        
+        Args:
+            remote_file_path: Relative path to the markdown file on WebDAV server
+            folder_path: Base folder path on WebDAV server
+            
+        Returns:
+            Tuple of (markdown_file_path, data_files_list) or None if processing failed
+        """
+        # Create local temporary file path
+        local_filename = os.path.basename(remote_file_path)
+        
+        # Use current working directory for processing
+        current_dir = Path.cwd()
+        local_markdown_path = current_dir / local_filename
+        
+        try:
+            # Download the markdown file from WebDAV
+            print(f"  📥 Downloading markdown file: {remote_file_path}")
+            
+            # Construct the full WebDAV path
+            webdav_remote_path = remote_file_path
+            
+            # Download the file
+            self.client.download_sync(webdav_remote_path, str(local_markdown_path))
+            print(f"  ✓ Downloaded to: {local_markdown_path.name}")
+            
+            # Read the markdown content
+            with open(local_markdown_path, 'r', encoding='utf-8') as f:
+                markdown_content = f.read()
+            
+            # Process the markdown content to recreate data files and populate databases
+            print(f"  🔄 Processing markdown content for database population...")
+            
+            # Use MoRAG services to process the markdown content
+            processing_result = await self.morag_services.process_content(
+                content=markdown_content,
+                content_type="text/markdown",
+                metadata={"source_file": remote_file_path, "resume_mode": True}
+            )
+            
+            if not processing_result.success:
+                print(f"  ✗ MoRAG processing failed for {remote_file_path}: {processing_result.error_message}")
+                return None
+            
+            print(f"  ✓ Successfully processed markdown content for database population")
+            
+            # Collect any data files that were generated
+            data_files = []
+            if self.data_output_dir.exists():
+                # Look for JSON data files that match the processed file
+                file_stem = Path(remote_file_path).stem
+                for data_file in self.data_output_dir.glob(f"{file_stem}*.json"):
+                    data_files.append(str(data_file))
+                    print(f"  📄 Generated data file: {data_file.name}")
+            
+            # Clean up downloaded markdown file
+            try:
+                local_markdown_path.unlink()
+                print(f"  🗑️  Cleaned up downloaded file: {local_filename}")
+            except Exception as cleanup_error:
+                print(f"  ⚠️  Warning: Could not clean up {local_filename}: {cleanup_error}")
+            
+            # Return the original remote path and any generated data files
+            return (remote_file_path, data_files)
+            
+        except Exception as e:
+            print(f"  ✗ Error processing markdown file {remote_file_path}: {e}")
+            return None
+
+    def upload_processed_files(self, original_file_path: str, processed_files: List[str], data_files: List[str], folder_path: str) -> bool:
+        """
+        Upload processed files and data files back to WebDAV server alongside the original file.
         
         Args:
             original_file_path: Relative path of the original file on WebDAV server
-            processed_files: List of local paths to processed files
+            processed_files: List of local paths to processed markdown files
+            data_files: List of local paths to data JSON files
             folder_path: Base folder path on WebDAV server
             
         Returns:
             bool: True if all uploads succeeded, False if any failed
         """
-        if not processed_files:
+        all_files = processed_files + data_files
+        if not all_files:
             return True
         
         upload_success = True
         
-        for local_file in processed_files:
+        for local_file in all_files:
             try:
                 # Get just the filename for upload
                 filename = os.path.basename(local_file)
@@ -590,12 +693,15 @@ class MoRAGWebDAVProcessor:
                 
                 # Upload the file using the correct webdav3 client method
                 self.client.upload(remote_path=remote_path, local_path=local_file)
-                print(f"  ✓ Uploaded {filename} to {remote_path}")
+                
+                # Determine file type for logging
+                file_type = "data file" if local_file.endswith('.json') else "markdown file"
+                print(f"  ✓ Uploaded {file_type} {filename} to {remote_path}")
                 
                 # Clean up local file after successful upload
                 try:
                     os.remove(local_file)
-                    print(f"  🗑️  Cleaned up local file: {filename}")
+                    print(f"  🗑️  Cleaned up local {file_type}: {filename}")
                 except Exception as cleanup_error:
                     print(f"  ⚠️  Warning: Could not clean up {filename}: {cleanup_error}")
                 
@@ -616,20 +722,24 @@ class MoRAGWebDAVProcessor:
             CUDAOutOfMemoryError: If CUDA runs out of memory during processing
         """
         print(f"\n🚀 Starting MoRAG processing of folder: {folder_path}")
-        print(f"📁 Processing files with extension: .{self.file_extension}")
+        if self.resume_mode:
+            print(f"📄 Resume mode: Processing existing markdown files for database population")
+        else:
+            print(f"📁 Processing files with extension: .{self.file_extension}")
         
         # Check if the file extension is supported by detecting content type
-        test_filename = f"test.{self.file_extension}"
-        content_type = self.morag_services.detect_content_type(test_filename)
-        
-        if content_type == "unknown":
-            print(f"✗ File extension '.{self.file_extension}' is not supported by MoRAG Services")
-            print("Supported extensions:")
-            print("  Video: mp4, avi, mov, mkv, wmv, flv, webm, m4v")
-            print("  Audio: mp3, wav, m4a, flac, aac, ogg")
-            print("  Image: jpg, jpeg, png, gif, bmp, webp, tiff, svg")
-            print("  Document: pdf, docx, xlsx, pptx, txt, md, html, csv, json, xml")
-            return
+        if not self.resume_mode:
+            test_filename = f"test.{self.file_extension}"
+            content_type = self.morag_services.detect_content_type(test_filename)
+            
+            if content_type == "unknown":
+                print(f"✗ File extension '.{self.file_extension}' is not supported by MoRAG Services")
+                print("Supported extensions:")
+                print("  Video: mp4, avi, mov, mkv, wmv, flv, webm, m4v")
+                print("  Audio: mp3, wav, m4a, flac, aac, ogg")
+                print("  Image: jpg, jpeg, png, gif, bmp, webp, tiff, svg")
+                print("  Document: pdf, docx, xlsx, pptx, txt, md, html, csv, json, xml")
+                return
         
         # Get all files recursively
         all_files = self.get_all_files_recursive(folder_path)
@@ -657,7 +767,9 @@ class MoRAGWebDAVProcessor:
             
             # Check if file should be processed
             if not self.should_process_file(file_path, folder_path, all_files):
-                if not file_path.lower().endswith(f'.{self.file_extension}'):
+                if self.resume_mode:
+                    print(f"  ⏭️  Skipping {file_path} - not a markdown file")
+                elif not file_path.lower().endswith(f'.{self.file_extension}'):
                     print(f"  ⏭️  Skipping {file_path} - wrong extension (looking for .{self.file_extension})")
                 skipped_count += 1
                 continue
@@ -671,11 +783,12 @@ class MoRAGWebDAVProcessor:
 
             try:
                 # Process the file using MoRAG
-                processed_file = await self.process_file(file_path, folder_path)
+                processed_result = await self.process_file(file_path, folder_path)
                 
-                if processed_file:
-                    # Upload processed file back to WebDAV
-                    upload_success = self.upload_processed_files(file_path, [processed_file], folder_path)
+                if processed_result:
+                    markdown_file, data_files = processed_result
+                    # Upload processed files (markdown + data files) back to WebDAV
+                    upload_success = self.upload_processed_files(file_path, [markdown_file], data_files, folder_path)
                     
                     if upload_success:
                         print(f"  ✅ Successfully processed and uploaded {file_path}")
@@ -786,6 +899,12 @@ Examples:
         help='File extension to process (e.g., mp4, avi, mov)'
     )
     
+    parser.add_argument(
+        '--resume', '-r',
+        action='store_true',
+        help='Resume mode: use existing markdown files to recreate data files and populate databases'
+    )
+    
     args = parser.parse_args()
     
     # Validate file extension early (before WebDAV connection)
@@ -809,7 +928,7 @@ Examples:
         sys.exit(1)
     
     # Initialize processor and run
-    processor = MoRAGWebDAVProcessor(args.url, args.subdirectory, args.username, args.password, args.extension)
+    processor = MoRAGWebDAVProcessor(args.url, args.subdirectory, args.username, args.password, args.extension, resume_mode=args.resume)
     
     # Run the async processing with proper error handling
     try:

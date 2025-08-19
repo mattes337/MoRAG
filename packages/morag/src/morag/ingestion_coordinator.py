@@ -1531,7 +1531,7 @@ class IngestionCoordinator:
             api_key = os.getenv('GEMINI_API_KEY')
             if api_key:
                 entity_normalizer = LLMEntityNormalizer(
-                    model_name="gemini-2.0-flash",
+                    model_name=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
                     api_key=api_key,
                     language='de'  # Use German for this document
                 )
@@ -2448,7 +2448,7 @@ class IngestionCoordinator:
                     # Get language from first fact, default to 'en'
                     language = facts_to_process[0].language if facts_to_process and hasattr(facts_to_process[0], 'language') else 'en'
                     entity_normalizer = LLMEntityNormalizer(
-                        model_name="gemini-2.0-flash",
+                        model_name=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
                         api_key=api_key,
                         language=language
                     )
@@ -2912,13 +2912,14 @@ class FactExtractionWrapper:
                 return [], []
 
             self.fact_extractor = FactExtractor(
-                model_id="gemini-2.0-flash",
+                model_id=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
                 api_key=api_key,
-                domain=domain
+                domain=domain,
+                language=context.get('language', 'en') if context else 'en'
             )
 
             self.graph_builder = FactGraphBuilder(
-                model_id="gemini-2.0-flash",
+                model_id=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
                 api_key=api_key,
                 language=context.get('language', 'en') if context else 'en'
             )

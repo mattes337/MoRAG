@@ -800,17 +800,13 @@ Return only the relationship type in uppercase, no explanation."""
                 chunk_entities = set()
 
                 for fact in chunk_fact_list:
-                    # Add subject entity
-                    if fact.subject and fact.subject.strip():
-                        subject_normalized = fact.subject.lower().strip()
-                        if subject_normalized in entity_lookup:
-                            chunk_entities.add(entity_lookup[subject_normalized])
-
-                    # Add object entity
-                    if fact.object and fact.object.strip():
-                        object_normalized = fact.object.lower().strip()
-                        if object_normalized in entity_lookup:
-                            chunk_entities.add(entity_lookup[object_normalized])
+                    # Add primary entities from structured metadata
+                    if fact.structured_metadata and fact.structured_metadata.primary_entities:
+                        for entity_name in fact.structured_metadata.primary_entities:
+                            if entity_name and entity_name.strip():
+                                entity_normalized = entity_name.lower().strip()
+                                if entity_normalized in entity_lookup:
+                                    chunk_entities.add(entity_lookup[entity_normalized])
 
                     # Add keyword entities
                     if fact.keywords:

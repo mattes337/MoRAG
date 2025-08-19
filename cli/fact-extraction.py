@@ -135,7 +135,9 @@ async def extract_facts_from_file(
         if verbose:
             print(f"✅ Extracted {len(facts)} facts")
             for fact in facts:
-                print(f"  • {fact.subject} → {fact.object} ({fact.fact_type}) - confidence: {fact.extraction_confidence:.2f}")
+                entities = fact.structured_metadata.primary_entities if fact.structured_metadata and fact.structured_metadata.primary_entities else ["N/A"]
+                entities_str = ", ".join(entities[:2])  # Show first 2 entities
+                print(f"  • {fact.fact_text[:50]}... ({fact.fact_type}) - entities: {entities_str} - confidence: {fact.extraction_confidence:.2f}")
         
         # Extract relationships if we have multiple facts
         relationships = []

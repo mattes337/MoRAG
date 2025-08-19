@@ -236,8 +236,8 @@ class AtomicStorageService:
                         fact_vectors.append(batch.facts.embeddings[fact.id])
                         fact_metadata.append({
                             'fact_id': fact.id,
-                            'subject': fact.subject,
-                            'object': fact.object,
+                            'fact_text': fact.fact_text,
+                            'primary_entities': fact.structured_metadata.primary_entities if fact.structured_metadata else [],
                             'domain': fact.domain,
                             'type': 'fact'
                         })

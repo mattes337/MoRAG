@@ -75,14 +75,16 @@ class MoRAGServices:
     making it easy to work with multiple content types through a single interface.
     """
     
-    def __init__(self, config: Optional[ServiceConfig] = None, graph_config: Optional[GraphProcessingConfig] = None):
+    def __init__(self, config: Optional[ServiceConfig] = None, graph_config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
         """Initialize MoRAG services.
         
         Args:
             config: Configuration for services
             graph_config: Configuration for graph processing
+            data_output_dir: Directory to write data files before database operations
         """
         self.config = config or ServiceConfig()
+        self.data_output_dir = data_output_dir
         
         # Initialize specialized services
         self.document_service = DocumentService()
@@ -102,8 +104,17 @@ class MoRAGServices:
         self.web_service = WebService()
         self.youtube_service = YouTubeService()
         
-        # Initialize graph processor
-        self.graph_processor = GraphProcessor(graph_config)
+        # Initialize graph processor with data output directory
+        self.graph_processor = GraphProcessor(graph_config, data_output_dir)
+        
+        # Initialize data file writer
+        self._data_writer = None
+        if data_output_dir:
+            try:
+                from .data_file_writer import DataFileWriter
+                self._data_writer = DataFileWriter(data_output_dir)
+            except ImportError:
+                logger.warning("DataFileWriter not available")
 
         # Initialize AI services for search functionality
         self._vector_storage = None
@@ -370,8 +381,28 @@ class MoRAGServices:
                         success=False,
                         error_message=f"Graph processing failed: {str(e)}"
                     )
+            
+            # Write data file even if graph processing is not enabled
+            data_file_path = None
+            if self._data_writer and text_content:
+                try:
+                    # Create chunks from text content for data file
+                    chunks = [(text_content, json_result.get("metadata", {}))]
+                    
+                    data_file_path = self._data_writer.write_processing_data(
+                        source_path=document_path,
+                        entities=[],  # No entities extracted without graph processing
+                        relations=[],  # No relations extracted without graph processing
+                        chunks=chunks,
+                        summary=json_result.get("title", ""),
+                        metadata=json_result.get("metadata", {}),
+                        processing_result=None  # Will be set after ProcessingResult creation
+                    )
+                    logger.info(f"Data file written for document: {data_file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to write data file for document: {str(e)}")
 
-            return ProcessingResult(
+            processing_result = ProcessingResult(
                 content_type=ContentType.DOCUMENT,
                 content_path=document_path,
                 text_content=text_content,  # Markdown for Qdrant
@@ -383,6 +414,25 @@ class MoRAGServices:
                 raw_result=json_result,  # JSON for API response
                 graph_result=graph_result  # Graph processing result
             )
+            
+            # Update data file with complete processing result if data file was created
+            if self._data_writer and data_file_path and text_content:
+                try:
+                    chunks = [(text_content, json_result.get("metadata", {}))]
+                    self._data_writer.write_processing_data(
+                        source_path=document_path,
+                        entities=[],
+                        relations=[],
+                        chunks=chunks,
+                        summary=json_result.get("title", ""),
+                        metadata=json_result.get("metadata", {}),
+                        processing_result=processing_result,
+                        graph_result=graph_result
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update data file with processing result: {str(e)}")
+            
+            return processing_result
         except Exception as e:
             logger.exception(f"Error processing document", document_path=document_path)
             return ProcessingResult(

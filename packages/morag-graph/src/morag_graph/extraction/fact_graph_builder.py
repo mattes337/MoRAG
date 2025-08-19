@@ -334,11 +334,10 @@ class FactGraphBuilder:
         """
         return {
             'id': fact.id,
-            'subject': fact.subject,
-            'object': fact.object,
-            'approach': fact.approach,
-            'solution': fact.solution,
-            'remarks': fact.remarks,
+            'fact_text': fact.fact_text,
+            'primary_entities': fact.structured_metadata.primary_entities if fact.structured_metadata else [],
+            'relationships': fact.structured_metadata.relationships if fact.structured_metadata else [],
+            'domain_concepts': fact.structured_metadata.domain_concepts if fact.structured_metadata else [],
             'fact_type': fact.fact_type
         }
     

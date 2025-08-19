@@ -208,11 +208,12 @@ async def extract_facts_from_file(
         for fact in facts:
             fact_dict = {
                 "id": fact.id,
-                "subject": fact.subject,
-                "object": fact.object,
-                "approach": fact.approach,
-                "solution": fact.solution,
-                "remarks": fact.remarks,
+                "fact_text": fact.fact_text,
+                "structured_metadata": {
+                    "primary_entities": fact.structured_metadata.primary_entities if fact.structured_metadata else [],
+                    "relationships": fact.structured_metadata.relationships if fact.structured_metadata else [],
+                    "domain_concepts": fact.structured_metadata.domain_concepts if fact.structured_metadata else []
+                } if fact.structured_metadata else None,
                 "fact_type": fact.fact_type,
                 "domain": fact.domain,
                 "confidence": fact.extraction_confidence,
@@ -235,7 +236,9 @@ async def extract_facts_from_file(
         if verbose:
             print(f"✅ Extracted {len(facts)} facts:")
             for fact in facts:
-                print(f"  • {fact.subject} → {fact.object} ({fact.fact_type}) - confidence: {fact.extraction_confidence:.2f}")
+                entities = fact.structured_metadata.primary_entities if fact.structured_metadata and fact.structured_metadata.primary_entities else ["N/A"]
+                entities_str = ", ".join(entities[:2])  # Show first 2 entities
+                print(f"  • {fact.fact_text[:50]}... ({fact.fact_type}) - entities: {entities_str} - confidence: {fact.extraction_confidence:.2f}")
 
     except Exception as e:
         print(f"❌ Error during fact extraction: {e}")
@@ -291,7 +294,9 @@ async def extract_facts_from_file(
                     target_fact = next((f for f in facts if f.id == rel.target_fact_id), None)
 
                     if source_fact and target_fact:
-                        print(f"  • {source_fact.subject} --[{rel.relationship_type}]--> {target_fact.subject}")
+                        source_entities = source_fact.structured_metadata.primary_entities if source_fact.structured_metadata and source_fact.structured_metadata.primary_entities else ["Unknown"]
+                        target_entities = target_fact.structured_metadata.primary_entities if target_fact.structured_metadata and target_fact.structured_metadata.primary_entities else ["Unknown"]
+                        print(f"  • {source_entities[0]} --[{rel.relationship_type}]--> {target_entities[0]}")
 
         except Exception as e:
             print(f"❌ Error during relationship extraction: {e}")

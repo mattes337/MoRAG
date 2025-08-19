@@ -305,10 +305,10 @@ class GraphToolController:
         # Extract unique entities from facts
         entities = set()
         for fact in facts[:self.max_entities_per_call]:
-            if hasattr(fact, 'subject') and fact.subject:
-                entities.add(fact.subject)
-            if hasattr(fact, 'object') and fact.object:
-                entities.add(fact.object)
+            if hasattr(fact, 'structured_metadata') and fact.structured_metadata and fact.structured_metadata.primary_entities:
+                for entity in fact.structured_metadata.primary_entities:
+                    if entity and entity.strip():
+                        entities.add(entity.strip())
         
         return {
             "entities": list(entities),

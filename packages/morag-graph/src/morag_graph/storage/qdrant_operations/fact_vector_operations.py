@@ -112,11 +112,10 @@ class FactVectorOperations:
         # Prepare payload with fact metadata
         payload = {
             "fact_id": fact.id,
-            "subject": fact.subject,
-            "object": fact.object,
-            "approach": fact.approach,
-            "solution": fact.solution,
-            "remarks": fact.remarks,
+            "fact_text": fact.fact_text,
+            "primary_entities": fact.structured_metadata.primary_entities if fact.structured_metadata else [],
+            "relationships": fact.structured_metadata.relationships if fact.structured_metadata else [],
+            "domain_concepts": fact.structured_metadata.domain_concepts if fact.structured_metadata else [],
             "fact_type": fact.fact_type,
             "domain": fact.domain,
             "confidence": fact.extraction_confidence,
@@ -160,7 +159,7 @@ class FactVectorOperations:
                 "Fact vector stored successfully",
                 fact_id=fact.id,
                 point_id=point_id,
-                subject=fact.subject[:50] + "..." if len(fact.subject) > 50 else fact.subject
+                fact_text=fact.fact_text[:50] + "..." if len(fact.fact_text) > 50 else fact.fact_text
             )
             
             return point_id
@@ -215,11 +214,10 @@ class FactVectorOperations:
             # Prepare payload
             payload = {
                 "fact_id": fact.id,
-                "subject": fact.subject,
-                "object": fact.object,
-                "approach": fact.approach,
-                "solution": fact.solution,
-                "remarks": fact.remarks,
+                "fact_text": fact.fact_text,
+                "primary_entities": fact.structured_metadata.primary_entities if fact.structured_metadata else [],
+                "relationships": fact.structured_metadata.relationships if fact.structured_metadata else [],
+                "domain_concepts": fact.structured_metadata.domain_concepts if fact.structured_metadata else [],
                 "fact_type": fact.fact_type,
                 "domain": fact.domain,
                 "confidence": fact.extraction_confidence,
