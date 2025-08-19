@@ -61,7 +61,7 @@ async def continue_ingestion_after_remote_processing(
                 document_id = generate_document_id(remote_job.source_file_path, content)
 
             # Create a mock processing result for the coordinator
-            from morag_core.models.config import ProcessingResult
+            from morag_core.models import ProcessingResult
             mock_result = ProcessingResult(
                 success=True,
                 task_id=remote_job.ingestion_task_id,

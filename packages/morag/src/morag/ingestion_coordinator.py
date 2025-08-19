@@ -18,7 +18,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timezone
 import uuid
 
-from morag_core.models.config import ProcessingResult
+from morag_core.models import ProcessingResult
 from morag_services.embedding import GeminiEmbeddingService
 from morag_services.storage import QdrantVectorStorage
 # Chunking is implemented directly in this module

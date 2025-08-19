@@ -2,7 +2,7 @@
 
 from .graph_builder import GraphBuilder, GraphBuildResult, GraphBuildError
 
-# Enhanced builder with OpenIE (optional)
+# Enhanced builder (optional)
 try:
     from .enhanced_graph_builder import EnhancedGraphBuilder, EnhancedGraphBuildResult
     _ENHANCED_AVAILABLE = True

@@ -442,36 +442,48 @@ class MarkdownOptimizerStage(Stage):
 
     def _get_system_prompt(self, content_type: str, config: MarkdownOptimizerConfig) -> str:
         """Get system prompt for optimization.
-        
+
         Args:
             content_type: Type of content being optimized
             config: Stage configuration
-            
+
         Returns:
             System prompt string
         """
-        base_prompt = """You are an expert content optimizer. Your task is to improve the readability and structure of the provided content while preserving all important information."""
-        
+        base_prompt = """You are an expert content optimizer. Your task is to improve the readability and structure of the provided content while preserving all important information.
+
+REMOVE CLUTTER: Remove non-essential elements such as:
+- Table of contents and indexes
+- Acknowledgements and dedications
+- Navigation elements and boilerplate text
+- Repetitive headers and footers
+- Page numbers and reference markers
+- Copyright notices and disclaimers (unless specifically relevant to content)
+- Advertisement sections and promotional content
+- Redundant metadata and formatting artifacts
+
+PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and meaningful structural elements."""
+
         if config.get('fix_transcription_errors', True):
             base_prompt += " Fix any transcription errors you notice."
-        
+
         if config.get('improve_structure', True):
             base_prompt += " Improve the document structure and formatting."
-        
+
         if config.get('preserve_timestamps', True) and content_type in ['video', 'audio']:
             base_prompt += " IMPORTANT: Preserve all timestamp information exactly as provided."
-        
+
         if config.get('preserve_metadata', True):
-            base_prompt += " Preserve all metadata and structural elements."
-        
+            base_prompt += " Preserve all metadata and structural elements that contain substantive information."
+
         # Add content-type specific instructions
         if content_type == 'video':
-            base_prompt += " This is a video transcript. Maintain speaker labels and timestamps."
+            base_prompt += " This is a video transcript. Maintain speaker labels and timestamps while removing any video-specific clutter like chapter markers or promotional segments."
         elif content_type == 'audio':
-            base_prompt += " This is an audio transcript. Maintain speaker labels and timestamps."
+            base_prompt += " This is an audio transcript. Maintain speaker labels and timestamps while removing any audio-specific clutter like intro/outro music references or promotional segments."
         elif content_type == 'document':
-            base_prompt += " This is a document. Maintain proper heading structure and formatting."
-        
+            base_prompt += " This is a document. Maintain proper heading structure and formatting while removing document-specific clutter like page headers, footers, and navigation elements."
+
         return base_prompt
     
     def _get_user_prompt(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
@@ -682,7 +694,19 @@ class MarkdownOptimizerStage(Stage):
         """
         base_prompt = f"""You are an expert content optimizer. You are processing chunk {chunk_num} of {total_chunks} from a larger document.
 
-Your task is to improve the readability and structure of this content chunk while preserving all important information. This is part of a larger document, so maintain consistency and don't add introductory or concluding statements that assume this is a complete document."""
+Your task is to improve the readability and structure of this content chunk while preserving all important information. This is part of a larger document, so maintain consistency and don't add introductory or concluding statements that assume this is a complete document.
+
+REMOVE CLUTTER: Remove non-essential elements such as:
+- Table of contents and index entries
+- Acknowledgements and dedications
+- Navigation elements and boilerplate text
+- Repetitive headers and footers
+- Page numbers and reference markers
+- Copyright notices and disclaimers (unless specifically relevant to content)
+- Advertisement sections and promotional content
+- Redundant metadata and formatting artifacts
+
+PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and meaningful structural elements."""
 
         if config.fix_transcription_errors:
             base_prompt += " Fix any transcription errors you notice."
@@ -694,15 +718,15 @@ Your task is to improve the readability and structure of this content chunk whil
             base_prompt += " CRITICAL: Preserve all timestamp information exactly as provided - do not modify timestamps."
 
         if config.preserve_metadata:
-            base_prompt += " Preserve all metadata and structural elements."
+            base_prompt += " Preserve all metadata and structural elements that contain substantive information."
 
         # Add content-type specific instructions
         if content_type == 'video':
-            base_prompt += " This is part of a video transcript. Maintain speaker labels and timestamps exactly."
+            base_prompt += " This is part of a video transcript. Maintain speaker labels and timestamps exactly while removing any video-specific clutter like chapter markers or promotional segments."
         elif content_type == 'audio':
-            base_prompt += " This is part of an audio transcript. Maintain speaker labels and timestamps exactly."
+            base_prompt += " This is part of an audio transcript. Maintain speaker labels and timestamps exactly while removing any audio-specific clutter like intro/outro music references or promotional segments."
         elif content_type == 'document':
-            base_prompt += " This is part of a document. Maintain proper heading structure and formatting."
+            base_prompt += " This is part of a document. Maintain proper heading structure and formatting while removing document-specific clutter like page headers, footers, and navigation elements."
 
         base_prompt += " Return only the optimized content without any explanatory text or metadata."
 

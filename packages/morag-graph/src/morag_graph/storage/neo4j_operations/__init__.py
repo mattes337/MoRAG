@@ -8,8 +8,6 @@ from .graph_operations import GraphOperations
 from .query_operations import QueryOperations
 from .fact_operations import FactOperations
 
-# OpenIE operations removed - replaced by LangExtract
-
 __all__ = [
     "ConnectionOperations",
     "DocumentOperations",
