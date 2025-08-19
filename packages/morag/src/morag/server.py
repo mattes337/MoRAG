@@ -216,7 +216,7 @@ def main():
     """Main entry point for running the server."""
     import os
 
-    # Get configuration from environment
+    # Get configuration from environment with proper defaults
     host = os.getenv("MORAG_HOST", "0.0.0.0")
     port = int(os.getenv("MORAG_PORT", "8000"))
     reload = os.getenv("MORAG_RELOAD", "false").lower() == "true"

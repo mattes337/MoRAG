@@ -1,4 +1,15 @@
-"""Configuration models for stages."""
+"""Configuration models for stages.
+
+DEPRECATED: These configuration models are deprecated in favor of the unified
+configuration system in morag_core.config. Use the new configuration classes:
+- LLMConfig
+- MarkdownOptimizerConfig
+- FactGeneratorConfig
+- ChunkerConfig
+- IngestorConfig
+
+These models are kept for backward compatibility only.
+"""
 
 from typing import Any, Dict, List, Optional, Union
 from pathlib import Path

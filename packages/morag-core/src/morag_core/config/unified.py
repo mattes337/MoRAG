@@ -330,32 +330,119 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
 
 class ChunkerConfig(BaseModel, ConfigMixin):
     """Configuration for chunker stage."""
-    
-    _env_prefix = "MORAG_CHUNKER_"
-    
+
     enabled: bool = Field(default=True, description="Enable chunking")
-    
+
     # Chunking strategy
     chunk_strategy: str = Field(default="semantic", description="Chunking strategy")
     chunk_size: int = Field(default=4000, ge=100, description="Target chunk size")
     overlap: int = Field(default=200, ge=0, description="Chunk overlap")
-    
+
     # Processing options
     generate_summary: bool = Field(default=True, description="Generate chunk summaries")
     extract_metadata: bool = Field(default=True, description="Extract metadata")
 
+    @classmethod
+    def from_env_and_overrides(
+        cls,
+        overrides: Optional[Dict[str, Any]] = None,
+        prefix: Optional[str] = None
+    ) -> 'ChunkerConfig':
+        """Create configuration from environment variables with overrides."""
+        if prefix is None:
+            prefix = "MORAG_CHUNKER_"
+
+        # Load from environment variables
+        env_config = {}
+
+        # Define field mappings with types
+        field_mappings = {
+            'enabled': ('ENABLED', bool),
+            'chunk_strategy': ('CHUNK_STRATEGY', str),
+            'chunk_size': ('CHUNK_SIZE', int),
+            'overlap': ('OVERLAP', int),
+            'generate_summary': ('GENERATE_SUMMARY', bool),
+            'extract_metadata': ('EXTRACT_METADATA', bool),
+        }
+
+        for field_name, (env_suffix, field_type) in field_mappings.items():
+            env_var = f"{prefix}{env_suffix}"
+            env_value = os.environ.get(env_var)
+
+            if env_value is not None:
+                try:
+                    converted_value = cls._convert_env_value(env_value, field_type)
+                    env_config[field_name] = converted_value
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
+
+        # Apply overrides
+        if overrides:
+            env_config.update(overrides)
+
+        return cls(**env_config)
+
 
 class IngestorConfig(BaseModel, ConfigMixin):
     """Configuration for ingestor stage."""
-    
-    _env_prefix = "MORAG_INGESTOR_"
-    
+
     enabled: bool = Field(default=True, description="Enable ingestion")
-    
+
     # Database configuration
     databases: list[str] = Field(default=["qdrant"], description="Target databases")
     batch_size: int = Field(default=50, ge=1, description="Ingestion batch size")
-    
+
     # Processing options
     generate_embeddings: bool = Field(default=True, description="Generate embeddings")
     validate_data: bool = Field(default=True, description="Validate data before ingestion")
+
+    @classmethod
+    def from_env_and_overrides(
+        cls,
+        overrides: Optional[Dict[str, Any]] = None,
+        prefix: Optional[str] = None
+    ) -> 'IngestorConfig':
+        """Create configuration from environment variables with overrides."""
+        if prefix is None:
+            prefix = "MORAG_INGESTOR_"
+
+        # Load from environment variables
+        env_config = {}
+
+        # Define field mappings with types
+        field_mappings = {
+            'enabled': ('ENABLED', bool),
+            'batch_size': ('BATCH_SIZE', int),
+            'generate_embeddings': ('GENERATE_EMBEDDINGS', bool),
+            'validate_data': ('VALIDATE_DATA', bool),
+        }
+
+        for field_name, (env_suffix, field_type) in field_mappings.items():
+            env_var = f"{prefix}{env_suffix}"
+            env_value = os.environ.get(env_var)
+
+            if env_value is not None:
+                try:
+                    converted_value = cls._convert_env_value(env_value, field_type)
+                    env_config[field_name] = converted_value
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid value for {env_var}: {env_value}", error=str(e))
+
+        # Handle databases list separately
+        databases_env = os.environ.get(f"{prefix}DATABASES")
+        if databases_env:
+            try:
+                # Parse as JSON array or comma-separated list
+                if databases_env.startswith('['):
+                    import json
+                    env_config['databases'] = json.loads(databases_env)
+                else:
+                    env_config['databases'] = [db.strip() for db in databases_env.split(',')]
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid value for {prefix}DATABASES: {databases_env}", error=str(e))
+
+        # Apply overrides
+        if overrides:
+            env_config.update(overrides)
+
+        return cls(**env_config)

@@ -160,16 +160,18 @@ class MoRAGServices:
                 )
 
             # Initialize embedding service
-            gemini_api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
-            if gemini_api_key:
+            from morag_core.config import LLMConfig
+            llm_config = LLMConfig.from_env_and_overrides()
+
+            if llm_config.api_key:
                 self._gemini_embedding_service = GeminiEmbeddingService(
-                    api_key=gemini_api_key,
+                    api_key=llm_config.api_key,
                     embedding_model="text-embedding-004",
                     generation_model=None  # Will use environment variable
                 )
                 logger.info("Search services initialized successfully")
             else:
-                logger.warning("Gemini API key not found - search functionality will be limited")
+                logger.warning("API key not found - search functionality will be limited")
 
         except Exception as e:
             logger.error("Failed to initialize search services", error=str(e))

@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, Set
 from pathlib import Path
 import structlog
 
+from morag_core.config import FactGeneratorConfig
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
@@ -58,7 +59,10 @@ class FactGeneratorStage(Stage):
             )
         
         input_file = input_files[0]
-        config = context.get_stage_config(self.stage_type)
+
+        # Load configuration from environment variables with context overrides
+        context_config = context.get_stage_config(self.stage_type)
+        config = FactGeneratorConfig.from_env_and_overrides(context_config)
         
         logger.info("Starting fact generation", 
                    input_file=str(input_file),
@@ -279,7 +283,7 @@ class FactGeneratorStage(Stage):
         
         return results
 
-    async def _llm_extraction_fallback(self, content: str, chunk_id: str, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _llm_extraction_fallback(self, content: str, chunk_id: str, config: FactGeneratorConfig) -> Dict[str, Any]:
         """Extract facts using LLM as fallback.
 
         Args:
@@ -295,10 +299,12 @@ class FactGeneratorStage(Stage):
 
         try:
             if not self.extraction_agent:
+                # Get LLM configuration with stage-specific overrides
+                llm_config = config.get_llm_config()
                 agent_config = AgentConfig(
-                    model=config.get('model', 'gemini-pro'),
-                    temperature=config.get('temperature', 0.1),
-                    max_tokens=config.get('max_tokens', 4096)
+                    model=llm_config.model,
+                    temperature=llm_config.temperature,
+                    max_tokens=llm_config.max_tokens
                 )
                 self.extraction_agent = create_agent(agent_config)
 
@@ -333,7 +339,7 @@ class FactGeneratorStage(Stage):
             logger.warning("LLM extraction failed", error=str(e))
             return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
 
-    def _get_extraction_system_prompt(self, config: Dict[str, Any]) -> str:
+    def _get_extraction_system_prompt(self, config: FactGeneratorConfig) -> str:
         """Get system prompt for extraction.
 
         Args:
@@ -342,7 +348,7 @@ class FactGeneratorStage(Stage):
         Returns:
             System prompt string
         """
-        domain = config.get('domain', 'general')
+        domain = config.domain
 
         prompt = f"""You are an expert knowledge extraction system. Extract structured information from the provided text in the {domain} domain.
 
@@ -381,15 +387,11 @@ Guidelines:
 - Include confidence scores between 0.0 and 1.0
 - Focus on the most important and relevant information"""
 
-        if config.get('entity_types'):
-            prompt += f"\n- Prioritize these entity types: {', '.join(config['entity_types'])}"
-
-        if config.get('relation_types'):
-            prompt += f"\n- Prioritize these relation types: {', '.join(config['relation_types'])}"
+        # Note: Entity and relation type prioritization can be added to FactGeneratorConfig if needed
 
         return prompt
 
-    def _get_extraction_user_prompt(self, content: str, config: Dict[str, Any]) -> str:
+    def _get_extraction_user_prompt(self, content: str, config: FactGeneratorConfig) -> str:
         """Get user prompt for extraction.
 
         Args:

@@ -273,25 +273,7 @@ class MoRAGWebDAVProcessor:
         context = StageContext(
             source_path=markdown_file_path,
             output_dir=output_dir,
-            config={
-                'chunker': {
-                    'chunk_strategy': 'semantic',
-                    'chunk_size': 4000,
-                    'overlap': 200,
-                    'generate_summary': True
-                },
-                'fact-generator': {
-                    'extract_entities': True,
-                    'extract_relations': True,
-                    'extract_keywords': True,
-                    'domain': 'general'
-                },
-                'ingestor': {
-                    'databases': ['qdrant', 'neo4j'],
-                    'collection_name': 'documents',
-                    'batch_size': 50
-                }
-            }
+            config={}  # All configuration now comes from environment variables
         )
 
         additional_files = []

@@ -73,18 +73,13 @@ logger = structlog.get_logger(__name__)
 
 class GraphProcessingConfig(BaseModel):
     """Configuration for graph processing."""
-    
+
     enabled: bool = False
     neo4j_uri: Optional[str] = None
     neo4j_username: Optional[str] = None
     neo4j_password: Optional[str] = None
     neo4j_database: Optional[str] = "neo4j"
-    
-    # LLM configuration for extraction
-    llm_provider: str = "gemini"
-    llm_api_key: Optional[str] = None
-    llm_model: Optional[str] = None
-    
+
     # Processing options
     chunk_by_structure: bool = True
     max_chunk_size: int = 4000
@@ -96,6 +91,23 @@ class GraphProcessingConfig(BaseModel):
     openie_min_confidence: float = 0.7
     openie_enable_entity_linking: bool = True
     openie_enable_predicate_normalization: bool = True
+
+    @classmethod
+    def from_env(cls) -> 'GraphProcessingConfig':
+        """Create configuration from environment variables."""
+        return cls(
+            enabled=os.getenv('MORAG_GRAPH_PROCESSING_ENABLED', 'false').lower() == 'true',
+            neo4j_uri=os.getenv('NEO4J_URI'),
+            neo4j_username=os.getenv('NEO4J_USERNAME'),
+            neo4j_password=os.getenv('NEO4J_PASSWORD'),
+            neo4j_database=os.getenv('NEO4J_DATABASE', 'neo4j'),
+            chunk_by_structure=os.getenv('MORAG_GRAPH_CHUNK_BY_STRUCTURE', 'true').lower() == 'true',
+            max_chunk_size=int(os.getenv('MORAG_GRAPH_MAX_CHUNK_SIZE', '4000')),
+            enable_openie=os.getenv('MORAG_GRAPH_ENABLE_OPENIE', 'true').lower() == 'true',
+            openie_min_confidence=float(os.getenv('MORAG_GRAPH_OPENIE_MIN_CONFIDENCE', '0.7')),
+            openie_enable_entity_linking=os.getenv('MORAG_GRAPH_OPENIE_ENTITY_LINKING', 'true').lower() == 'true',
+            openie_enable_predicate_normalization=os.getenv('MORAG_GRAPH_OPENIE_PREDICATE_NORM', 'true').lower() == 'true',
+        )
     
     @classmethod
     def from_env(cls) -> "GraphProcessingConfig":

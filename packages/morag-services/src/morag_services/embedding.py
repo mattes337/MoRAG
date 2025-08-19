@@ -54,7 +54,10 @@ class GeminiEmbeddingService(BaseEmbeddingService):
 
         # Use environment variable for generation model if not provided
         if generation_model is None:
-            generation_model = os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
+            # Use unified LLM configuration for fallback
+            from morag_core.config import LLMConfig
+            llm_config = LLMConfig.from_env_and_overrides()
+            generation_model = llm_config.model
 
         config = EmbeddingConfig(
             provider=EmbeddingProvider.GEMINI,

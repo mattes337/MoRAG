@@ -103,12 +103,31 @@ async def execute_stage_chain(args):
             print(f"Valid stages: {[s.value for s in StageType]}")
             sys.exit(1)
     
-    # Create context - configuration loaded from environment variables
+    # Create CLI overrides from arguments
+    cli_overrides = {}
+
+    # Global LLM overrides
+    if hasattr(args, 'llm_model') and args.llm_model:
+        cli_overrides['model'] = args.llm_model
+    if hasattr(args, 'llm_provider') and args.llm_provider:
+        cli_overrides['provider'] = args.llm_provider
+    if hasattr(args, 'llm_temperature') and args.llm_temperature is not None:
+        cli_overrides['temperature'] = args.llm_temperature
+    if hasattr(args, 'llm_max_tokens') and args.llm_max_tokens:
+        cli_overrides['max_tokens'] = args.llm_max_tokens
+
+    # Apply overrides to all stages in the chain
+    config_overrides = {}
+    if cli_overrides:
+        for stage_name in stage_names:
+            config_overrides[stage_name] = cli_overrides.copy()
+
+    # Create context - configuration loaded from environment variables with CLI overrides
     context = StageContext(
         source_path=Path(args.input),
         output_dir=Path(args.output_dir),
         webhook_url=args.webhook_url,
-        config={}
+        config=config_overrides
     )
     
     try:
