@@ -101,13 +101,17 @@ def stage(ctx: click.Context, stage_name: str, input_file: str, output_dir: str,
 
 
 @cli.command()
-@click.argument('stages', help='Comma-separated stage names (e.g., "markdown-conversion,chunker,fact-generator")')
+@click.argument('stages')
 @click.argument('input_file', type=click.Path(exists=True))
 @click.option('--output-dir', default='./output', help='Output directory')
 @click.option('--webhook-url', help='Webhook URL for notifications')
 @click.pass_context
 def stages(ctx: click.Context, stages: str, input_file: str, output_dir: str, webhook_url: Optional[str]):
-    """Execute a chain of stages using canonical stage names."""
+    """Execute a chain of stages using canonical stage names.
+
+    STAGES: Comma-separated stage names (e.g., "markdown-conversion,chunker,fact-generator")
+    INPUT_FILE: Path to the input file to process
+    """
     async def _execute_stage_chain():
         stage_manager = StageManager()
 
