@@ -27,6 +27,7 @@ classifiers = [
 dependencies = [
     "morag-core>=0.1.0",
     "morag-services>=0.1.0",
+    "morag-stages>=0.1.0",
     "morag-web>=0.1.0",
     "morag-youtube>=0.1.0",
     "morag-reasoning>=0.1.0",
