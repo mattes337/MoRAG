@@ -44,6 +44,15 @@ The system uses these exact canonical stage names:
 4. **`fact-generator`** - Extract facts, entities, relations, and keywords
 5. **`ingestor`** - Database ingestion and storage
 
+#### Configuration System
+
+MoRAG uses a unified environment variable configuration system with CLI override support:
+
+- **Environment Variables**: All configuration uses `MORAG_` prefixed environment variables
+- **CLI Overrides**: Command-line arguments can override any environment variable
+- **Fallback Chain**: Stage-specific → Global LLM → Legacy → Defaults
+- **LLM Model Fallback**: Always falls back to `MORAG_GEMINI_MODEL` for compatibility
+
 #### Stage Flow
 
 ```
@@ -130,6 +139,16 @@ python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" i
 
 # Execute full pipeline
 python cli/morag-stages.py process input.pdf --optimize --output-dir ./output
+
+# Override LLM configuration via CLI
+python cli/morag-stages.py stage markdown-optimizer input.md --llm-model gemini-1.5-pro --llm-temperature 0.2
+
+# Override stage-specific parameters
+python cli/morag-stages.py stage chunker input.md --chunk-size 2000
+python cli/morag-stages.py stage fact-generator input.md --domain medical
+
+# Chain with LLM overrides
+python cli/morag-stages.py stages "markdown-optimizer,chunker" input.pdf --llm-model gemini-1.5-flash
 ```
 
 #### REST API Usage

@@ -7,6 +7,10 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 # Add packages directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-stages" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src"))
@@ -16,35 +20,42 @@ from morag_stages import StageManager, StageType, StageStatus
 from morag_stages.models import StageContext
 
 
-def load_config(config_path: Optional[str]) -> Dict[str, Any]:
-    """Load configuration from file."""
-    if not config_path:
-        return {}
-    
-    config_path = Path(config_path)
-    
-    if config_path.suffix == '.json':
-        import json
-        with open(config_path) as f:
-            return json.load(f)
-    elif config_path.suffix in ['.yml', '.yaml']:
-        import yaml
-        with open(config_path) as f:
-            return yaml.safe_load(f)
-    else:
-        raise ValueError(f"Unsupported config file format: {config_path.suffix}")
-
 
 async def execute_stage(args):
     """Execute a single stage."""
     stage_manager = StageManager()
     
-    # Create stage context
+    # Create CLI overrides from arguments
+    cli_overrides = {}
+
+    # Global LLM overrides
+    if hasattr(args, 'llm_model') and args.llm_model:
+        cli_overrides['model'] = args.llm_model
+    if hasattr(args, 'llm_provider') and args.llm_provider:
+        cli_overrides['provider'] = args.llm_provider
+    if hasattr(args, 'llm_temperature') and args.llm_temperature is not None:
+        cli_overrides['temperature'] = args.llm_temperature
+    if hasattr(args, 'llm_max_tokens') and args.llm_max_tokens:
+        cli_overrides['max_tokens'] = args.llm_max_tokens
+
+    # Stage-specific overrides
+    stage_overrides = {}
+    if hasattr(args, 'chunk_size') and args.chunk_size:
+        stage_overrides['chunk_size'] = args.chunk_size
+    if hasattr(args, 'max_chunk_size') and args.max_chunk_size:
+        stage_overrides['max_chunk_size'] = args.max_chunk_size
+    if hasattr(args, 'domain') and args.domain:
+        stage_overrides['domain'] = args.domain
+
+    # Combine overrides
+    config_overrides = {args.stage: {**cli_overrides, **stage_overrides}} if cli_overrides or stage_overrides else {}
+
+    # Create stage context - configuration loaded from environment variables with CLI overrides
     context = StageContext(
         source_path=Path(args.input),
         output_dir=Path(args.output_dir),
         webhook_url=args.webhook_url,
-        config=load_config(args.config) if args.config else {}
+        config=config_overrides
     )
     
     # Execute stage
@@ -92,12 +103,12 @@ async def execute_stage_chain(args):
             print(f"Valid stages: {[s.value for s in StageType]}")
             sys.exit(1)
     
-    # Create context
+    # Create context - configuration loaded from environment variables
     context = StageContext(
         source_path=Path(args.input),
         output_dir=Path(args.output_dir),
         webhook_url=args.webhook_url,
-        config=load_config(args.config) if args.config else {}
+        config={}
     )
     
     try:
@@ -150,12 +161,12 @@ async def execute_full_pipeline(args):
                 sys.exit(1)
         stages = [s for s in stages if s not in skip_stages]
     
-    # Create context
+    # Create context - configuration loaded from environment variables
     context = StageContext(
         source_path=Path(args.input),
         output_dir=Path(args.output_dir),
         webhook_url=args.webhook_url,
-        config=load_config(args.config) if args.config else {}
+        config={}
     )
     
     try:
@@ -188,7 +199,17 @@ def setup_parser():
     stage_parser.add_argument("input", help="Input file or previous stage output")
     stage_parser.add_argument("--output-dir", default="./output", help="Output directory")
     stage_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
-    stage_parser.add_argument("--config", help="Configuration file path")
+
+    # LLM configuration overrides
+    stage_parser.add_argument("--llm-model", help="Override LLM model (e.g., gemini-1.5-flash)")
+    stage_parser.add_argument("--llm-provider", help="Override LLM provider (e.g., gemini)")
+    stage_parser.add_argument("--llm-temperature", type=float, help="Override LLM temperature")
+    stage_parser.add_argument("--llm-max-tokens", type=int, help="Override LLM max tokens")
+
+    # Stage-specific overrides
+    stage_parser.add_argument("--chunk-size", type=int, help="Override chunk size for chunker")
+    stage_parser.add_argument("--max-chunk-size", type=int, help="Override max chunk size for markdown optimizer")
+    stage_parser.add_argument("--domain", help="Override domain for fact generator")
 
     # Stage chain execution using canonical names
     chain_parser = subparsers.add_parser("stages", help="Execute a chain of stages")
@@ -196,7 +217,12 @@ def setup_parser():
     chain_parser.add_argument("input", help="Input file")
     chain_parser.add_argument("--output-dir", default="./output", help="Output directory")
     chain_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
-    chain_parser.add_argument("--config", help="Configuration file path")
+
+    # LLM configuration overrides for chain
+    chain_parser.add_argument("--llm-model", help="Override LLM model for all stages")
+    chain_parser.add_argument("--llm-provider", help="Override LLM provider for all stages")
+    chain_parser.add_argument("--llm-temperature", type=float, help="Override LLM temperature for all stages")
+    chain_parser.add_argument("--llm-max-tokens", type=int, help="Override LLM max tokens for all stages")
     
     # Full pipeline (backward compatibility)
     pipeline_parser = subparsers.add_parser("process", help="Execute full pipeline")
@@ -205,7 +231,6 @@ def setup_parser():
     pipeline_parser.add_argument("--optimize", action="store_true", help="Include markdown optimization stage")
     pipeline_parser.add_argument("--skip-stages", help="Comma-separated list of stages to skip")
     pipeline_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
-    pipeline_parser.add_argument("--config", help="Configuration file path")
     
     # List available stages
     list_parser = subparsers.add_parser("list", help="List available stages")

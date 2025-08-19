@@ -268,17 +268,12 @@ class MoRAGWebDAVProcessor:
 
         print(f"  🔄 Executing additional stages: {[s.value for s in stage_types]}")
 
-        # Create stage context
+        # Create stage context - configuration will be loaded from environment variables
         output_dir = markdown_file_path.parent
         context = StageContext(
             source_path=markdown_file_path,
             output_dir=output_dir,
             config={
-                'markdown-optimizer': {
-                    'enabled': True,
-                    'model': 'gemini-pro',
-                    'temperature': 0.1
-                },
                 'chunker': {
                     'chunk_strategy': 'semantic',
                     'chunk_size': 4000,

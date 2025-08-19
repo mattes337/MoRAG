@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import structlog
 
+from morag_core.config import MarkdownOptimizerConfig, LLMConfig
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
@@ -54,7 +55,10 @@ class MarkdownOptimizerStage(Stage):
             )
         
         input_file = input_files[0]
-        config = context.get_stage_config(self.stage_type)
+
+        # Load configuration from environment variables with context overrides
+        context_config = context.get_stage_config(self.stage_type)
+        config = MarkdownOptimizerConfig.from_env_and_overrides(context_config)
         
         logger.info("Starting markdown optimization", 
                    input_file=str(input_file),
@@ -73,7 +77,7 @@ class MarkdownOptimizerStage(Stage):
             
             # Optimize content if LLM is available and API key is configured
             api_key_available = self._check_api_key_available()
-            if LLM_AVAILABLE and config.get('enabled', True) and api_key_available:
+            if LLM_AVAILABLE and config.enabled and api_key_available:
                 try:
                     optimized_content = await self._optimize_with_llm(content, metadata, config)
                     optimization_applied = True
@@ -249,8 +253,8 @@ class MarkdownOptimizerStage(Stage):
         
         return "\n".join(yaml_lines) + content
     
-    async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> str:
-        """Optimize content using LLM.
+    async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
+        """Optimize content using LLM with text splitting for large files.
 
         Args:
             content: Content to optimize
@@ -260,9 +264,31 @@ class MarkdownOptimizerStage(Stage):
         Returns:
             Optimized content
         """
-        # For now, just return basic cleanup since LLM optimization needs more complex setup
-        logger.info("LLM optimization not fully implemented, using basic cleanup")
-        return self._basic_text_cleanup(content)
+        try:
+            # Import LLM client
+            from morag_reasoning.llm import LLMClient
+
+            # Get LLM configuration with stage-specific overrides
+            llm_config = config.get_llm_config()
+            llm_client = LLMClient(llm_config)
+
+            # Determine if content needs splitting
+            if len(content) <= config.max_chunk_size:
+                # Content is small enough to process in one request
+                logger.info("Processing content in single LLM request", content_length=len(content))
+                return await self._optimize_single_chunk(llm_client, content, metadata, config)
+            else:
+                # Content is too large, split and process in chunks
+                logger.info("Content too large, splitting for multiple LLM requests",
+                           content_length=len(content), max_chunk_size=config.max_chunk_size)
+                return await self._optimize_with_splitting(llm_client, content, metadata, config)
+
+        except ImportError:
+            logger.warning("LLM reasoning module not available, using basic cleanup")
+            return self._basic_text_cleanup(content)
+        except Exception as e:
+            logger.warning("LLM optimization failed, using basic cleanup", error=str(e))
+            return self._basic_text_cleanup(content)
     
     def _basic_text_cleanup(self, content: str) -> str:
         """Basic text cleanup without LLM.
@@ -283,8 +309,138 @@ class MarkdownOptimizerStage(Stage):
         content = content.replace('\r\n', '\n').replace('\r', '\n')
         
         return content.strip()
-    
-    def _get_system_prompt(self, content_type: str, config: Dict[str, Any]) -> str:
+
+    def _get_api_key(self) -> Optional[str]:
+        """Get API key for LLM operations.
+
+        Returns:
+            API key string or None if not available
+        """
+        import os
+        return os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+
+    async def _optimize_single_chunk(self, llm_client, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
+        """Optimize content in a single LLM request.
+
+        Args:
+            llm_client: LLM client instance
+            content: Content to optimize
+            metadata: Document metadata
+            config: Stage configuration
+
+        Returns:
+            Optimized content
+        """
+        # Determine content type for appropriate prompting
+        content_type = self._determine_content_type(metadata, content)
+
+        # Create system and user prompts
+        system_prompt = self._get_system_prompt(content_type, config)
+        user_prompt = self._get_user_prompt(content, metadata, config)
+
+        # Generate optimized content
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        response = await llm_client.generate_from_messages(
+            messages,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature
+        )
+
+        return response.strip()
+
+    async def _optimize_with_splitting(self, llm_client, content: str, metadata: Dict[str, Any],
+                                     config: MarkdownOptimizerConfig) -> str:
+        """Optimize content by splitting into chunks and processing separately.
+
+        Args:
+            llm_client: LLM client instance
+            content: Content to optimize
+            metadata: Document metadata
+            config: Stage configuration
+
+        Returns:
+            Optimized content reassembled from chunks
+        """
+        # Split content into manageable chunks
+        chunks = self._split_content_intelligently(content, config.max_chunk_size)
+
+        logger.info("Split content into chunks for optimization",
+                   num_chunks=len(chunks),
+                   avg_chunk_size=sum(len(c) for c in chunks) // len(chunks) if chunks else 0)
+
+        # Process each chunk
+        optimized_chunks = []
+        content_type = self._determine_content_type(metadata, content)
+
+        for i, chunk in enumerate(chunks, 1):
+            logger.debug(f"Processing chunk {i}/{len(chunks)}", chunk_size=len(chunk))
+
+            try:
+                # Create context-aware prompts for chunk processing
+                system_prompt = self._get_chunk_system_prompt(content_type, config, i, len(chunks))
+                user_prompt = self._get_chunk_user_prompt(chunk, metadata, config, i, len(chunks))
+
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
+
+                optimized_chunk = await llm_client.generate_from_messages(
+                    messages,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature
+                )
+
+                optimized_chunks.append(optimized_chunk.strip())
+
+            except Exception as e:
+                logger.warning(f"Failed to optimize chunk {i}, using original", error=str(e))
+                optimized_chunks.append(chunk)
+
+        # Reassemble optimized content
+        return self._reassemble_chunks(optimized_chunks, content_type)
+
+    def _determine_content_type(self, metadata: Dict[str, Any], content: str) -> str:
+        """Determine the type of content for appropriate optimization.
+
+        Args:
+            metadata: Document metadata
+            content: Content to analyze
+
+        Returns:
+            Content type string (video, audio, document, web_content, general)
+        """
+        # Check metadata for content type hints
+        if metadata:
+            source_type = metadata.get('source_type', '').lower()
+            if 'video' in source_type or 'mp4' in source_type:
+                return 'video'
+            elif 'audio' in source_type or any(ext in source_type for ext in ['mp3', 'wav', 'flac']):
+                return 'audio'
+            elif 'pdf' in source_type or 'document' in source_type:
+                return 'document'
+            elif 'web' in source_type or 'html' in source_type:
+                return 'web_content'
+
+        # Analyze content for type indicators
+        if '[' in content and ']' in content and any(time_pattern in content for time_pattern in [':', 'min', 'sec']):
+            # Likely contains timestamps
+            if 'speaker' in content.lower() or any(speaker in content.lower() for speaker in ['person', 'interviewer', 'host']):
+                return 'video'  # Video with speakers
+            else:
+                return 'audio'  # Audio transcript
+        elif content.count('#') > 3:  # Multiple headings suggest document structure
+            return 'document'
+        elif 'http' in content or 'www.' in content:
+            return 'web_content'
+        else:
+            return 'general'
+
+    def _get_system_prompt(self, content_type: str, config: MarkdownOptimizerConfig) -> str:
         """Get system prompt for optimization.
         
         Args:
@@ -318,7 +474,7 @@ class MarkdownOptimizerStage(Stage):
         
         return base_prompt
     
-    def _get_user_prompt(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> str:
+    def _get_user_prompt(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
         """Get user prompt for optimization.
         
         Args:
@@ -335,3 +491,261 @@ class MarkdownOptimizerStage(Stage):
             prompt = f"Document metadata: {metadata}\n\n" + prompt
         
         return prompt
+
+    def _split_content_intelligently(self, content: str, max_chunk_size: int) -> List[str]:
+        """Split content into chunks while preserving structure.
+
+        Args:
+            content: Content to split
+            max_chunk_size: Maximum size per chunk in characters
+
+        Returns:
+            List of content chunks
+        """
+        if len(content) <= max_chunk_size:
+            return [content]
+
+        chunks = []
+
+        # Try to split at major section boundaries first (## headers)
+        major_sections = re.split(r'\n(?=##\s)', content)
+
+        current_chunk = ""
+
+        for section in major_sections:
+            section = section.strip()
+            if not section:
+                continue
+
+            # If adding this section would exceed chunk size
+            if current_chunk and len(current_chunk) + len(section) + 2 > max_chunk_size:
+                # Try to split the current chunk at minor boundaries
+                if current_chunk:
+                    chunks.extend(self._split_section_at_boundaries(current_chunk, max_chunk_size))
+                current_chunk = section
+            else:
+                # Add section to current chunk
+                if current_chunk:
+                    current_chunk += f"\n\n{section}"
+                else:
+                    current_chunk = section
+
+        # Handle remaining content
+        if current_chunk:
+            chunks.extend(self._split_section_at_boundaries(current_chunk, max_chunk_size))
+
+        return [chunk.strip() for chunk in chunks if chunk.strip()]
+
+    def _split_section_at_boundaries(self, section: str, max_chunk_size: int) -> List[str]:
+        """Split a section at natural boundaries.
+
+        Args:
+            section: Section to split
+            max_chunk_size: Maximum chunk size
+
+        Returns:
+            List of section chunks
+        """
+        if len(section) <= max_chunk_size:
+            return [section]
+
+        chunks = []
+
+        # Try splitting at paragraph boundaries first
+        paragraphs = section.split('\n\n')
+        current_chunk = ""
+
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+
+            # If adding this paragraph would exceed chunk size
+            if current_chunk and len(current_chunk) + len(paragraph) + 2 > max_chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+
+                # If single paragraph is too large, split it further
+                if len(paragraph) > max_chunk_size:
+                    chunks.extend(self._split_paragraph_at_sentences(paragraph, max_chunk_size))
+                else:
+                    current_chunk = paragraph
+            else:
+                # Add paragraph to current chunk
+                if current_chunk:
+                    current_chunk += f"\n\n{paragraph}"
+                else:
+                    current_chunk = paragraph
+
+        # Add final chunk
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
+    def _split_paragraph_at_sentences(self, paragraph: str, max_chunk_size: int) -> List[str]:
+        """Split a large paragraph at sentence boundaries.
+
+        Args:
+            paragraph: Paragraph to split
+            max_chunk_size: Maximum chunk size
+
+        Returns:
+            List of paragraph chunks
+        """
+        if len(paragraph) <= max_chunk_size:
+            return [paragraph]
+
+        # Split at sentence boundaries (simple approach)
+        sentences = re.split(r'(?<=[.!?])\s+', paragraph)
+
+        chunks = []
+        current_chunk = ""
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+
+            # If adding this sentence would exceed chunk size
+            if current_chunk and len(current_chunk) + len(sentence) + 1 > max_chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+
+                # If single sentence is too large, split at word boundaries
+                if len(sentence) > max_chunk_size:
+                    chunks.extend(self._split_at_word_boundaries(sentence, max_chunk_size))
+                else:
+                    current_chunk = sentence
+            else:
+                # Add sentence to current chunk
+                if current_chunk:
+                    current_chunk += f" {sentence}"
+                else:
+                    current_chunk = sentence
+
+        # Add final chunk
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
+    def _split_at_word_boundaries(self, text: str, max_chunk_size: int) -> List[str]:
+        """Split text at word boundaries as a last resort.
+
+        Args:
+            text: Text to split
+            max_chunk_size: Maximum chunk size
+
+        Returns:
+            List of text chunks
+        """
+        if len(text) <= max_chunk_size:
+            return [text]
+
+        chunks = []
+        words = text.split()
+        current_chunk = ""
+
+        for word in words:
+            # If adding this word would exceed chunk size
+            if current_chunk and len(current_chunk) + len(word) + 1 > max_chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = word
+            else:
+                # Add word to current chunk
+                if current_chunk:
+                    current_chunk += f" {word}"
+                else:
+                    current_chunk = word
+
+        # Add final chunk
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
+
+    def _get_chunk_system_prompt(self, content_type: str, config: MarkdownOptimizerConfig,
+                                chunk_num: int, total_chunks: int) -> str:
+        """Get system prompt for chunk processing.
+
+        Args:
+            content_type: Type of content being optimized
+            config: Stage configuration
+            chunk_num: Current chunk number (1-based)
+            total_chunks: Total number of chunks
+
+        Returns:
+            System prompt string
+        """
+        base_prompt = f"""You are an expert content optimizer. You are processing chunk {chunk_num} of {total_chunks} from a larger document.
+
+Your task is to improve the readability and structure of this content chunk while preserving all important information. This is part of a larger document, so maintain consistency and don't add introductory or concluding statements that assume this is a complete document."""
+
+        if config.fix_transcription_errors:
+            base_prompt += " Fix any transcription errors you notice."
+
+        if config.improve_structure:
+            base_prompt += " Improve the formatting and structure within this chunk."
+
+        if config.preserve_timestamps and content_type in ['video', 'audio']:
+            base_prompt += " CRITICAL: Preserve all timestamp information exactly as provided - do not modify timestamps."
+
+        if config.preserve_metadata:
+            base_prompt += " Preserve all metadata and structural elements."
+
+        # Add content-type specific instructions
+        if content_type == 'video':
+            base_prompt += " This is part of a video transcript. Maintain speaker labels and timestamps exactly."
+        elif content_type == 'audio':
+            base_prompt += " This is part of an audio transcript. Maintain speaker labels and timestamps exactly."
+        elif content_type == 'document':
+            base_prompt += " This is part of a document. Maintain proper heading structure and formatting."
+
+        base_prompt += " Return only the optimized content without any explanatory text or metadata."
+
+        return base_prompt
+
+    def _get_chunk_user_prompt(self, chunk: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig,
+                              chunk_num: int, total_chunks: int) -> str:
+        """Get user prompt for chunk processing.
+
+        Args:
+            chunk: Content chunk to optimize
+            metadata: Document metadata
+            config: Stage configuration
+            chunk_num: Current chunk number
+            total_chunks: Total number of chunks
+
+        Returns:
+            User prompt string
+        """
+        prompt = f"Optimize this content chunk ({chunk_num}/{total_chunks}):\n\n{chunk}"
+
+        if chunk_num == 1 and metadata:
+            prompt = f"Document context: {metadata}\n\n" + prompt
+
+        return prompt
+
+    def _reassemble_chunks(self, optimized_chunks: List[str], content_type: str) -> str:
+        """Reassemble optimized chunks into final content.
+
+        Args:
+            optimized_chunks: List of optimized content chunks
+            content_type: Type of content
+
+        Returns:
+            Reassembled optimized content
+        """
+        if not optimized_chunks:
+            return ""
+
+        # For most content types, simply join with double newlines
+        if content_type in ['video', 'audio']:
+            # For transcripts, be more careful about spacing to preserve flow
+            return '\n\n'.join(chunk.strip() for chunk in optimized_chunks if chunk.strip())
+        else:
+            # For documents and other content, use standard spacing
+            return '\n\n'.join(chunk.strip() for chunk in optimized_chunks if chunk.strip())

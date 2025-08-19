@@ -49,20 +49,24 @@ class MarkdownConversionConfig(BaseModel):
 
 class MarkdownOptimizerConfig(BaseModel):
     """Configuration for markdown-optimizer stage."""
-    
+
     model: str = Field(default="gemini-pro", description="LLM model to use")
     max_tokens: int = Field(default=8192, description="Maximum tokens for LLM")
     temperature: float = Field(default=0.1, description="LLM temperature")
-    
+
+    # Text splitting settings
+    max_chunk_size: int = Field(default=50000, description="Maximum characters per chunk for LLM processing")
+    enable_splitting: bool = Field(default=True, description="Enable text splitting for large files")
+
     # Optimization settings
     fix_transcription_errors: bool = Field(default=True, description="Fix transcription errors")
     improve_structure: bool = Field(default=True, description="Improve document structure")
     preserve_timestamps: bool = Field(default=True, description="Preserve timestamp information")
     preserve_metadata: bool = Field(default=True, description="Preserve metadata headers")
-    
+
     # Content type specific
     content_type_prompts: Dict[str, str] = Field(
-        default_factory=dict, 
+        default_factory=dict,
         description="Custom prompts for different content types"
     )
 

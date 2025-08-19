@@ -14,6 +14,36 @@ This document provides comprehensive documentation for all MoRAG CLI commands an
 
 ## 🎯 Stage-Based Processing Commands
 
+### Configuration System
+
+MoRAG uses a unified configuration system based on environment variables with CLI override support:
+
+#### Environment Variables
+All configuration is done through environment variables with the `MORAG_` prefix:
+
+```bash
+# Global LLM Configuration (fallback for all stages)
+MORAG_LLM_PROVIDER=gemini
+MORAG_LLM_MODEL=gemini-1.5-flash
+MORAG_LLM_TEMPERATURE=0.1
+MORAG_LLM_MAX_TOKENS=4000
+MORAG_LLM_MAX_RETRIES=5
+
+# Stage-specific overrides
+MORAG_MARKDOWN_OPTIMIZER_MODEL=gemini-1.5-flash
+MORAG_MARKDOWN_OPTIMIZER_MAX_CHUNK_SIZE=50000
+MORAG_FACT_GENERATOR_DOMAIN=general
+MORAG_CHUNKER_CHUNK_SIZE=4000
+```
+
+#### Fallback Chain
+The system uses this fallback chain for LLM configuration:
+1. CLI arguments (highest priority)
+2. Stage-specific environment variables (e.g., `MORAG_MARKDOWN_OPTIMIZER_MODEL`)
+3. Global LLM environment variables (e.g., `MORAG_LLM_MODEL`)
+4. `MORAG_GEMINI_MODEL` (legacy fallback)
+5. Default values (lowest priority)
+
 ### Core Stage Commands
 
 #### `morag-stages.py` - Main Stage Controller
@@ -40,6 +70,23 @@ python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" i
 
 # Execute full pipeline
 python cli/morag-stages.py process input.pdf --optimize --output-dir ./output
+```
+
+**LLM Configuration Overrides**:
+```bash
+# Override LLM model for a single stage
+python cli/morag-stages.py stage markdown-optimizer input.md --llm-model gemini-1.5-flash
+
+# Override multiple LLM parameters
+python cli/morag-stages.py stage fact-generator input.md --llm-model gemini-1.5-pro --llm-temperature 0.2 --llm-max-tokens 8000
+
+# Override LLM for entire stage chain
+python cli/morag-stages.py stages "markdown-optimizer,chunker,fact-generator" input.pdf --llm-model gemini-1.5-pro
+
+# Stage-specific parameter overrides
+python cli/morag-stages.py stage chunker input.md --chunk-size 2000
+python cli/morag-stages.py stage markdown-optimizer input.md --max-chunk-size 25000
+python cli/morag-stages.py stage fact-generator input.md --domain medical
 ```
 
 **Advanced Options**:
