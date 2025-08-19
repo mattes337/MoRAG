@@ -2,16 +2,28 @@
 """
 MoRAG WebDAV File Processor CLI Script
 
-This script connects to a WebDAV server, processes video files in a specified folder,
-and uploads the processed markdown results back to the server using MoRAG.
+This script connects to a WebDAV server, processes files in a specified folder,
+and uploads the processed results back to the server using MoRAG stages.
+
+Features:
+- Converts files to markdown (video, audio, documents)
+- Optional markdown optimization using LLM
+- Chunking with embeddings
+- Fact and entity extraction
+- Database ingestion (Qdrant, Neo4j)
 
 Requirements:
     pip install webdavclient3 argparse
     pip install -e packages/morag-core
-    pip install -e packages/morag-video
+    pip install -e packages/morag-services
+    pip install -e packages/morag-stages
 
 Usage:
+    # Basic processing (markdown conversion only)
     python webdav-processor.py --url https://webdav.example.com --username user --password pass --folder /path/to/folder --extension mp4
+
+    # With additional stages
+    python webdav-processor.py --url https://webdav.example.com --username user --password pass --folder /path/to/folder --extension mp4 --stages all
 """
 
 import argparse
@@ -21,7 +33,7 @@ import asyncio
 import tempfile
 import gc
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 from webdav3.client import Client
 
 # Add the project root to the path
@@ -41,6 +53,18 @@ except ImportError as e:
     print("  pip install -e packages/morag-core")
     print("  pip install -e packages/morag-services")
     sys.exit(1)
+
+# Try to import stages - optional for now
+STAGES_AVAILABLE = False
+try:
+    from morag_stages import (
+        StageManager, StageType, StageContext, StageStatus,
+        StageError, StageValidationError, StageExecutionError
+    )
+    STAGES_AVAILABLE = True
+except ImportError:
+    print("⚠️  Warning: morag-stages not available. Stage functionality will be disabled.")
+    print("  To enable stages: pip install -e packages/morag-stages")
 
 
 class CUDAOutOfMemoryError(Exception):
@@ -134,10 +158,10 @@ def get_cuda_memory_info() -> dict:
 
 
 class MoRAGWebDAVProcessor:
-    def __init__(self, webdav_url: str, subdirectory: str, username: str, password: str, file_extension: str, resume_mode: bool = False):
+    def __init__(self, webdav_url: str, subdirectory: str, username: str, password: str, file_extension: str, resume_mode: bool = False, stages: Optional[Set[str]] = None):
         """
         Initialize the MoRAG WebDAV processor.
-        
+
         Args:
             webdav_url: Base WebDAV server URL (without subdirectory)
             subdirectory: Subdirectory path on the WebDAV server
@@ -145,6 +169,7 @@ class MoRAGWebDAVProcessor:
             password: WebDAV password
             file_extension: File extension to filter (e.g., 'mp4')
             resume_mode: If True, use existing markdown files to recreate data files
+            stages: Set of stage names to execute (e.g., {'markdown-optimizer', 'chunker'})
         """
         self.webdav_url = webdav_url.rstrip('/')
         self.subdirectory = subdirectory.strip('/') if subdirectory else ''
@@ -152,6 +177,14 @@ class MoRAGWebDAVProcessor:
         self.password = password
         self.file_extension = file_extension.lower().lstrip('.')
         self.resume_mode = resume_mode
+        self.stages = stages or set()
+
+        # Initialize stage manager if stages are specified and available
+        self.stage_manager = None
+        if self.stages and STAGES_AVAILABLE:
+            self.stage_manager = StageManager()
+        elif self.stages and not STAGES_AVAILABLE:
+            print("⚠️  Warning: Stages requested but morag-stages not available. Stages will be skipped.")
         
         # Initialize WebDAV client with base URL (without subdirectory)
         # We'll include the subdirectory in the paths instead
@@ -185,6 +218,123 @@ class MoRAGWebDAVProcessor:
         except Exception as e:
             print(f"✗ Failed to initialize MoRAG Services: {e}")
             sys.exit(1)
+
+    def _parse_stage_types(self):
+        """Parse stage names to StageType enums.
+
+        Returns:
+            List of StageType enums to execute (empty list if stages not available)
+        """
+        if not self.stages or not STAGES_AVAILABLE:
+            return []
+
+        stage_mapping = {
+            'markdown-conversion': StageType.MARKDOWN_CONVERSION,
+            'markdown-optimizer': StageType.MARKDOWN_OPTIMIZER,
+            'chunker': StageType.CHUNKER,
+            'chunking': StageType.CHUNKER,  # Allow alternative name
+            'fact-generator': StageType.FACT_GENERATOR,
+            'fact-generation': StageType.FACT_GENERATOR,  # Allow alternative name
+            'ingestor': StageType.INGESTOR,
+            'ingestion': StageType.INGESTOR,  # Allow alternative name
+        }
+
+        stage_types = []
+        for stage_name in self.stages:
+            stage_name = stage_name.lower().strip()
+            if stage_name in stage_mapping:
+                stage_types.append(stage_mapping[stage_name])
+            else:
+                print(f"⚠️  Warning: Unknown stage name '{stage_name}', skipping")
+
+        return stage_types
+
+    async def _execute_additional_stages(self, markdown_file_path: Path, original_file_path: str) -> List[str]:
+        """Execute additional stages on the generated markdown file.
+
+        Args:
+            markdown_file_path: Path to the generated markdown file
+            original_file_path: Original file path for naming outputs
+
+        Returns:
+            List of additional data files generated by stages
+        """
+        if not self.stage_manager or not self.stages or not STAGES_AVAILABLE:
+            return []
+
+        stage_types = self._parse_stage_types()
+        if not stage_types:
+            return []
+
+        print(f"  🔄 Executing additional stages: {[s.value for s in stage_types]}")
+
+        # Create stage context
+        output_dir = markdown_file_path.parent
+        context = StageContext(
+            source_path=markdown_file_path,
+            output_dir=output_dir,
+            config={
+                'markdown-optimizer': {
+                    'enabled': True,
+                    'model': 'gemini-pro',
+                    'temperature': 0.1
+                },
+                'chunker': {
+                    'chunk_strategy': 'semantic',
+                    'chunk_size': 4000,
+                    'overlap': 200,
+                    'generate_summary': True
+                },
+                'fact-generator': {
+                    'extract_entities': True,
+                    'extract_relations': True,
+                    'extract_keywords': True,
+                    'domain': 'general'
+                },
+                'ingestor': {
+                    'databases': ['qdrant', 'neo4j'],
+                    'collection_name': 'documents',
+                    'batch_size': 50
+                }
+            }
+        )
+
+        additional_files = []
+        current_input_files = [markdown_file_path]
+
+        try:
+            # Execute stages in sequence
+            for stage_type in stage_types:
+                print(f"    🔄 Executing stage: {stage_type.value}")
+
+                result = await self.stage_manager.execute_stage(
+                    stage_type, current_input_files, context
+                )
+
+                if result.success:
+                    print(f"    ✓ Stage {stage_type.value} completed successfully")
+
+                    # Add output files to additional files list
+                    for output_file in result.output_files:
+                        if output_file.suffix == '.json':
+                            additional_files.append(str(output_file))
+                            print(f"      📄 Generated: {output_file.name}")
+
+                    # Use outputs as inputs for next stage
+                    current_input_files = result.output_files
+
+                elif stage_type == StageType.MARKDOWN_OPTIMIZER:
+                    # Markdown optimizer is optional, continue with original file
+                    print(f"    ⚠️  Optional stage {stage_type.value} failed, continuing")
+                    current_input_files = [markdown_file_path]
+                else:
+                    print(f"    ✗ Stage {stage_type.value} failed: {result.error_message}")
+                    break
+
+        except Exception as e:
+            print(f"    ✗ Error executing stages: {e}")
+
+        return additional_files
 
     def get_all_files_recursive(self, folder_path: str) -> List[str]:
         """
@@ -552,7 +702,14 @@ class MoRAGWebDAVProcessor:
             if not markdown_file_path.exists():
                 print(f"  ✗ Failed to create markdown file for {remote_file_path}")
                 return None
-            
+
+            # Execute additional stages if specified
+            additional_data_files = []
+            if self.stages and self.stage_manager:
+                additional_data_files = await self._execute_additional_stages(
+                    markdown_file_path, remote_file_path
+                )
+
             # Collect data files generated during processing
             data_files = []
             if self.data_output_dir.exists():
@@ -561,14 +718,17 @@ class MoRAGWebDAVProcessor:
                 for data_file in self.data_output_dir.glob(f"{file_stem}*.json"):
                     data_files.append(str(data_file))
                     print(f"  📄 Found data file: {data_file.name}")
-            
+
+            # Add additional data files from stages
+            data_files.extend(additional_data_files)
+
             # Clean up downloaded file after processing
             try:
                 local_temp_path.unlink()
                 print(f"  🗑️  Cleaned up downloaded file: {local_filename}")
             except Exception as cleanup_error:
                 print(f"  ⚠️  Warning: Could not clean up {local_filename}: {cleanup_error}")
-            
+
             return (str(markdown_file_path), data_files)
             
         except Exception as e:
@@ -634,7 +794,14 @@ class MoRAGWebDAVProcessor:
                 return None
             
             print(f"  ✓ Successfully processed markdown content for database population")
-            
+
+            # Execute additional stages if specified
+            additional_data_files = []
+            if self.stages and self.stage_manager:
+                additional_data_files = await self._execute_additional_stages(
+                    local_markdown_path, remote_file_path
+                )
+
             # Collect any data files that were generated
             data_files = []
             if self.data_output_dir.exists():
@@ -643,14 +810,17 @@ class MoRAGWebDAVProcessor:
                 for data_file in self.data_output_dir.glob(f"{file_stem}*.json"):
                     data_files.append(str(data_file))
                     print(f"  📄 Generated data file: {data_file.name}")
-            
+
+            # Add additional data files from stages
+            data_files.extend(additional_data_files)
+
             # Clean up downloaded markdown file
             try:
                 local_markdown_path.unlink()
                 print(f"  🗑️  Cleaned up downloaded file: {local_filename}")
             except Exception as cleanup_error:
                 print(f"  ⚠️  Warning: Could not clean up {local_filename}: {cleanup_error}")
-            
+
             # Return the original remote path and any generated data files
             return (remote_file_path, data_files)
             
@@ -858,8 +1028,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic processing (markdown conversion only)
   python webdav-processor.py --url https://webdav.example.com --subdirectory /path --username user --password pass --folder /documents --extension mp4
-  python webdav-processor.py -u https://cloud.example.com/webdav -s /shared -U myuser -P mypass -f /projects -e avi
+
+  # Process with optimization and chunking stages
+  python webdav-processor.py -u https://cloud.example.com/webdav -s /shared -U myuser -P mypass -f /projects -e avi --stages markdown-optimizer,chunker
+
+  # Run all stages (optimization, chunking, fact generation, ingestion)
+  python webdav-processor.py -u https://webdav.example.com -U user -P pass -f /videos -e mp4 --stages all
+
+  # Resume mode with stages
+  python webdav-processor.py -u https://webdav.example.com -U user -P pass -f /docs -e md --resume --stages chunker,fact-generator
         """
     )
     
@@ -904,15 +1083,31 @@ Examples:
         action='store_true',
         help='Resume mode: use existing markdown files to recreate data files and populate databases'
     )
+
+    parser.add_argument(
+        '--stages', '-S',
+        type=str,
+        help='Comma-separated list of stages to run after markdown conversion (e.g., "markdown-optimizer,chunker,fact-generator" or "all")'
+    )
     
     args = parser.parse_args()
-    
+
+    # Parse stages argument
+    stages = set()
+    if args.stages:
+        if args.stages.lower() == 'all':
+            stages = {'markdown-optimizer', 'chunker', 'fact-generator', 'ingestor'}
+        else:
+            stages = {stage.strip() for stage in args.stages.split(',') if stage.strip()}
+
+        print(f"✓ Stages to execute: {', '.join(sorted(stages))}")
+
     # Validate file extension early (before WebDAV connection)
     try:
         temp_services = MoRAGServices()
         test_filename = f"test.{args.extension.lower().lstrip('.')}"
         content_type = temp_services.detect_content_type(test_filename)
-        
+
         if content_type == "unknown":
             print(f"✗ File extension '.{args.extension}' is not supported by MoRAG Services")
             print("Supported extensions:")
@@ -926,9 +1121,9 @@ Examples:
     except Exception as e:
         print(f"✗ Failed to validate file extension: {e}")
         sys.exit(1)
-    
+
     # Initialize processor and run
-    processor = MoRAGWebDAVProcessor(args.url, args.subdirectory, args.username, args.password, args.extension, resume_mode=args.resume)
+    processor = MoRAGWebDAVProcessor(args.url, args.subdirectory, args.username, args.password, args.extension, resume_mode=args.resume, stages=stages)
     
     # Run the async processing with proper error handling
     try:
