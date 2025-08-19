@@ -218,20 +218,22 @@ class MarkdownConversionStage(Stage):
         """
         logger.info("Processing video file", input_file=str(input_file))
         
+        # Prepare options for video service
+        options = {
+            'include_timestamps': config.get('include_timestamps', True),
+            'speaker_diarization': config.get('speaker_diarization', True),
+            'topic_segmentation': config.get('topic_segmentation', True),
+            'extract_thumbnails': config.get('extract_thumbnails', False)
+        }
+
         # Use video service
-        result = await self.services.process_video(
-            str(input_file),
-            include_timestamps=config.get('include_timestamps', True),
-            speaker_diarization=config.get('speaker_diarization', True),
-            topic_segmentation=config.get('topic_segmentation', True),
-            extract_thumbnails=config.get('extract_thumbnails', False)
-        )
+        result = await self.services.process_video(str(input_file), options)
         
         # Create markdown with metadata header
         markdown_content = self._create_markdown_with_metadata(
-            content=result.content,
+            content=result.text_content or "",
             metadata={
-                "title": result.title or input_file.stem,
+                "title": result.metadata.get('title') or input_file.stem,
                 "source": str(input_file),
                 "type": "video",
                 "duration": result.metadata.get('duration'),
@@ -240,17 +242,17 @@ class MarkdownConversionStage(Stage):
                 **result.metadata
             }
         )
-        
+
         # Write to file
         output_file.write_text(markdown_content, encoding='utf-8')
-        
+
         return {
             "content_type": "video",
-            "title": result.title,
+            "title": result.metadata.get('title'),
             "metadata": result.metadata,
             "metrics": {
                 "duration": result.metadata.get('duration', 0),
-                "transcript_length": len(result.content),
+                "transcript_length": len(result.text_content or ""),
                 "has_timestamps": config.get('include_timestamps', True)
             }
         }
@@ -268,19 +270,21 @@ class MarkdownConversionStage(Stage):
         """
         logger.info("Processing audio file", input_file=str(input_file))
 
+        # Prepare options for audio service
+        options = {
+            'include_timestamps': config.get('include_timestamps', True),
+            'speaker_diarization': config.get('speaker_diarization', True),
+            'topic_segmentation': config.get('topic_segmentation', True)
+        }
+
         # Use audio service
-        result = await self.services.process_audio(
-            str(input_file),
-            include_timestamps=config.get('include_timestamps', True),
-            speaker_diarization=config.get('speaker_diarization', True),
-            topic_segmentation=config.get('topic_segmentation', True)
-        )
+        result = await self.services.process_audio(str(input_file), options)
 
         # Create markdown with metadata header
         markdown_content = self._create_markdown_with_metadata(
-            content=result.content,
+            content=result.text_content or "",
             metadata={
-                "title": result.title or input_file.stem,
+                "title": result.metadata.get('title') or input_file.stem,
                 "source": str(input_file),
                 "type": "audio",
                 "duration": result.metadata.get('duration'),
@@ -295,11 +299,11 @@ class MarkdownConversionStage(Stage):
 
         return {
             "content_type": "audio",
-            "title": result.title,
+            "title": result.metadata.get('title'),
             "metadata": result.metadata,
             "metrics": {
                 "duration": result.metadata.get('duration', 0),
-                "transcript_length": len(result.content),
+                "transcript_length": len(result.text_content or ""),
                 "has_timestamps": config.get('include_timestamps', True)
             }
         }
@@ -317,20 +321,22 @@ class MarkdownConversionStage(Stage):
         """
         logger.info("Processing document file", input_file=str(input_file))
 
+        # Prepare options for document service
+        options = {
+            'preserve_formatting': config.get('preserve_formatting', True),
+            'extract_tables': config.get('extract_tables', True),
+            'extract_images': config.get('extract_images', False),
+            'ocr_enabled': config.get('ocr_enabled', True)
+        }
+
         # Use document service
-        result = await self.services.process_document(
-            str(input_file),
-            preserve_formatting=config.get('preserve_formatting', True),
-            extract_tables=config.get('extract_tables', True),
-            extract_images=config.get('extract_images', False),
-            ocr_enabled=config.get('ocr_enabled', True)
-        )
+        result = await self.services.process_document(str(input_file), options)
 
         # Create markdown with metadata header
         markdown_content = self._create_markdown_with_metadata(
-            content=result.content,
+            content=result.text_content or "",
             metadata={
-                "title": result.title or input_file.stem,
+                "title": result.metadata.get('title') or input_file.stem,
                 "source": str(input_file),
                 "type": "document",
                 "pages": result.metadata.get('pages'),
@@ -345,11 +351,11 @@ class MarkdownConversionStage(Stage):
 
         return {
             "content_type": "document",
-            "title": result.title,
+            "title": result.metadata.get('title'),
             "metadata": result.metadata,
             "metrics": {
                 "pages": result.metadata.get('pages', 0),
-                "content_length": len(result.content),
+                "content_length": len(result.text_content or ""),
                 "has_tables": config.get('extract_tables', True)
             }
         }
@@ -445,15 +451,90 @@ class MarkdownConversionStage(Stage):
         }
 
     def _create_markdown_with_metadata(self, content: str, metadata: Dict[str, Any]) -> str:
-        """Create markdown content with YAML metadata header.
+        """Create markdown content with metadata header.
 
         Args:
             content: Main content
             metadata: Metadata dictionary
 
         Returns:
-            Markdown content with metadata header
+            Formatted markdown with metadata header
         """
+        content_type = metadata.get('type', 'document')
+
+        if content_type in ['audio', 'video']:
+            return self._create_media_markdown(content, metadata)
+        else:
+            return self._create_document_markdown(content, metadata)
+
+    def _create_media_markdown(self, content: str, metadata: Dict[str, Any]) -> str:
+        """Create markdown for audio/video files following example.md format."""
+        content_type = metadata.get('type', 'audio')
+        title = metadata.get('title', metadata.get('source_name', 'Unknown'))
+
+        # Start with title
+        markdown_lines = [f"# {content_type.title()} Analysis: {title}", ""]
+
+        # Add media information section
+        markdown_lines.append(f"## {content_type.title()} Information")
+        markdown_lines.append("")
+
+        # Add relevant metadata based on content type
+        if content_type == 'audio':
+            if metadata.get('duration'):
+                duration = metadata['duration']
+                minutes = int(duration // 60)
+                seconds = int(duration % 60)
+                markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
+
+            if metadata.get('channels'):
+                markdown_lines.append(f"- **Channels**: {metadata['channels']}")
+            if metadata.get('sample_rate'):
+                markdown_lines.append(f"- **Sample Rate**: {metadata['sample_rate']}")
+            if metadata.get('bit_depth'):
+                markdown_lines.append(f"- **Bit Depth**: {metadata['bit_depth']}")
+
+        elif content_type == 'video':
+            if metadata.get('duration'):
+                duration = metadata['duration']
+                minutes = int(duration // 60)
+                seconds = int(duration % 60)
+                markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
+
+            # Add video-specific metadata if available
+            if metadata.get('resolution'):
+                markdown_lines.append(f"- **Resolution**: {metadata['resolution']}")
+            if metadata.get('fps'):
+                markdown_lines.append(f"- **FPS**: {metadata['fps']}")
+            if metadata.get('format'):
+                markdown_lines.append(f"- **Format**: {metadata['format']}")
+            if metadata.get('video_codec'):
+                markdown_lines.append(f"- **Video Codec**: {metadata['video_codec']}")
+            if metadata.get('audio_codec'):
+                markdown_lines.append(f"- **Audio**: Yes ({metadata['audio_codec']})")
+
+        markdown_lines.append("")
+        markdown_lines.append("")
+
+        # Add transcript section
+        markdown_lines.append("## Transcript")
+        markdown_lines.append("")
+
+        # Add the actual transcript content
+        if content:
+            # If content already contains timestamps, use it directly
+            if '[' in content and ']' in content:
+                markdown_lines.append(content)
+            else:
+                # If no timestamps, add as plain text
+                markdown_lines.append(content)
+        else:
+            markdown_lines.append("*No transcript available*")
+
+        return "\n".join(markdown_lines)
+
+    def _create_document_markdown(self, content: str, metadata: Dict[str, Any]) -> str:
+        """Create markdown for document files with YAML frontmatter."""
         # Create YAML frontmatter
         yaml_lines = ["---"]
         for key, value in metadata.items():

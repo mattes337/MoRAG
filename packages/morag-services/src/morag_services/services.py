@@ -482,9 +482,18 @@ class MoRAGServices:
                     # For now, extract the transcript from JSON content
                     content = json_result.get("content", {})
                     if isinstance(content, dict):
-                        # Extract transcript and segments for markdown conversion
-                        transcript = content.get("transcript", "")
-                        segments = content.get("segments", [])
+                        # Extract segments from topics structure (new audio converter format)
+                        topics = content.get("topics", [])
+                        all_segments = []
+
+                        # Collect all segments from all topics
+                        for topic in topics:
+                            if isinstance(topic, dict):
+                                sentences = topic.get("sentences", [])
+                                all_segments.extend(sentences)
+
+                        # Sort segments by timestamp
+                        all_segments.sort(key=lambda x: x.get("timestamp", 0))
                         
                         # Create basic markdown content with timestamps
                         markdown_parts = []
@@ -501,20 +510,19 @@ class MoRAGServices:
                             markdown_parts.append("")
                         
                         # Add transcript with timestamps if segments are available
-                        if segments:
+                        if all_segments:
                             markdown_parts.append("## Detailed Transcript\n")
-                            for segment in segments:
+                            for segment in all_segments:
                                 if isinstance(segment, dict):
-                                    start_time = segment.get("start", 0)
+                                    start_time = segment.get("timestamp", 0)
                                     text = segment.get("text", "")
                                     # Format timestamp
                                     minutes = int(start_time // 60)
                                     seconds = int(start_time % 60)
                                     timestamp = f"[{minutes:02d}:{seconds:02d}]"
                                     markdown_parts.append(f"{timestamp} {text}")
-                        elif transcript:
-                            markdown_parts.append("## Full Transcript\n")
-                            markdown_parts.append(transcript)
+                        else:
+                            markdown_parts.append("*No transcript available*")
                         
                         text_content = "\n".join(markdown_parts)
                     elif isinstance(content, str):
