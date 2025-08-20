@@ -102,7 +102,7 @@ class MarkdownOptimizerStage(Stage):
                 start_time=datetime.now(),
                 input_files=[str(input_file)],
                 output_files=[str(output_file)],
-                config_used=config,
+                config_used=config.model_dump() if hasattr(config, 'model_dump') else config.__dict__,
                 metrics={
                     "optimization_applied": optimization_applied,
                     "input_length": len(content),

@@ -55,6 +55,11 @@ class MoRAGBaseAgent(Generic[T], ABC):
     def _create_agent(self) -> Agent:
         """Create the PydanticAI agent instance."""
         try:
+            # Set the API key in environment for PydanticAI if available
+            import os
+            if self.provider.api_key and not os.getenv("GOOGLE_API_KEY"):
+                os.environ["GOOGLE_API_KEY"] = self.provider.api_key
+
             return Agent(
                 model=self.config.model,
                 result_type=self.get_result_type(),

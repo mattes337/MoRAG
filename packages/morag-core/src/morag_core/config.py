@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     # Qdrant Configuration
     qdrant_host: str = Field(default="localhost", alias="QDRANT_HOST")
     qdrant_port: int = Field(default=6333, alias="QDRANT_PORT")
-    qdrant_collection_name: str = Field(default="", alias="QDRANT_COLLECTION_NAME", description="Qdrant collection name - required")
+    qdrant_collection_name: str = Field(default="morag_documents", alias="QDRANT_COLLECTION_NAME", description="Qdrant collection name")
     qdrant_api_key: Optional[str] = Field(default=None, alias="QDRANT_API_KEY")
 
     # Performance Monitoring
@@ -280,10 +280,8 @@ class Settings(BaseSettings):
     def validate_collection_name(cls, v):
         """Validate that collection name is provided."""
         if not v:
-            raise ValueError(
-                "QDRANT_COLLECTION_NAME environment variable is required. "
-                "Please set it to your desired collection name (e.g., 'morag_documents')"
-            )
+            logger.warning("QDRANT_COLLECTION_NAME not set, using default 'morag_documents'")
+            return "morag_documents"
         return v
 
     model_config = SettingsConfigDict(

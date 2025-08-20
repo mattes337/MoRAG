@@ -153,47 +153,62 @@ class StageRegistry:
     
     def get_dependency_order(self, stage_types: List[StageType]) -> List[StageType]:
         """Get stages in dependency order.
-        
+
         Args:
             stage_types: List of stage types to order
-            
+
         Returns:
             List of stage types in dependency order
-            
+
         Raises:
             StageDependencyError: If circular dependencies exist
         """
-        # Build dependency graph
+        # Build dependency graph - only consider dependencies within the requested stages
         dependencies: Dict[StageType, Set[StageType]] = {}
+        requested_stages = set(stage_types)
+
         for stage_type in stage_types:
             if not self.is_registered(stage_type):
                 raise StageError(f"Stage type {stage_type.value} is not registered")
-            
+
             stage = self.get_stage(stage_type)
-            dependencies[stage_type] = set(stage.get_dependencies())
-        
+            all_deps = set(stage.get_dependencies())
+            # Only include dependencies that are also in the requested stages
+            filtered_deps = all_deps.intersection(requested_stages)
+            dependencies[stage_type] = filtered_deps
+
         # Topological sort
         ordered: List[StageType] = []
         remaining = set(stage_types)
-        
+
         while remaining:
-            # Find stages with no unresolved dependencies
+            # Find stages with no unresolved dependencies within the requested set
             ready = [
                 stage_type for stage_type in remaining
                 if dependencies[stage_type].issubset(set(ordered))
             ]
-            
+
             if not ready:
-                # Circular dependency detected
-                raise StageDependencyError(
-                    f"Circular dependency detected in stages: {[s.value for s in remaining]}"
-                )
-            
+                # Check if we have a true circular dependency or just missing external dependencies
+                unresolved_deps = set()
+                for stage_type in remaining:
+                    unresolved_deps.update(dependencies[stage_type] - set(ordered))
+
+                if unresolved_deps.issubset(remaining):
+                    # True circular dependency within the requested stages
+                    raise StageDependencyError(
+                        f"Circular dependency detected in stages: {[s.value for s in remaining]}"
+                    )
+                else:
+                    # External dependencies - just pick the first remaining stage
+                    # This allows stages to run if they receive appropriate input files
+                    ready = [next(iter(remaining))]
+
             # Add ready stages to ordered list
             for stage_type in ready:
                 ordered.append(stage_type)
                 remaining.remove(stage_type)
-        
+
         return ordered
     
     def get_optional_stages(self) -> List[StageType]:

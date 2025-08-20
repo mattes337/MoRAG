@@ -4,6 +4,26 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import sys
+import os
+
+# Load environment variables from .env file early
+try:
+    from dotenv import load_dotenv
+    # Look for .env file in current directory and parent directories
+    env_path = Path.cwd() / ".env"
+    if not env_path.exists():
+        # Try parent directories
+        for parent in Path.cwd().parents:
+            env_path = parent / ".env"
+            if env_path.exists():
+                break
+    if env_path.exists():
+        load_dotenv(env_path)
+        print(f"Loaded environment variables from: {env_path}")
+    else:
+        print("No .env file found")
+except ImportError:
+    print("python-dotenv not available, skipping .env file loading")
 
 import uvicorn
 from fastapi import FastAPI, HTTPException

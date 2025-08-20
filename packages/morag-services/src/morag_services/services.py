@@ -137,9 +137,10 @@ class MoRAGServices:
             # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
             qdrant_url = os.getenv('QDRANT_URL')
             qdrant_api_key = os.getenv('QDRANT_API_KEY')
-            collection_name = os.getenv('QDRANT_COLLECTION_NAME')
+            collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
             if not collection_name:
-                raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
+                logger.warning("QDRANT_COLLECTION_NAME not set, using default 'morag_documents'")
+                collection_name = 'morag_documents'
 
             if qdrant_url:
                 # Use URL-based connection (supports HTTPS automatically)

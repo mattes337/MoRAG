@@ -24,18 +24,16 @@ logger = structlog.get_logger(__name__)
 
 class MarkdownConversionStage(Stage):
     """Stage that converts input files to unified markdown format."""
-    
+
     def __init__(self, stage_type: StageType = StageType.MARKDOWN_CONVERSION):
         """Initialize markdown conversion stage."""
         super().__init__(stage_type)
-        
+
         if not SERVICES_AVAILABLE:
-            raise StageExecutionError(
-                "MoRAG services not available for markdown conversion",
-                stage_type=self.stage_type.value
-            )
-        
-        self.services = MoRAGServices()
+            logger.warning("MoRAG services not available for markdown conversion")
+            self.services = None
+        else:
+            self.services = MoRAGServices()
     
     async def execute(self, 
                      input_files: List[Path], 
@@ -49,13 +47,19 @@ class MarkdownConversionStage(Stage):
         Returns:
             Stage execution result
         """
+        if not SERVICES_AVAILABLE or self.services is None:
+            raise StageExecutionError(
+                "MoRAG services not available for markdown conversion",
+                stage_type=self.stage_type.value
+            )
+
         if len(input_files) != 1:
             raise StageValidationError(
                 "Markdown conversion stage requires exactly one input file",
                 stage_type=self.stage_type.value,
                 invalid_files=[str(f) for f in input_files]
             )
-        
+
         input_file = input_files[0]
         config = context.get_stage_config(self.stage_type)
         

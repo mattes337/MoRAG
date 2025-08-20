@@ -12,13 +12,14 @@ from ..exceptions import StageExecutionError, StageValidationError
 
 # Import services with graceful fallback
 try:
-    from morag_core.ai import create_agent, AgentConfig
+    from morag_core.ai import create_agent, AgentConfig, SummarizationAgent
     from morag_embedding import GeminiEmbeddingService
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
     create_agent = None
     AgentConfig = None
+    SummarizationAgent = None
     GeminiEmbeddingService = None
 
 logger = structlog.get_logger(__name__)
@@ -34,7 +35,17 @@ class ChunkerStage(Stage):
         if not SERVICES_AVAILABLE:
             logger.warning("Services not available for chunking")
         
-        self.embedding_service = GeminiEmbeddingService() if GeminiEmbeddingService else None
+        # Initialize embedding service with API key from environment
+        if GeminiEmbeddingService:
+            import os
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                self.embedding_service = GeminiEmbeddingService(api_key=api_key)
+            else:
+                logger.warning("GEMINI_API_KEY not found - embedding generation disabled")
+                self.embedding_service = None
+        else:
+            self.embedding_service = None
         self.summarization_agent = None
     
     async def execute(self, 
@@ -226,26 +237,33 @@ class ChunkerStage(Stage):
     
     async def _generate_summary(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> str:
         """Generate document summary using LLM.
-        
+
         Args:
             content: Document content
             metadata: Document metadata
             config: Stage configuration
-            
+
         Returns:
             Document summary
         """
         if not create_agent:
             return ""
-        
+
+        # Check if API key is available before attempting to create agent
+        import os
+        api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+        if not api_key:
+            logger.info("No API key available for summary generation - skipping")
+            return ""
+
         try:
             if not self.summarization_agent:
                 agent_config = AgentConfig(
-                    model=config.get('model', 'gemini-pro'),
+                    model=config.get('model', 'google-gla:gemini-1.5-flash'),
                     temperature=0.1,
                     max_tokens=config.get('summary_max_tokens', 1000)
                 )
-                self.summarization_agent = create_agent(agent_config)
+                self.summarization_agent = create_agent(SummarizationAgent, config=agent_config)
             
             # Create summarization prompt
             content_type = metadata.get('type', 'text')
@@ -553,11 +571,9 @@ class ChunkerStage(Stage):
             batch_size = config.get('batch_size', 50)
             model = config.get('embedding_model', 'text-embedding-004')
 
-            embeddings = await self.embedding_service.embed_texts(
-                texts,
-                model=model,
-                batch_size=batch_size
-            )
+            # Use the correct method name for batch embeddings
+            batch_result = await self.embedding_service.generate_batch_embeddings(texts)
+            embeddings = batch_result.embeddings
 
             # Add embeddings to chunks
             for i, chunk in enumerate(chunks):

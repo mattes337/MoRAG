@@ -116,7 +116,7 @@ class FactGeneratorStage(Stage):
                     "total_facts": len(all_facts),
                     "total_keywords": len(all_keywords),
                     "source_chunks": len(chunks),
-                    "extraction_config": config,
+                    "extraction_config": config.model_dump() if hasattr(config, 'model_dump') else config.__dict__,
                     "source_metadata": source_metadata,
                     "created_at": datetime.now().isoformat()
                 }
@@ -132,7 +132,7 @@ class FactGeneratorStage(Stage):
                 start_time=datetime.now(),
                 input_files=[str(input_file)],
                 output_files=[str(output_file)],
-                config_used=config,
+                config_used=config.model_dump() if hasattr(config, 'model_dump') else config.__dict__,
                 metrics={
                     "total_entities": len(all_entities),
                     "total_relations": len(all_relations),
@@ -140,10 +140,10 @@ class FactGeneratorStage(Stage):
                     "total_keywords": len(all_keywords),
                     "chunks_processed": len(chunks),
                     "extraction_enabled": {
-                        "entities": config.get('extract_entities', True),
-                        "relations": config.get('extract_relations', True),
-                        "facts": config.get('extract_facts', True),
-                        "keywords": config.get('extract_keywords', True)
+                        "entities": getattr(config, 'extract_entities', True),
+                        "relations": getattr(config, 'extract_relations', True),
+                        "facts": getattr(config, 'extract_facts', True),
+                        "keywords": getattr(config, 'extract_keywords', True)
                     }
                 }
             )
@@ -250,11 +250,11 @@ class FactGeneratorStage(Stage):
             try:
                 extraction_result = await self.fact_extractor.extract_from_text(
                     content,
-                    domain=config.get('domain', 'general'),
-                    extract_entities=config.get('extract_entities', True),
-                    extract_relations=config.get('extract_relations', True),
-                    extract_facts=config.get('extract_facts', True),
-                    min_confidence=config.get('min_confidence', 0.7)
+                    domain=getattr(config, 'domain', 'general'),
+                    extract_entities=getattr(config, 'extract_entities', True),
+                    extract_relations=getattr(config, 'extract_relations', True),
+                    extract_facts=getattr(config, 'extract_facts', True),
+                    min_confidence=getattr(config, 'min_confidence', 0.7)
                 )
                 
                 # Add source chunk information
@@ -277,7 +277,7 @@ class FactGeneratorStage(Stage):
             results = await self._llm_extraction_fallback(content, chunk_id, config)
         
         # Extract keywords if enabled
-        if config.get('extract_keywords', True):
+        if getattr(config, 'extract_keywords', True):
             keywords = self._extract_keywords(content)
             results['keywords'] = keywords
         
@@ -300,7 +300,7 @@ class FactGeneratorStage(Stage):
         try:
             if not self.extraction_agent:
                 # Get LLM configuration with stage-specific overrides
-                llm_config = config.get_llm_config()
+                llm_config = getattr(config, 'get_llm_config', lambda: config)()
                 agent_config = AgentConfig(
                     model=llm_config.model,
                     temperature=llm_config.temperature,
@@ -401,9 +401,9 @@ Guidelines:
         Returns:
             User prompt string
         """
-        max_entities = config.get('max_entities_per_chunk', 20)
-        max_relations = config.get('max_relations_per_chunk', 15)
-        min_confidence = config.get('min_confidence', 0.7)
+        max_entities = getattr(config, 'max_entities_per_chunk', 20)
+        max_relations = getattr(config, 'max_relations_per_chunk', 15)
+        min_confidence = getattr(config, 'min_confidence', 0.7)
 
         return f"""Extract structured information from this text. Limit to {max_entities} entities and {max_relations} relations. Only include items with confidence >= {min_confidence}.
 
