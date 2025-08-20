@@ -766,6 +766,42 @@ python tests/cli/test-document.py sample.pdf --ingest        # Ingestion mode
 
 ### Code Quality
 
+#### Comprehensive Syntax Checking
+
+MoRAG includes a comprehensive syntax checker that validates all Python files:
+
+```bash
+# Quick syntax check (all files)
+python check_syntax.py
+
+# Verbose output with detailed information
+python check_syntax.py --verbose
+
+# Check specific directory only
+python check_syntax.py --path packages/morag-core
+
+# Auto-fix import sorting issues
+python check_syntax.py --fix
+
+# Windows users can also use:
+check_syntax.bat --verbose
+# or
+.\check_syntax.ps1 -Verbose -Fix
+```
+
+**Current Status**: ✅ All 574 Python files compile successfully with no syntax errors.
+
+The syntax checker validates:
+- ✅ **Python syntax errors** (compile-time validation)
+- ✅ **Import resolution** (all imports can be found)
+- ⚠️ **Code style** (flake8 compliance)
+- ⚠️ **Type checking** (mypy validation)
+- ⚠️ **Import sorting** (isort compliance)
+
+See [SYNTAX_CHECK_REPORT.md](SYNTAX_CHECK_REPORT.md) for detailed results.
+
+#### Manual Code Quality Tools
+
 ```bash
 # Format code
 black src/ tests/

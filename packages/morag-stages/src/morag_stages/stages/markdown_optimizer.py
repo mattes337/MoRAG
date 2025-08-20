@@ -265,12 +265,22 @@ class MarkdownOptimizerStage(Stage):
             Optimized content
         """
         try:
-            # Import LLM client
-            from morag_reasoning.llm import LLMClient
+            # Import LLM client and config
+            from morag_reasoning.llm import LLMClient, LLMConfig as ReasoningLLMConfig
 
             # Get LLM configuration with stage-specific overrides
-            llm_config = config.get_llm_config()
-            llm_client = LLMClient(llm_config)
+            unified_llm_config = config.get_llm_config()
+
+            # Convert to reasoning LLMConfig format
+            reasoning_config = ReasoningLLMConfig(
+                provider=unified_llm_config.provider,
+                model=unified_llm_config.model,
+                api_key=unified_llm_config.api_key,
+                temperature=unified_llm_config.temperature,
+                max_tokens=unified_llm_config.max_tokens,
+                max_retries=unified_llm_config.max_retries,
+            )
+            llm_client = LLMClient(reasoning_config)
 
             # Determine if content needs splitting
             if len(content) <= config.max_chunk_size:

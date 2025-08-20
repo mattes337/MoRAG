@@ -173,23 +173,60 @@ class TestStageRegistry:
     def test_get_dependency_order_circular(self):
         """Test circular dependency detection."""
         registry = StageRegistry()
-        
+
         # Create circular dependency
         class Stage1(MockStage):
             def __init__(self):
                 super().__init__(StageType.MARKDOWN_CONVERSION, [StageType.CHUNKER])
-        
+
         class Stage2(MockStage):
             def __init__(self):
                 super().__init__(StageType.CHUNKER, [StageType.MARKDOWN_CONVERSION])
-        
+
         registry.register_stage(Stage1)
         registry.register_stage(Stage2)
-        
+
         # Test circular dependency detection
         chain = [StageType.MARKDOWN_CONVERSION, StageType.CHUNKER]
         with pytest.raises(StageDependencyError, match="Circular dependency"):
             registry.get_dependency_order(chain)
+
+    def test_dependency_ordering_preserves_user_order(self):
+        """Test that user's original order is preserved when no internal dependencies exist."""
+        registry = StageRegistry()
+
+        # Mock stages with external dependencies only
+        class MarkdownOptimizerStage(MockStage):
+            def __init__(self):
+                super().__init__(StageType.MARKDOWN_OPTIMIZER, [StageType.MARKDOWN_CONVERSION])  # External dependency
+
+        class ChunkerStage(MockStage):
+            def __init__(self):
+                super().__init__(StageType.CHUNKER, [StageType.MARKDOWN_CONVERSION])  # External dependency
+
+        class FactGeneratorStage(MockStage):
+            def __init__(self):
+                super().__init__(StageType.FACT_GENERATOR, [StageType.CHUNKER])
+
+        registry.register_stage(MarkdownOptimizerStage)
+        registry.register_stage(ChunkerStage)
+        registry.register_stage(FactGeneratorStage)
+
+        # Test that user's order is preserved when external dependencies exist
+        user_order = [StageType.MARKDOWN_OPTIMIZER, StageType.CHUNKER, StageType.FACT_GENERATOR]
+        ordered = registry.get_dependency_order(user_order)
+
+        # Should preserve user's order: markdown-optimizer first, then chunker, then fact-generator
+        expected = [StageType.MARKDOWN_OPTIMIZER, StageType.CHUNKER, StageType.FACT_GENERATOR]
+        assert ordered == expected
+
+        # Test reverse user order
+        reverse_user_order = [StageType.CHUNKER, StageType.MARKDOWN_OPTIMIZER, StageType.FACT_GENERATOR]
+        ordered_reverse = registry.get_dependency_order(reverse_user_order)
+
+        # Should preserve user's order: chunker first, then markdown-optimizer, then fact-generator
+        expected_reverse = [StageType.CHUNKER, StageType.MARKDOWN_OPTIMIZER, StageType.FACT_GENERATOR]
+        assert ordered_reverse == expected_reverse
     
     def test_get_optional_stages(self):
         """Test getting optional stages."""

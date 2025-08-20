@@ -180,6 +180,8 @@ class StageRegistry:
         # Topological sort
         ordered: List[StageType] = []
         remaining = set(stage_types)
+        # Keep track of original order for tie-breaking
+        original_order = {stage: i for i, stage in enumerate(stage_types)}
 
         while remaining:
             # Find stages with no unresolved dependencies within the requested set
@@ -200,9 +202,12 @@ class StageRegistry:
                         f"Circular dependency detected in stages: {[s.value for s in remaining]}"
                     )
                 else:
-                    # External dependencies - just pick the first remaining stage
-                    # This allows stages to run if they receive appropriate input files
-                    ready = [next(iter(remaining))]
+                    # External dependencies - pick stages in original order
+                    # This preserves user's intended order when no internal dependencies exist
+                    ready = [min(remaining, key=lambda x: original_order[x])]
+
+            # Sort ready stages by original order to maintain user's preference
+            ready.sort(key=lambda x: original_order[x])
 
             # Add ready stages to ordered list
             for stage_type in ready:

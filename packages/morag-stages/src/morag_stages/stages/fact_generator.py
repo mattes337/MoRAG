@@ -27,16 +27,44 @@ logger = structlog.get_logger(__name__)
 
 class FactGeneratorStage(Stage):
     """Stage that extracts facts, entities, relations, and keywords from chunks."""
-    
+
     def __init__(self, stage_type: StageType = StageType.FACT_GENERATOR):
         """Initialize fact generator stage."""
         super().__init__(stage_type)
-        
+
         if not SERVICES_AVAILABLE:
             logger.warning("Services not available for fact generation")
-        
-        self.fact_extractor = FactExtractor() if FactExtractor else None
-        self.entity_normalizer = EntityNormalizer() if EntityNormalizer else None
+
+        # Initialize fact extractor with API key from environment
+        if FactExtractor:
+            import os
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                self.fact_extractor = FactExtractor(
+                    model_id=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
+                    api_key=api_key
+                )
+            else:
+                logger.warning("GEMINI_API_KEY not found - fact extraction disabled")
+                self.fact_extractor = None
+        else:
+            self.fact_extractor = None
+
+        # Initialize entity normalizer with API key from environment
+        if EntityNormalizer:
+            import os
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                self.entity_normalizer = EntityNormalizer(
+                    model_name=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
+                    api_key=api_key
+                )
+            else:
+                logger.warning("GEMINI_API_KEY not found - entity normalization disabled")
+                self.entity_normalizer = None
+        else:
+            self.entity_normalizer = None
+
         self.extraction_agent = None
     
     async def execute(self, 
@@ -248,14 +276,38 @@ class FactGeneratorStage(Stage):
         # Use fact extractor if available
         if self.fact_extractor and SERVICES_AVAILABLE:
             try:
-                extraction_result = await self.fact_extractor.extract_from_text(
-                    content,
-                    domain=getattr(config, 'domain', 'general'),
-                    extract_entities=getattr(config, 'extract_entities', True),
-                    extract_relations=getattr(config, 'extract_relations', True),
-                    extract_facts=getattr(config, 'extract_facts', True),
-                    min_confidence=getattr(config, 'min_confidence', 0.7)
+                # Use the correct method name: extract_facts
+                facts = await self.fact_extractor.extract_facts(
+                    chunk_text=content,
+                    chunk_id=chunk_id,
+                    document_id="unknown",  # We don't have document_id in this context
+                    context={
+                        'domain': getattr(config, 'domain', 'general'),
+                        'language': 'en'
+                    }
                 )
+
+                # Convert facts to the expected format
+                extraction_result = {
+                    'entities': [],
+                    'relations': [],
+                    'facts': [
+                        {
+                            'id': fact.id,
+                            'fact_text': fact.fact_text,
+                            'fact_type': fact.fact_type,
+                            'confidence': fact.extraction_confidence,
+                            'keywords': fact.keywords,
+                            'source_chunk': chunk_id,
+                            'source_document_id': fact.source_document_id,
+                            'source_chunk_id': fact.source_chunk_id,
+                            'domain': fact.domain,
+                            'language': fact.language,
+                            'structured_metadata': fact.structured_metadata.model_dump() if hasattr(fact.structured_metadata, 'model_dump') else fact.structured_metadata
+                        }
+                        for fact in facts
+                    ]
+                }
                 
                 # Add source chunk information
                 for entity in extraction_result.get('entities', []):
@@ -298,22 +350,33 @@ class FactGeneratorStage(Stage):
             return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
 
         try:
-            if not self.extraction_agent:
+            # Use direct LLM call instead of agent for better JSON control
+            from morag_reasoning.llm import LLMClient, LLMConfig as ReasoningLLMConfig
+
+            if not hasattr(self, '_llm_client') or self._llm_client is None:
                 # Get LLM configuration with stage-specific overrides
                 llm_config = getattr(config, 'get_llm_config', lambda: config)()
-                agent_config = AgentConfig(
+
+                # Convert to reasoning LLMConfig format
+                reasoning_config = ReasoningLLMConfig(
+                    provider=llm_config.provider,
                     model=llm_config.model,
+                    api_key=llm_config.api_key,
                     temperature=llm_config.temperature,
-                    max_tokens=llm_config.max_tokens
+                    max_tokens=llm_config.max_tokens,
+                    max_retries=llm_config.max_retries,
                 )
-                self.extraction_agent = create_agent(agent_config)
+                self._llm_client = LLMClient(reasoning_config)
 
             # Create extraction prompt
             system_prompt = self._get_extraction_system_prompt(config)
             user_prompt = self._get_extraction_user_prompt(content, config)
 
-            response = await self.extraction_agent.run(user_prompt, system_prompt=system_prompt)
-            response_text = response.data if hasattr(response, 'data') else str(response)
+            # Use LLM client for direct JSON response
+            response_text = await self._llm_client.generate_from_messages([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ])
 
             # Parse response (expecting JSON format)
             try:
@@ -476,7 +539,25 @@ Return valid JSON only."""
             return self._basic_entity_deduplication(entities)
 
         try:
-            return await self.entity_normalizer.normalize_entities(entities)
+            # Extract entity names for normalization
+            entity_names = [entity.get('name', '') for entity in entities]
+            entity_types = [entity.get('type', None) for entity in entities]
+
+            # Use the correct method name: normalize_entities_batch
+            normalized_variations = await self.entity_normalizer.normalize_entities_batch(entity_names, entity_types)
+
+            # Update entities with normalized names
+            normalized_entities = []
+            for i, entity in enumerate(entities):
+                if i < len(normalized_variations):
+                    normalized_entity = entity.copy()
+                    normalized_entity['name'] = normalized_variations[i].normalized
+                    normalized_entity['normalization_confidence'] = normalized_variations[i].confidence
+                    normalized_entities.append(normalized_entity)
+                else:
+                    normalized_entities.append(entity)
+
+            return self._basic_entity_deduplication(normalized_entities)
         except Exception as e:
             logger.warning("Entity normalization failed, using basic deduplication", error=str(e))
             return self._basic_entity_deduplication(entities)
