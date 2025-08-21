@@ -57,7 +57,8 @@ class StageContext(BaseModel):
         Returns:
             Configuration dictionary for the stage
         """
-        return self.config.get(stage_type.value, {})
+        config = self.config.get(stage_type.value, {})
+        return config if isinstance(config, dict) else {}
     
     def set_stage_config(self, stage_type: StageType, config: Dict[str, Any]) -> None:
         """Set configuration for a specific stage.
@@ -119,8 +120,10 @@ class StageContext(BaseModel):
         # Get the most recent successful result
         latest_result = None
         for result in self.stage_results.values():
-            if result.success and (latest_result is None or 
-                                 result.metadata.end_time > latest_result.metadata.end_time):
+            if (result.success and result.metadata.end_time is not None and
+                (latest_result is None or
+                 (latest_result.metadata.end_time is not None and
+                  result.metadata.end_time > latest_result.metadata.end_time))):
                 latest_result = result
         
         if latest_result is None:

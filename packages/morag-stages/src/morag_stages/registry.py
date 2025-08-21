@@ -26,30 +26,28 @@ class StageRegistry:
         Raises:
             StageError: If stage type is already registered
         """
-        # Create temporary instance to get stage type
-        try:
-            temp_instance = stage_class()
-            stage_type = temp_instance.stage_type
-        except TypeError:
-            # Fallback for stages that require stage_type parameter
-            # Try to infer stage type from class name
-            class_name = stage_class.__name__.lower()
-            if 'markdown_conversion' in class_name or 'markdownconversion' in class_name:
-                stage_type = StageType.MARKDOWN_CONVERSION
-            elif 'markdown_optimizer' in class_name or 'markdownoptimizer' in class_name:
-                stage_type = StageType.MARKDOWN_OPTIMIZER
-            elif 'chunker' in class_name:
-                stage_type = StageType.CHUNKER
-            elif 'fact_generator' in class_name or 'factgenerator' in class_name:
-                stage_type = StageType.FACT_GENERATOR
-            elif 'ingestor' in class_name:
-                stage_type = StageType.INGESTOR
-            else:
-                # Default fallback
-                stage_type = StageType.MARKDOWN_CONVERSION
+        # Try to infer stage type from class name since Stage constructor requires stage_type
+        class_name = stage_class.__name__.lower()
+        stage_type = None
 
-            temp_instance = stage_class(stage_type)
-            stage_type = temp_instance.stage_type
+        # Try to infer stage type from class name
+        if 'markdown_conversion' in class_name or 'markdownconversion' in class_name:
+            stage_type = StageType.MARKDOWN_CONVERSION
+        elif 'markdown_optimizer' in class_name or 'markdownoptimizer' in class_name:
+            stage_type = StageType.MARKDOWN_OPTIMIZER
+        elif 'chunker' in class_name:
+            stage_type = StageType.CHUNKER
+        elif 'fact_generator' in class_name or 'factgenerator' in class_name:
+            stage_type = StageType.FACT_GENERATOR
+        elif 'ingestor' in class_name:
+            stage_type = StageType.INGESTOR
+        else:
+            # Default fallback
+            stage_type = StageType.MARKDOWN_CONVERSION
+
+        # Create temporary instance to verify stage type
+        temp_instance = stage_class(stage_type)
+        stage_type = temp_instance.stage_type
         
         if stage_type in self._stages:
             raise StageError(f"Stage type {stage_type.value} is already registered")
@@ -89,11 +87,8 @@ class StageRegistry:
         # Return cached instance or create new one
         if stage_type not in self._instances:
             stage_class = self._stages[stage_type]
-            try:
-                self._instances[stage_type] = stage_class()
-            except TypeError:
-                # Fallback for stages that require stage_type parameter
-                self._instances[stage_type] = stage_class(stage_type)
+            # All Stage classes require stage_type parameter
+            self._instances[stage_type] = stage_class(stage_type)
         
         return self._instances[stage_type]
     

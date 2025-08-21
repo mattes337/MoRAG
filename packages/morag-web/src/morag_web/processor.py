@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 
 import httpx
 import structlog
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup, Comment, Tag, PageElement
 from markdownify import markdownify
 
 from morag_core.exceptions import ProcessingError, ValidationError
@@ -211,7 +211,7 @@ class WebProcessor(BaseProcessor):
         
         return soup
     
-    def _extract_main_content(self, soup: BeautifulSoup) -> BeautifulSoup:
+    def _extract_main_content(self, soup: BeautifulSoup) -> Union[Tag, PageElement, BeautifulSoup]:
         """Extract main content from the page."""
         # Try to find main content area
         main_selectors = [
@@ -250,28 +250,43 @@ class WebProcessor(BaseProcessor):
         
         # Extract meta tags
         for meta in soup.find_all('meta'):
-            name = meta.get('name', '').lower()
-            property_name = meta.get('property', '').lower()
-            content = meta.get('content', '')
-            
-            if name and content:
-                metadata[f'meta_{name}'] = content
-            elif property_name and content:
-                metadata[f'meta_{property_name}'] = content
+            if isinstance(meta, Tag):
+                name_attr = meta.get('name', '')
+                property_attr = meta.get('property', '')
+                content_attr = meta.get('content', '')
+
+                name = str(name_attr).lower() if name_attr else ''
+                property_name = str(property_attr).lower() if property_attr else ''
+                content = str(content_attr) if content_attr else ''
+
+                if name and content:
+                    metadata[f'meta_{name}'] = content
+                elif property_name and content:
+                    metadata[f'meta_{property_name}'] = content
         
         # Extract Open Graph metadata
         for meta in soup.find_all('meta', property=re.compile(r'^og:')):
-            property_name = meta.get('property', '').lower().replace('og:', 'og_')
-            content = meta.get('content', '')
-            if property_name and content:
-                metadata[property_name] = content
+            if isinstance(meta, Tag):
+                property_attr = meta.get('property', '')
+                content_attr = meta.get('content', '')
+
+                property_name = str(property_attr).lower().replace('og:', 'og_') if property_attr else ''
+                content = str(content_attr) if content_attr else ''
+
+                if property_name and content:
+                    metadata[property_name] = content
         
         # Extract Twitter Card metadata
-        for meta in soup.find_all('meta', name=re.compile(r'^twitter:')):
-            name = meta.get('name', '').lower().replace('twitter:', 'twitter_')
-            content = meta.get('content', '')
-            if name and content:
-                metadata[name] = content
+        for meta in soup.find_all('meta', attrs={'name': re.compile(r'^twitter:')}):
+            if isinstance(meta, Tag):
+                name_attr = meta.get('name', '')
+                content_attr = meta.get('content', '')
+
+                name = str(name_attr).lower().replace('twitter:', 'twitter_') if name_attr else ''
+                content = str(content_attr) if content_attr else ''
+
+                if name and content:
+                    metadata[name] = content
         
         return metadata
     
@@ -280,7 +295,9 @@ class WebProcessor(BaseProcessor):
         links = []
         
         for a_tag in soup.find_all('a', href=True):
-            href = a_tag.get('href', '').strip()
+            if isinstance(a_tag, Tag):
+                href_attr = a_tag.get('href', '')
+                href = str(href_attr).strip() if href_attr else ''
             
             # Skip empty links and javascript/mailto links
             if not href or href.startswith(('javascript:', 'mailto:', 'tel:', '#')):
@@ -301,7 +318,9 @@ class WebProcessor(BaseProcessor):
         images = []
         
         for img_tag in soup.find_all('img', src=True):
-            src = img_tag.get('src', '').strip()
+            if isinstance(img_tag, Tag):
+                src_attr = img_tag.get('src', '')
+                src = str(src_attr).strip() if src_attr else ''
             
             # Skip empty sources and data URIs
             if not src or src.startswith('data:'):
@@ -319,7 +338,7 @@ class WebProcessor(BaseProcessor):
     
     def _convert_to_markdown(self, html: str, config: WebScrapingConfig) -> str:
         """Convert HTML to Markdown."""
-        return markdownify(
+        result = markdownify(
             html,
             heading_style="atx",
             strip=["script", "style"],
@@ -331,15 +350,17 @@ class WebProcessor(BaseProcessor):
             bullets="-",
             strong_em_symbol="*"
         )
+        return str(result) if result is not None else ""
     
-    def _create_chunks(self, content: str, metadata: Dict[str, Any]) -> List[DocumentChunk]:
+    def _create_chunks(self, content: str, metadata: Dict[str, Any], document_id: str) -> List[DocumentChunk]:
         """Create document chunks from content."""
         # Simple chunking by paragraphs for now
         paragraphs = [p for p in content.split('\n\n') if p.strip()]
-        
+
         chunks = []
         for i, paragraph in enumerate(paragraphs):
             chunk = DocumentChunk(
+                document_id=document_id,
                 content=paragraph,
                 metadata={
                     **metadata,
@@ -348,7 +369,7 @@ class WebProcessor(BaseProcessor):
                 }
             )
             chunks.append(chunk)
-        
+
         return chunks
     
     async def process(self, file_path: Union[str, Path], config: Optional[ProcessingConfig] = None) -> ProcessingResult:
@@ -435,7 +456,7 @@ class WebProcessor(BaseProcessor):
             )
             
             # Create chunks
-            chunks = self._create_chunks(content.content, metadata)
+            chunks = self._create_chunks(content.content, metadata, normalized_url)
             
             # Calculate total processing time
             processing_time = time.time() - start_time
@@ -454,7 +475,7 @@ class WebProcessor(BaseProcessor):
             processing_time = time.time() - start_time
             return WebScrapingResult(
                 url=url,
-                content=None,  # type: ignore
+                content=None,
                 chunks=[],
                 processing_time=processing_time,
                 success=False,
@@ -466,7 +487,7 @@ class WebProcessor(BaseProcessor):
             processing_time = time.time() - start_time
             return WebScrapingResult(
                 url=url,
-                content=None,  # type: ignore
+                content=None,
                 chunks=[],
                 processing_time=processing_time,
                 success=False,

@@ -82,7 +82,8 @@ class FileManager:
         
         if metadata_path.exists():
             with open(metadata_path, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                return data if isinstance(data, dict) else None
         
         return None
     
@@ -149,7 +150,7 @@ class FileManager:
         """Get storage statistics."""
         total_files = 0
         total_size = 0
-        stage_counts = {}
+        stage_counts: Dict[str, int] = {}
         
         for metadata_file in self.metadata_dir.glob("*.json"):
             try:

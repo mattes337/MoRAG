@@ -16,9 +16,13 @@ try:
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
-    create_agent_with_config = None
-    SummarizationAgent = None
-    AgentConfig = None
+    # Create placeholder functions/classes for runtime
+    def create_agent_with_config(*args, **kwargs):  # type: ignore
+        return None
+    class SummarizationAgent:  # type: ignore
+        pass
+    class AgentConfig:  # type: ignore
+        pass
 
 logger = structlog.get_logger(__name__)
 

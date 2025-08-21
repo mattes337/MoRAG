@@ -3,12 +3,15 @@
 import json
 import hashlib
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, TYPE_CHECKING
 from pathlib import Path
 import structlog
 
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
+
+if TYPE_CHECKING:
+    from morag_graph.storage import Neo4jStorage, QdrantStorage
 
 # Import storage services with graceful fallback
 try:
@@ -16,10 +19,15 @@ try:
     STORAGE_AVAILABLE = True
 except ImportError:
     STORAGE_AVAILABLE = False
-    Neo4jStorage = None
-    QdrantStorage = None
-    Neo4jConfig = None
-    QdrantConfig = None
+    # Create placeholder classes for runtime
+    class Neo4jStorage:  # type: ignore
+        pass
+    class QdrantStorage:  # type: ignore
+        pass
+    class Neo4jConfig:  # type: ignore
+        pass
+    class QdrantConfig:  # type: ignore
+        pass
 
 logger = structlog.get_logger(__name__)
 
@@ -33,9 +41,9 @@ class IngestorStage(Stage):
         
         if not STORAGE_AVAILABLE:
             logger.warning("Storage services not available for ingestion")
-        
-        self.neo4j_storage = None
-        self.qdrant_storage = None
+
+        self.neo4j_storage: Optional["Neo4jStorage"] = None
+        self.qdrant_storage: Optional["QdrantStorage"] = None
     
     async def execute(self, 
                      input_files: List[Path], 
@@ -248,22 +256,22 @@ class IngestorStage(Stage):
         databases = config.get('databases', ['qdrant'])
         
         # Initialize Qdrant if requested
-        if 'qdrant' in databases and QdrantStorage:
+        if 'qdrant' in databases and STORAGE_AVAILABLE:
             try:
                 qdrant_config = QdrantConfig(**config.get('qdrant_config', {}))
                 self.qdrant_storage = QdrantStorage(qdrant_config)
-                await self.qdrant_storage.initialize()
+                await self.qdrant_storage.initialize()  # type: ignore
                 logger.info("Qdrant storage initialized")
             except Exception as e:
                 logger.error("Failed to initialize Qdrant storage", error=str(e))
                 raise StageExecutionError(f"Qdrant initialization failed: {e}")
-        
+
         # Initialize Neo4j if requested
-        if 'neo4j' in databases and Neo4jStorage:
+        if 'neo4j' in databases and STORAGE_AVAILABLE:
             try:
                 neo4j_config = Neo4jConfig(**config.get('neo4j_config', {}))
                 self.neo4j_storage = Neo4jStorage(neo4j_config)
-                await self.neo4j_storage.initialize()
+                await self.neo4j_storage.initialize()  # type: ignore
                 logger.info("Neo4j storage initialized")
             except Exception as e:
                 logger.error("Failed to initialize Neo4j storage", error=str(e))
@@ -440,6 +448,10 @@ class IngestorStage(Stage):
         Returns:
             Entity ingestion results
         """
+        if self.neo4j_storage is None:
+            logger.warning("Neo4j storage not available, skipping entity ingestion")
+            return {"ingested": 0, "duplicates_skipped": 0}
+
         results = {"ingested": 0, "duplicates_skipped": 0}
 
         for entity in entities:
@@ -480,6 +492,10 @@ class IngestorStage(Stage):
         Returns:
             Relation ingestion results
         """
+        if self.neo4j_storage is None:
+            logger.warning("Neo4j storage not available, skipping relation ingestion")
+            return {"ingested": 0, "duplicates_skipped": 0}
+
         results = {"ingested": 0, "duplicates_skipped": 0}
 
         for relation in relations:
@@ -528,6 +544,10 @@ class IngestorStage(Stage):
         Returns:
             Fact ingestion results
         """
+        if self.neo4j_storage is None:
+            logger.warning("Neo4j storage not available, skipping fact ingestion")
+            return {"ingested": 0, "duplicates_skipped": 0}
+
         results = {"ingested": 0, "duplicates_skipped": 0}
 
         for fact in facts:

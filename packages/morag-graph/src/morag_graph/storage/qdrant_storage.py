@@ -1,8 +1,15 @@
 """Qdrant storage backend for graph data."""
 
 import logging
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any, Set, TYPE_CHECKING
 import uuid
+
+if TYPE_CHECKING:
+    from qdrant_client import AsyncQdrantClient
+    from qdrant_client.models import (
+        Distance, VectorParams, CreateCollection, PointStruct,
+        Filter, FieldCondition, MatchValue, SearchRequest
+    )
 
 try:
     from qdrant_client import AsyncQdrantClient
@@ -13,7 +20,25 @@ try:
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False
-    AsyncQdrantClient = type(None)  # Placeholder type
+    # Create placeholder classes for runtime
+    class AsyncQdrantClient:  # type: ignore
+        pass
+    class Distance:  # type: ignore
+        pass
+    class VectorParams:  # type: ignore
+        pass
+    class CreateCollection:  # type: ignore
+        pass
+    class PointStruct:  # type: ignore
+        pass
+    class Filter:  # type: ignore
+        pass
+    class FieldCondition:  # type: ignore
+        pass
+    class MatchValue:  # type: ignore
+        pass
+    class SearchRequest:  # type: ignore
+        pass
 
 from pydantic import BaseModel
 
@@ -66,7 +91,7 @@ class QdrantStorage(BaseStorage):
             raise ImportError("qdrant-client is required for QdrantStorage")
             
         self.config = config
-        self.client: Optional[AsyncQdrantClient] = None
+        self.client: Optional["AsyncQdrantClient"] = None
     
     async def connect(self) -> None:
         """Connect to Qdrant database."""
