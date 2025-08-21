@@ -1,10 +1,10 @@
 #!/bin/bash
-"""
-Safe Worker Startup Script for MoRAG
-
-This script runs CPU compatibility checks before starting Celery workers
-to prevent crashes due to CPU instruction set incompatibilities.
-"""
+#
+# Safe Worker Startup Script for MoRAG
+#
+# This script runs CPU compatibility checks before starting Celery workers
+# to prevent crashes due to CPU instruction set incompatibilities.
+#
 
 echo "=== MoRAG Worker Safe Startup ==="
 echo "Checking CPU compatibility before starting worker..."
