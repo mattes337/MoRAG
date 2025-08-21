@@ -53,6 +53,7 @@ class StageFileMetadata(BaseModel):
     stage_type: StageTypeEnum = Field(..., description="Stage that created this file")
     content_type: Optional[str] = Field(None, description="MIME type of the file")
     checksum: Optional[str] = Field(None, description="File checksum for integrity verification")
+    content: Optional[str] = Field(None, description="File content (included when return_content=true)")
 
 
 class StageExecutionMetadata(BaseModel):
@@ -86,6 +87,7 @@ class StageChainRequest(BaseModel):
     webhook_config: Optional[WebhookConfig] = Field(None, description="Webhook notification configuration")
     stop_on_failure: bool = Field(True, description="Stop chain execution if any stage fails")
     skip_existing: bool = Field(True, description="Skip stages if their outputs already exist")
+    return_content: bool = Field(False, description="Include file contents in response")
 
 
 class StageChainResponse(BaseModel):

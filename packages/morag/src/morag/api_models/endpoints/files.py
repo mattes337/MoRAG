@@ -28,10 +28,10 @@ def get_content_type(file_path: Path) -> str:
     return content_type or "application/octet-stream"
 
 
-def create_file_metadata(file_path: Path, stage_type: Optional[StageTypeEnum] = None) -> StageFileMetadata:
+def create_file_metadata(file_path: Path, stage_type: Optional[StageTypeEnum] = None, include_content: bool = False) -> StageFileMetadata:
     """Create file metadata from a file path."""
     stat = file_path.stat()
-    
+
     # Determine stage type from filename if not provided
     if stage_type is None:
         if file_path.name.endswith('.opt.md'):
@@ -46,7 +46,18 @@ def create_file_metadata(file_path: Path, stage_type: Optional[StageTypeEnum] = 
             stage_type = StageTypeEnum.INGESTOR
         else:
             stage_type = StageTypeEnum.MARKDOWN_CONVERSION  # Default
-    
+
+    # Read file content if requested
+    content = None
+    if include_content:
+        try:
+            # Try to read as text first
+            content = file_path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            # If it's not text, read as binary and encode as base64
+            import base64
+            content = base64.b64encode(file_path.read_bytes()).decode('ascii')
+
     return StageFileMetadata(
         filename=file_path.name,
         file_path=str(file_path),
@@ -54,7 +65,8 @@ def create_file_metadata(file_path: Path, stage_type: Optional[StageTypeEnum] = 
         created_at=datetime.fromtimestamp(stat.st_mtime),
         stage_type=stage_type,
         content_type=get_content_type(file_path),
-        checksum=None  # TODO: Calculate checksum if needed
+        checksum=None,  # TODO: Calculate checksum if needed
+        content=content
     )
 
 
