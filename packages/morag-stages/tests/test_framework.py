@@ -5,7 +5,7 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pytest
 import structlog
@@ -208,7 +208,7 @@ This document contains various topics that can be used for testing fact extracti
         file_path.write_text(json.dumps(facts_data, indent=2), encoding='utf-8')
         return file_path
     
-    def create_context(self, source_file: Path, config: Dict[str, Any] = None) -> StageContext:
+    def create_context(self, source_file: Path, config: Optional[Dict[str, Any]] = None) -> StageContext:
         """Create a stage context for testing."""
         return StageContext(
             source_path=source_file,
@@ -219,7 +219,7 @@ This document contains various topics that can be used for testing fact extracti
     async def execute_stage_test(self, 
                                 stage_type: StageType,
                                 input_files: List[Path],
-                                config: Dict[str, Any] = None):
+                                config: Optional[Dict[str, Any]] = None):
         """Execute a stage for testing."""
         
         context = self.create_context(input_files[0], config)
@@ -238,7 +238,7 @@ This document contains various topics that can be used for testing fact extracti
         assert result.status == StageStatus.SKIPPED, f"Expected stage to be skipped, got: {result.status}"
         assert len(result.output_files) > 0, "Skipped stage should still have output files"
     
-    def assert_file_content(self, file_path: Path, expected_content: str = None, min_length: int = None):
+    def assert_file_content(self, file_path: Path, expected_content: Optional[str] = None, min_length: Optional[int] = None):
         """Assert file content meets expectations."""
         assert file_path.exists(), f"File {file_path} does not exist"
         

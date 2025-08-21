@@ -88,7 +88,7 @@ class EntityOperations(BaseOperations):
         except Exception:
             logger.warning(f"Invalid entity ID format: {entity.id}")
             # Generate a new valid ID
-            entity.id = UnifiedIDGenerator.generate_entity_id(entity.name, str(entity.type))
+            entity.id = UnifiedIDGenerator.generate_entity_id(entity.name, str(entity.type), entity.source_doc_id or "")
             logger.info(f"Generated new entity ID: {entity.id}")
 
         # Get the normalized Neo4j label from the entity type
@@ -146,7 +146,7 @@ class EntityOperations(BaseOperations):
             return result[0]["id"]
         return entity.id
 
-    async def _create_missing_entity(self, entity_id: str, entity_name: str) -> str:
+    async def _create_missing_entity(self, entity_id: str, entity_name: str) -> Optional[str]:
         """Create a missing entity with minimal information.
 
         Args:

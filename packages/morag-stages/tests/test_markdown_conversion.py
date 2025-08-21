@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from morag_stages import StageType
+from morag_stages import StageType, StageStatus
 from .test_framework import StageTestFramework
 
 

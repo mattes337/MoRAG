@@ -5,6 +5,7 @@ import tempfile
 import json
 import asyncio
 from pathlib import Path
+from typing import Optional
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
 from fastapi import UploadFile
@@ -35,7 +36,7 @@ class TestFileUploadHandler:
         # Cleanup after test
         handler.cleanup_temp_dir()
     
-    def create_mock_upload_file(self, filename: str, content: bytes, content_type: str = None):
+    def create_mock_upload_file(self, filename: str, content: bytes, content_type: Optional[str] = None):
         """Create mock UploadFile for testing."""
         upload_file = Mock(spec=UploadFile)
         upload_file.filename = filename
@@ -43,14 +44,15 @@ class TestFileUploadHandler:
         upload_file.size = len(content)
         
         # Mock async read method
+        content_buffer = bytearray(content)  # Use mutable bytearray
         async def mock_read(size: int = -1):
-            if size == -1 or size >= len(content):
-                data = content
-                content[:] = b''  # Clear content to simulate reading
+            if size == -1 or size >= len(content_buffer):
+                data = bytes(content_buffer)
+                content_buffer[:] = b''  # Clear content to simulate reading
                 return data
             else:
-                data = content[:size]
-                content[:] = content[size:]
+                data = bytes(content_buffer[:size])
+                content_buffer[:] = content_buffer[size:]
                 return data
         
         upload_file.read = mock_read

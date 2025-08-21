@@ -8,6 +8,7 @@ import tempfile
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 from unittest.mock import Mock, patch
 
 # Add the packages to the path
@@ -24,7 +25,7 @@ def test_progress_callback():
     """Test that progress callbacks are called during processing."""
     progress_calls = []
     
-    def mock_progress_callback(progress: float, message: str = None):
+    def mock_progress_callback(progress: float, message: Optional[str] = None):
         progress_calls.append((progress, message))
         print(f"Progress: {int(progress * 100)}% - {message}")
     
@@ -43,7 +44,7 @@ def test_progress_callback():
 
 def test_processing_config_with_progress():
     """Test that ProcessingConfig accepts progress_callback parameter."""
-    def dummy_callback(progress: float, message: str = None):
+    def dummy_callback(progress: float, message: Optional[str] = None):
         pass
     
     config = ProcessingConfig(
@@ -99,7 +100,7 @@ def test_document_processor_progress():
         
         # Create a mock progress callback
         progress_calls = []
-        def progress_callback(progress: float, message: str = None):
+        def progress_callback(progress: float, message: Optional[str] = None):
             progress_calls.append((progress, message))
             print(f"Document processing: {int(progress * 100)}% - {message}")
         

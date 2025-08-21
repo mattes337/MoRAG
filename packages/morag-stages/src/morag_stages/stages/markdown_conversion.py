@@ -10,14 +10,24 @@ import structlog
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
+# Import core exceptions
+try:
+    from morag_core.exceptions import ProcessingError
+except ImportError:
+    class ProcessingError(Exception):  # type: ignore
+        pass
+
 # Import services with graceful fallback
 try:
     from morag_services import MoRAGServices, ContentType
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
-    MoRAGServices = None
-    ContentType = None
+    # Create placeholder types for when services are not available
+    class MoRAGServices:  # type: ignore
+        pass
+    class ContentType:  # type: ignore
+        pass
 
 logger = structlog.get_logger(__name__)
 
@@ -177,7 +187,7 @@ class MarkdownConversionStage(Stage):
         Returns:
             Detected content type or None
         """
-        if not ContentType:
+        if not SERVICES_AVAILABLE:
             return None
         
         file_str = str(file_path).lower()
@@ -231,6 +241,8 @@ class MarkdownConversionStage(Stage):
         }
 
         # Use video service
+        if not self.services:
+            raise ProcessingError("MoRAG services not available")
         result = await self.services.process_video(str(input_file), options)
         
         # Create markdown with metadata header
@@ -282,6 +294,8 @@ class MarkdownConversionStage(Stage):
         }
 
         # Use audio service
+        if not self.services:
+            raise ProcessingError("MoRAG services not available")
         result = await self.services.process_audio(str(input_file), options)
 
         # Create markdown with metadata header
@@ -334,6 +348,8 @@ class MarkdownConversionStage(Stage):
         }
 
         # Use document service
+        if not self.services:
+            raise ProcessingError("MoRAG services not available")
         result = await self.services.process_document(str(input_file), options)
 
         # Create markdown with metadata header
@@ -379,6 +395,8 @@ class MarkdownConversionStage(Stage):
         logger.info("Processing web URL", url=url)
 
         # Use web service
+        if not self.services:
+            raise ProcessingError("MoRAG services not available")
         result = await self.services.process_web(
             url,
             follow_links=config.get('follow_links', False),
