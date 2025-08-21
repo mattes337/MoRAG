@@ -57,12 +57,6 @@ class MarkdownConversionStage(Stage):
         Returns:
             Stage execution result
         """
-        if not SERVICES_AVAILABLE or self.services is None:
-            raise StageExecutionError(
-                "MoRAG services not available for markdown conversion",
-                stage_type=self.stage_type.value
-            )
-
         if len(input_files) != 1:
             raise StageValidationError(
                 "Markdown conversion stage requires exactly one input file",
@@ -72,21 +66,37 @@ class MarkdownConversionStage(Stage):
 
         input_file = input_files[0]
         config = context.get_stage_config(self.stage_type)
-        
-        logger.info("Starting markdown conversion", 
+
+        # Determine content type
+        content_type = self._detect_content_type(input_file)
+
+        # Check if we need MoRAG services (not needed for MarkItDown processing)
+        needs_services = not self._should_use_markitdown(input_file, content_type)
+
+        if needs_services and (not SERVICES_AVAILABLE or self.services is None):
+            raise StageExecutionError(
+                "MoRAG services not available for markdown conversion",
+                stage_type=self.stage_type.value
+            )
+
+        logger.info("Starting markdown conversion",
                    input_file=str(input_file),
                    config=config)
-        
+
         try:
-            # Determine content type
-            content_type = self._detect_content_type(input_file)
             
             # Generate output filename
             output_file = context.output_dir / f"{input_file.stem}.md"
             context.output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Process based on content type
-            if content_type == ContentType.VIDEO:
+            # Check if we should use MarkItDown for better quality
+            if self._should_use_markitdown(input_file, content_type):
+                logger.info("Using MarkItDown for high-quality conversion",
+                           input_file=str(input_file),
+                           content_type=content_type.value if content_type else "unknown")
+                result_data = await self._process_with_markitdown(input_file, output_file, config)
+            # Otherwise use specialized processors
+            elif content_type == ContentType.VIDEO:
                 result_data = await self._process_video(input_file, output_file, config)
             elif content_type == ContentType.AUDIO:
                 result_data = await self._process_audio(input_file, output_file, config)
@@ -236,6 +246,103 @@ class MarkdownConversionStage(Stage):
         
         # Default to text for unknown types
         return ContentType.TEXT
+
+    def _should_use_markitdown(self, file_path: Path, content_type: ContentType) -> bool:
+        """Check if MarkItDown should be used for this file type.
+
+        Args:
+            file_path: File path to check
+            content_type: Detected content type
+
+        Returns:
+            True if MarkItDown should be used
+        """
+        # MarkItDown supported extensions (based on documentation)
+        markitdown_extensions = {
+            # Document formats
+            '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
+            # Text formats
+            '.html', '.htm', '.txt', '.md', '.rst',
+            # Data formats
+            '.json', '.xml', '.csv',
+            # Image formats (with LLM support)
+            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'
+        }
+
+        file_ext = file_path.suffix.lower()
+
+        # Use MarkItDown for supported file extensions
+        if file_ext in markitdown_extensions:
+            return True
+
+        # Don't use MarkItDown for audio/video files (they need specialized processing)
+        if content_type in [ContentType.AUDIO, ContentType.VIDEO]:
+            return False
+
+        # Don't use MarkItDown for web URLs (we have custom web processing)
+        if content_type == ContentType.WEB:
+            return False
+
+        return False
+
+    async def _process_with_markitdown(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Process file using MarkItDown for high-quality conversion.
+
+        Args:
+            input_file: Input file path
+            output_file: Output markdown file path
+            config: Stage configuration
+
+        Returns:
+            Processing result data
+        """
+        try:
+            from markitdown import MarkItDown
+
+            logger.info("Processing with MarkItDown", input_file=str(input_file))
+
+            # Initialize MarkItDown with optional LLM support for images
+            md_converter = MarkItDown()
+
+            # Convert file to markdown
+            result = md_converter.convert(str(input_file))
+
+            if not result or not result.text_content:
+                raise ProcessingError(f"MarkItDown failed to extract content from {input_file}")
+
+            # Create markdown with metadata header
+            markdown_content = self._create_markdown_with_metadata(
+                content=result.text_content,
+                metadata={
+                    "title": getattr(result, 'title', None) or input_file.stem,
+                    "source": str(input_file),
+                    "type": "document",
+                    "file_extension": input_file.suffix,
+                    "processed_with": "markitdown",
+                    "created_at": datetime.now().isoformat(),
+                    # Add any additional metadata from MarkItDown result
+                    **(getattr(result, 'metadata', {}) or {})
+                }
+            )
+
+            # Write to file
+            output_file.write_text(markdown_content, encoding='utf-8')
+
+            return {
+                "content_type": "document",
+                "title": getattr(result, 'title', None) or input_file.stem,
+                "metadata": getattr(result, 'metadata', {}) or {},
+                "metrics": {
+                    "file_path": str(input_file),
+                    "file_size": input_file.stat().st_size,
+                    "content_length": len(result.text_content),
+                    "processor": "markitdown"
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"MarkItDown processing failed: {e}", input_file=str(input_file))
+            raise ProcessingError(f"MarkItDown processing failed for {input_file}: {e}")
     
     async def _process_video(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process video file to markdown.
