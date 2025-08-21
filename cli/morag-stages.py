@@ -187,7 +187,7 @@ async def execute_full_pipeline(args):
         webhook_url=args.webhook_url,
         config={}
     )
-    
+
     try:
         # Execute pipeline
         results = await stage_manager.execute_stage_chain(stages, [Path(args.input)], context)

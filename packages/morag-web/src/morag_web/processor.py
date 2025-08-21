@@ -112,7 +112,7 @@ class WebProcessor(BaseProcessor):
             "User-Agent": config.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
+            # Remove explicit Accept-Encoding to let httpx handle compression automatically
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
             "Cache-Control": "max-age=0"
@@ -129,7 +129,7 @@ class WebProcessor(BaseProcessor):
                 async with httpx.AsyncClient(timeout=config.timeout, follow_redirects=True) as client:
                     response = await client.get(url, headers=headers)
                     response.raise_for_status()
-                    
+
                     # Check content type
                     content_type = response.headers.get('content-type', '').split(';')[0].strip().lower()
                     if content_type not in config.allowed_content_types:
@@ -137,7 +137,7 @@ class WebProcessor(BaseProcessor):
                             f"Unsupported content type: {content_type}. "
                             f"Allowed types: {', '.join(config.allowed_content_types)}"
                         )
-                    
+
                     # Check content length
                     content_length = len(response.content)
                     if content_length > config.max_content_length:
@@ -145,8 +145,50 @@ class WebProcessor(BaseProcessor):
                             f"Content too large: {content_length} bytes "
                             f"(max: {config.max_content_length})"
                         )
-                    
-                    return response.text, content_type, dict(response.headers)
+
+                    # Handle text decoding more robustly
+                    try:
+                        # Log response details for debugging
+                        logger.debug(
+                            "Response details",
+                            url=url,
+                            status_code=response.status_code,
+                            content_encoding=response.headers.get('content-encoding'),
+                            content_type=response.headers.get('content-type'),
+                            content_length=len(response.content)
+                        )
+
+                        # First try the response's automatic text decoding
+                        text_content = response.text
+
+                        # Validate that the content is actually readable text
+                        # Check for excessive binary characters which indicate corruption
+                        binary_chars = sum(1 for c in text_content[:1000] if ord(c) < 32 and c not in '\n\r\t')
+                        if binary_chars > 50:  # More than 50 binary chars in first 1000 suggests corruption
+                            logger.warning(f"Content appears corrupted, binary chars: {binary_chars}", url=url)
+                            raise UnicodeDecodeError("corruption", b"", 0, 1, "Content appears corrupted")
+
+                        return text_content, content_type, dict(response.headers)
+
+                    except UnicodeDecodeError as e:
+                        logger.warning(f"Text decoding failed: {e}", url=url)
+                        # If automatic decoding fails, try different encodings
+                        for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                            try:
+                                text_content = response.content.decode(encoding, errors='ignore')
+                                logger.warning(f"Used fallback encoding: {encoding}", url=url)
+
+                                # Validate the fallback content too
+                                binary_chars = sum(1 for c in text_content[:1000] if ord(c) < 32 and c not in '\n\r\t')
+                                if binary_chars > 50:
+                                    continue  # Try next encoding
+
+                                return text_content, content_type, dict(response.headers)
+                            except UnicodeDecodeError:
+                                continue
+
+                        # If all encodings fail, raise an error
+                        raise ProcessingError(f"Could not decode content from {url}")
                     
             except httpx.HTTPStatusError as e:
                 last_error = ProcessingError(f"HTTP error: {e.response.status_code} - {e.response.reason_phrase}")
@@ -337,20 +379,42 @@ class WebProcessor(BaseProcessor):
         return list(set(images))  # Remove duplicates
     
     def _convert_to_markdown(self, html: str, config: WebScrapingConfig) -> str:
-        """Convert HTML to Markdown."""
-        result = markdownify(
-            html,
-            heading_style="atx",
-            strip=["script", "style"],
-            convert={"img": lambda tag: f"![{tag.get('alt', '')}]({tag.get('src', '')})"},
-            escape_asterisks=True,
-            escape_underscores=True,
-            table_class="",
-            wrap_width=0,  # No wrapping
-            bullets="-",
-            strong_em_symbol="*"
-        )
-        return str(result) if result is not None else ""
+        """Convert HTML to Markdown using MarkItDown for better content extraction."""
+        try:
+            from markitdown import MarkItDown
+            from io import BytesIO
+
+            # Initialize MarkItDown
+            md_converter = MarkItDown()
+
+            # Create a BytesIO object to simulate a file-like object for HTML content
+            html_bytes = html.encode('utf-8')
+            html_stream = BytesIO(html_bytes)
+
+            # Convert HTML to markdown using MarkItDown
+            # MarkItDown automatically handles content extraction and removes clutter
+            result = md_converter.convert_stream(html_stream, file_extension=".html")
+
+            return result.text_content if result and result.text_content else ""
+
+        except Exception as e:
+            logger.warning(f"MarkItDown conversion failed, falling back to basic conversion: {e}")
+
+            # Fallback to basic HTML cleaning if MarkItDown fails
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, 'html.parser')
+
+            # Remove script, style, nav, header, footer, and other clutter tags
+            for tag in soup(['script', 'style', 'nav', 'header', 'footer', 'aside', 'menu']):
+                tag.decompose()
+
+            # Try to find main content area
+            main_content = soup.find('main') or soup.find('article') or soup.find('div', class_=['content', 'main', 'article'])
+            if main_content:
+                soup = main_content
+
+            # Extract text content
+            return soup.get_text(separator='\n', strip=True)
     
     def _create_chunks(self, content: str, metadata: Dict[str, Any], document_id: str) -> List[DocumentChunk]:
         """Create document chunks from content."""

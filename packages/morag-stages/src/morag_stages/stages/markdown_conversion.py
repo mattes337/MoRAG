@@ -145,7 +145,16 @@ class MarkdownConversionStage(Stage):
         input_file = input_files[0]
         
         # Check if file exists (for local files)
-        if not str(input_file).startswith(('http://', 'https://')):
+        # Handle URLs that may have been converted to Windows paths
+        file_str = str(input_file)
+        is_url = (
+            file_str.startswith(('http://', 'https://')) or
+            file_str.replace('\\', '/').startswith(('http://', 'https://')) or
+            ('http:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str)) or
+            ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
+        )
+
+        if not is_url:
             if not input_file.exists():
                 return False
         
@@ -180,20 +189,29 @@ class MarkdownConversionStage(Stage):
     
     def _detect_content_type(self, file_path: Path) -> Optional[ContentType]:
         """Detect content type from file path.
-        
+
         Args:
             file_path: File path to analyze
-            
+
         Returns:
             Detected content type or None
         """
         if not SERVICES_AVAILABLE:
             return None
-        
-        file_str = str(file_path).lower()
-        
-        # Web URLs
-        if file_str.startswith(('http://', 'https://')):
+
+        file_str = str(file_path)
+
+        # Web URLs - handle Windows path conversion issue
+        # On Windows, Path() converts URLs to backslash format, so we need to check both
+        # Also check for the pattern where the URL scheme gets mangled
+        is_url = (
+            file_str.startswith(('http://', 'https://')) or
+            file_str.replace('\\', '/').startswith(('http://', 'https://')) or
+            ('http:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str)) or
+            ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
+        )
+
+        if is_url:
             return ContentType.WEB
         
         # Video files
@@ -391,23 +409,38 @@ class MarkdownConversionStage(Stage):
         Returns:
             Processing result data
         """
+        # Normalize URL - fix Windows path conversion issue
         url = str(input_file)
+
+        # Check if this looks like a URL that got mangled by Windows Path conversion
+        if ('http:' in url or 'https:' in url) and ('\\' in url or not url.startswith(('http://', 'https://'))):
+            # Convert backslashes to forward slashes first
+            url = url.replace('\\', '/')
+
+            # Then fix the protocol if needed
+            if url.startswith('https:/') and not url.startswith('https://'):
+                url = url.replace('https:/', 'https://', 1)
+            elif url.startswith('http:/') and not url.startswith('http://'):
+                url = url.replace('http:/', 'http://', 1)
+
         logger.info("Processing web URL", url=url)
 
         # Use web service
         if not self.services:
             raise ProcessingError("MoRAG services not available")
-        result = await self.services.process_web(
+        result = await self.services.process_url(
             url,
-            follow_links=config.get('follow_links', False),
-            max_depth=config.get('max_depth', 1)
+            {
+                'follow_links': config.get('follow_links', False),
+                'max_depth': config.get('max_depth', 1)
+            }
         )
 
         # Create markdown with metadata header
         markdown_content = self._create_markdown_with_metadata(
-            content=result.content,
+            content=result.text_content or "",
             metadata={
-                "title": result.title or "Web Content",
+                "title": result.metadata.get('title', "Web Content"),
                 "source": url,
                 "type": "web",
                 "url": url,
@@ -422,11 +455,11 @@ class MarkdownConversionStage(Stage):
 
         return {
             "content_type": "web",
-            "title": result.title,
+            "title": result.metadata.get('title', "Web Content"),
             "metadata": result.metadata,
             "metrics": {
                 "url": url,
-                "content_length": len(result.content),
+                "content_length": len(result.text_content or ""),
                 "links_followed": config.get('follow_links', False)
             }
         }
