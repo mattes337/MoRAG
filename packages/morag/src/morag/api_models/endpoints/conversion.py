@@ -1,6 +1,7 @@
 """Conversion endpoints for MoRAG API."""
 
 import time
+from datetime import datetime
 from typing import Optional, Dict, Any
 from pathlib import Path
 import structlog
@@ -20,6 +21,55 @@ from morag.services.document_deduplication_service import get_deduplication_serv
 logger = structlog.get_logger(__name__)
 
 conversion_router = APIRouter(prefix="/api/convert", tags=["Conversion"])
+
+
+def _format_markdown_with_metadata(content: str, filename: str, content_type: str, metadata: Dict[str, Any]) -> str:
+    """Format markdown content with consistent H1 title and H2 sections format."""
+    title = metadata.get('title', filename)
+
+    # Start with title
+    markdown_lines = [f"# {content_type.title()} Analysis: {title}", ""]
+
+    # Add information section
+    markdown_lines.append(f"## {content_type.title()} Information")
+    markdown_lines.append("")
+
+    # Add relevant metadata
+    if metadata.get('original_format'):
+        markdown_lines.append(f"- **Original Format**: {metadata['original_format']}")
+    if metadata.get('file_size_bytes'):
+        file_size = metadata['file_size_bytes']
+        if file_size < 1024:
+            file_size_str = f"{file_size} bytes"
+        elif file_size < 1024 * 1024:
+            file_size_str = f"{file_size / 1024:.1f} KB"
+        else:
+            file_size_str = f"{file_size / (1024 * 1024):.1f} MB"
+        markdown_lines.append(f"- **File Size**: {file_size_str}")
+    if metadata.get('estimated_page_count'):
+        markdown_lines.append(f"- **Estimated Pages**: {metadata['estimated_page_count']}")
+    if metadata.get('content_type'):
+        markdown_lines.append(f"- **Content Type**: {metadata['content_type']}")
+
+    markdown_lines.append(f"- **Processed With**: MarkItDown")
+    markdown_lines.append(f"- **Created At**: {datetime.now().isoformat()}")
+    markdown_lines.append("")
+    markdown_lines.append("")
+
+    # Add content section
+    if content_type in ['audio', 'video']:
+        markdown_lines.append("## Transcript")
+    else:
+        markdown_lines.append("## Content")
+    markdown_lines.append("")
+
+    # Add the actual content
+    if content:
+        markdown_lines.append(content)
+    else:
+        markdown_lines.append("*No content available*")
+
+    return "\n".join(markdown_lines)
 
 
 def setup_conversion_endpoints():
@@ -98,8 +148,8 @@ def setup_conversion_endpoints():
             if file_extension in ['pdf', 'doc', 'docx', 'txt', 'md', 'html', 'rtf']:
                 # Use markitdown service for documents
                 markitdown_service = MarkitdownService()
-                markdown_content = await markitdown_service.convert_file(temp_path)
-                
+                raw_content = await markitdown_service.convert_file(temp_path)
+
                 # Add document-specific metadata
                 if file_extension == 'pdf':
                     # Try to get page count (basic estimation)
@@ -109,41 +159,69 @@ def setup_conversion_endpoints():
                         conversion_metadata["estimated_page_count"] = estimated_pages
                     except Exception:
                         pass
+
+                # Format with consistent structure
+                markdown_content = _format_markdown_with_metadata(
+                    raw_content, file.filename, "document", conversion_metadata
+                )
                         
             elif file_extension in ['mp3', 'wav', 'm4a', 'flac', 'aac', 'ogg', 'wma']:
                 # Use markitdown service for audio files (faster than full audio processing)
                 try:
                     markitdown_service = MarkitdownService()
-                    markdown_content = await markitdown_service.convert_file(temp_path)
+                    raw_content = await markitdown_service.convert_file(temp_path)
 
                     # Add basic audio metadata
                     conversion_metadata["content_type"] = "audio"
+
+                    # Format with consistent structure
+                    markdown_content = _format_markdown_with_metadata(
+                        raw_content, file.filename, "audio", conversion_metadata
+                    )
                 except Exception as e:
                     logger.warning("Markitdown audio conversion failed, trying fallback", error=str(e))
                     # Fallback: create basic markdown structure
-                    markdown_content = f"# Audio File: {file.filename}\n\n*Audio transcription not available in preview mode*"
+                    conversion_metadata["content_type"] = "audio"
+                    markdown_content = _format_markdown_with_metadata(
+                        "*Audio transcription not available in preview mode*",
+                        file.filename, "audio", conversion_metadata
+                    )
 
             elif file_extension in ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv']:
                 # Use markitdown service for video files (faster than full video processing)
                 try:
                     markitdown_service = MarkitdownService()
-                    markdown_content = await markitdown_service.convert_file(temp_path)
+                    raw_content = await markitdown_service.convert_file(temp_path)
 
                     # Add basic video metadata
                     conversion_metadata["content_type"] = "video"
+
+                    # Format with consistent structure
+                    markdown_content = _format_markdown_with_metadata(
+                        raw_content, file.filename, "video", conversion_metadata
+                    )
                 except Exception as e:
                     logger.warning("Markitdown video conversion failed, trying fallback", error=str(e))
                     # Fallback: create basic markdown structure
-                    markdown_content = f"# Video File: {file.filename}\n\n*Video transcription not available in preview mode*"
+                    conversion_metadata["content_type"] = "video"
+                    markdown_content = _format_markdown_with_metadata(
+                        "*Video transcription not available in preview mode*",
+                        file.filename, "video", conversion_metadata
+                    )
                     
             else:
                 # Try markitdown as fallback for other formats
                 try:
                     markitdown_service = MarkitdownService()
-                    markdown_content = await markitdown_service.convert_file(temp_path)
+                    raw_content = await markitdown_service.convert_file(temp_path)
+
+                    # Format with consistent structure
+                    markdown_content = _format_markdown_with_metadata(
+                        raw_content, file.filename, "document", conversion_metadata
+                    )
                 except Exception as e:
                     raise HTTPException(
-                        status_code=400, 
+                        status_code=400,
                         detail=f"Unsupported file format: {file_extension}. Error: {str(e)}"
                     )
             

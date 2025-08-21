@@ -81,13 +81,14 @@ async def test_markdown_conversion_with_config(stage_test_framework: StageTestFr
     # Assert success
     stage_test_framework.assert_stage_success(result)
     
-    # Check output file has metadata
+    # Check output file has metadata in new H1+H2 format
     output_file = stage_test_framework.get_file_by_extension(result.output_files, ".md")
     content = output_file.read_text(encoding='utf-8')
-    
-    # Should preserve original metadata
-    assert "---" in content
-    assert "title:" in content
+
+    # Should use new H1+H2 format instead of YAML frontmatter
+    assert content.startswith("# ")
+    assert "## " in content
+    assert "Information" in content
 
 
 @pytest.mark.asyncio
@@ -117,14 +118,16 @@ async def test_markdown_conversion_audio_simulation(stage_test_framework: StageT
     """Test markdown-conversion stage with audio file simulation."""
     
     # Create a file that simulates audio processing output
-    audio_content = """---
-title: Audio Transcript
-content_type: audio
-duration: 120
-processed_at: 2024-01-01T00:00:00
----
+    audio_content = """# Audio Analysis: Audio Transcript
 
-# Audio Transcript
+## Audio Information
+
+- **Duration**: 02:00
+- **Content Type**: audio
+- **Processed At**: 2024-01-01T00:00:00
+
+
+## Transcript
 
 [00:00 - 00:15] Speaker 1: Welcome to this presentation about artificial intelligence.
 
@@ -173,15 +176,17 @@ async def test_markdown_conversion_video_simulation(stage_test_framework: StageT
     """Test markdown-conversion stage with video file simulation."""
     
     # Create a file that simulates video processing output
-    video_content = """---
-title: Video Transcript
-content_type: video
-duration: 180
-resolution: 1920x1080
-processed_at: 2024-01-01T00:00:00
----
+    video_content = """# Video Analysis: Video Transcript
 
-# Video Transcript
+## Video Information
+
+- **Duration**: 03:00
+- **Resolution**: 1920x1080
+- **Content Type**: video
+- **Processed At**: 2024-01-01T00:00:00
+
+
+## Transcript
 
 ## Topic: Introduction to Data Science
 

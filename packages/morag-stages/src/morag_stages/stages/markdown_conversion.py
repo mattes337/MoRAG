@@ -645,9 +645,25 @@ class MarkdownConversionStage(Stage):
         if content_type == 'audio':
             if metadata.get('duration'):
                 duration = metadata['duration']
-                minutes = int(duration // 60)
-                seconds = int(duration % 60)
-                markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
+                # Handle both numeric and string duration formats
+                if isinstance(duration, str):
+                    # If it's already formatted (e.g., "01:11:57"), use as-is
+                    if ':' in duration:
+                        markdown_lines.append(f"- **Duration**: {duration}")
+                    else:
+                        # Try to parse as numeric string
+                        try:
+                            duration = float(duration)
+                            minutes = int(duration // 60)
+                            seconds = int(duration % 60)
+                            markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
+                        except ValueError:
+                            markdown_lines.append(f"- **Duration**: {duration}")
+                else:
+                    # Numeric duration
+                    minutes = int(duration // 60)
+                    seconds = int(duration % 60)
+                    markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
 
             if metadata.get('channels'):
                 markdown_lines.append(f"- **Channels**: {metadata['channels']}")
@@ -659,9 +675,25 @@ class MarkdownConversionStage(Stage):
         elif content_type == 'video':
             if metadata.get('duration'):
                 duration = metadata['duration']
-                minutes = int(duration // 60)
-                seconds = int(duration % 60)
-                markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
+                # Handle both numeric and string duration formats
+                if isinstance(duration, str):
+                    # If it's already formatted (e.g., "01:11:57"), use as-is
+                    if ':' in duration:
+                        markdown_lines.append(f"- **Duration**: {duration}")
+                    else:
+                        # Try to parse as numeric string
+                        try:
+                            duration = float(duration)
+                            minutes = int(duration // 60)
+                            seconds = int(duration % 60)
+                            markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
+                        except ValueError:
+                            markdown_lines.append(f"- **Duration**: {duration}")
+                else:
+                    # Numeric duration
+                    minutes = int(duration // 60)
+                    seconds = int(duration % 60)
+                    markdown_lines.append(f"- **Duration**: {minutes:02d}:{seconds:02d}")
 
             # Add video-specific metadata if available
             if metadata.get('resolution'):
@@ -696,17 +728,43 @@ class MarkdownConversionStage(Stage):
         return "\n".join(markdown_lines)
 
     def _create_document_markdown(self, content: str, metadata: Dict[str, Any]) -> str:
-        """Create markdown for document files with YAML frontmatter."""
-        # Create YAML frontmatter
-        yaml_lines = ["---"]
-        for key, value in metadata.items():
-            if value is not None:
-                if isinstance(value, str):
-                    yaml_lines.append(f'{key}: "{value}"')
-                else:
-                    yaml_lines.append(f'{key}: {value}')
-        yaml_lines.append("---")
-        yaml_lines.append("")  # Empty line after frontmatter
+        """Create markdown for document files with H1 title and H2 sections format."""
+        content_type = metadata.get('type', 'document')
+        title = metadata.get('title', 'Unknown Document')
+        source = metadata.get('source', 'Unknown Source')
 
-        # Combine with content
-        return "\n".join(yaml_lines) + content
+        # Start with title
+        markdown_lines = [f"# {content_type.title()} Analysis: {title}", ""]
+
+        # Add document information section
+        markdown_lines.append(f"## {content_type.title()} Information")
+        markdown_lines.append("")
+
+        # Add relevant metadata
+        if metadata.get('file_extension'):
+            markdown_lines.append(f"- **File Extension**: {metadata['file_extension']}")
+        if metadata.get('processed_with'):
+            markdown_lines.append(f"- **Processed With**: {metadata['processed_with']}")
+        if metadata.get('language'):
+            markdown_lines.append(f"- **Language**: {metadata['language']}")
+        if metadata.get('pages'):
+            markdown_lines.append(f"- **Pages**: {metadata['pages']}")
+        if metadata.get('created_at'):
+            markdown_lines.append(f"- **Created At**: {metadata['created_at']}")
+        if source != 'Unknown Source':
+            markdown_lines.append(f"- **Source**: {source}")
+
+        markdown_lines.append("")
+        markdown_lines.append("")
+
+        # Add content section
+        markdown_lines.append("## Content")
+        markdown_lines.append("")
+
+        # Add the actual content
+        if content:
+            markdown_lines.append(content)
+        else:
+            markdown_lines.append("*No content available*")
+
+        return "\n".join(markdown_lines)

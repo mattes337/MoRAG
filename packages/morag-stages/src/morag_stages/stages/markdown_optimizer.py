@@ -204,21 +204,21 @@ class MarkdownOptimizerStage(Stage):
         return bool(os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY'))
     
     def _extract_metadata_and_content(self, markdown: str) -> tuple[Dict[str, Any], str]:
-        """Extract YAML frontmatter and content from markdown.
-        
+        """Extract metadata and content from markdown (supports both YAML frontmatter and H1+H2 format).
+
         Args:
             markdown: Full markdown content
-            
+
         Returns:
             Tuple of (metadata dict, content string)
         """
-        # Check for YAML frontmatter
+        # Check for YAML frontmatter (legacy format)
         if markdown.startswith('---\n'):
             parts = markdown.split('---\n', 2)
             if len(parts) >= 3:
                 yaml_content = parts[1]
                 content = parts[2]
-                
+
                 # Parse YAML metadata (simple parsing)
                 metadata = {}
                 for line in yaml_content.strip().split('\n'):
@@ -227,35 +227,94 @@ class MarkdownOptimizerStage(Stage):
                         key = key.strip()
                         value = value.strip().strip('"\'')
                         metadata[key] = value
-                
+
                 return metadata, content
-        
+
+        # Check for new H1+H2 format
+        lines = markdown.split('\n')
+        if lines and lines[0].startswith('# '):
+            # Extract title from H1
+            title_line = lines[0][2:].strip()
+            metadata = {'title': title_line}
+
+            # Look for information section
+            info_section_start = -1
+            for i, line in enumerate(lines):
+                if line.startswith('## ') and 'Information' in line:
+                    info_section_start = i
+                    break
+
+            if info_section_start > 0:
+                # Extract metadata from information section
+                for i in range(info_section_start + 1, len(lines)):
+                    line = lines[i].strip()
+                    if line.startswith('- **') and '**:' in line:
+                        # Parse metadata line: - **Key**: Value
+                        key_end = line.find('**:', 4)
+                        if key_end > 4:
+                            key = line[4:key_end].strip()
+                            value = line[key_end + 3:].strip()
+                            metadata[key.lower().replace(' ', '_')] = value
+                    elif line.startswith('## ') or (line and not line.startswith('- ')):
+                        # End of information section
+                        break
+
+            return metadata, markdown
+
         return {}, markdown
     
     def _reconstruct_markdown(self, metadata: Dict[str, Any], content: str) -> str:
-        """Reconstruct markdown with metadata header.
-        
+        """Reconstruct markdown with H1+H2 format (no longer uses YAML frontmatter).
+
         Args:
             metadata: Metadata dictionary
             content: Content string
-            
+
         Returns:
-            Complete markdown with metadata header
+            Complete markdown with H1 title and H2 sections format
         """
         if not metadata:
             return content
-        
-        # Create YAML frontmatter
-        yaml_lines = ["---"]
+
+        # If content already has the new format, return as-is
+        if content.strip().startswith('# ') and '## ' in content:
+            return content
+
+        # Convert to new H1+H2 format
+        title = metadata.get('title', 'Unknown Document')
+        content_type = metadata.get('type', 'document')
+
+        # Start with title
+        markdown_lines = [f"# {content_type.title()} Analysis: {title}", ""]
+
+        # Add information section
+        markdown_lines.append(f"## {content_type.title()} Information")
+        markdown_lines.append("")
+
+        # Add relevant metadata
         for key, value in metadata.items():
-            if isinstance(value, str):
-                yaml_lines.append(f'{key}: "{value}"')
-            else:
-                yaml_lines.append(f'{key}: {value}')
-        yaml_lines.append("---")
-        yaml_lines.append("")  # Empty line after frontmatter
-        
-        return "\n".join(yaml_lines) + content
+            if key not in ['title', 'type'] and value:
+                # Convert key to display format
+                display_key = key.replace('_', ' ').title()
+                markdown_lines.append(f"- **{display_key}**: {value}")
+
+        markdown_lines.append("")
+        markdown_lines.append("")
+
+        # Add content section
+        if content_type in ['audio', 'video']:
+            markdown_lines.append("## Transcript")
+        else:
+            markdown_lines.append("## Content")
+        markdown_lines.append("")
+
+        # Add the actual content
+        if content:
+            markdown_lines.append(content)
+        else:
+            markdown_lines.append("*No content available*")
+
+        return "\n".join(markdown_lines)
     
     async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
         """Optimize content using LLM with text splitting for large files.

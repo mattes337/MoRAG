@@ -207,21 +207,21 @@ class ChunkerStage(Stage):
         return [output_file]
     
     def _extract_metadata_and_content(self, markdown: str) -> tuple[Dict[str, Any], str]:
-        """Extract YAML frontmatter and content from markdown.
-        
+        """Extract metadata and content from markdown (supports both YAML frontmatter and H1+H2 format).
+
         Args:
             markdown: Full markdown content
-            
+
         Returns:
             Tuple of (metadata dict, content string)
         """
-        # Check for YAML frontmatter
+        # Check for YAML frontmatter (legacy format)
         if markdown.startswith('---\n'):
             parts = markdown.split('---\n', 2)
             if len(parts) >= 3:
                 yaml_content = parts[1]
                 content = parts[2]
-                
+
                 # Parse YAML metadata (simple parsing)
                 metadata = {}
                 for line in yaml_content.strip().split('\n'):
@@ -230,9 +230,51 @@ class ChunkerStage(Stage):
                         key = key.strip()
                         value = value.strip().strip('"\'')
                         metadata[key] = value
-                
+
                 return metadata, content
-        
+
+        # Check for new H1+H2 format
+        lines = markdown.split('\n')
+        if lines and lines[0].startswith('# '):
+            # Extract title from H1
+            title_line = lines[0][2:].strip()
+            metadata = {'title': title_line}
+
+            # Look for information section
+            info_section_start = -1
+            content_section_start = -1
+
+            for i, line in enumerate(lines):
+                if line.startswith('## ') and 'Information' in line:
+                    info_section_start = i
+                elif line.startswith('## ') and ('Content' in line or 'Transcript' in line):
+                    content_section_start = i
+                    break
+
+            if info_section_start > 0:
+                # Extract metadata from information section
+                for i in range(info_section_start + 1, len(lines)):
+                    line = lines[i].strip()
+                    if line.startswith('- **') and '**:' in line:
+                        # Parse metadata line: - **Key**: Value
+                        key_end = line.find('**:', 4)
+                        if key_end > 4:
+                            key = line[4:key_end].strip()
+                            value = line[key_end + 3:].strip()
+                            metadata[key.lower().replace(' ', '_')] = value
+                    elif line.startswith('## '):
+                        # End of information section
+                        break
+
+            # Extract content from content/transcript section
+            if content_section_start > 0:
+                content_lines = lines[content_section_start + 2:]  # Skip section header and empty line
+                content = '\n'.join(content_lines)
+            else:
+                content = markdown  # Fallback to full content
+
+            return metadata, content
+
         return {}, markdown
     
     async def _generate_summary(self, content: str, metadata: Dict[str, Any], config: Dict[str, Any]) -> str:
