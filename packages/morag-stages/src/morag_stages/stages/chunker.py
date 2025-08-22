@@ -317,11 +317,10 @@ class ChunkerStage(Stage):
             
             # Create summarization prompt
             content_type = metadata.get('type', 'text')
-            system_prompt = f"You are an expert at creating concise, informative summaries. Create a summary of the following {content_type} content that captures the main points and key information."
-            
-            user_prompt = f"Please create a summary of this content:\n\n{content[:8000]}"  # Limit content length
-            
-            response = await self.summarization_agent.run(user_prompt, system_prompt=system_prompt)
+
+            user_prompt = f"Please create a summary of this {content_type} content:\n\n{content[:8000]}"  # Limit content length
+
+            response = await self.summarization_agent.run(user_prompt)
             return response.data if hasattr(response, 'data') else str(response)
             
         except Exception as e:
