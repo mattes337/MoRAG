@@ -4,6 +4,7 @@
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import re
 import structlog
 
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
@@ -29,6 +30,40 @@ except ImportError:
         pass
 
 logger = structlog.get_logger(__name__)
+
+
+def sanitize_filename(filename: str, max_length: int = 100) -> str:
+    """Sanitize filename for safe filesystem usage.
+
+    Args:
+        filename: Original filename
+        max_length: Maximum length for filename
+
+    Returns:
+        Sanitized filename
+    """
+    if not filename:
+        return "unnamed"
+
+    # Remove or replace invalid characters for Windows/Unix
+    invalid_chars = r'[<>:"/\\|?*\x00-\x1f%]'
+    sanitized = re.sub(invalid_chars, '_', filename)
+
+    # Remove leading/trailing dots and spaces
+    sanitized = sanitized.strip('. ')
+
+    # Replace multiple consecutive underscores with single underscore
+    sanitized = re.sub(r'_+', '_', sanitized)
+
+    # Ensure filename is not empty
+    if not sanitized:
+        sanitized = "unnamed"
+
+    # Truncate if too long
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length].rstrip('_')
+
+    return sanitized
 
 
 class MarkdownConversionStage(Stage):
@@ -85,7 +120,8 @@ class MarkdownConversionStage(Stage):
         try:
             
             # Generate output filename
-            output_file = context.output_dir / f"{input_file.stem}.md"
+            sanitized_name = sanitize_filename(input_file.stem)
+            output_file = context.output_dir / f"{sanitized_name}.md"
             context.output_dir.mkdir(parents=True, exist_ok=True)
             
             # Check if we should use MarkItDown for better quality
@@ -193,7 +229,8 @@ class MarkdownConversionStage(Stage):
             return []
         
         input_file = input_files[0]
-        output_file = context.output_dir / f"{input_file.stem}.md"
+        sanitized_name = sanitize_filename(input_file.stem)
+        output_file = context.output_dir / f"{sanitized_name}.md"
         return [output_file]
     
     def _detect_content_type(self, file_path: Path) -> Optional[ContentType]:

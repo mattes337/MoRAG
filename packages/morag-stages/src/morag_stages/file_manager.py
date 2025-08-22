@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import shutil
 import time
 from datetime import datetime, timedelta
@@ -11,6 +12,40 @@ from typing import Any, Dict, List, Optional
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+
+def sanitize_filename(filename: str, max_length: int = 100) -> str:
+    """Sanitize filename for safe filesystem usage.
+
+    Args:
+        filename: Original filename
+        max_length: Maximum length for filename
+
+    Returns:
+        Sanitized filename
+    """
+    if not filename:
+        return "unnamed"
+
+    # Remove or replace invalid characters for Windows/Unix
+    invalid_chars = r'[<>:"/\\|?*\x00-\x1f%]'
+    sanitized = re.sub(invalid_chars, '_', filename)
+
+    # Remove leading/trailing dots and spaces
+    sanitized = sanitized.strip('. ')
+
+    # Replace multiple consecutive underscores with single underscore
+    sanitized = re.sub(r'_+', '_', sanitized)
+
+    # Ensure filename is not empty
+    if not sanitized:
+        sanitized = "unnamed"
+
+    # Truncate if too long
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length].rstrip('_')
+
+    return sanitized
 
 
 class FileManager:
@@ -212,20 +247,20 @@ class FileNamingConvention:
     @classmethod
     def get_stage_output_filename(cls, source_path: Path, stage: str) -> str:
         """Get standardized filename for stage output."""
-        base_name = source_path.stem
+        base_name = sanitize_filename(source_path.stem)
         extension = cls.STAGE_EXTENSIONS.get(stage, ".out")
         return f"{base_name}{extension}"
     
     @classmethod
     def get_metadata_filename(cls, source_path: Path, stage: str) -> str:
         """Get metadata filename for stage output."""
-        base_name = source_path.stem
+        base_name = sanitize_filename(source_path.stem)
         return f"{base_name}.{stage}.meta.json"
     
     @classmethod
     def get_report_filename(cls, source_path: Path, stage: str) -> str:
         """Get report filename for stage output."""
-        base_name = source_path.stem
+        base_name = sanitize_filename(source_path.stem)
         return f"{base_name}.{stage}.report.json"
     
     @classmethod
