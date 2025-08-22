@@ -57,7 +57,7 @@ class GraphTraversalAgent:
         # Create PydanticAI agent for graph traversal decisions
         self.agent = Agent(
             model=llm_client.get_model(),
-            result_type=GTAResponse,
+            output_type=GTAResponse,
             system_prompt=self._get_system_prompt()
         )
 

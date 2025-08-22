@@ -57,7 +57,7 @@ class EntityIdentificationService:
         # Create PydanticAI agent for entity identification
         self.agent = Agent(
             model=llm_client.get_model(),
-            result_type=EntityIdentificationResult,
+            output_type=EntityIdentificationResult,
             system_prompt=self._get_system_prompt()
         )
     

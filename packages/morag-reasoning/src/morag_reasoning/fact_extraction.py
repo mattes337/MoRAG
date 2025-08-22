@@ -51,14 +51,14 @@ class FactExtractionService:
         # Create PydanticAI agent for fact extraction
         self.agent = Agent(
             model=llm_client.get_model(),
-            result_type=ExtractedFacts,
+            output_type=ExtractedFacts,
             system_prompt=self._get_system_prompt()
         )
 
         # Create PydanticAI agent for source mapping
         self.source_mapping_agent = Agent(
             model=llm_client.get_model(),
-            result_type=SourceMappingResult,
+            output_type=SourceMappingResult,
             system_prompt=self._get_source_mapping_prompt()
         )
     
