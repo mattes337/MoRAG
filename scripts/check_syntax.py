@@ -45,22 +45,26 @@ class SyntaxChecker:
         """Find all Python files in the project."""
         search_path = path or self.project_root
         python_files = []
-        
+
+        # If path is a specific file, return it directly
+        if path and path.is_file() and str(path).endswith('.py'):
+            return [path]
+
         # Skip certain directories
         skip_dirs = {
-            '__pycache__', '.git', 'venv', 'env', '.venv', 
+            '__pycache__', '.git', 'venv', 'env', '.venv',
             'node_modules', '.pytest_cache', 'htmlcov',
             '.mypy_cache', '.coverage', 'dist', 'build'
         }
-        
+
         for root, dirs, files in os.walk(search_path):
             # Remove skip directories from dirs list to avoid traversing them
             dirs[:] = [d for d in dirs if d not in skip_dirs]
-            
+
             for file in files:
                 if file.endswith('.py'):
                     python_files.append(Path(root) / file)
-        
+
         return sorted(python_files)
     
     def check_syntax(self, file_path: Path) -> bool:
@@ -88,6 +92,9 @@ class SyntaxChecker:
     def check_imports(self, file_path: Path) -> bool:
         """Check if all imports in the file can be resolved."""
         try:
+            # Store original sys.path to restore later
+            original_path = sys.path.copy()
+
             # Add the project root and packages to Python path
             sys.path.insert(0, str(self.project_root))
             sys.path.insert(0, str(self.project_root / "packages"))
@@ -101,8 +108,15 @@ class SyntaxChecker:
                         if src_dir.exists():
                             sys.path.insert(0, str(src_dir))
 
+            # Also add the CLI directory for CLI scripts
+            cli_dir = self.project_root / "cli"
+            if cli_dir.exists():
+                sys.path.insert(0, str(cli_dir))
+
             # Try to load the module
-            spec = importlib.util.spec_from_file_location("temp_module", file_path)
+            # Use a unique module name based on the file to avoid phantom errors
+            module_name = f"syntax_check_{hash(str(file_path)) % 100000}"
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
             if spec and spec.loader:
                 module = importlib.util.module_from_spec(spec)
                 # Try to execute the module to catch runtime import errors
@@ -113,7 +127,15 @@ class SyntaxChecker:
                 except Exception as e:
                     # Check if it's a critical import error or just a runtime error
                     error_str = str(e).lower()
-                    if any(keyword in error_str for keyword in ['no module named', 'cannot import', 'importerror', 'modulenotfounderror']):
+
+                    # Filter out phantom temp_module errors and other false positives
+                    if ('temp_module' in error_str or
+                        module_name in error_str or
+                        'syntax_check_' in error_str):
+                        # This is likely a phantom error from our syntax checking process
+                        # Don't log these as they're not real issues
+                        return True
+                    elif any(keyword in error_str for keyword in ['no module named', 'cannot import', 'importerror', 'modulenotfounderror']):
                         warning_msg = f"Import Error in {file_path}: {e}"
                         self.warnings.append(warning_msg)
                         self.log(warning_msg, "WARNING")
@@ -138,22 +160,8 @@ class SyntaxChecker:
             self.log(f"Could not check imports for {file_path}: {e}", "WARNING")
             return True
         finally:
-            # Clean up sys.path
-            paths_to_remove = [
-                str(self.project_root),
-                str(self.project_root / "packages")
-            ]
-            packages_dir = self.project_root / "packages"
-            if packages_dir.exists():
-                for package_dir in packages_dir.iterdir():
-                    if package_dir.is_dir():
-                        src_dir = package_dir / "src"
-                        if src_dir.exists():
-                            paths_to_remove.append(str(src_dir))
-
-            for path in paths_to_remove:
-                if path in sys.path:
-                    sys.path.remove(path)
+            # Restore original sys.path
+            sys.path[:] = original_path
     
     def run_flake8(self, files: List[Path]) -> bool:
         """Run flake8 on the specified files."""

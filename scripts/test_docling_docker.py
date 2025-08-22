@@ -15,7 +15,7 @@ sys.path.insert(0, '/app/packages/morag-document/src')
 sys.path.insert(0, '/app/packages/morag-core/src')
 
 from morag_document.converters.pdf import PDFConverter
-from morag_core.interfaces.document import Document, DocumentMetadata
+from morag_core.models.document import Document, DocumentMetadata
 from morag_core.interfaces.processor import ConversionOptions
 
 # Configure logging

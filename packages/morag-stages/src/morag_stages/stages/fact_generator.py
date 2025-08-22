@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, TYPE_CHECKING
 from pathlib import Path
 import structlog
 
@@ -11,16 +11,24 @@ from ..models import Stage, StageType, StageStatus, StageResult, StageContext, S
 from ..exceptions import StageExecutionError, StageValidationError
 
 # Import services with graceful fallback
-try:
+if TYPE_CHECKING:
     from morag_core.ai import create_agent, AgentConfig
     from morag_graph.extraction import FactExtractor, EntityNormalizer
+
+try:
+    from morag_core.ai import create_agent as _create_agent, AgentConfig as _AgentConfig
+    from morag_graph.extraction import FactExtractor as _FactExtractor, EntityNormalizer as _EntityNormalizer
+    create_agent = _create_agent
+    AgentConfig = _AgentConfig
+    FactExtractor = _FactExtractor
+    EntityNormalizer = _EntityNormalizer
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
-    create_agent = None
-    AgentConfig = None
-    FactExtractor = None
-    EntityNormalizer = None
+    create_agent = None  # type: ignore
+    AgentConfig = None  # type: ignore
+    FactExtractor = None  # type: ignore
+    EntityNormalizer = None  # type: ignore
 
 logger = structlog.get_logger(__name__)
 
@@ -36,7 +44,7 @@ class FactGeneratorStage(Stage):
             logger.warning("Services not available for fact generation")
 
         # Initialize fact extractor with API key from environment
-        if FactExtractor:
+        if SERVICES_AVAILABLE and FactExtractor is not None:
             import os
             api_key = os.getenv('GEMINI_API_KEY')
             if api_key:
@@ -51,7 +59,7 @@ class FactGeneratorStage(Stage):
             self.fact_extractor = None
 
         # Initialize entity normalizer with API key from environment
-        if EntityNormalizer:
+        if SERVICES_AVAILABLE and EntityNormalizer is not None:
             import os
             api_key = os.getenv('GEMINI_API_KEY')
             if api_key:
@@ -253,7 +261,7 @@ class FactGeneratorStage(Stage):
         output_file = context.output_dir / f"{input_file.stem.replace('.chunks', '')}.facts.json"
         return [output_file]
     
-    async def _extract_from_chunk(self, chunk: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _extract_from_chunk(self, chunk: Dict[str, Any], config: FactGeneratorConfig) -> Dict[str, Any]:
         """Extract facts from a single chunk.
         
         Args:
@@ -266,7 +274,7 @@ class FactGeneratorStage(Stage):
         content = chunk.get('content', '')
         chunk_id = chunk.get('id', 'unknown')
         
-        results = {
+        results: Dict[str, Any] = {
             'entities': [],
             'relations': [],
             'facts': [],
@@ -346,7 +354,7 @@ class FactGeneratorStage(Stage):
         Returns:
             Extraction results
         """
-        if not create_agent:
+        if not SERVICES_AVAILABLE or create_agent is None:
             return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
 
         try:
@@ -355,16 +363,16 @@ class FactGeneratorStage(Stage):
 
             if not hasattr(self, '_llm_client') or self._llm_client is None:
                 # Get LLM configuration with stage-specific overrides
-                llm_config = getattr(config, 'get_llm_config', lambda: config)()
+                llm_config = config.get_llm_config() if hasattr(config, 'get_llm_config') else config
 
                 # Convert to reasoning LLMConfig format
                 reasoning_config = ReasoningLLMConfig(
-                    provider=llm_config.provider,
-                    model=llm_config.model,
-                    api_key=llm_config.api_key,
-                    temperature=llm_config.temperature,
-                    max_tokens=llm_config.max_tokens,
-                    max_retries=llm_config.max_retries,
+                    provider=getattr(llm_config, 'provider', 'gemini'),
+                    model=getattr(llm_config, 'model', 'gemini-2.0-flash'),
+                    api_key=getattr(llm_config, 'api_key', ''),
+                    temperature=getattr(llm_config, 'temperature', 0.1),
+                    max_tokens=getattr(llm_config, 'max_tokens', 4000),
+                    max_retries=getattr(llm_config, 'max_retries', 3),
                 )
                 self._llm_client = LLMClient(reasoning_config)
 
@@ -517,7 +525,7 @@ Return valid JSON only."""
         }
 
         # Count word frequencies
-        word_counts = {}
+        word_counts: Dict[str, int] = {}
         for word in words:
             if word not in stop_words and len(word) > 3:
                 word_counts[word] = word_counts.get(word, 0) + 1
@@ -541,7 +549,7 @@ Return valid JSON only."""
         try:
             # Extract entity names for normalization
             entity_names = [entity.get('name', '') for entity in entities]
-            entity_types = [entity.get('type', None) for entity in entities]
+            entity_types = [entity.get('type', '') or '' for entity in entities]
 
             # Use the correct method name: normalize_entities_batch
             normalized_variations = await self.entity_normalizer.normalize_entities_batch(entity_names, entity_types)

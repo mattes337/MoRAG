@@ -14,8 +14,9 @@ from pathlib import Path
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_document import DocumentProcessor, DocumentChunk, DocumentParseResult
-from morag_services.processing import SemanticChunker
+from morag_document import DocumentProcessor
+from morag_core.models.document import DocumentChunk
+from morag_core.chunking import SemanticChunker
 
 
 async def create_sample_document_chunks():

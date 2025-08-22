@@ -17,8 +17,8 @@ import json
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from morag_audio import AudioProcessor, AudioConfig
-from morag_audio.services import speaker_diarization_service
-from morag_audio.services import topic_segmentation_service
+from morag_audio.services import SpeakerDiarizationService
+from morag_audio.services import TopicSegmentationService
 from morag_audio import AudioConverter
 from morag_core.interfaces.converter import ConversionOptions
 from morag_core.config import settings
@@ -84,7 +84,8 @@ async def demo_speaker_diarization(audio_file: Path):
     print(f"🎯 Analyzing speakers in: {audio_file.name}")
     
     start_time = time.time()
-    result = await speaker_diarization_service.diarize_audio(audio_file)
+    speaker_service = SpeakerDiarizationService()
+    result = await speaker_service.diarize_audio(audio_file)
     processing_time = time.time() - start_time
     
     print(f"⏱️  Diarization time: {processing_time:.2f} seconds")
@@ -121,7 +122,8 @@ async def demo_topic_segmentation(text: str):
     print(f"🎯 Analyzing topics in text ({len(text)} characters)")
     
     start_time = time.time()
-    result = await topic_segmentation_service.segment_topics(text)
+    topic_service = TopicSegmentationService()
+    result = await topic_service.segment_topics(text)
     processing_time = time.time() - start_time
     
     print(f"⏱️  Segmentation time: {processing_time:.2f} seconds")

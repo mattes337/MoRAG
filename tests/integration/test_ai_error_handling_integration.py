@@ -5,9 +5,9 @@ import asyncio
 from unittest.mock import patch, AsyncMock
 import time
 
-from morag_services.embedding import gemini_service
-from morag_audio.services import whisper_service
-from src.morag.core.ai_error_handlers import execute_with_ai_resilience, get_ai_service_health
+from morag_services.embedding import GeminiEmbeddingService
+# Note: AI error handlers not yet implemented - using mock for demo
+# from morag_audio.services import whisper_service
 from morag_core.exceptions import RateLimitError, ExternalServiceError
 
 

@@ -11,8 +11,9 @@ from .unified import (
 
 # Import settings from the main config module
 try:
-    from ..config import settings, Settings, get_settings, validate_configuration_and_log, validate_chunk_size
+    from ..config import settings, Settings, get_settings, validate_configuration_and_log, validate_chunk_size, detect_device, get_safe_device
 except ImportError:
+    from typing import Optional
     # Create a minimal settings fallback that handles missing attributes
     class MockSettings:
         def __init__(self):
@@ -56,6 +57,14 @@ except ImportError:
             return 10000
         return size
 
+    def detect_device() -> str:
+        """Mock detect_device function."""
+        return "cpu"
+
+    def get_safe_device(preferred_device: Optional[str] = None) -> str:
+        """Mock get_safe_device function."""
+        return "cpu"
+
     settings = MockSettings()
     Settings = type(settings)
     get_settings = lambda: settings
@@ -73,4 +82,6 @@ __all__ = [
     'get_settings',
     'validate_configuration_and_log',
     'validate_chunk_size',
+    'detect_device',
+    'get_safe_device',
 ]

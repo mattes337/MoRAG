@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import structlog
 
-from morag_core.config.unified import MarkdownOptimizerConfig, LLMConfig
+from morag_core.config.unified import MarkdownOptimizerConfig
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
@@ -425,7 +425,10 @@ class MarkdownOptimizerStage(Stage):
         )
 
         # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
-        return response.strip(' \t')
+        if isinstance(response, str):
+            return response.strip(' \t')
+        else:
+            return str(response).strip(' \t')
 
     async def _optimize_with_splitting(self, llm_client, content: str, metadata: Dict[str, Any],
                                      config: MarkdownOptimizerConfig) -> str:

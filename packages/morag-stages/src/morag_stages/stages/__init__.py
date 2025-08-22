@@ -8,7 +8,7 @@ from .ingestor import IngestorStage
 
 __all__ = [
     "MarkdownConversionStage",
-    "MarkdownOptimizerStage", 
+    "MarkdownOptimizerStage",
     "ChunkerStage",
     "FactGeneratorStage",
     "IngestorStage",

@@ -9,8 +9,21 @@ from typing import Optional, Dict, Any, List
 import click
 import structlog
 
-from morag_stages import StageManager, StageType, StageStatus
-from morag_stages.models import StageContext
+try:
+    from morag_stages import StageManager, StageType, StageStatus
+    from morag_stages.models import StageContext
+    STAGES_AVAILABLE = True
+except ImportError:
+    # Mock classes for when morag_stages is not available
+    class StageManager:
+        pass
+    class StageType:
+        pass
+    class StageStatus:
+        pass
+    class StageContext:
+        pass
+    STAGES_AVAILABLE = False
 
 logger = structlog.get_logger(__name__)
 
@@ -39,6 +52,11 @@ def load_config(config_path: Optional[str]) -> Dict[str, Any]:
 @click.pass_context
 def cli(ctx: click.Context, config: Optional[str], verbose: bool):
     """MoRAG - Stage-based processing system using canonical stage names."""
+    # Check if stages are available
+    if not STAGES_AVAILABLE:
+        click.echo("❌ MoRAG Stages package not available. Please install morag-stages package.")
+        ctx.exit(1)
+
     # Configure logging
     if verbose:
         structlog.configure(

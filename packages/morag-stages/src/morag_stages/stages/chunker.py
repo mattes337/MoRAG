@@ -3,7 +3,7 @@
 import json
 import re
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, TYPE_CHECKING
 from pathlib import Path
 import structlog
 
@@ -11,16 +11,24 @@ from ..models import Stage, StageType, StageStatus, StageResult, StageContext, S
 from ..exceptions import StageExecutionError, StageValidationError
 
 # Import services with graceful fallback
-try:
+if TYPE_CHECKING:
     from morag_core.ai import create_agent, AgentConfig, SummarizationAgent
     from morag_embedding import GeminiEmbeddingService
+
+try:
+    from morag_core.ai import create_agent as _create_agent, AgentConfig as _AgentConfig, SummarizationAgent as _SummarizationAgent
+    from morag_embedding import GeminiEmbeddingService as _GeminiEmbeddingService
+    create_agent = _create_agent
+    AgentConfig = _AgentConfig
+    SummarizationAgent = _SummarizationAgent
+    GeminiEmbeddingService = _GeminiEmbeddingService
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
-    create_agent = None
-    AgentConfig = None
-    SummarizationAgent = None
-    GeminiEmbeddingService = None
+    create_agent = None  # type: ignore
+    AgentConfig = None  # type: ignore
+    SummarizationAgent = None  # type: ignore
+    GeminiEmbeddingService = None  # type: ignore
 
 logger = structlog.get_logger(__name__)
 
@@ -36,7 +44,7 @@ class ChunkerStage(Stage):
             logger.warning("Services not available for chunking")
         
         # Initialize embedding service with API key from environment
-        if GeminiEmbeddingService:
+        if SERVICES_AVAILABLE and GeminiEmbeddingService is not None:
             import os
             api_key = os.getenv('GEMINI_API_KEY')
             if api_key:
@@ -288,7 +296,7 @@ class ChunkerStage(Stage):
         Returns:
             Document summary
         """
-        if not create_agent:
+        if not SERVICES_AVAILABLE or create_agent is None:
             return ""
 
         # Check if API key is available before attempting to create agent
@@ -420,7 +428,7 @@ class ChunkerStage(Stage):
                 # Start new chunk with overlap
                 if overlap > 0:
                     words = current_chunk.split()
-                    overlap_words = words[-overlap//10:]  # Approximate word overlap
+                    overlap_words = words[-overlap // 10:]  # Approximate word overlap
                     current_chunk = " ".join(overlap_words) + " " + paragraph
                 else:
                     current_chunk = paragraph
@@ -613,14 +621,27 @@ class ChunkerStage(Stage):
             batch_size = config.get('batch_size', 50)
             model = config.get('embedding_model', 'text-embedding-004')
 
-            # Use the correct method name for batch embeddings
-            batch_result = await self.embedding_service.generate_batch_embeddings(texts)
-            embeddings = batch_result.embeddings
+            # Process in batches for better performance
+            all_embeddings = []
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                logger.debug("Generating embeddings for batch",
+                           batch_start=i, batch_size=len(batch_texts), model=model)
+
+                # Use the correct method name for batch embeddings
+                batch_result = await self.embedding_service.generate_batch_embeddings(batch_texts)
+                all_embeddings.extend(batch_result.embeddings)
 
             # Add embeddings to chunks
             for i, chunk in enumerate(chunks):
-                if i < len(embeddings):
-                    chunk['embedding'] = embeddings[i]
+                if i < len(all_embeddings):
+                    chunk['embedding'] = all_embeddings[i]
+
+            logger.info("Generated embeddings for chunks",
+                       total_chunks=len(chunks),
+                       total_embeddings=len(all_embeddings),
+                       batch_size=batch_size,
+                       model=model)
 
             return chunks
 

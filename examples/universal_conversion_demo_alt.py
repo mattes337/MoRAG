@@ -17,11 +17,8 @@ import tempfile
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_services import (
-    DocumentConverter,
-    ConversionOptions,
-    ChunkingStrategy
-)
+from morag_document.converters import DocumentConverter
+from morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
 
 
 async def demo_text_conversion():

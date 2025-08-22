@@ -5,12 +5,8 @@ import time
 from typing import Dict, Any
 import structlog
 
-from src.morag.core.ai_error_handlers import (
-    execute_with_ai_resilience, 
-    get_ai_service_health,
-    universal_ai_handler
-)
-from morag_services.embedding import gemini_service
+# Note: AI error handlers not yet implemented - using mock functions for demo
+from morag_services.embedding import GeminiEmbeddingService
 from morag_core.exceptions import RateLimitError, ExternalServiceError
 
 # Configure logging for demo

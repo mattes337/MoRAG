@@ -311,8 +311,16 @@ class Settings(BaseSettings):
 
         # Fall back to parsing max_file_size string
         try:
-            from .utils.file_handling import parse_size_string
-            return parse_size_string(self.max_file_size)
+            # Simple size parsing to avoid circular imports
+            size_str = self.max_file_size.upper()
+            if size_str.endswith('MB'):
+                return int(float(size_str[:-2]) * 1024 * 1024)
+            elif size_str.endswith('GB'):
+                return int(float(size_str[:-2]) * 1024 * 1024 * 1024)
+            elif size_str.endswith('KB'):
+                return int(float(size_str[:-2]) * 1024)
+            else:
+                return int(size_str)
         except Exception:
             # If parsing fails, return the default bytes value
             return self.max_upload_size_bytes

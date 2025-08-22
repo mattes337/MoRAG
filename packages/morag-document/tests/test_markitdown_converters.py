@@ -12,7 +12,7 @@ from morag_document.converters.pdf import PDFConverter
 from morag_document.converters.word import WordConverter
 from morag_document.converters.excel import ExcelConverter
 from morag_document.converters.presentation import PresentationConverter
-from morag_document.converters.image import ImageConverter
+# from morag_document.converters.image import ImageConverter  # Module not available
 
 
 @pytest.mark.asyncio

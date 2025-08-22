@@ -8,7 +8,7 @@ from pathlib import Path
 import structlog
 from dotenv import load_dotenv
 
-from config import RemoteConverterConfig, setup_logging
+from .config import RemoteConverterConfig, setup_logging
 from remote_converter import RemoteConverter
 
 logger = structlog.get_logger(__name__)

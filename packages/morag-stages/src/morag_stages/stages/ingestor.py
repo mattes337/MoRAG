@@ -3,7 +3,7 @@
 import json
 import hashlib
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Set, TYPE_CHECKING
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from pathlib import Path
 import structlog
 
@@ -15,17 +15,25 @@ if TYPE_CHECKING:
 
 # Import storage services with graceful fallback
 try:
-    from morag_graph.storage import Neo4jStorage, QdrantStorage, Neo4jConfig, QdrantConfig
+    from morag_graph.storage import Neo4jStorage as _Neo4jStorage, QdrantStorage as _QdrantStorage, Neo4jConfig as _Neo4jConfig, QdrantConfig as _QdrantConfig
+    Neo4jStorage = _Neo4jStorage
+    QdrantStorage = _QdrantStorage
+    Neo4jConfig = _Neo4jConfig
+    QdrantConfig = _QdrantConfig
     STORAGE_AVAILABLE = True
 except ImportError:
     STORAGE_AVAILABLE = False
     # Create placeholder classes for runtime
+
     class Neo4jStorage:  # type: ignore
         pass
+
     class QdrantStorage:  # type: ignore
         pass
+
     class Neo4jConfig:  # type: ignore
         pass
+
     class QdrantConfig:  # type: ignore
         pass
 
@@ -239,7 +247,11 @@ class IngestorStage(Stage):
         """
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                else:
+                    raise ValueError(f"Expected JSON object, got {type(data)}")
         except Exception as e:
             logger.error("Failed to load JSON file", file=str(file_path), error=str(e))
             raise StageExecutionError(f"Failed to load {file_path}: {e}")
@@ -374,7 +386,12 @@ class IngestorStage(Stage):
 
                 # Ingest batch
                 if documents:
-                    await self.qdrant_storage.store_documents(documents, collection_name)
+                    if hasattr(self.qdrant_storage, 'store_documents'):
+                        await self.qdrant_storage.store_documents(documents, collection_name)
+                    elif hasattr(self.qdrant_storage, 'store_document_batch'):
+                        await self.qdrant_storage.store_document_batch(documents, collection_name)
+                    else:
+                        logger.warning("Qdrant storage does not have expected store method")
                     results["chunks_ingested"] += len(documents)
 
                     logger.info("Ingested chunk batch",
@@ -458,22 +475,32 @@ class IngestorStage(Stage):
             try:
                 # Check for duplicates if enabled
                 if enable_dedup:
-                    existing = await self.neo4j_storage.find_entity_by_name(
-                        entity.get('normalized_name', entity.get('name', ''))
-                    )
+                    entity_name = entity.get('normalized_name', entity.get('name', ''))
+                    if hasattr(self.neo4j_storage, 'find_entity_by_name'):
+                        existing = await self.neo4j_storage.find_entity_by_name(entity_name)
+                    elif hasattr(self.neo4j_storage, 'get_entity'):
+                        existing = await self.neo4j_storage.get_entity(entity_name)
+                    else:
+                        existing = None
+
                     if existing:
                         results["duplicates_skipped"] += 1
                         continue
 
                 # Create entity node
-                await self.neo4j_storage.create_entity(
-                    name=entity.get('name', ''),
-                    entity_type=entity.get('type', 'Entity'),
-                    normalized_name=entity.get('normalized_name', ''),
-                    confidence=entity.get('confidence', 0.0),
-                    source_chunks=entity.get('source_chunks', []),
-                    metadata=entity.get('metadata', {})
-                )
+                if hasattr(self.neo4j_storage, 'create_entity'):
+                    await self.neo4j_storage.create_entity(
+                        name=entity.get('name', ''),
+                        entity_type=entity.get('type', 'Entity'),
+                        normalized_name=entity.get('normalized_name', ''),
+                        confidence=entity.get('confidence', 0.0),
+                        source_chunks=entity.get('source_chunks', []),
+                        metadata=entity.get('metadata', {})
+                    )
+                elif hasattr(self.neo4j_storage, 'store_entity'):
+                    await self.neo4j_storage.store_entity(entity)
+                else:
+                    logger.warning("Neo4j storage does not have expected entity creation method")
 
                 results["ingested"] += 1
 
@@ -509,20 +536,31 @@ class IngestorStage(Stage):
 
                 # Check for duplicates if enabled
                 if enable_dedup:
-                    existing = await self.neo4j_storage.find_relation(subject, predicate, obj)
+                    if hasattr(self.neo4j_storage, 'find_relation'):
+                        existing = await self.neo4j_storage.find_relation(subject, predicate, obj)
+                    elif hasattr(self.neo4j_storage, 'get_relation'):
+                        existing = await self.neo4j_storage.get_relation(subject, predicate, obj)
+                    else:
+                        existing = None
+
                     if existing:
                         results["duplicates_skipped"] += 1
                         continue
 
                 # Create relation
-                await self.neo4j_storage.create_relation(
-                    subject=subject,
-                    predicate=predicate,
-                    obj=obj,
-                    confidence=relation.get('confidence', 0.0),
-                    source_chunks=relation.get('source_chunks', []),
-                    metadata=relation.get('metadata', {})
-                )
+                if hasattr(self.neo4j_storage, 'create_relation'):
+                    await self.neo4j_storage.create_relation(
+                        subject=subject,
+                        predicate=predicate,
+                        obj=obj,
+                        confidence=relation.get('confidence', 0.0),
+                        source_chunks=relation.get('source_chunks', []),
+                        metadata=relation.get('metadata', {})
+                    )
+                elif hasattr(self.neo4j_storage, 'store_relation'):
+                    await self.neo4j_storage.store_relation(relation)
+                else:
+                    logger.warning("Neo4j storage does not have expected relation creation method")
 
                 results["ingested"] += 1
 
@@ -559,19 +597,30 @@ class IngestorStage(Stage):
                 # Check for duplicates if enabled
                 if enable_dedup:
                     statement_hash = self._generate_content_hash(statement)
-                    existing = await self.neo4j_storage.find_fact_by_hash(statement_hash)
+                    if hasattr(self.neo4j_storage, 'find_fact_by_hash'):
+                        existing = await self.neo4j_storage.find_fact_by_hash(statement_hash)
+                    elif hasattr(self.neo4j_storage, 'get_fact'):
+                        existing = await self.neo4j_storage.get_fact(statement_hash)
+                    else:
+                        existing = None
+
                     if existing:
                         results["duplicates_skipped"] += 1
                         continue
 
                 # Create fact node
-                await self.neo4j_storage.create_fact(
-                    statement=statement,
-                    entities=fact.get('entities', []),
-                    confidence=fact.get('confidence', 0.0),
-                    source_chunk=fact.get('source_chunk', ''),
-                    metadata=fact.get('metadata', {})
-                )
+                if hasattr(self.neo4j_storage, 'create_fact'):
+                    await self.neo4j_storage.create_fact(
+                        statement=statement,
+                        entities=fact.get('entities', []),
+                        confidence=fact.get('confidence', 0.0),
+                        source_chunk=fact.get('source_chunk', ''),
+                        metadata=fact.get('metadata', {})
+                    )
+                elif hasattr(self.neo4j_storage, 'store_fact'):
+                    await self.neo4j_storage.store_fact(fact)
+                else:
+                    logger.warning("Neo4j storage does not have expected fact creation method")
 
                 results["ingested"] += 1
 
@@ -608,11 +657,22 @@ class IngestorStage(Stage):
 
         try:
             # Search for existing document with same hash
-            results = await self.qdrant_storage.search_by_metadata(
-                collection_name,
-                {"content_hash": content_hash},
-                limit=1
-            )
-            return len(results) > 0
+            if hasattr(self.qdrant_storage, 'search_by_metadata'):
+                results = await self.qdrant_storage.search_by_metadata(
+                    collection_name,
+                    {"content_hash": content_hash},
+                    limit=1
+                )
+                return len(results) > 0
+            elif hasattr(self.qdrant_storage, 'search_documents'):
+                results = await self.qdrant_storage.search_documents(
+                    collection_name,
+                    metadata_filter={"content_hash": content_hash},
+                    limit=1
+                )
+                return len(results) > 0
+            else:
+                logger.warning("Qdrant storage does not have expected search method")
+                return False
         except Exception:
             return False

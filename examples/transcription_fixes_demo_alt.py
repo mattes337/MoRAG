@@ -20,9 +20,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.morag.converters.audio import AudioConverter
-from src.morag.converters.video import VideoConverter
-from src.morag.converters.base import ConversionOptions
+from morag_audio.converters import AudioConverter
+from morag_video.converters import VideoConverter
+from morag_core.interfaces.converter import ConversionOptions
 
 
 async def demo_audio_transcription_fixes(file_path: Path):

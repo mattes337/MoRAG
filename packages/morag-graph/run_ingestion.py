@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
 
-from src.morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
-from src.morag_graph.models.fact import Fact, FactRelation
-from src.morag_graph.storage.neo4j_operations.fact_operations import FactOperations
+from morag_graph.storage.neo4j_storage import Neo4jStorage, Neo4jConfig
+from morag_graph.models.fact import Fact, FactRelation
+from morag_graph.storage.neo4j_operations.fact_operations import FactOperations
 
 
 def load_extracted_data(file_path: Path) -> Dict[str, Any]:

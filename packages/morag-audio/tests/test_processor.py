@@ -6,7 +6,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from morag_audio.processor import AudioProcessor, AudioConfig, AudioProcessingError, AudioSegment
-from morag_audio.processor import AudioProcessingResult, AudioTranscriptSegment
+from morag_audio.processor import AudioProcessingResult
+from morag_audio import AudioTranscriptSegment
 
 
 @pytest.fixture
