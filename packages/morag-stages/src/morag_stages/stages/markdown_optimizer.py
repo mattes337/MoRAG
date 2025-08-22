@@ -381,7 +381,8 @@ class MarkdownOptimizerStage(Stage):
         # Normalize line endings
         content = content.replace('\r\n', '\n').replace('\r', '\n')
         
-        return content.strip()
+        # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
+        return content.strip(' \t')
 
     def _get_api_key(self) -> Optional[str]:
         """Get API key for LLM operations.
@@ -423,7 +424,8 @@ class MarkdownOptimizerStage(Stage):
             temperature=config.temperature
         )
 
-        return response.strip()
+        # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
+        return response.strip(' \t')
 
     async def _optimize_with_splitting(self, llm_client, content: str, metadata: Dict[str, Any],
                                      config: MarkdownOptimizerConfig) -> str:
@@ -468,7 +470,8 @@ class MarkdownOptimizerStage(Stage):
                     temperature=config.temperature
                 )
 
-                optimized_chunks.append(optimized_chunk.strip())
+                # Preserve formatting by only stripping leading/trailing whitespace, not internal formatting
+                optimized_chunks.append(optimized_chunk.strip(' \t'))
 
             except Exception as e:
                 logger.warning(f"Failed to optimize chunk {i}, using original", error=str(e))
@@ -525,6 +528,12 @@ class MarkdownOptimizerStage(Stage):
         """
         base_prompt = """You are an expert content optimizer. Your task is to improve the readability and structure of the provided content while preserving all important information.
 
+CRITICAL FORMATTING REQUIREMENTS:
+- PRESERVE ALL NEWLINES AND LINE BREAKS exactly as they appear in the original content
+- PRESERVE ALL WHITESPACE FORMATTING including indentation and spacing
+- Return content in valid JSON format with proper escaping of newlines and special characters
+- DO NOT remove line breaks from transcriptions or structured content
+
 REMOVE CLUTTER: Remove non-essential elements such as:
 - Table of contents and indexes
 - Acknowledgements and dedications
@@ -561,20 +570,48 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
     
     def _get_user_prompt(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
         """Get user prompt for optimization.
-        
+
         Args:
             content: Content to optimize
             metadata: Document metadata
             config: Stage configuration
-            
+
         Returns:
             User prompt string
         """
-        prompt = f"Please optimize the following content:\n\n{content}"
-        
+        # Extract language information for preservation
+        language_instruction = ""
+        if metadata:
+            detected_language = metadata.get('language', '').lower()
+            if detected_language:
+                language_names = {
+                    'en': 'English',
+                    'de': 'German',
+                    'fr': 'French',
+                    'es': 'Spanish',
+                    'it': 'Italian',
+                    'pt': 'Portuguese',
+                    'nl': 'Dutch',
+                    'ru': 'Russian',
+                    'zh': 'Chinese',
+                    'ja': 'Japanese',
+                    'ko': 'Korean'
+                }
+                language_name = language_names.get(detected_language, detected_language.title())
+                language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the original language ({language_name}) AT ALL COSTS. DO NOT translate or switch to any other language, especially English. Keep ALL content in {language_name}."
+
+        # Check for existing document type prefixes in title to avoid duplication
+        title_prefix_instruction = ""
+        if content.strip().startswith('# '):
+            first_line = content.split('\n')[0]
+            if any(prefix in first_line for prefix in ['# Video Analysis', '# Document Analysis', '# Audio Analysis']):
+                title_prefix_instruction = "\n\nIMPORTANT: The document already has a proper analysis prefix in the title. DO NOT add additional prefixes like 'Document Analysis:' to the existing title."
+
+        prompt = f"Please optimize the following content:{language_instruction}{title_prefix_instruction}\n\n{content}"
+
         if metadata:
             prompt = f"Document metadata: {metadata}\n\n" + prompt
-        
+
         return prompt
 
     def _split_content_intelligently(self, content: str, max_chunk_size: int) -> List[str]:
@@ -769,6 +806,12 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
 
 Your task is to improve the readability and structure of this content chunk while preserving all important information. This is part of a larger document, so maintain consistency and don't add introductory or concluding statements that assume this is a complete document.
 
+CRITICAL FORMATTING REQUIREMENTS:
+- PRESERVE ALL NEWLINES AND LINE BREAKS exactly as they appear in the original content
+- PRESERVE ALL WHITESPACE FORMATTING including indentation and spacing
+- Return content in valid JSON format with proper escaping of newlines and special characters
+- DO NOT remove line breaks from transcriptions or structured content
+
 REMOVE CLUTTER: Remove non-essential elements such as:
 - Table of contents and index entries
 - Acknowledgements and dedications
@@ -819,7 +862,28 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
         Returns:
             User prompt string
         """
-        prompt = f"Optimize this content chunk ({chunk_num}/{total_chunks}):\n\n{chunk}"
+        # Extract language information for preservation
+        language_instruction = ""
+        if metadata:
+            detected_language = metadata.get('language', '').lower()
+            if detected_language:
+                language_names = {
+                    'en': 'English',
+                    'de': 'German',
+                    'fr': 'French',
+                    'es': 'Spanish',
+                    'it': 'Italian',
+                    'pt': 'Portuguese',
+                    'nl': 'Dutch',
+                    'ru': 'Russian',
+                    'zh': 'Chinese',
+                    'ja': 'Japanese',
+                    'ko': 'Korean'
+                }
+                language_name = language_names.get(detected_language, detected_language.title())
+                language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the original language ({language_name}) AT ALL COSTS. DO NOT translate or switch to any other language, especially English. Keep ALL content in {language_name}."
+
+        prompt = f"Optimize this content chunk ({chunk_num}/{total_chunks}):{language_instruction}\n\n{chunk}"
 
         if chunk_num == 1 and metadata:
             prompt = f"Document context: {metadata}\n\n" + prompt
@@ -841,8 +905,8 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
 
         # For most content types, simply join with double newlines
         if content_type in ['video', 'audio']:
-            # For transcripts, be more careful about spacing to preserve flow
-            return '\n\n'.join(chunk.strip() for chunk in optimized_chunks if chunk.strip())
+            # For transcripts, preserve internal formatting but clean edges
+            return '\n\n'.join(chunk.strip(' \t') for chunk in optimized_chunks if chunk.strip(' \t'))
         else:
-            # For documents and other content, use standard spacing
-            return '\n\n'.join(chunk.strip() for chunk in optimized_chunks if chunk.strip())
+            # For documents and other content, preserve internal formatting but clean edges
+            return '\n\n'.join(chunk.strip(' \t') for chunk in optimized_chunks if chunk.strip(' \t'))
