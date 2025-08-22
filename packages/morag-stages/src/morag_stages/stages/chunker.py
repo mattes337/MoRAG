@@ -14,14 +14,17 @@ from ..exceptions import StageExecutionError, StageValidationError
 if TYPE_CHECKING:
     from morag_core.ai import create_agent, AgentConfig, SummarizationAgent
     from morag_embedding import GeminiEmbeddingService
+    from morag_core.config.unified import ChunkerConfig
 
 try:
     from morag_core.ai import create_agent as _create_agent, AgentConfig as _AgentConfig, SummarizationAgent as _SummarizationAgent
     from morag_embedding import GeminiEmbeddingService as _GeminiEmbeddingService
+    from morag_core.config.unified import ChunkerConfig as _ChunkerConfig
     create_agent = _create_agent
     AgentConfig = _AgentConfig
     SummarizationAgent = _SummarizationAgent
     GeminiEmbeddingService = _GeminiEmbeddingService
+    ChunkerConfig = _ChunkerConfig
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
@@ -29,6 +32,7 @@ except ImportError:
     AgentConfig = None  # type: ignore
     SummarizationAgent = None  # type: ignore
     GeminiEmbeddingService = None  # type: ignore
+    ChunkerConfig = None  # type: ignore
 
 logger = structlog.get_logger(__name__)
 
@@ -55,6 +59,15 @@ class ChunkerStage(Stage):
         else:
             self.embedding_service = None
         self.summarization_agent = None
+
+    def _get_config_value(self, config, key: str, default=None):
+        """Get configuration value from either dict or config object."""
+        if hasattr(config, key):
+            return getattr(config, key)
+        elif hasattr(config, 'get'):
+            return config.get(key, default)
+        else:
+            return default
     
     async def execute(self, 
                      input_files: List[Path], 
@@ -76,7 +89,14 @@ class ChunkerStage(Stage):
             )
         
         input_file = input_files[0]
-        config = context.get_stage_config(self.stage_type)
+
+        # Load configuration from environment variables with context overrides
+        context_config = context.get_stage_config(self.stage_type)
+        if SERVICES_AVAILABLE and ChunkerConfig:
+            config = ChunkerConfig.from_env_and_overrides(context_config)
+        else:
+            # Fallback to dictionary config
+            config = context_config
         
         logger.info("Starting chunking", 
                    input_file=str(input_file),
@@ -95,7 +115,7 @@ class ChunkerStage(Stage):
             
             # Generate document summary
             summary = ""
-            if config.get('generate_summary', True):
+            if self._get_config_value(config, 'generate_summary', True):
                 summary = await self._generate_summary(content, metadata, config)
             
             # Create chunks based on strategy
@@ -114,10 +134,10 @@ class ChunkerStage(Stage):
                 "chunks": chunks,
                 "metadata": {
                     "total_chunks": len(chunks),
-                    "chunk_strategy": config.get('chunk_strategy', 'semantic'),
-                    "chunk_size": config.get('chunk_size', 4000),
-                    "overlap": config.get('overlap', 200),
-                    "embedding_model": config.get('embedding_model', 'text-embedding-004'),
+                    "chunk_strategy": self._get_config_value(config, 'chunk_strategy', 'semantic'),
+                    "chunk_size": self._get_config_value(config, 'chunk_size', 4000),
+                    "overlap": self._get_config_value(config, 'overlap', 200),
+                    "embedding_model": self._get_config_value(config, 'embedding_model', 'text-embedding-004'),
                     "source_file": str(input_file),
                     "source_metadata": metadata,
                     "created_at": datetime.now().isoformat()
@@ -129,12 +149,15 @@ class ChunkerStage(Stage):
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
             
             # Create metadata
+            # Convert config to dict if it's a config object
+            config_dict = config.model_dump() if hasattr(config, 'model_dump') else config
+
             stage_metadata = StageMetadata(
                 execution_time=0.0,  # Will be set by manager
                 start_time=datetime.now(),
                 input_files=[str(input_file)],
                 output_files=[str(output_file)],
-                config_used=config,
+                config_used=config_dict,
                 metrics={
                     "total_chunks": len(chunks),
                     "average_chunk_size": sum(len(chunk['content']) for chunk in chunks) / len(chunks) if chunks else 0,
@@ -152,7 +175,7 @@ class ChunkerStage(Stage):
                 data={
                     "total_chunks": len(chunks),
                     "summary_length": len(summary),
-                    "chunk_strategy": config.get('chunk_strategy', 'semantic')
+                    "chunk_strategy": self._get_config_value(config, 'chunk_strategy', 'semantic')
                 }
             )
             
@@ -309,9 +332,9 @@ class ChunkerStage(Stage):
         try:
             if not self.summarization_agent:
                 agent_config = AgentConfig(
-                    model=config.get('model', 'google-gla:gemini-1.5-flash'),
+                    model=self._get_config_value(config, 'model', 'google-gla:gemini-1.5-flash'),
                     temperature=0.1,
-                    max_tokens=config.get('summary_max_tokens', 1000)
+                    max_tokens=self._get_config_value(config, 'summary_max_tokens', 1000)
                 )
                 self.summarization_agent = create_agent(SummarizationAgent, config=agent_config)
             
@@ -338,9 +361,9 @@ class ChunkerStage(Stage):
         Returns:
             List of chunk dictionaries
         """
-        strategy = config.get('chunk_strategy', 'semantic')
-        chunk_size = config.get('chunk_size', 4000)
-        overlap = config.get('overlap', 200)
+        strategy = self._get_config_value(config, 'chunk_strategy', 'semantic')
+        chunk_size = self._get_config_value(config, 'chunk_size', 4000)
+        overlap = self._get_config_value(config, 'overlap', 200)
         
         if strategy == 'semantic':
             return await self._semantic_chunking(content, metadata, chunk_size, overlap)
@@ -617,8 +640,8 @@ class ChunkerStage(Stage):
             texts = [chunk['content'] for chunk in chunks]
 
             # Generate embeddings in batches
-            batch_size = config.get('batch_size', 50)
-            model = config.get('embedding_model', 'text-embedding-004')
+            batch_size = self._get_config_value(config, 'batch_size', 50)
+            model = self._get_config_value(config, 'embedding_model', 'text-embedding-004')
 
             # Process in batches for better performance
             all_embeddings = []
@@ -658,10 +681,10 @@ class ChunkerStage(Stage):
         Returns:
             Chunks with context added
         """
-        if not config.get('include_context', True):
+        if not self._get_config_value(config, 'include_context', True):
             return chunks
 
-        context_window = config.get('context_window', 2)
+        context_window = self._get_config_value(config, 'context_window', 2)
 
         for i, chunk in enumerate(chunks):
             # Add surrounding context
