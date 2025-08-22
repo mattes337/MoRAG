@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import structlog
 
-from morag_core.config import MarkdownOptimizerConfig, LLMConfig
+from morag_core.config.unified import MarkdownOptimizerConfig, LLMConfig
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
@@ -546,16 +546,16 @@ REMOVE CLUTTER: Remove non-essential elements such as:
 
 PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and meaningful structural elements."""
 
-        if config.get('fix_transcription_errors', True):
+        if config.fix_transcription_errors:
             base_prompt += " Fix any transcription errors you notice."
 
-        if config.get('improve_structure', True):
+        if config.improve_structure:
             base_prompt += " Improve the document structure and formatting."
 
-        if config.get('preserve_timestamps', True) and content_type in ['video', 'audio']:
+        if config.preserve_timestamps and content_type in ['video', 'audio']:
             base_prompt += " IMPORTANT: Preserve all timestamp information exactly as provided."
 
-        if config.get('preserve_metadata', True):
+        if config.preserve_metadata:
             base_prompt += " Preserve all metadata and structural elements that contain substantive information."
 
         # Add content-type specific instructions

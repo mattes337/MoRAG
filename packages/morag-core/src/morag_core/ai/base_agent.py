@@ -62,7 +62,7 @@ class MoRAGBaseAgent(Generic[T], ABC):
 
             return Agent(
                 model=self.config.model,
-                result_type=self.get_result_type(),
+                output_type=self.get_result_type(),
                 system_prompt=self.get_system_prompt(),
                 deps_type=self.get_deps_type(),
             )

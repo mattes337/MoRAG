@@ -91,21 +91,43 @@ class SyntaxChecker:
             # Add the project root and packages to Python path
             sys.path.insert(0, str(self.project_root))
             sys.path.insert(0, str(self.project_root / "packages"))
-            
+
+            # Add all package source directories to Python path
+            packages_dir = self.project_root / "packages"
+            if packages_dir.exists():
+                for package_dir in packages_dir.iterdir():
+                    if package_dir.is_dir():
+                        src_dir = package_dir / "src"
+                        if src_dir.exists():
+                            sys.path.insert(0, str(src_dir))
+
             # Try to load the module
             spec = importlib.util.spec_from_file_location("temp_module", file_path)
             if spec and spec.loader:
                 module = importlib.util.module_from_spec(spec)
-                # Don't execute the module, just check if it can be loaded
-                # spec.loader.exec_module(module)
-                self.log(f"✓ Imports OK: {file_path}")
-                return True
+                # Try to execute the module to catch runtime import errors
+                try:
+                    spec.loader.exec_module(module)
+                    self.log(f"✓ Imports OK: {file_path}")
+                    return True
+                except Exception as e:
+                    # Check if it's a critical import error or just a runtime error
+                    error_str = str(e).lower()
+                    if any(keyword in error_str for keyword in ['no module named', 'cannot import', 'importerror', 'modulenotfounderror']):
+                        warning_msg = f"Import Error in {file_path}: {e}"
+                        self.warnings.append(warning_msg)
+                        self.log(warning_msg, "WARNING")
+                        return False
+                    else:
+                        # Runtime error, but imports are probably OK
+                        self.log(f"Runtime error in {file_path} (imports OK): {e}", "WARNING")
+                        return True
             else:
                 warning_msg = f"Could not create module spec for {file_path}"
                 self.warnings.append(warning_msg)
                 self.log(warning_msg, "WARNING")
                 return False
-                
+
         except ImportError as e:
             warning_msg = f"Import Error in {file_path}: {e}"
             self.warnings.append(warning_msg)
@@ -117,10 +139,21 @@ class SyntaxChecker:
             return True
         finally:
             # Clean up sys.path
-            if str(self.project_root) in sys.path:
-                sys.path.remove(str(self.project_root))
-            if str(self.project_root / "packages") in sys.path:
-                sys.path.remove(str(self.project_root / "packages"))
+            paths_to_remove = [
+                str(self.project_root),
+                str(self.project_root / "packages")
+            ]
+            packages_dir = self.project_root / "packages"
+            if packages_dir.exists():
+                for package_dir in packages_dir.iterdir():
+                    if package_dir.is_dir():
+                        src_dir = package_dir / "src"
+                        if src_dir.exists():
+                            paths_to_remove.append(str(src_dir))
+
+            for path in paths_to_remove:
+                if path in sys.path:
+                    sys.path.remove(path)
     
     def run_flake8(self, files: List[Path]) -> bool:
         """Run flake8 on the specified files."""
