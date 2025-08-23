@@ -284,6 +284,8 @@ class MarkdownOptimizerStage(Stage):
 
         # Return the cleaned content directly
         return content
+
+
     
     async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
         """Optimize content using LLM with text splitting for large files.
@@ -500,14 +502,17 @@ class MarkdownOptimizerStage(Stage):
         """
         base_prompt = """You are an expert content optimizer. Your task is to improve the readability and structure of the provided content while preserving all important information.
 
-CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language.
+CRITICAL CONTENT REQUIREMENT: You MUST work ONLY with the content provided in the user message. DO NOT add, generate, or hallucinate any new content. DO NOT add examples, conversations, or any content that is not in the original document.
+
+CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English or Spanish. Analyze the content language and keep ALL content in that same language.
 
 CRITICAL OUTPUT FORMAT REQUIREMENTS:
-- Return ONLY the optimized markdown content
+- Return ONLY the optimized version of the provided content
 - DO NOT wrap the content in code blocks (```markdown or ```)
 - DO NOT add any explanatory text, metadata, or JSON wrapping
 - DO NOT add prefixes like "Document Analysis:" or "Content:" to titles
 - DO NOT add document information sections or metadata sections
+- DO NOT generate or add any new content, examples, or conversations
 - Return the content exactly as it should appear in the final markdown file
 
 CRITICAL FORMATTING REQUIREMENTS:
@@ -590,7 +595,10 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
             if any(prefix in first_line for prefix in ['# Video Analysis', '# Document Analysis', '# Audio Analysis']):
                 title_prefix_instruction = "\n\nIMPORTANT: The document already has a proper analysis prefix in the title. DO NOT add additional prefixes like 'Document Analysis:' to the existing title."
 
-        prompt = f"Please optimize the following content:{language_instruction}{title_prefix_instruction}\n\n{content}"
+        # Add strong anti-hallucination instructions
+        anti_hallucination_instruction = "\n\nCRITICAL: Work ONLY with the content provided below. DO NOT add any new content, examples, conversations, or text that is not in the original. DO NOT generate or hallucinate any additional content."
+
+        prompt = f"Please optimize ONLY the following content:{language_instruction}{title_prefix_instruction}{anti_hallucination_instruction}\n\n{content}"
 
         if metadata:
             prompt = f"Document metadata: {metadata}\n\n" + prompt
@@ -789,14 +797,17 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
 
 Your task is to improve the readability and structure of this content chunk while preserving all important information. This is part of a larger document, so maintain consistency and don't add introductory or concluding statements that assume this is a complete document.
 
-CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language.
+CRITICAL CONTENT REQUIREMENT: You MUST work ONLY with the content provided in the user message. DO NOT add, generate, or hallucinate any new content. DO NOT add examples, conversations, or any content that is not in the original document.
+
+CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English or Spanish. Analyze the content language and keep ALL content in that same language.
 
 CRITICAL OUTPUT FORMAT REQUIREMENTS:
-- Return ONLY the optimized markdown content
+- Return ONLY the optimized version of the provided content
 - DO NOT wrap the content in code blocks (```markdown or ```)
 - DO NOT add any explanatory text, metadata, or JSON wrapping
 - DO NOT add prefixes like "Document Analysis:" or "Content:" to titles
 - DO NOT add document information sections or metadata sections
+- DO NOT generate or add any new content, examples, or conversations
 - Return the content exactly as it should appear in the final markdown file
 
 CRITICAL FORMATTING REQUIREMENTS:
@@ -877,7 +888,10 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
                 language_name = language_names.get(detected_language, detected_language.title())
                 language_instruction = f"\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the original language ({language_name}) AT ALL COSTS. DO NOT translate or switch to any other language, especially English. Keep ALL content in {language_name}."
 
-        prompt = f"Optimize this content chunk ({chunk_num}/{total_chunks}):{language_instruction}\n\n{chunk}"
+        # Add strong anti-hallucination instructions for chunks
+        anti_hallucination_instruction = "\n\nCRITICAL: Work ONLY with the content chunk provided below. DO NOT add any new content, examples, conversations, or text that is not in the original chunk. DO NOT generate or hallucinate any additional content."
+
+        prompt = f"Optimize ONLY this content chunk ({chunk_num}/{total_chunks}):{language_instruction}{anti_hallucination_instruction}\n\n{chunk}"
 
         if chunk_num == 1 and metadata:
             prompt = f"Document context: {metadata}\n\n" + prompt
