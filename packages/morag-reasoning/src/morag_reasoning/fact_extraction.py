@@ -51,14 +51,14 @@ class FactExtractionService:
         # Create PydanticAI agent for fact extraction
         self.agent = Agent(
             model=llm_client.get_model(),
-            output_type=ExtractedFacts,
+            result_type=ExtractedFacts,
             system_prompt=self._get_system_prompt()
         )
 
         # Create PydanticAI agent for source mapping
         self.source_mapping_agent = Agent(
             model=llm_client.get_model(),
-            output_type=SourceMappingResult,
+            result_type=SourceMappingResult,
             system_prompt=self._get_source_mapping_prompt()
         )
     
@@ -159,7 +159,7 @@ Return only the most relevant and well-supported facts."""
             
             # Extract facts using LLM
             result = await self.agent.run(prompt)
-            extracted_facts = result.facts
+            extracted_facts = result.data.facts
             
             # Process and enhance facts with source information
             enhanced_facts = []
@@ -296,7 +296,7 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
 
             # Get source mappings from LLM
             result = await self.source_mapping_agent.run(prompt)
-            mappings = result.mappings
+            mappings = result.data.mappings
 
             # Apply mappings to facts
             for mapping in mappings:

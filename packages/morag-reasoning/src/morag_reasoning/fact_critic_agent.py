@@ -25,7 +25,7 @@ class FactCriticAgent:
         # Create PydanticAI agent for fact criticism
         self.agent = Agent(
             model=llm_client.get_model(),
-            output_type=FCAResponse,
+            result_type=FCAResponse,
             system_prompt=self._get_system_prompt()
         )
     

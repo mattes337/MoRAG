@@ -60,9 +60,10 @@ class MoRAGBaseAgent(Generic[T], ABC):
             if self.provider.api_key and not os.getenv("GOOGLE_API_KEY"):
                 os.environ["GOOGLE_API_KEY"] = self.provider.api_key
 
+            # Create agent with proper parameter names for current PydanticAI version
             return Agent(
-                model=self.config.model,
-                output_type=self.get_result_type(),
+                self.config.model,
+                result_type=self.get_result_type(),
                 system_prompt=self.get_system_prompt(),
                 deps_type=self.get_deps_type(),
             )

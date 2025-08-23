@@ -53,7 +53,7 @@ class RecursivePathFollower:
         # Create PydanticAI agent for path following decisions
         self.agent = Agent(
             model=llm_client.get_model(),
-            output_type=PathFollowingDecision,
+            result_type=PathFollowingDecision,
             system_prompt=self._get_system_prompt()
         )
     
