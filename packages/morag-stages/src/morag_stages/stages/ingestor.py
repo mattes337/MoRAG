@@ -65,9 +65,10 @@ class IngestorStage(Stage):
         Returns:
             Stage execution result
         """
-        if len(input_files) < 1 or len(input_files) > 2:
+        # Flexible input validation - we'll find the required files in the execute method
+        if len(input_files) < 1:
             raise StageValidationError(
-                "Ingestor stage requires 1-2 input files (chunks.json and optionally facts.json)",
+                "Ingestor stage requires at least 1 input file",
                 stage_type=self.stage_type.value,
                 invalid_files=[str(f) for f in input_files]
             )
@@ -79,19 +80,33 @@ class IngestorStage(Stage):
                    config=config)
         
         try:
-            # Find chunks and facts files
+            # Find chunks and facts files from input files first
             chunks_file = None
             facts_file = None
-            
+
             for file in input_files:
                 if file.name.endswith('.chunks.json'):
                     chunks_file = file
                 elif file.name.endswith('.facts.json'):
                     facts_file = file
-            
+
+            # If chunks file not in input, look in output directory
+            if not chunks_file:
+                chunks_files = list(context.output_dir.glob("*.chunks.json"))
+                if chunks_files:
+                    chunks_file = chunks_files[0]
+                    logger.info("Found chunks file in output directory", chunks_file=str(chunks_file))
+
+            # If facts file not in input, look in output directory
+            if not facts_file:
+                facts_files = list(context.output_dir.glob("*.facts.json"))
+                if facts_files:
+                    facts_file = facts_files[0]
+                    logger.info("Found facts file in output directory", facts_file=str(facts_file))
+
             if not chunks_file:
                 raise StageValidationError(
-                    "No chunks.json file found in input files",
+                    "No chunks.json file found in input files or output directory",
                     stage_type=self.stage_type.value,
                     invalid_files=[str(f) for f in input_files]
                 )
@@ -169,26 +184,21 @@ class IngestorStage(Stage):
     
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for ingestion.
-        
+
         Args:
             input_files: List of input file paths
-            
+
         Returns:
             True if inputs are valid
         """
-        if len(input_files) < 1 or len(input_files) > 2:
+        if len(input_files) < 1:
             return False
-        
-        # Check for required chunks file
-        has_chunks = any(f.name.endswith('.chunks.json') for f in input_files)
-        if not has_chunks:
-            return False
-        
+
         # Validate all files exist and are JSON
         for file in input_files:
             if not file.exists():
                 return False
-            
+
             if not file.name.endswith('.json'):
                 return False
             
@@ -211,27 +221,32 @@ class IngestorStage(Stage):
     
     def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output file paths.
-        
+
         Args:
             input_files: List of input file paths
             context: Stage execution context
-            
+
         Returns:
             List of expected output file paths
         """
         if not input_files:
             return []
-        
-        # Find chunks file to determine base name
-        chunks_file = None
-        for file in input_files:
-            if file.name.endswith('.chunks.json'):
-                chunks_file = file
-                break
-        
-        if not chunks_file:
-            return []
-        
+
+        # Check if we have the required input files for ingestion
+        has_chunks = any(file.name.endswith('.chunks.json') for file in input_files)
+
+        # If we don't have chunks file, we can't determine outputs or skip
+        # Return empty list so stage won't be skipped
+        if not has_chunks:
+            # Look for chunks file in the output directory (from previous stages)
+            chunks_files = list(context.output_dir.glob("*.chunks.json"))
+            if not chunks_files:
+                return []  # No chunks file available, can't skip
+            chunks_file = chunks_files[0]
+        else:
+            # Find chunks file from input
+            chunks_file = next(file for file in input_files if file.name.endswith('.chunks.json'))
+
         base_name = chunks_file.stem.replace('.chunks', '')
         output_file = context.output_dir / f"{base_name}.ingestion.json"
         return [output_file]

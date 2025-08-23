@@ -235,18 +235,18 @@ class StageManager:
         
         results: List[StageResult] = []
         current_input_files = initial_input_files
-        
+
         for stage_type in ordered_stages:
             try:
                 result = await self.execute_stage(stage_type, current_input_files, context)
                 results.append(result)
-                
-                # Use outputs as inputs for next stage (if successful)
-                if result.success:
+
+                # Use outputs as inputs for next stage (if successful or skipped)
+                if result.success or result.skipped:
                     current_input_files = result.output_files
                 elif not self.registry.get_stage(stage_type).is_optional():
                     # Required stage failed, stop execution
-                    logger.error("Required stage failed, stopping chain", 
+                    logger.error("Required stage failed, stopping chain",
                                stage_type=stage_type.value)
                     break
                 
