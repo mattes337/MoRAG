@@ -132,8 +132,13 @@ class MoRAGBaseAgent(Generic[T], ABC):
                 )
                 
                 # Extract and validate the result
-                # PydanticAI returns AgentRunResult, we need the .data attribute
-                actual_result = result.data if hasattr(result, 'data') else result
+                # PydanticAI returns AgentRunResult, we need to extract the actual result
+                if hasattr(result, 'data'):
+                    actual_result = result.data
+                elif hasattr(result, 'output'):
+                    actual_result = result.output
+                else:
+                    actual_result = result
                 validated_result = self._validate_result(actual_result)
                 
                 self.logger.info("Agent execution successful", attempt=attempt + 1)
