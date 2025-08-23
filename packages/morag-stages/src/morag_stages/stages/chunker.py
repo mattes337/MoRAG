@@ -344,7 +344,8 @@ class ChunkerStage(Stage):
             user_prompt = f"Please create a summary of this {content_type} content:\n\n{content[:8000]}"  # Limit content length
 
             response = await self.summarization_agent.run(user_prompt)
-            return response.data if hasattr(response, 'data') else str(response)
+            # The base agent's run method returns the validated result directly
+            return response.summary if hasattr(response, 'summary') else str(response)
             
         except Exception as e:
             logger.warning("Summary generation failed", error=str(e))
