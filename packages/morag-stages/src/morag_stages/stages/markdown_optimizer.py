@@ -264,57 +264,26 @@ class MarkdownOptimizerStage(Stage):
         return {}, markdown
     
     def _reconstruct_markdown(self, metadata: Dict[str, Any], content: str) -> str:
-        """Reconstruct markdown with H1+H2 format (no longer uses YAML frontmatter).
+        """Reconstruct markdown - return optimized content directly without adding structure.
 
         Args:
-            metadata: Metadata dictionary
-            content: Content string
+            metadata: Metadata dictionary (not used in current implementation)
+            content: Optimized content string
 
         Returns:
-            Complete markdown with H1 title and H2 sections format
+            The optimized content as-is, without additional structure
         """
-        if not metadata:
-            return content
+        # Clean up any unwanted markdown code block wrapping that the LLM might have added
+        content = content.strip()
 
-        # If content already has the new format, return as-is
-        if content.strip().startswith('# ') and '## ' in content:
-            return content
+        # Remove markdown code block wrapping if present
+        if content.startswith('```markdown\n') and content.endswith('\n```'):
+            content = content[12:-4].strip()
+        elif content.startswith('```\n') and content.endswith('\n```'):
+            content = content[4:-4].strip()
 
-        # Convert to new H1+H2 format
-        title = metadata.get('title', 'Unknown Document')
-        content_type = metadata.get('type', 'document')
-
-        # Start with title
-        markdown_lines = [f"# {content_type.title()} Analysis: {title}", ""]
-
-        # Add information section
-        markdown_lines.append(f"## {content_type.title()} Information")
-        markdown_lines.append("")
-
-        # Add relevant metadata
-        for key, value in metadata.items():
-            if key not in ['title', 'type'] and value:
-                # Convert key to display format
-                display_key = key.replace('_', ' ').title()
-                markdown_lines.append(f"- **{display_key}**: {value}")
-
-        markdown_lines.append("")
-        markdown_lines.append("")
-
-        # Add content section
-        if content_type in ['audio', 'video']:
-            markdown_lines.append("## Transcript")
-        else:
-            markdown_lines.append("## Content")
-        markdown_lines.append("")
-
-        # Add the actual content
-        if content:
-            markdown_lines.append(content)
-        else:
-            markdown_lines.append("*No content available*")
-
-        return "\n".join(markdown_lines)
+        # Return the cleaned content directly
+        return content
     
     async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
         """Optimize content using LLM with text splitting for large files.
@@ -531,10 +500,20 @@ class MarkdownOptimizerStage(Stage):
         """
         base_prompt = """You are an expert content optimizer. Your task is to improve the readability and structure of the provided content while preserving all important information.
 
+CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language.
+
+CRITICAL OUTPUT FORMAT REQUIREMENTS:
+- Return ONLY the optimized markdown content
+- DO NOT wrap the content in code blocks (```markdown or ```)
+- DO NOT add any explanatory text, metadata, or JSON wrapping
+- DO NOT add prefixes like "Document Analysis:" or "Content:" to titles
+- DO NOT add document information sections or metadata sections
+- Return the content exactly as it should appear in the final markdown file
+
 CRITICAL FORMATTING REQUIREMENTS:
 - PRESERVE ALL NEWLINES AND LINE BREAKS exactly as they appear in the original content
 - PRESERVE ALL WHITESPACE FORMATTING including indentation and spacing
-- Return content in valid JSON format with proper escaping of newlines and special characters
+- Return content in valid markdown format
 - DO NOT remove line breaks from transcriptions or structured content
 
 REMOVE CLUTTER: Remove non-essential elements such as:
@@ -583,7 +562,8 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
             User prompt string
         """
         # Extract language information for preservation
-        language_instruction = ""
+        language_instruction = "\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language."
+
         if metadata:
             detected_language = metadata.get('language', '').lower()
             if detected_language:
@@ -809,10 +789,20 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
 
 Your task is to improve the readability and structure of this content chunk while preserving all important information. This is part of a larger document, so maintain consistency and don't add introductory or concluding statements that assume this is a complete document.
 
+CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language.
+
+CRITICAL OUTPUT FORMAT REQUIREMENTS:
+- Return ONLY the optimized markdown content
+- DO NOT wrap the content in code blocks (```markdown or ```)
+- DO NOT add any explanatory text, metadata, or JSON wrapping
+- DO NOT add prefixes like "Document Analysis:" or "Content:" to titles
+- DO NOT add document information sections or metadata sections
+- Return the content exactly as it should appear in the final markdown file
+
 CRITICAL FORMATTING REQUIREMENTS:
 - PRESERVE ALL NEWLINES AND LINE BREAKS exactly as they appear in the original content
 - PRESERVE ALL WHITESPACE FORMATTING including indentation and spacing
-- Return content in valid JSON format with proper escaping of newlines and special characters
+- Return content in valid markdown format
 - DO NOT remove line breaks from transcriptions or structured content
 
 REMOVE CLUTTER: Remove non-essential elements such as:
@@ -866,7 +856,8 @@ PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and m
             User prompt string
         """
         # Extract language information for preservation
-        language_instruction = ""
+        language_instruction = "\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English. Analyze the content language and keep ALL content in that same language."
+
         if metadata:
             detected_language = metadata.get('language', '').lower()
             if detected_language:
