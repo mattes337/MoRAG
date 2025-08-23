@@ -11,15 +11,17 @@ from ..models import Stage, StageType, StageStatus, StageResult, StageContext, S
 from ..exceptions import StageExecutionError, StageValidationError
 
 if TYPE_CHECKING:
-    from morag_graph.storage import Neo4jStorage, QdrantStorage
+    from morag_graph.storage import Neo4jStorage
+    from morag_services.storage import QdrantVectorStorage
 
 # Import storage services with graceful fallback
 try:
-    from morag_graph.storage import Neo4jStorage as _Neo4jStorage, QdrantStorage as _QdrantStorage, Neo4jConfig as _Neo4jConfig, QdrantConfig as _QdrantConfig
+    from morag_graph.storage import Neo4jStorage as _Neo4jStorage, Neo4jConfig as _Neo4jConfig
+    from morag_services.storage import QdrantVectorStorage as _QdrantVectorStorage
     Neo4jStorage = _Neo4jStorage
-    QdrantStorage = _QdrantStorage
+    QdrantStorage = _QdrantVectorStorage  # Use QdrantVectorStorage which has initialize() method
     Neo4jConfig = _Neo4jConfig
-    QdrantConfig = _QdrantConfig
+    # QdrantConfig is not needed since QdrantVectorStorage uses different config
     STORAGE_AVAILABLE = True
 except ImportError:
     STORAGE_AVAILABLE = False
@@ -285,8 +287,21 @@ class IngestorStage(Stage):
         # Initialize Qdrant if requested
         if 'qdrant' in databases and STORAGE_AVAILABLE:
             try:
-                qdrant_config = QdrantConfig(**config.get('qdrant_config', {}))
-                self.qdrant_storage = QdrantStorage(qdrant_config)
+                import os
+                qdrant_config = config.get('qdrant_config', {})
+
+                # Use environment variables as defaults
+                host = qdrant_config.get('host', os.getenv('QDRANT_HOST', 'localhost'))
+                port = qdrant_config.get('port', int(os.getenv('QDRANT_PORT', '6333')))
+                api_key = qdrant_config.get('api_key', os.getenv('QDRANT_API_KEY'))
+                collection_name = qdrant_config.get('collection_name', os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents'))
+
+                self.qdrant_storage = QdrantStorage(
+                    host=host,
+                    port=port,
+                    api_key=api_key,
+                    collection_name=collection_name
+                )
                 await self.qdrant_storage.initialize()  # type: ignore
                 logger.info("Qdrant storage initialized")
             except Exception as e:
