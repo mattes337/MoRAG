@@ -420,6 +420,26 @@ class IngestorStage(Stage):
                         await self.qdrant_storage.store_documents(documents, collection_name)
                     elif hasattr(self.qdrant_storage, 'store_document_batch'):
                         await self.qdrant_storage.store_document_batch(documents, collection_name)
+                    elif hasattr(self.qdrant_storage, 'store_vectors'):
+                        # Adapt documents for QdrantVectorStorage.store_vectors method
+                        vectors = []
+                        metadata_list = []
+                        for doc in documents:
+                            if doc.get('embedding'):
+                                vectors.append(doc['embedding'])
+                                # Combine content and metadata for storage
+                                doc_metadata = {
+                                    "id": doc.get('id'),
+                                    "content": doc.get('content', ''),
+                                    **doc.get('metadata', {})
+                                }
+                                metadata_list.append(doc_metadata)
+
+                        if vectors:
+                            try:
+                                await self.qdrant_storage.store_vectors(vectors, metadata_list, collection_name)
+                            except Exception as e:
+                                logger.warning("Failed to store vectors in Qdrant, continuing without vector storage", error=str(e))
                     else:
                         logger.warning("Qdrant storage does not have expected store method")
                     results["chunks_ingested"] += len(documents)
