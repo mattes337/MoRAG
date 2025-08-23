@@ -131,8 +131,10 @@ class MoRAGBaseAgent(Generic[T], ABC):
                     timeout=self.config.timeout
                 )
                 
-                # Validate the result
-                validated_result = self._validate_result(result.data)
+                # Extract and validate the result
+                # PydanticAI returns AgentRunResult, we need the .data attribute
+                actual_result = result.data if hasattr(result, 'data') else result
+                validated_result = self._validate_result(actual_result)
                 
                 self.logger.info("Agent execution successful", attempt=attempt + 1)
                 return validated_result

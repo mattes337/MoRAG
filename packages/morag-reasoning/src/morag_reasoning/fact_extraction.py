@@ -159,7 +159,7 @@ Return only the most relevant and well-supported facts."""
             
             # Extract facts using LLM
             result = await self.agent.run(prompt)
-            extracted_facts = result.data.facts
+            extracted_facts = result.facts
             
             # Process and enhance facts with source information
             enhanced_facts = []
@@ -296,7 +296,7 @@ Analyze which chunks support each fact. For each fact, identify the chunk indice
 
             # Get source mappings from LLM
             result = await self.source_mapping_agent.run(prompt)
-            mappings = result.data.mappings
+            mappings = result.mappings
 
             # Apply mappings to facts
             for mapping in mappings:
