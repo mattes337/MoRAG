@@ -5,10 +5,10 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 import structlog
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends, Query, Request, Body
 from fastapi.responses import FileResponse
 
 # Add path for stage imports
@@ -207,7 +207,7 @@ async def list_stages():
 @router.post("/{stage_name}/execute", response_model=StageExecutionResponse)
 async def execute_stage(
     stage_name: str,
-    request: Optional[StageExecutionRequest] = None,
+    request: Optional[Union[StageExecutionRequest, str]] = Body(None),
     file: Optional[UploadFile] = File(None),
     # Form data parameters for when file upload is used
     output_dir: Optional[str] = Form("./output"),
@@ -231,11 +231,21 @@ async def execute_stage(
 
         # Handle request data - either from JSON body or form data
         if request is not None:
+            # Handle both string and object request formats
+            if isinstance(request, str):
+                try:
+                    request_dict = json.loads(request)
+                    parsed_request = StageExecutionRequest(**request_dict)
+                except (json.JSONDecodeError, ValueError) as e:
+                    raise HTTPException(status_code=400, detail=f"Invalid JSON request: {str(e)}")
+            else:
+                parsed_request = request
+
             # JSON request body
-            request_output_dir = request.output_dir
-            request_config = request.config or {}
-            request_input_files = request.input_files or []
-            request_webhook_url = request.webhook_config.url if request.webhook_config else None
+            request_output_dir = parsed_request.output_dir
+            request_config = parsed_request.config or {}
+            request_input_files = parsed_request.input_files or []
+            request_webhook_url = parsed_request.webhook_config.url if parsed_request.webhook_config else None
         else:
             # Form data request
             request_output_dir = output_dir or "./output"
@@ -308,14 +318,24 @@ async def execute_stage(
 
 @router.post("/chain", response_model=StageChainResponse)
 async def execute_stage_chain(
-    request: StageChainRequest,
+    request: Union[StageChainRequest, str] = Body(...),
     file: Optional[UploadFile] = File(None),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """Execute a chain of stages using canonical stage names."""
     try:
+        # Handle both string and object request formats
+        if isinstance(request, str):
+            try:
+                request_dict = json.loads(request)
+                parsed_request = StageChainRequest(**request_dict)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise HTTPException(status_code=400, detail=f"Invalid JSON request: {str(e)}")
+        else:
+            parsed_request = request
+
         # Convert stage enums to internal types
-        stage_types = [convert_stage_type(stage_enum) for stage_enum in request.stages]
+        stage_types = [convert_stage_type(stage_enum) for stage_enum in parsed_request.stages]
 
         # Handle file upload if provided
         input_files = []
@@ -323,26 +343,26 @@ async def execute_stage_chain(
             upload_handler = get_upload_handler()
             temp_path = await upload_handler.save_upload(file)
             input_files = [temp_path]
-        elif request.input_files:
-            input_files = [Path(f) for f in request.input_files]
+        elif parsed_request.input_files:
+            input_files = [Path(f) for f in parsed_request.input_files]
         else:
             raise HTTPException(status_code=400, detail="Either file upload or input_files must be provided")
 
         # Create stage context
-        output_dir = Path(request.output_dir)
+        output_dir = Path(parsed_request.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Merge global and stage-specific configs
-        merged_config = request.global_config or {}
-        if request.stage_configs:
-            for stage_enum, stage_config in request.stage_configs.items():
+        merged_config = parsed_request.global_config or {}
+        if parsed_request.stage_configs:
+            for stage_enum, stage_config in parsed_request.stage_configs.items():
                 stage_key = stage_enum.value
                 merged_config[stage_key] = {**(merged_config.get(stage_key, {})), **stage_config}
 
         context = StageContext(
             source_path=input_files[0] if input_files else None,
             output_dir=output_dir,
-            webhook_url=request.webhook_config.url if request and request.webhook_config else None,
+            webhook_url=parsed_request.webhook_config.url if parsed_request and parsed_request.webhook_config else None,
             config=merged_config
         )
 
@@ -357,10 +377,10 @@ async def execute_stage_chain(
         final_output_files = []
 
         for i, result in enumerate(results):
-            stage_enum = request.stages[i]
+            stage_enum = parsed_request.stages[i]
 
             output_file_metadata = [
-                create_file_metadata(f, stage_enum, include_content=request.return_content) for f in result.output_files
+                create_file_metadata(f, stage_enum, include_content=parsed_request.return_content) for f in result.output_files
             ]
 
             execution_metadata = StageExecutionMetadata(
@@ -387,7 +407,7 @@ async def execute_stage_chain(
             # Track failures
             if result.status not in [StageStatus.COMPLETED, StageStatus.SKIPPED]:
                 failed_stage = stage_enum
-                if request.stop_on_failure:
+                if parsed_request.stop_on_failure:
                     break
 
             # Update final output files
@@ -398,10 +418,10 @@ async def execute_stage_chain(
         total_execution_time = (end_time - start_time).total_seconds()
 
         # Send webhook notification for chain completion if configured
-        if request and request.webhook_config:
+        if parsed_request and parsed_request.webhook_config:
             chain_success = failed_stage is None
             await send_webhook_notification_for_chain(
-                request.webhook_config, stage_responses, chain_success, total_execution_time
+                parsed_request.webhook_config, stage_responses, chain_success, total_execution_time
             )
 
         return StageChainResponse(
@@ -620,3 +640,6 @@ async def health_check():
     except Exception as e:
         logger.error("Health check failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+
+

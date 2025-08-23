@@ -4,8 +4,9 @@ from typing import List, Optional, Dict, Any, Union
 from pathlib import Path
 from datetime import datetime
 from enum import Enum
+import json
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 
 
 class StageTypeEnum(str, Enum):
@@ -88,6 +89,9 @@ class StageChainRequest(BaseModel):
     stop_on_failure: bool = Field(True, description="Stop chain execution if any stage fails")
     skip_existing: bool = Field(True, description="Skip stages if their outputs already exist")
     return_content: bool = Field(False, description="Include file contents in response")
+
+
+
 
 
 class StageChainResponse(BaseModel):

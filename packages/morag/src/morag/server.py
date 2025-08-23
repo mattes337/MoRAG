@@ -84,6 +84,7 @@ def create_app() -> FastAPI:
         - File management and download capabilities
         - Webhook notifications for stage completion
         - Resume capability with existing output detection
+        - Flexible request formats: accepts both JSON objects and JSON strings (Postman compatible)
 
         ## API Endpoints
         - `/api/v1/stages/` - List available stages
