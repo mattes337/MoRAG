@@ -180,3 +180,14 @@ class HealthCheckResponse(BaseModel):
     version: str = Field(..., description="API version")
     stages_available: List[StageTypeEnum] = Field(..., description="Available stages")
     services_status: Dict[str, str] = Field(..., description="Status of underlying services")
+
+
+class JobCleanupResponse(BaseModel):
+    """Response model for job cleanup operations."""
+    success: bool = Field(..., description="Whether cleanup was successful")
+    job_id: str = Field(..., description="Job ID that was cleaned up")
+    files_deleted: int = Field(..., description="Number of files deleted")
+    directories_removed: int = Field(..., description="Number of directories removed")
+    total_size_freed: int = Field(..., description="Total size freed in bytes")
+    deleted_files: List[str] = Field(..., description="List of deleted file paths")
+    message: str = Field(..., description="Human-readable status message")
