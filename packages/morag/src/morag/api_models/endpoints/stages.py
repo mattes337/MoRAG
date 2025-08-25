@@ -231,6 +231,7 @@ async def execute_stage(
             )
 
         # Handle request data - either from JSON body or form data
+        parsed_request = None
         if request is not None:
             # Handle both string and object request formats
             if isinstance(request, str):
@@ -324,8 +325,8 @@ async def execute_stage(
 
         # Send webhook notification if configured
         webhook_sent = False
-        if request is not None and request.webhook_config:
-            webhook_sent = await send_webhook_notification(request.webhook_config, result)
+        if parsed_request is not None and parsed_request.webhook_config:
+            webhook_sent = await send_webhook_notification(parsed_request.webhook_config, result)
         
         return StageExecutionResponse(
             success=result.status in [StageStatus.COMPLETED, StageStatus.SKIPPED],
