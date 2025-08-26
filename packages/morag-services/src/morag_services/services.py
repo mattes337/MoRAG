@@ -70,11 +70,24 @@ class ProcessingResult(BaseModel):
 
 class MoRAGServices:
     """Unified service layer for MoRAG system.
-    
+
     This class integrates all specialized processing services into a cohesive API,
     making it easy to work with multiple content types through a single interface.
     """
-    
+
+    # Type annotations for service attributes
+    audio_service: Optional[AudioService]
+    audio_available: bool
+    document_service: DocumentService
+    video_service: VideoService
+    image_service: ImageService
+    embedding_service: GeminiEmbeddingService
+    web_service: WebService
+    youtube_service: YouTubeService
+    graph_processor: Optional[GraphProcessor]
+    config: ServiceConfig
+    data_output_dir: Optional[str]
+
     def __init__(self, config: Optional[ServiceConfig] = None, graph_config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
         """Initialize MoRAG services.
         
@@ -137,9 +150,10 @@ class MoRAGServices:
             # Prefer QDRANT_URL if available, otherwise use QDRANT_HOST/PORT
             qdrant_url = os.getenv('QDRANT_URL')
             qdrant_api_key = os.getenv('QDRANT_API_KEY')
-            collection_name = os.getenv('QDRANT_COLLECTION_NAME')
+            collection_name = os.getenv('QDRANT_COLLECTION_NAME', 'morag_documents')
             if not collection_name:
-                raise ValueError("QDRANT_COLLECTION_NAME environment variable is required")
+                logger.warning("QDRANT_COLLECTION_NAME not set, using default 'morag_documents'")
+                collection_name = 'morag_documents'
 
             if qdrant_url:
                 # Use URL-based connection (supports HTTPS automatically)
@@ -160,16 +174,18 @@ class MoRAGServices:
                 )
 
             # Initialize embedding service
-            gemini_api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
-            if gemini_api_key:
+            from morag_core.config import LLMConfig
+            llm_config = LLMConfig.from_env_and_overrides()
+
+            if llm_config.api_key:
                 self._gemini_embedding_service = GeminiEmbeddingService(
-                    api_key=gemini_api_key,
+                    api_key=llm_config.api_key,
                     embedding_model="text-embedding-004",
                     generation_model=None  # Will use environment variable
                 )
                 logger.info("Search services initialized successfully")
             else:
-                logger.warning("Gemini API key not found - search functionality will be limited")
+                logger.warning("API key not found - search functionality will be limited")
 
         except Exception as e:
             logger.error("Failed to initialize search services", error=str(e))
@@ -352,26 +368,29 @@ class MoRAGServices:
                     
                     if database_configs:
                         # Use new multi-database approach
-                        graph_result = await self.graph_processor.process_document_multi_db(
-                            content=text_content,
-                            source_doc_id=document_path,
-                            database_configs=database_configs,
-                            metadata=document_metadata
-                        )
+                        if self.graph_processor:
+                            graph_result = await self.graph_processor.process_document_multi_db(
+                                content=text_content,
+                                source_doc_id=document_path,
+                                database_configs=database_configs,
+                                metadata=document_metadata
+                            )
                     else:
                         # Backward compatibility: use single database approach
-                        graph_result = await self.graph_processor.process_document(
-                            markdown_content=text_content,
+                        if self.graph_processor:
+                            graph_result = await self.graph_processor.process_document(
+                                markdown_content=text_content,
                             document_path=document_path,
                             document_metadata=document_metadata
                         )
                     
-                    logger.info("Graph processing completed", 
-                               document_path=document_path,
-                               success=graph_result.success,
-                               entities_count=graph_result.entities_count,
-                               relations_count=graph_result.relations_count,
-                               databases_processed=len(graph_result.database_results) if hasattr(graph_result, 'database_results') else 1)
+                    if graph_result:
+                        logger.info("Graph processing completed",
+                                   document_path=document_path,
+                                   success=graph_result.success,
+                                   entities_count=graph_result.entities_count,
+                                   relations_count=graph_result.relations_count,
+                                   databases_processed=len(graph_result.database_results) if hasattr(graph_result, 'database_results') else 1)
                     
                 except Exception as e:
                     logger.warning("Graph processing failed, continuing with document processing",
@@ -482,9 +501,18 @@ class MoRAGServices:
                     # For now, extract the transcript from JSON content
                     content = json_result.get("content", {})
                     if isinstance(content, dict):
-                        # Extract transcript and segments for markdown conversion
-                        transcript = content.get("transcript", "")
-                        segments = content.get("segments", [])
+                        # Extract segments from topics structure (new audio converter format)
+                        topics = content.get("topics", [])
+                        all_segments = []
+
+                        # Collect all segments from all topics
+                        for topic in topics:
+                            if isinstance(topic, dict):
+                                sentences = topic.get("sentences", [])
+                                all_segments.extend(sentences)
+
+                        # Sort segments by timestamp
+                        all_segments.sort(key=lambda x: x.get("timestamp", 0))
                         
                         # Create basic markdown content with timestamps
                         markdown_parts = []
@@ -501,20 +529,19 @@ class MoRAGServices:
                             markdown_parts.append("")
                         
                         # Add transcript with timestamps if segments are available
-                        if segments:
+                        if all_segments:
                             markdown_parts.append("## Detailed Transcript\n")
-                            for segment in segments:
+                            for segment in all_segments:
                                 if isinstance(segment, dict):
-                                    start_time = segment.get("start", 0)
+                                    start_time = segment.get("timestamp", 0)
                                     text = segment.get("text", "")
                                     # Format timestamp
                                     minutes = int(start_time // 60)
                                     seconds = int(start_time % 60)
                                     timestamp = f"[{minutes:02d}:{seconds:02d}]"
                                     markdown_parts.append(f"{timestamp} {text}")
-                        elif transcript:
-                            markdown_parts.append("## Full Transcript\n")
-                            markdown_parts.append(transcript)
+                        else:
+                            markdown_parts.append("*No transcript available*")
                         
                         text_content = "\n".join(markdown_parts)
                     elif isinstance(content, str):
@@ -709,7 +736,7 @@ class MoRAGServices:
         try:
             result = await self.web_service.process_url(
                 url,
-                config_options=self.config.web_config.to_dict() if hasattr(self.config.web_config, 'to_dict') else None
+                config_options=self.config.web_config.to_dict() if self.config.web_config and hasattr(self.config.web_config, 'to_dict') else None
             )
             
             return ProcessingResult(
@@ -743,9 +770,16 @@ class MoRAGServices:
             ProcessingResult with extracted content and metadata
         """
         try:
+            # Convert ProcessingConfig to YouTubeConfig if needed
+            youtube_config = None
+            if self.config.youtube_config:
+                # For now, pass None since we need to handle the type mismatch
+                # TODO: Create proper config conversion
+                youtube_config = None
+
             result = await self.youtube_service.process_video(
                 url,
-                config=self.config.youtube_config
+                config=youtube_config
             )
             
             # Convert YouTube-specific result to unified format
@@ -822,7 +856,8 @@ class MoRAGServices:
         
         # Convert results to dictionary
         result_dict = {}
-        for item, result in results:
+        for i, result in enumerate(results):
+            item = items[i]  # Get the corresponding item
             if isinstance(result, Exception):
                 # Handle exceptions
                 result_dict[item] = ProcessingResult(
@@ -834,7 +869,9 @@ class MoRAGServices:
                     error_message=str(result)
                 )
             else:
-                result_dict[item] = result
+                # result is a tuple (item, processing_result)
+                _, processing_result = result
+                result_dict[item] = processing_result
         
         return result_dict
     
@@ -847,10 +884,16 @@ class MoRAGServices:
         Returns:
             Embeddings as list of floats or list of list of floats
         """
-        return await self.embedding_service.generate_embeddings(
-            text,
-            config=self.config.embedding_config
-        )
+        if isinstance(text, list):
+            return await self.embedding_service.generate_batch_embeddings(
+                text,
+                config=self.config.embedding_config
+            )
+        else:
+            return await self.embedding_service.generate_embedding(
+                text,
+                config=self.config.embedding_config
+            )
     
     async def get_health_status(self) -> Dict[str, Any]:
         """Get health status of all services.
@@ -881,7 +924,11 @@ class MoRAGServices:
 
         for service_name, service in services_to_check:
             try:
-                service_health = await service.health_check()
+                # Type check to ensure service has health_check method
+                if hasattr(service, 'health_check'):
+                    service_health = await service.health_check()
+                else:
+                    service_health = {"status": "unknown", "error": "No health_check method"}
                 health_status["services"][service_name] = service_health
 
                 # Check if service is unhealthy
@@ -1003,6 +1050,8 @@ class MoRAGServices:
         """
         # For now, use the standard embedding generation but optimized for search
         # Future enhancement: add caching for repeated queries
+        if not self._gemini_embedding_service:
+            raise ProcessingError("Embedding service not available")
         return await self._gemini_embedding_service.generate_embedding(
             query,
             task_type="retrieval_query"

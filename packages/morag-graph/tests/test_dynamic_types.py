@@ -14,8 +14,20 @@ from unittest.mock import Mock, AsyncMock, patch
 from typing import Dict, List, Optional
 
 from morag_graph.extraction import EntityExtractor, RelationExtractor
-from morag_graph.extraction.base import LLMConfig
 from morag_graph.models import Entity, Relation
+
+# Import LLMConfig from morag-reasoning package
+try:
+    from morag_reasoning.llm import LLMConfig
+except ImportError:
+    # Fallback LLMConfig for compatibility
+    from pydantic import BaseModel
+    class LLMConfig(BaseModel):
+        provider: str = "gemini"
+        model: str = "gemini-1.5-flash"
+        api_key: str = None
+        temperature: float = 0.1
+        max_tokens: int = 2000
 
 
 class TestEntityExtractorDynamicTypes:

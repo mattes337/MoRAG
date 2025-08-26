@@ -8,44 +8,52 @@ from typing import Any, Dict, List, Optional, Union
 from ..exceptions import ProcessingError
 
 
-@dataclass
 class ProcessingConfig:
     """Base configuration for content processing."""
-    # File path (required for document processing)
-    file_path: Optional[str] = None
 
-    # Common configuration options for all processors
-    max_file_size: Optional[int] = None
-    quality_threshold: float = 0.7
-    extract_metadata: bool = True
+    def __init__(self, **kwargs):
+        """Initialize processing config with flexible parameter handling."""
+        # File path (required for document processing)
+        self.file_path: Optional[str] = kwargs.get('file_path')
 
-    # Document-specific options
-    chunking_strategy: Optional[str] = None
-    chunk_size: Optional[int] = None
-    chunk_overlap: Optional[int] = None
+        # Common configuration options for all processors
+        self.max_file_size: Optional[int] = kwargs.get('max_file_size')
+        self.quality_threshold: float = kwargs.get('quality_threshold', 0.7)
+        self.extract_metadata: bool = kwargs.get('extract_metadata', True)
 
-    # Additional options that may be passed but should be ignored by this config
-    # These are handled at higher levels (service/task level)
-    webhook_url: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    use_docling: Optional[bool] = None
-    store_in_vector_db: Optional[bool] = None
-    generate_embeddings: Optional[bool] = None
+        # Document-specific options
+        self.chunking_strategy: Optional[str] = kwargs.get('chunking_strategy')
+        self.chunk_size: Optional[int] = kwargs.get('chunk_size')
+        self.chunk_overlap: Optional[int] = kwargs.get('chunk_overlap')
 
-    # Document management options (handled at service level)
-    document_id: Optional[str] = None
-    replace_existing: Optional[bool] = None
+        # Additional options that may be passed but should be ignored by this config
+        # These are handled at higher levels (service/task level)
+        self.webhook_url: Optional[str] = kwargs.get('webhook_url')
+        self.metadata: Optional[Dict[str, Any]] = kwargs.get('metadata')
+        self.use_docling: Optional[bool] = kwargs.get('use_docling')
+        self.store_in_vector_db: Optional[bool] = kwargs.get('store_in_vector_db')
+        self.generate_embeddings: Optional[bool] = kwargs.get('generate_embeddings')
 
-    # Remote processing options (handled at service level)
-    remote: Optional[bool] = None
+        # Document management options (handled at service level)
+        self.document_id: Optional[str] = kwargs.get('document_id')
+        self.replace_existing: Optional[bool] = kwargs.get('replace_existing')
 
-    # Progress callback for long-running operations
-    progress_callback: Optional[callable] = None
+        # Remote processing options (handled at service level)
+        self.remote: Optional[bool] = kwargs.get('remote')
 
-    def __post_init__(self):
-        """Post-initialization to handle any additional unknown parameters."""
-        # This allows the config to accept additional parameters without failing
-        pass
+        # Progress callback for long-running operations
+        self.progress_callback: Optional[callable] = kwargs.get('progress_callback')
+
+        # Store any additional unknown parameters for potential use by converters
+        self.additional_options: Dict[str, Any] = {
+            k: v for k, v in kwargs.items()
+            if k not in {
+                'file_path', 'max_file_size', 'quality_threshold', 'extract_metadata',
+                'chunking_strategy', 'chunk_size', 'chunk_overlap', 'webhook_url',
+                'metadata', 'use_docling', 'store_in_vector_db', 'generate_embeddings',
+                'document_id', 'replace_existing', 'remote', 'progress_callback'
+            }
+        }
 
 
 @dataclass

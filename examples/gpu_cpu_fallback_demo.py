@@ -20,9 +20,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from morag_core.config import Settings, detect_device, get_safe_device
 from morag_audio import AudioProcessor, AudioConfig
 from morag_image import ImageProcessor
-from morag_audio.services import EnhancedTopicSegmentation
-from morag_audio.services import EnhancedSpeakerDiarization
-from morag_audio.services import WhisperService
+from morag_audio.services import TopicSegmentationService
+from morag_audio.services import SpeakerDiarizationService
+from morag_audio import AudioService
 
 
 def print_section(title: str):
@@ -128,9 +128,9 @@ def test_topic_segmentation():
     print_section("Topic Segmentation GPU Fallback")
     
     try:
-        print("1. Testing EnhancedTopicSegmentation initialization:")
-        service = EnhancedTopicSegmentation()
-        print(f"   EnhancedTopicSegmentation initialized successfully")
+        print("1. Testing TopicSegmentationService initialization:")
+        service = TopicSegmentationService()
+        print(f"   TopicSegmentationService initialized successfully")
         print(f"   Model loaded: {service.model_loaded}")
         
         if service.model_loaded:
@@ -167,7 +167,7 @@ async def test_async_operations():
     
     try:
         print("1. Testing async topic segmentation:")
-        service = EnhancedTopicSegmentation()
+        service = TopicSegmentationService()
         
         test_text = "This is a test sentence. This is another sentence about a different topic."
         result = await service.segment_topics(test_text)

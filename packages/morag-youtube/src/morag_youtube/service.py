@@ -62,7 +62,7 @@ class YouTubeService(BaseService):
         async with self.semaphore:
             return await self.processor.process_url(url, config)
     
-    async def process_videos(self, urls: List[str], config: Optional[YouTubeConfig] = None) -> List[YouTubeDownloadResult]:
+    async def process_videos(self, urls: List[str], config: Optional[YouTubeConfig] = None) -> List[Union[YouTubeDownloadResult, BaseException]]:
         """Process multiple YouTube videos concurrently.
         
         Args:
@@ -216,7 +216,7 @@ class YouTubeService(BaseService):
         
         return result.audio_path
     
-    async def download_subtitles(self, url: str, languages: List[str] = None, 
+    async def download_subtitles(self, url: str, languages: Optional[List[str]] = None,
                                output_dir: Optional[Path] = None) -> List[Path]:
         """Download subtitles for a YouTube video.
         

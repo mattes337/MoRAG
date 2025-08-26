@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     # Qdrant Configuration
     qdrant_host: str = Field(default="localhost", alias="QDRANT_HOST")
     qdrant_port: int = Field(default=6333, alias="QDRANT_PORT")
-    qdrant_collection_name: str = Field(default="", alias="QDRANT_COLLECTION_NAME", description="Qdrant collection name - required")
+    qdrant_collection_name: str = Field(default="morag_documents", alias="QDRANT_COLLECTION_NAME", description="Qdrant collection name")
     qdrant_api_key: Optional[str] = Field(default=None, alias="QDRANT_API_KEY")
 
     # Performance Monitoring
@@ -232,34 +232,7 @@ class Settings(BaseSettings):
         description="Maximum size for page-based chunks"
     )
 
-    # OpenIE Configuration
-    openie_enabled: bool = Field(
-        default=True,
-        alias="MORAG_OPENIE_ENABLED",
-        description="Enable OpenIE relation extraction"
-    )
 
-    openie_implementation: str = Field(
-        default="stanford",
-        alias="MORAG_OPENIE_IMPLEMENTATION",
-        description="OpenIE implementation to use (stanford, openie5, etc.)"
-    )
-
-    openie_confidence_threshold: float = Field(
-        default=0.7,
-        alias="MORAG_OPENIE_CONFIDENCE_THRESHOLD",
-        ge=0.0,
-        le=1.0,
-        description="Minimum confidence threshold for OpenIE triplets"
-    )
-
-    openie_max_triplets_per_sentence: int = Field(
-        default=10,
-        alias="MORAG_OPENIE_MAX_TRIPLETS_PER_SENTENCE",
-        ge=1,
-        le=50,
-        description="Maximum number of triplets to extract per sentence"
-    )
 
     openie_enable_entity_linking: bool = Field(
         default=True,
@@ -307,10 +280,8 @@ class Settings(BaseSettings):
     def validate_collection_name(cls, v):
         """Validate that collection name is provided."""
         if not v:
-            raise ValueError(
-                "QDRANT_COLLECTION_NAME environment variable is required. "
-                "Please set it to your desired collection name (e.g., 'morag_documents')"
-            )
+            logger.warning("QDRANT_COLLECTION_NAME not set, using default 'morag_documents'")
+            return "morag_documents"
         return v
 
     model_config = SettingsConfigDict(
@@ -340,8 +311,16 @@ class Settings(BaseSettings):
 
         # Fall back to parsing max_file_size string
         try:
-            from .utils.file_handling import parse_size_string
-            return parse_size_string(self.max_file_size)
+            # Simple size parsing to avoid circular imports
+            size_str = self.max_file_size.upper()
+            if size_str.endswith('MB'):
+                return int(float(size_str[:-2]) * 1024 * 1024)
+            elif size_str.endswith('GB'):
+                return int(float(size_str[:-2]) * 1024 * 1024 * 1024)
+            elif size_str.endswith('KB'):
+                return int(float(size_str[:-2]) * 1024)
+            else:
+                return int(size_str)
         except Exception:
             # If parsing fails, return the default bytes value
             return self.max_upload_size_bytes

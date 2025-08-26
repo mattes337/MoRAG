@@ -16,12 +16,8 @@ import json
 # Add the src directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from morag_services import (
-    DocumentConverter,
-    ConversionOptions,
-    ChunkingStrategy
-)
-from morag_core.models import get_conversion_config, create_sample_config
+from morag_document.converters import DocumentConverter
+from morag_core.interfaces.converter import ConversionOptions, ChunkingStrategy
 
 
 async def demo_basic_conversion():
@@ -84,30 +80,26 @@ async def demo_configuration():
     """Demonstrate configuration system."""
     print("⚙️  Configuration Demo")
     print("-" * 25)
-    
-    # Get current configuration
-    config = get_conversion_config()
-    
-    print("Default options:")
-    for key, value in config.default_options.items():
-        print(f"  • {key}: {value}")
+
+    print("📝 Configuration system available through ConversionOptions:")
+    print("  • chunking_strategy: Controls how documents are chunked")
+    print("  • include_metadata: Whether to extract document metadata")
+    print("  • extract_images: Whether to extract images from documents")
+    print("  • format_options: Format-specific conversion options")
     print()
-    
-    print("Format-specific options:")
-    for format_type, options in config.format_specific.items():
-        print(f"  • {format_type}:")
-        for key, value in options.items():
-            print(f"    - {key}: {value}")
+
+    # Show example configuration
+    options = ConversionOptions(
+        chunking_strategy=ChunkingStrategy.PAGE,
+        include_metadata=True,
+        extract_images=False
+    )
+
+    print("Example configuration:")
+    print(f"  • Chunking strategy: {options.chunking_strategy}")
+    print(f"  • Include metadata: {options.include_metadata}")
+    print(f"  • Extract images: {options.extract_images}")
     print()
-    
-    # Create sample configuration file
-    sample_config_path = Path("sample_conversion_config.yaml")
-    create_sample_config(sample_config_path)
-    print(f"📝 Created sample configuration: {sample_config_path}")
-    
-    # Clean up
-    if sample_config_path.exists():
-        sample_config_path.unlink()
 
 
 async def demo_conversion_options():

@@ -62,6 +62,7 @@ RUN pip install /build/packages/morag-core && \
     pip install /build/packages/morag-graph && \
     pip install /build/packages/morag-reasoning && \
     pip install /build/packages/morag-services && \
+    pip install /build/packages/morag-stages && \
     pip install /build/packages/morag
 
 

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class RelationOperations(BaseOperations):
     """Handles relation storage, retrieval, and management operations."""
     
-    async def store_relation(self, relation: Relation) -> RelationId:
+    async def store_relation(self, relation: Relation) -> Optional[RelationId]:
         """Store a relation in Neo4J.
 
         If either entity doesn't exist, it will be created automatically.

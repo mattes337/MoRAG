@@ -108,7 +108,7 @@ class LangExtractVisualizer:
         relations: Optional[List[Relation]]
     ) -> List[Any]:
         """Create LangExtract examples from existing entity/relation data."""
-        examples = []
+        examples: List[Dict[str, Any]] = []
         
         if not entities and not relations:
             return examples

@@ -365,8 +365,7 @@ Be generous in extracting information - anything related to the user's query is 
             )
 
             # Call LLM for fact extraction
-            result = await self.agent.run(prompt)
-            response = result.data
+            response = await self.agent.run(prompt)
 
             self.logger.debug(
                 "LLM fact extraction response",

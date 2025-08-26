@@ -1,148 +1,122 @@
-"""FastAPI server for MoRAG system."""
+"""FastAPI server for MoRAG Stage-Based Processing System."""
 
 import asyncio
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from pathlib import Path
-import json
-import uuid
+import sys
+import os
+
+# Load environment variables from .env file early
+try:
+    from dotenv import load_dotenv
+    # Look for .env file in current directory and parent directories
+    env_path = Path.cwd() / ".env"
+    if not env_path.exists():
+        # Try parent directories
+        for parent in Path.cwd().parents:
+            env_path = parent / ".env"
+            if env_path.exists():
+                break
+    if env_path.exists():
+        load_dotenv(env_path)
+        print(f"Loaded environment variables from: {env_path}")
+    else:
+        print("No .env file found")
+except ImportError:
+    print("python-dotenv not available, skipping .env file loading")
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
 import structlog
 
-from morag.api import MoRAGAPI
-from morag.api_models.models import (
-    ProcessURLRequest, ProcessBatchRequest, SearchRequest, ProcessingResultResponse,
-    IngestFileRequest, IngestURLRequest, IngestBatchRequest, IngestRemoteFileRequest,
-    ProcessRemoteFileRequest, IngestResponse, BatchIngestResponse, TaskStatus
-)
-from morag.api_models.utils import (
-    download_remote_file, normalize_content_type, normalize_processing_result,
-    encode_thumbnails_to_base64
-)
-from morag_services import ServiceConfig
-from morag_core.models import ProcessingResult, IngestionResponse, BatchIngestionResponse, TaskStatusResponse
-from morag_graph.models.database_config import DatabaseType, DatabaseConfig
-from morag.utils.file_upload import get_upload_handler, FileUploadError, validate_temp_directory_access
-from morag.services.cleanup_service import start_cleanup_service, stop_cleanup_service, force_cleanup
-from morag.worker import (
-    process_file_task, process_url_task, process_web_page_task,
-    process_youtube_video_task, process_batch_task, celery_app
-)
-from morag.ingest_tasks import ingest_file_task, ingest_url_task, ingest_batch_task
-from morag.endpoints import remote_jobs_router
-from morag.api_models.endpoints.processing import setup_processing_endpoints
-from morag.api_models.endpoints.search import setup_search_endpoints
-from morag.api_models.endpoints.ingestion import setup_ingestion_endpoints
-from morag.api_models.endpoints.tasks import setup_task_endpoints, setup_task_management_endpoints
-from morag.api_models.endpoints.admin import setup_admin_endpoints
-from morag.api_models.endpoints.conversion import setup_conversion_endpoints
-from morag.api_models.endpoints.temp_files import setup_temp_files_endpoints
-from morag.api_models.endpoints.unified import setup_unified_endpoints
-from morag.api_models.openapi_schemas import OPENAPI_TAGS, OPENAPI_SERVERS, OPENAPI_SECURITY_SCHEMES
+# Add path for stage imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "morag-stages" / "src"))
+
+from morag.api_models.endpoints.stages import router as stages_router
+from morag.api_models.endpoints.files import router as files_router
+from morag.utils.file_upload import validate_temp_directory_access
 
 logger = structlog.get_logger(__name__)
 
 
-# Note: Utility functions have been moved to morag.api.utils module
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan."""
+    logger.info("Starting MoRAG Stage-Based Processing Server...")
 
-
-
-
-
-# Note: Pydantic models have been moved to morag.api.models module
-
-
-def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
-    """Create FastAPI application."""
-
-    # Initialize MoRAG API lazily to avoid settings validation at import time
-    morag_api = None
-
-    def get_morag_api() -> MoRAGAPI:
-        """Get or create MoRAG API instance."""
-        nonlocal morag_api
-        if morag_api is None:
-            morag_api = MoRAGAPI(config)
-        return morag_api
-
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        """Lifespan context manager for startup and shutdown."""
-        # Startup
-        logger.info("MoRAG API server starting up")
-
-        # Validate temp directory access early - fail fast if not accessible
-        try:
-            validate_temp_directory_access()
-            logger.info("Temp directory validation passed")
-        except RuntimeError as e:
-            logger.error("STARTUP FAILURE: Temp directory validation failed", error=str(e))
-            raise RuntimeError(f"Cannot start server: {str(e)}")
-
-        # Start periodic cleanup service
-        start_cleanup_service(
-            cleanup_interval_hours=1,    # Run cleanup every hour
-            max_file_age_hours=24,       # Files older than 24 hours are eligible for cleanup
-            max_disk_usage_mb=10000       # Aggressive cleanup if temp files exceed 10GB
-        )
-        logger.info("Periodic cleanup service started")
+    try:
+        # Validate temp directory access early
+        validate_temp_directory_access()
+        logger.info("Temp directory access validated")
 
         yield
 
-        # Shutdown
-        logger.info("MoRAG API server shutting down")
-        stop_cleanup_service()
-        logger.info("Periodic cleanup service stopped")
-        await get_morag_api().cleanup()
-        logger.info("MoRAG API server shut down")
+    except Exception as e:
+        logger.error("Failed to initialize MoRAG server", error=str(e))
+        raise
+    finally:
+        logger.info("Shutting down MoRAG server...")
 
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+
+    # Create FastAPI app with lifespan management
     app = FastAPI(
-        title="MoRAG API",
+        title="MoRAG Stage-Based Processing API",
         description="""
-        # Multi-modal Retrieval Augmented Generation API
+        # Stage-Based Processing System
 
-        MoRAG provides comprehensive document processing, analysis, and retrieval capabilities
-        with support for multiple file formats including PDFs, audio, video, and text documents.
+        MoRAG Stage-Based Processing API using canonical stage names:
+        - **markdown-conversion**: Convert input files to unified markdown format
+        - **markdown-optimizer**: LLM-based text improvement and error correction (optional)
+        - **chunker**: Create summary, chunks, and contextual embeddings
+        - **fact-generator**: Extract facts, entities, relations, and keywords
+        - **ingestor**: Database ingestion and storage
 
-        ## Core Features
-        - **Processing Endpoints**: Process content and return results immediately
-        - **Ingestion Endpoints**: Process content and store in vector database for retrieval
-        - **Task Management**: Track processing status and manage background tasks
-        - **Search**: Query stored content using vector similarity
+        ## Key Features
+        - Individual stage execution with canonical names
+        - Stage chain execution for multi-step processing
+        - File management and download capabilities
+        - Webhook notifications for stage completion
+        - Resume capability with existing output detection
+        - Flexible request formats: accepts both JSON objects and JSON strings (Postman compatible)
 
-        ## UI Interoperability Features
+        ## API Endpoints
+        - `/api/v1/stages/` - List available stages
+        - `/api/v1/stages/{stage-name}/execute` - Execute individual stages
+        - `/api/v1/stages/chain` - Execute stage chains
+        - `/api/v1/stages/status` - Check execution status
+        - `/api/v1/stages/health` - Health check
+        - `/api/v1/files/` - File management endpoints
 
-        Specialized endpoints for UI applications:
+        ## Stage Names (Canonical)
+        All endpoints use these exact canonical stage names:
+        - `markdown-conversion`
+        - `markdown-optimizer`
+        - `chunker`
+        - `fact-generator`
+        - `ingestor`
 
-        - **Markdown Conversion**: Fast file-to-markdown conversion for preview functionality
-        - **Processing with Webhooks**: Complete document processing with real-time progress notifications
-        - **Document Deduplication**: ID-based deduplication system to prevent duplicate processing
-        - **Temporary File Management**: Access to intermediate files generated during processing
-
-        ## Authentication
-
-        Most endpoints support optional Bearer token authentication. Temporary file endpoints
-        require session-based access control for security.
-
-        ## Endpoint Categories
-        - `/process/*` - Immediate processing (no storage)
-        - `/api/v1/ingest/*` - Background processing with vector storage
-        - `/api/v1/status/*` - Task status and management
-        - `/search` - Vector similarity search
-        - `/api/convert/*` - File conversion for UI preview
-        - `/api/files/*` - Temporary file management
+        **Note**: This API completely replaces all previous MoRAG endpoints.
+        No backward compatibility is provided.
         """,
         version="1.0.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
         lifespan=lifespan,
-        openapi_tags=OPENAPI_TAGS,
-        servers=OPENAPI_SERVERS
+        openapi_tags=[
+            {
+                "name": "stages",
+                "description": "Stage execution endpoints using canonical stage names"
+            },
+            {
+                "name": "files",
+                "description": "File management and download endpoints"
+            }
+        ]
     )
 
     # Add CORS middleware
@@ -153,52 +127,75 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
+    # Add global exception handler
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request, exc):
+        logger.error("Unhandled exception",
+                    path=request.url.path,
+                    method=request.method,
+                    error=str(exc),
+                    exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "error": str(exc)}
+        )
+
+    # Root endpoint
     @app.get("/")
     async def root():
-        """Root endpoint."""
-        return {"message": "MoRAG API", "version": "0.1.0"}
+        """Root endpoint with API information."""
+        return {
+            "name": "MoRAG Stage-Based Processing API",
+            "version": "1.0.0",
+            "description": "Stage-based processing system using canonical stage names",
+            "available_stages": [
+                "markdown-conversion",
+                "markdown-optimizer",
+                "chunker",
+                "fact-generator",
+                "ingestor"
+            ],
+            "docs_url": "/docs",
+            "redoc_url": "/redoc",
+            "health_url": "/api/v1/stages/health",
+            "migration_notice": "This API completely replaces all previous MoRAG endpoints. No backward compatibility is provided."
+        }
 
-    @app.get("/health")
-    async def health_check():
-        """Health check endpoint."""
-        try:
-            status = await get_morag_api().health_check()
-            return JSONResponse(content=status)
-        except Exception as e:
-            logger.error("Health check failed", error=str(e))
-            raise HTTPException(status_code=500, detail=str(e))
+    # Legacy endpoint deprecation notice
+    @app.get("/api/v1/process")
+    @app.post("/api/v1/process")
+    @app.get("/api/v1/ingest")
+    @app.post("/api/v1/ingest")
+    @app.get("/process")
+    @app.post("/process")
+    async def deprecated_endpoint():
+        """Deprecated endpoint notice."""
+        return JSONResponse(
+            status_code=410,
+            content={
+                "error": "Endpoint Deprecated",
+                "message": "This endpoint has been removed. Use the new stage-based API.",
+                "migration_guide": {
+                    "old_process_endpoints": "Use /api/v1/stages/chain with appropriate stages",
+                    "old_ingest_endpoints": "Use /api/v1/stages/ingestor/execute",
+                    "documentation": "/docs",
+                    "available_stages": [
+                        "markdown-conversion",
+                        "markdown-optimizer",
+                        "chunker",
+                        "fact-generator",
+                        "ingestor"
+                    ]
+                }
+            }
+        )
 
-    # Setup modular endpoints
-    # NOTE: Legacy endpoints kept for backward compatibility
-    # New unified endpoint is the recommended approach
-    processing_router = setup_processing_endpoints(get_morag_api)
-    search_router = setup_search_endpoints(get_morag_api)
-    ingestion_router = setup_ingestion_endpoints(get_morag_api)
-    tasks_router = setup_task_endpoints(get_morag_api)
-    task_mgmt_router = setup_task_management_endpoints(get_morag_api)
-    admin_router = setup_admin_endpoints(get_morag_api)
-    conversion_router = setup_conversion_endpoints()
-    temp_files_router = setup_temp_files_endpoints()
+    # Include stage-based routers ONLY
+    app.include_router(stages_router)
+    app.include_router(files_router)
 
-    # Setup new unified endpoint (recommended)
-    unified_router = setup_unified_endpoints(get_morag_api)
-
-    # Include routers
-    # New unified endpoint first (takes precedence)
-    app.include_router(unified_router)
-
-    # Legacy endpoints for backward compatibility
-    app.include_router(processing_router)
-    app.include_router(search_router)
-    app.include_router(ingestion_router)
-    app.include_router(tasks_router)
-    app.include_router(task_mgmt_router)
-    app.include_router(admin_router)
-    app.include_router(conversion_router)
-    app.include_router(temp_files_router)
-
-    # Custom OpenAPI schema with security schemes
+    # Custom OpenAPI schema
     def custom_openapi():
         if app.openapi_schema:
             return app.openapi_schema
@@ -208,22 +205,24 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
             version=app.version,
             description=app.description,
             routes=app.routes,
-            servers=app.servers,
-            tags=app.openapi_tags
         )
 
-        # Add security schemes
-        openapi_schema["components"]["securitySchemes"] = OPENAPI_SECURITY_SCHEMES
-
-        # Add examples and additional documentation
-        openapi_schema["info"]["contact"] = {
-            "name": "MoRAG Support",
-            "email": "support@morag.example.com"
+        # Add custom info
+        openapi_schema["info"]["x-logo"] = {
+            "url": "https://example.com/logo.png"
         }
 
-        openapi_schema["info"]["license"] = {
-            "name": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+        # Add migration notice
+        openapi_schema["info"]["x-migration-notice"] = {
+            "message": "This API completely replaces all previous MoRAG endpoints",
+            "backward_compatibility": False,
+            "canonical_stage_names": [
+                "markdown-conversion",
+                "markdown-optimizer",
+                "chunker",
+                "fact-generator",
+                "ingestor"
+            ]
         }
 
         app.openapi_schema = openapi_schema
@@ -231,86 +230,30 @@ def create_app(config: Optional[ServiceConfig] = None) -> FastAPI:
 
     app.openapi = custom_openapi
 
-
-    # Include routers
-    app.include_router(remote_jobs_router)
-
-    # Include enhanced query router (v2 API)
-    try:
-        from morag.endpoints import enhanced_query_router
-        app.include_router(enhanced_query_router)
-        logger.info("Enhanced query API endpoints loaded")
-    except ImportError as e:
-        logger.warning("Enhanced query endpoints not available", error=str(e))
-
-    # Include intelligent retrieval router (v2 API)
-    try:
-        from morag.endpoints.intelligent_retrieval import router as intelligent_retrieval_router
-        app.include_router(intelligent_retrieval_router)
-        logger.info("Intelligent retrieval API endpoints loaded")
-    except ImportError as e:
-        logger.warning("Intelligent retrieval endpoints not available", error=str(e))
-
-    # Legacy router temporarily disabled
-    # try:
-    #     from morag.endpoints import legacy_router
-    #     app.include_router(legacy_router)
-    #     logger.info("Legacy API endpoints loaded")
-    # except ImportError as e:
-    #     logger.warning("Legacy endpoints not available", error=str(e))
-
-    # Include reasoning router (multi-hop reasoning API)
-    try:
-        from morag.endpoints.reasoning import router as reasoning_router
-        app.include_router(reasoning_router, prefix="/api/v2")
-        logger.info("Multi-hop reasoning API endpoints loaded")
-    except ImportError as e:
-        logger.warning("Multi-hop reasoning endpoints not available", error=str(e))
-
-    # Include recursive fact retrieval router (recursive fact retrieval API)
-    try:
-        from morag.endpoints.recursive_fact_retrieval import router as recursive_fact_retrieval_router
-        app.include_router(recursive_fact_retrieval_router)
-        logger.info("Recursive fact retrieval API endpoints loaded")
-    except ImportError as e:
-        logger.warning("Recursive fact retrieval endpoints not available", error=str(e))
-
     return app
 
 
 def main():
-    """Main entry point for the server."""
-    import argparse
+    """Main entry point for running the server."""
+    import os
 
-    parser = argparse.ArgumentParser(description="MoRAG API Server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
-    parser.add_argument("--config", help="Configuration file path")
-
-    args = parser.parse_args()
-
-    # Load configuration if provided
-    config = None
-    if args.config:
-        config_path = Path(args.config)
-        if config_path.exists():
-            import json
-            with open(config_path) as f:
-                config_data = json.load(f)
-                config = ServiceConfig(**config_data)
+    # Get configuration from environment with proper defaults
+    host = os.getenv("MORAG_HOST", "0.0.0.0")
+    port = int(os.getenv("MORAG_PORT", "8000"))
+    reload = os.getenv("MORAG_RELOAD", "false").lower() == "true"
+    log_level = os.getenv("MORAG_LOG_LEVEL", "info")
 
     # Create app
-    app = create_app(config)
+    app = create_app()
 
     # Run server
     uvicorn.run(
         app,
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-        workers=args.workers if not args.reload else 1
+        host=host,
+        port=port,
+        reload=reload,
+        log_level=log_level,
+        access_log=True
     )
 
 

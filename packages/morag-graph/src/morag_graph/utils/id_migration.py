@@ -17,7 +17,7 @@ class IDMigrationService:
     def __init__(self, neo4j_storage: Neo4jStorage, qdrant_storage: Optional[QdrantStorage] = None):
         self.neo4j = neo4j_storage
         self.qdrant = qdrant_storage
-        self.migration_log = []
+        self.migration_log: List[Dict[str, Any]] = []
     
     async def migrate_document_ids(self, batch_size: int = 100) -> Dict[str, Any]:
         """Migrate document IDs to unified format.

@@ -377,17 +377,17 @@ def get_temp_file_service() -> TemporaryFileService:
     """Get global temporary file service instance."""
     global _temp_file_service
     if _temp_file_service is None:
-        # Get configuration from environment
+        # Get configuration from environment with proper defaults
         base_dir = os.getenv('MORAG_TEMP_DIR', 'temp_storage')
         retention_hours = int(os.getenv('MORAG_TEMP_RETENTION_HOURS', '24'))
         max_session_size_mb = int(os.getenv('MORAG_TEMP_MAX_SESSION_SIZE_MB', '1024'))
         cleanup_interval_minutes = int(os.getenv('MORAG_TEMP_CLEANUP_INTERVAL_MINUTES', '60'))
-        
+
         _temp_file_service = TemporaryFileService(
             base_dir=base_dir,
             retention_hours=retention_hours,
             max_session_size_mb=max_session_size_mb,
             cleanup_interval_minutes=cleanup_interval_minutes
         )
-    
+
     return _temp_file_service

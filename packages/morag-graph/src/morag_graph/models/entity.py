@@ -4,6 +4,7 @@ import json
 import uuid
 import hashlib
 import logging
+from datetime import datetime
 from typing import Dict, List, Optional, Any, Union, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
@@ -37,6 +38,10 @@ class Entity(BaseModel):
     attributes: EntityAttributes = Field(default_factory=dict)
     source_doc_id: Optional[str] = None
     confidence: float = 1.0
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    embedding: Optional[List[float]] = Field(default=None, description="Vector embedding")
+    created_at: Optional[datetime] = Field(default_factory=datetime.now, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(default_factory=datetime.now, description="Last update timestamp")
     
 
     

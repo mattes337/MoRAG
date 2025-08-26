@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlparse, urlunparse
 
 import httpx
 import structlog
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup, Comment, Tag, PageElement
 from markdownify import markdownify
 
 from morag_core.exceptions import ProcessingError, ValidationError
@@ -112,7 +112,7 @@ class WebProcessor(BaseProcessor):
             "User-Agent": config.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
+            # Remove explicit Accept-Encoding to let httpx handle compression automatically
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
             "Cache-Control": "max-age=0"
@@ -129,7 +129,7 @@ class WebProcessor(BaseProcessor):
                 async with httpx.AsyncClient(timeout=config.timeout, follow_redirects=True) as client:
                     response = await client.get(url, headers=headers)
                     response.raise_for_status()
-                    
+
                     # Check content type
                     content_type = response.headers.get('content-type', '').split(';')[0].strip().lower()
                     if content_type not in config.allowed_content_types:
@@ -137,7 +137,7 @@ class WebProcessor(BaseProcessor):
                             f"Unsupported content type: {content_type}. "
                             f"Allowed types: {', '.join(config.allowed_content_types)}"
                         )
-                    
+
                     # Check content length
                     content_length = len(response.content)
                     if content_length > config.max_content_length:
@@ -145,8 +145,50 @@ class WebProcessor(BaseProcessor):
                             f"Content too large: {content_length} bytes "
                             f"(max: {config.max_content_length})"
                         )
-                    
-                    return response.text, content_type, dict(response.headers)
+
+                    # Handle text decoding more robustly
+                    try:
+                        # Log response details for debugging
+                        logger.debug(
+                            "Response details",
+                            url=url,
+                            status_code=response.status_code,
+                            content_encoding=response.headers.get('content-encoding'),
+                            content_type=response.headers.get('content-type'),
+                            content_length=len(response.content)
+                        )
+
+                        # First try the response's automatic text decoding
+                        text_content = response.text
+
+                        # Validate that the content is actually readable text
+                        # Check for excessive binary characters which indicate corruption
+                        binary_chars = sum(1 for c in text_content[:1000] if ord(c) < 32 and c not in '\n\r\t')
+                        if binary_chars > 50:  # More than 50 binary chars in first 1000 suggests corruption
+                            logger.warning(f"Content appears corrupted, binary chars: {binary_chars}", url=url)
+                            raise UnicodeDecodeError("corruption", b"", 0, 1, "Content appears corrupted")
+
+                        return text_content, content_type, dict(response.headers)
+
+                    except UnicodeDecodeError as e:
+                        logger.warning(f"Text decoding failed: {e}", url=url)
+                        # If automatic decoding fails, try different encodings
+                        for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                            try:
+                                text_content = response.content.decode(encoding, errors='ignore')
+                                logger.warning(f"Used fallback encoding: {encoding}", url=url)
+
+                                # Validate the fallback content too
+                                binary_chars = sum(1 for c in text_content[:1000] if ord(c) < 32 and c not in '\n\r\t')
+                                if binary_chars > 50:
+                                    continue  # Try next encoding
+
+                                return text_content, content_type, dict(response.headers)
+                            except UnicodeDecodeError:
+                                continue
+
+                        # If all encodings fail, raise an error
+                        raise ProcessingError(f"Could not decode content from {url}")
                     
             except httpx.HTTPStatusError as e:
                 last_error = ProcessingError(f"HTTP error: {e.response.status_code} - {e.response.reason_phrase}")
@@ -211,7 +253,7 @@ class WebProcessor(BaseProcessor):
         
         return soup
     
-    def _extract_main_content(self, soup: BeautifulSoup) -> BeautifulSoup:
+    def _extract_main_content(self, soup: BeautifulSoup) -> Union[Tag, PageElement, BeautifulSoup]:
         """Extract main content from the page."""
         # Try to find main content area
         main_selectors = [
@@ -250,28 +292,43 @@ class WebProcessor(BaseProcessor):
         
         # Extract meta tags
         for meta in soup.find_all('meta'):
-            name = meta.get('name', '').lower()
-            property_name = meta.get('property', '').lower()
-            content = meta.get('content', '')
-            
-            if name and content:
-                metadata[f'meta_{name}'] = content
-            elif property_name and content:
-                metadata[f'meta_{property_name}'] = content
+            if isinstance(meta, Tag):
+                name_attr = meta.get('name', '')
+                property_attr = meta.get('property', '')
+                content_attr = meta.get('content', '')
+
+                name = str(name_attr).lower() if name_attr else ''
+                property_name = str(property_attr).lower() if property_attr else ''
+                content = str(content_attr) if content_attr else ''
+
+                if name and content:
+                    metadata[f'meta_{name}'] = content
+                elif property_name and content:
+                    metadata[f'meta_{property_name}'] = content
         
         # Extract Open Graph metadata
         for meta in soup.find_all('meta', property=re.compile(r'^og:')):
-            property_name = meta.get('property', '').lower().replace('og:', 'og_')
-            content = meta.get('content', '')
-            if property_name and content:
-                metadata[property_name] = content
+            if isinstance(meta, Tag):
+                property_attr = meta.get('property', '')
+                content_attr = meta.get('content', '')
+
+                property_name = str(property_attr).lower().replace('og:', 'og_') if property_attr else ''
+                content = str(content_attr) if content_attr else ''
+
+                if property_name and content:
+                    metadata[property_name] = content
         
         # Extract Twitter Card metadata
-        for meta in soup.find_all('meta', name=re.compile(r'^twitter:')):
-            name = meta.get('name', '').lower().replace('twitter:', 'twitter_')
-            content = meta.get('content', '')
-            if name and content:
-                metadata[name] = content
+        for meta in soup.find_all('meta', attrs={'name': re.compile(r'^twitter:')}):
+            if isinstance(meta, Tag):
+                name_attr = meta.get('name', '')
+                content_attr = meta.get('content', '')
+
+                name = str(name_attr).lower().replace('twitter:', 'twitter_') if name_attr else ''
+                content = str(content_attr) if content_attr else ''
+
+                if name and content:
+                    metadata[name] = content
         
         return metadata
     
@@ -280,7 +337,9 @@ class WebProcessor(BaseProcessor):
         links = []
         
         for a_tag in soup.find_all('a', href=True):
-            href = a_tag.get('href', '').strip()
+            if isinstance(a_tag, Tag):
+                href_attr = a_tag.get('href', '')
+                href = str(href_attr).strip() if href_attr else ''
             
             # Skip empty links and javascript/mailto links
             if not href or href.startswith(('javascript:', 'mailto:', 'tel:', '#')):
@@ -301,7 +360,9 @@ class WebProcessor(BaseProcessor):
         images = []
         
         for img_tag in soup.find_all('img', src=True):
-            src = img_tag.get('src', '').strip()
+            if isinstance(img_tag, Tag):
+                src_attr = img_tag.get('src', '')
+                src = str(src_attr).strip() if src_attr else ''
             
             # Skip empty sources and data URIs
             if not src or src.startswith('data:'):
@@ -318,28 +379,52 @@ class WebProcessor(BaseProcessor):
         return list(set(images))  # Remove duplicates
     
     def _convert_to_markdown(self, html: str, config: WebScrapingConfig) -> str:
-        """Convert HTML to Markdown."""
-        return markdownify(
-            html,
-            heading_style="atx",
-            strip=["script", "style"],
-            convert={"img": lambda tag: f"![{tag.get('alt', '')}]({tag.get('src', '')})"},
-            escape_asterisks=True,
-            escape_underscores=True,
-            table_class="",
-            wrap_width=0,  # No wrapping
-            bullets="-",
-            strong_em_symbol="*"
-        )
+        """Convert HTML to Markdown using MarkItDown for better content extraction."""
+        try:
+            from markitdown import MarkItDown
+            from io import BytesIO
+
+            # Initialize MarkItDown
+            md_converter = MarkItDown()
+
+            # Create a BytesIO object to simulate a file-like object for HTML content
+            html_bytes = html.encode('utf-8')
+            html_stream = BytesIO(html_bytes)
+
+            # Convert HTML to markdown using MarkItDown
+            # MarkItDown automatically handles content extraction and removes clutter
+            result = md_converter.convert_stream(html_stream, file_extension=".html")
+
+            return result.text_content if result and result.text_content else ""
+
+        except Exception as e:
+            logger.warning(f"MarkItDown conversion failed, falling back to basic conversion: {e}")
+
+            # Fallback to basic HTML cleaning if MarkItDown fails
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, 'html.parser')
+
+            # Remove script, style, nav, header, footer, and other clutter tags
+            for tag in soup(['script', 'style', 'nav', 'header', 'footer', 'aside', 'menu']):
+                tag.decompose()
+
+            # Try to find main content area
+            main_content = soup.find('main') or soup.find('article') or soup.find('div', class_=['content', 'main', 'article'])
+            if main_content:
+                soup = main_content
+
+            # Extract text content
+            return soup.get_text(separator='\n', strip=True)
     
-    def _create_chunks(self, content: str, metadata: Dict[str, Any]) -> List[DocumentChunk]:
+    def _create_chunks(self, content: str, metadata: Dict[str, Any], document_id: str) -> List[DocumentChunk]:
         """Create document chunks from content."""
         # Simple chunking by paragraphs for now
         paragraphs = [p for p in content.split('\n\n') if p.strip()]
-        
+
         chunks = []
         for i, paragraph in enumerate(paragraphs):
             chunk = DocumentChunk(
+                document_id=document_id,
                 content=paragraph,
                 metadata={
                     **metadata,
@@ -348,7 +433,7 @@ class WebProcessor(BaseProcessor):
                 }
             )
             chunks.append(chunk)
-        
+
         return chunks
     
     async def process(self, file_path: Union[str, Path], config: Optional[ProcessingConfig] = None) -> ProcessingResult:
@@ -435,7 +520,7 @@ class WebProcessor(BaseProcessor):
             )
             
             # Create chunks
-            chunks = self._create_chunks(content.content, metadata)
+            chunks = self._create_chunks(content.content, metadata, normalized_url)
             
             # Calculate total processing time
             processing_time = time.time() - start_time
@@ -454,7 +539,7 @@ class WebProcessor(BaseProcessor):
             processing_time = time.time() - start_time
             return WebScrapingResult(
                 url=url,
-                content=None,  # type: ignore
+                content=None,
                 chunks=[],
                 processing_time=processing_time,
                 success=False,
@@ -466,7 +551,7 @@ class WebProcessor(BaseProcessor):
             processing_time = time.time() - start_time
             return WebScrapingResult(
                 url=url,
-                content=None,  # type: ignore
+                content=None,
                 chunks=[],
                 processing_time=processing_time,
                 success=False,

@@ -1,12 +1,144 @@
 # MoRAG CLI Documentation
 
-This document provides comprehensive documentation for all MoRAG CLI commands and scripts, covering both **ingestion** and **processing** operations.
+This document provides comprehensive documentation for all MoRAG CLI commands and scripts, covering both **stage-based processing** and legacy **ingestion/processing** operations.
+
+## 🚨 Breaking Changes - Stage-Based Architecture
+
+**MoRAG has been completely refactored to use a stage-based processing architecture with NO backward compatibility.**
+
+- All previous API endpoints have been removed
+- All previous CLI commands have been replaced
+- New canonical stage names are used throughout
+- New file naming conventions
+- New configuration structure
+
+## 🎯 Stage-Based Processing Commands
+
+### Configuration System
+
+MoRAG uses a unified configuration system based on environment variables with CLI override support:
+
+#### Environment Variables
+All configuration is done through environment variables with the `MORAG_` prefix:
+
+```bash
+# Global LLM Configuration (fallback for all stages)
+MORAG_LLM_PROVIDER=gemini
+MORAG_LLM_MODEL=gemini-1.5-flash
+MORAG_LLM_TEMPERATURE=0.1
+MORAG_LLM_MAX_TOKENS=4000
+MORAG_LLM_MAX_RETRIES=5
+
+# Stage-specific overrides
+MORAG_MARKDOWN_OPTIMIZER_MODEL=gemini-1.5-flash
+MORAG_MARKDOWN_OPTIMIZER_MAX_CHUNK_SIZE=50000
+MORAG_FACT_GENERATOR_DOMAIN=general
+MORAG_CHUNKER_CHUNK_SIZE=4000
+```
+
+#### Fallback Chain
+The system uses this fallback chain for LLM configuration:
+1. CLI arguments (highest priority)
+2. Stage-specific environment variables (e.g., `MORAG_MARKDOWN_OPTIMIZER_MODEL`)
+3. Global LLM environment variables (e.g., `MORAG_LLM_MODEL`)
+4. `MORAG_GEMINI_MODEL` (legacy fallback)
+5. Default values (lowest priority)
+
+### Core Stage Commands
+
+#### `morag-stages.py` - Main Stage Controller
+
+**Purpose**: Execute individual stages or stage chains with the new canonical stage names
+
+**Available Stages**:
+1. **`markdown-conversion`** - Convert input files to unified markdown format
+2. **`markdown-optimizer`** - LLM-based text improvement and error correction (optional)
+3. **`chunker`** - Create summary, chunks, and contextual embeddings
+4. **`fact-generator`** - Extract facts, entities, relations, and keywords
+5. **`ingestor`** - Database ingestion and storage
+
+**Basic Usage**:
+```bash
+# List available stages
+python cli/morag-stages.py list
+
+# Execute a single stage
+python cli/morag-stages.py stage markdown-conversion input.pdf --output-dir ./output
+
+# Execute a chain of stages
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+
+# Execute full pipeline
+python cli/morag-stages.py process input.pdf --optimize --output-dir ./output
+```
+
+**LLM Configuration Overrides**:
+```bash
+# Override LLM model for a single stage
+python cli/morag-stages.py stage markdown-optimizer input.md --llm-model gemini-1.5-flash
+
+# Override multiple LLM parameters
+python cli/morag-stages.py stage fact-generator input.md --llm-model gemini-1.5-pro --llm-temperature 0.2 --llm-max-tokens 8000
+
+# Override LLM for entire stage chain
+python cli/morag-stages.py stages "markdown-optimizer,chunker,fact-generator" input.pdf --llm-model gemini-1.5-pro
+
+# Stage-specific parameter overrides
+python cli/morag-stages.py stage chunker input.md --chunk-size 2000
+python cli/morag-stages.py stage markdown-optimizer input.md --max-chunk-size 25000
+python cli/morag-stages.py stage fact-generator input.md --domain medical
+```
+
+**Advanced Options**:
+```bash
+# Skip the optional markdown-optimizer stage
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+
+# Include optimization stage
+python cli/morag-stages.py stages "markdown-conversion,markdown-optimizer,chunker" input.pdf
+
+# Custom output directory
+python cli/morag-stages.py process input.pdf --output-dir /custom/path
+
+# Resume from existing files (automatic skip of completed stages)
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+```
+
+#### `stage-status.py` - Stage Status Checker
+
+**Purpose**: Check the status of stage processing and output files
+
+```bash
+# Check stage status for output directory
+python cli/stage-status.py --output-dir ./output
+
+# Check specific file processing status
+python cli/stage-status.py --file input.pdf --output-dir ./output
+```
+
+### File Naming Conventions
+
+Each stage produces files with standardized naming:
+
+- **markdown-conversion**: `filename.md`
+- **markdown-optimizer**: `filename.opt.md`
+- **chunker**: `filename.chunks.json`
+- **fact-generator**: `filename.facts.json`
+- **ingestor**: `filename.ingestion.json`
 
 ## 🔄 Operation Modes
 
-MoRAG supports two distinct operation modes:
+MoRAG supports multiple distinct operation modes:
 
-### **Processing Mode** (Immediate Results)
+### **Stage-Based Processing Mode** (New Default)
+- **Purpose**: Execute processing pipeline using canonical stages with resume capability
+- **Use Case**: Modular processing, reusable intermediate files, better error recovery
+- **Output**: Standardized files for each stage that can be reused across runs
+- **Storage**: Configurable (Qdrant, Neo4j, or file-only)
+- **Resume**: Automatically skips completed stages
+- **Reusability**: Output files can be used as input for other databases/systems
+
+### **Processing Mode** (Legacy - Immediate Results)
 - **Purpose**: Get immediate processing results without storage
 - **Use Case**: One-time analysis, testing, development
 - **Output**: Direct results returned immediately
@@ -54,7 +186,7 @@ python cli/create-databases.py --list-existing
 - Pre-creating databases/collections for better organization
 - Troubleshooting database connection issues
 
-### System Validation Scripts
+### Stage-Based Testing Scripts
 
 #### `test-simple.py`
 **Purpose**: Quick system validation and health check
@@ -66,6 +198,49 @@ python cli/test-simple.py
 **Purpose**: Comprehensive system testing with detailed reporting
 ```bash
 python cli/test-all.py
+```
+
+### Stage Testing Framework
+
+#### Running Stage Tests
+
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio
+
+# Run all stage tests
+cd packages/morag-stages
+pytest tests/
+
+# Run specific stage test
+pytest tests/test_markdown_conversion.py
+
+# Run with coverage
+pytest --cov=morag_stages tests/
+```
+
+#### Test Framework Usage
+
+```python
+from tests.test_framework import StageTestFramework
+
+async def test_my_stage():
+    framework = StageTestFramework()
+    await framework.setup()
+
+    # Create test file
+    test_file = framework.create_test_markdown()
+
+    # Execute stage
+    result = await framework.execute_stage_test(
+        StageType.CHUNKER,
+        [test_file]
+    )
+
+    # Assert success
+    framework.assert_stage_success(result)
+
+    await framework.teardown()
 ```
 
 ### Component Testing Scripts
@@ -312,7 +487,52 @@ python cli/test-remote-conversion.py --test api
 
 ## 🔧 Command Line Options
 
-### Common Options (All Scripts)
+### Stage-Based Options
+
+#### Core Stage Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--output-dir DIR` | Output directory for stage files | `--output-dir ./output` |
+| `--optimize` | Include markdown-optimizer stage | `--optimize` |
+| `--config FILE` | Stage configuration file | `--config stages.json` |
+| `--force` | Force re-execution of completed stages | `--force` |
+| `--dry-run` | Show what would be executed without running | `--dry-run` |
+
+#### Stage Configuration File
+
+Create a `stages.json` file for advanced configuration:
+
+```json
+{
+  "markdown-conversion": {
+    "include_timestamps": true,
+    "speaker_diarization": true,
+    "topic_segmentation": true
+  },
+  "markdown-optimizer": {
+    "fix_transcription_errors": true,
+    "improve_readability": true,
+    "preserve_timestamps": true
+  },
+  "chunker": {
+    "chunk_strategy": "semantic",
+    "chunk_size": 2000,
+    "generate_summary": true
+  },
+  "fact-generator": {
+    "extract_entities": true,
+    "extract_relations": true,
+    "domain": "general"
+  },
+  "ingestor": {
+    "databases": ["qdrant", "neo4j"],
+    "collection_name": "my_collection"
+  }
+}
+```
+
+### Legacy Options (All Scripts)
 
 | Option | Description | Example |
 |--------|-------------|---------|
@@ -352,14 +572,34 @@ python cli/test-remote-conversion.py --test api
 
 ## 📊 Output Files
 
-### Processing Mode Output
-All processing mode scripts generate output files in the same directory as the input file:
+### Stage-Based Output (New Default)
+Each stage produces standardized files that can be reused:
+
+- **markdown-conversion**: `{filename}.md` - Unified markdown format
+- **markdown-optimizer**: `{filename}.opt.md` - Optimized markdown (optional)
+- **chunker**: `{filename}.chunks.json` - Chunks with embeddings and summary
+- **fact-generator**: `{filename}.facts.json` - Extracted facts, entities, relations
+- **ingestor**: `{filename}.ingestion.json` - Database ingestion results
+
+### Resume Capability
+The system automatically detects existing output files and skips completed stages:
+
+```bash
+# First run - executes all stages
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+
+# Second run - skips completed stages automatically
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" input.pdf
+```
+
+### Legacy Processing Mode Output
+All legacy processing mode scripts generate output files in the same directory as the input file:
 
 - `{filename}_test_result.json` - Detailed processing results
 - `{filename}_converted.md` - Markdown-formatted content (when applicable)
 
-### Ingestion Mode Output
-Ingestion mode scripts generate:
+### Legacy Ingestion Mode Output
+Legacy ingestion mode scripts generate:
 
 - `{filename}_ingest_result.json` - Task ID and ingestion status
 - Background processing stores results in Qdrant vector database
@@ -425,27 +665,61 @@ ANTHROPIC_API_KEY=your_anthropic_api_key  # Optional
 
 ## 🚀 Quick Start Examples
 
-### Test System Health
+### Stage-Based Processing (Recommended)
+
+#### Test System Health
 ```bash
-python tests/cli/test-simple.py
+python cli/test-simple.py
 ```
 
-### Process a Document (Immediate Results)
+#### Process a Document with Stages
+```bash
+# Execute full pipeline
+python cli/morag-stages.py process document.pdf --output-dir ./output
+
+# Execute specific stages
+python cli/morag-stages.py stages "markdown-conversion,chunker" document.pdf
+
+# Include optimization
+python cli/morag-stages.py process document.pdf --optimize --output-dir ./output
+```
+
+#### Process Audio/Video with Stages
+```bash
+# Audio processing with stages
+python cli/morag-stages.py process audio.mp3 --output-dir ./output
+
+# Video processing with optimization
+python cli/morag-stages.py process video.mp4 --optimize --output-dir ./output
+```
+
+#### Resume Processing
+```bash
+# First run - processes all stages
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" document.pdf
+
+# Second run - automatically skips completed stages
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" document.pdf
+```
+
+### Legacy Examples
+
+#### Process a Document (Immediate Results)
 ```bash
 python tests/cli/test-document.py uploads/document.pdf
 ```
 
-### Ingest a Document (Background + Storage)
+#### Ingest a Document (Background + Storage)
 ```bash
 python tests/cli/test-document.py uploads/document.pdf --ingest
 ```
 
-### Process Audio with Advanced Features
+#### Process Audio with Advanced Features
 ```bash
 python tests/cli/test-audio.py uploads/audio.mp3 --enable-diarization --enable-topics
 ```
 
-### Ingest Web Content with Metadata
+#### Ingest Web Content with Metadata
 ```bash
 python tests/cli/test-web.py https://example.com --ingest --metadata '{"category": "reference"}'
 ```

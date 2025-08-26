@@ -89,8 +89,7 @@ Be objective and consistent in your scoring. Focus on how well the fact helps an
 
             # Call LLM for fact evaluation with retry logic for malformed function calls
             try:
-                result = await self.agent.run(prompt)
-                response = result.data
+                response = await self.agent.run(prompt)
 
                 # Create scored fact
                 scored_fact = response.scored_fact

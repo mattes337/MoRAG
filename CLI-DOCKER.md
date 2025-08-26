@@ -1,6 +1,16 @@
 # MoRAG CLI Docker Setup
 
-This document explains how to build and use the MoRAG CLI Docker container for running CLI scripts like `webdav-processor.py`.
+This document explains how to build and use the MoRAG CLI Docker container for running both **stage-based processing** and legacy CLI scripts.
+
+## 🚨 Breaking Changes - Stage-Based Architecture
+
+**MoRAG has been completely refactored to use a stage-based processing architecture with NO backward compatibility.**
+
+- All previous API endpoints have been removed
+- All previous CLI commands have been replaced
+- New canonical stage names are used throughout
+- New file naming conventions
+- New configuration structure
 
 ## Quick Start
 
@@ -21,13 +31,38 @@ cp .env.example .env
 
 ### 3. Run CLI Scripts
 
-#### Basic Usage
+#### Stage-Based Processing (Recommended)
 
 ```bash
 # Show available CLI scripts
 docker run -it --rm --env-file .env morag-cli
 
-# Run a specific script
+# List available stages
+docker run -it --rm --env-file .env morag-cli morag-stages.py list
+
+# Execute a single stage
+docker run -it --rm --env-file .env \
+  -v $(pwd)/input:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py stage markdown-conversion /app/input/document.pdf --output-dir /app/output
+
+# Execute full pipeline
+docker run -it --rm --env-file .env \
+  -v $(pwd)/input:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py process /app/input/document.pdf --output-dir /app/output
+
+# Execute stage chain
+docker run -it --rm --env-file .env \
+  -v $(pwd)/input:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py stages "markdown-conversion,chunker,fact-generator" /app/input/document.pdf
+```
+
+#### Legacy Script Usage
+
+```bash
+# Run a specific legacy script
 docker run -it --rm --env-file .env morag-cli webdav-processor.py --help
 
 # Run webdav-processor with arguments
@@ -48,7 +83,18 @@ docker-compose -f docker-compose.cli.yml build
 # Show available scripts
 docker-compose -f docker-compose.cli.yml run --rm morag-cli
 
-# Run webdav-processor
+# Stage-based processing with Docker Compose
+docker-compose -f docker-compose.cli.yml run --rm morag-cli morag-stages.py list
+
+# Execute full pipeline
+docker-compose -f docker-compose.cli.yml run --rm morag-cli \
+  morag-stages.py process /app/input/document.pdf --output-dir /app/output
+
+# Execute specific stages
+docker-compose -f docker-compose.cli.yml run --rm morag-cli \
+  morag-stages.py stages "markdown-conversion,chunker" /app/input/document.pdf
+
+# Legacy webdav-processor
 docker-compose -f docker-compose.cli.yml run --rm morag-cli webdav-processor.py \
   --url https://webdav.example.com \
   --username user \
@@ -59,7 +105,13 @@ docker-compose -f docker-compose.cli.yml run --rm morag-cli webdav-processor.py 
 
 ## Available CLI Scripts
 
-The following CLI scripts are available in the container:
+### Stage-Based Processing Scripts (New)
+
+- `morag-stages.py` - Main stage controller for canonical stage processing
+- `stage-status.py` - Check status of stage processing and output files
+- `batch-process-stages.py` - Batch processing with stages
+
+### Legacy CLI Scripts
 
 - `webdav-processor.py` - Process video files from WebDAV server
 - `ingest-markdown-folder.py` - Ingest markdown files from a folder
@@ -96,7 +148,58 @@ The Docker Compose setup automatically mounts the following directories:
 
 ## Examples
 
-### WebDAV Video Processing
+### Stage-Based Processing Examples
+
+#### Document Processing with Stages
+
+```bash
+# Process a PDF document through all stages
+docker run -it --rm --env-file .env \
+  -v $(pwd)/documents:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py process /app/input/document.pdf --output-dir /app/output
+
+# Process with optimization stage
+docker run -it --rm --env-file .env \
+  -v $(pwd)/documents:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py process /app/input/document.pdf --optimize --output-dir /app/output
+
+# Execute specific stage chain
+docker run -it --rm --env-file .env \
+  -v $(pwd)/documents:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py stages "markdown-conversion,chunker,fact-generator" /app/input/document.pdf
+```
+
+#### Audio/Video Processing with Stages
+
+```bash
+# Process audio file
+docker run -it --rm --env-file .env \
+  -v $(pwd)/media:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py process /app/input/audio.mp3 --output-dir /app/output
+
+# Process video file with optimization
+docker run -it --rm --env-file .env \
+  -v $(pwd)/media:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py process /app/input/video.mp4 --optimize --output-dir /app/output
+```
+
+#### Check Stage Status
+
+```bash
+# Check processing status
+docker run -it --rm --env-file .env \
+  -v $(pwd)/output:/app/output \
+  morag-cli stage-status.py --output-dir /app/output
+```
+
+### Legacy Examples
+
+#### WebDAV Video Processing
 
 ```bash
 # Process MP4 files from WebDAV server
@@ -120,14 +223,31 @@ docker run -it --rm --env-file .env \
 
 ### Testing Scripts
 
+#### Stage-Based Testing
+
 ```bash
 # Run system status check
 docker run -it --rm --env-file .env morag-cli check-system-status.py
 
-# Test document processing
+# Test stage processing
+docker run -it --rm --env-file .env \
+  -v $(pwd)/test_files:/app/input \
+  -v $(pwd)/output:/app/output \
+  morag-cli morag-stages.py process /app/input/test.pdf --output-dir /app/output
+
+# Check stage status
+docker run -it --rm --env-file .env \
+  -v $(pwd)/output:/app/output \
+  morag-cli stage-status.py --output-dir /app/output
+```
+
+#### Legacy Testing
+
+```bash
+# Test document processing (legacy)
 docker run -it --rm --env-file .env morag-cli test-document.py
 
-# Test video processing
+# Test video processing (legacy)
 docker run -it --rm --env-file .env morag-cli test-video.py
 ```
 

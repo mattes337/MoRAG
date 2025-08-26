@@ -1,8 +1,15 @@
 """Qdrant storage backend for graph data."""
 
 import logging
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any, Set, TYPE_CHECKING
 import uuid
+
+if TYPE_CHECKING:
+    from qdrant_client import AsyncQdrantClient
+    from qdrant_client.models import (
+        Distance, VectorParams, CreateCollection, PointStruct,
+        Filter, FieldCondition, MatchValue, SearchRequest
+    )
 
 try:
     from qdrant_client import AsyncQdrantClient
@@ -13,7 +20,25 @@ try:
     QDRANT_AVAILABLE = True
 except ImportError:
     QDRANT_AVAILABLE = False
-    AsyncQdrantClient = None
+    # Create placeholder classes for runtime
+    class AsyncQdrantClient:  # type: ignore
+        pass
+    class Distance:  # type: ignore
+        pass
+    class VectorParams:  # type: ignore
+        pass
+    class CreateCollection:  # type: ignore
+        pass
+    class PointStruct:  # type: ignore
+        pass
+    class Filter:  # type: ignore
+        pass
+    class FieldCondition:  # type: ignore
+        pass
+    class MatchValue:  # type: ignore
+        pass
+    class SearchRequest:  # type: ignore
+        pass
 
 from pydantic import BaseModel
 
@@ -66,7 +91,7 @@ class QdrantStorage(BaseStorage):
             raise ImportError("qdrant-client is required for QdrantStorage")
             
         self.config = config
-        self.client: Optional[AsyncQdrantClient] = None
+        self.client: Optional["AsyncQdrantClient"] = None
     
     async def connect(self) -> None:
         """Connect to Qdrant database."""
@@ -79,12 +104,9 @@ class QdrantStorage(BaseStorage):
                 port = parsed.port or (443 if parsed.scheme == 'https' else self.config.port)
                 use_https = parsed.scheme == 'https'
 
-                logger.info("Connecting to Qdrant via URL",
-                           url=self.config.host,
-                           hostname=hostname,
-                           port=port,
-                           https=use_https,
-                           verify_ssl=self.config.verify_ssl)
+                logger.info(f"Connecting to Qdrant via URL: {self.config.host} "
+                           f"(hostname={hostname}, port={port}, https={use_https}, "
+                           f"verify_ssl={self.config.verify_ssl})")
 
                 self.client = AsyncQdrantClient(
                     host=hostname,
@@ -101,11 +123,8 @@ class QdrantStorage(BaseStorage):
                 # Auto-detect HTTPS if port is 443
                 use_https = self.config.https or (self.config.port == 443)
 
-                logger.info("Connecting to Qdrant via host/port",
-                           host=self.config.host,
-                           port=self.config.port,
-                           https=use_https,
-                           verify_ssl=self.config.verify_ssl)
+                logger.info(f"Connecting to Qdrant via host/port: {self.config.host}:{self.config.port} "
+                           f"(https={use_https}, verify_ssl={self.config.verify_ssl})")
 
                 self.client = AsyncQdrantClient(
                     host=self.config.host,

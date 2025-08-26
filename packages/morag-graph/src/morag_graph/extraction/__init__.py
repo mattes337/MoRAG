@@ -8,10 +8,12 @@ try:
     from .fact_graph_builder import FactGraphBuilder
     from .fact_validator import FactValidator
     from .fact_prompts import FactExtractionPrompts, FactPromptTemplates
+    from .entity_normalizer import LLMEntityNormalizer as EntityNormalizer
 
     __all__ = [
         "EntityExtractor", "RelationExtractor", "BaseExtractor", "Entity", "Relation", "DummyExtractor",
-        "FactExtractor", "FactGraphBuilder", "FactValidator", "FactExtractionPrompts", "FactPromptTemplates"
+        "FactExtractor", "FactGraphBuilder", "FactValidator", "FactExtractionPrompts", "FactPromptTemplates",
+        "EntityNormalizer"
     ]
 except ImportError:
     from .base import BaseExtractor, Entity, Relation, DummyExtractor

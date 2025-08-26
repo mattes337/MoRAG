@@ -354,15 +354,19 @@ def get_llm_client() -> Optional[LLMClient]:
     if not REASONING_AVAILABLE:
         return None
     try:
-        config = LLMConfig(
-            provider=os.getenv("MORAG_LLM_PROVIDER", "gemini"),
-            model=os.getenv("MORAG_GEMINI_MODEL", "gemini-1.5-flash"),
-            api_key=os.getenv("GEMINI_API_KEY"),
-            temperature=float(os.getenv("MORAG_LLM_TEMPERATURE", "0.1")),
-            max_tokens=int(os.getenv("MORAG_LLM_MAX_TOKENS", "2000")),
-            max_retries=int(os.getenv("MORAG_LLM_MAX_RETRIES", "5")),
+        from morag_core.config import LLMConfig as UnifiedLLMConfig
+        config = UnifiedLLMConfig.from_env_and_overrides()
+
+        # Convert to reasoning LLMConfig format
+        reasoning_config = LLMConfig(
+            provider=config.provider,
+            model=config.model,
+            api_key=config.api_key,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            max_retries=config.max_retries,
         )
-        return LLMClient(config)
+        return LLMClient(reasoning_config)
     except Exception as e:
         logger.warning("LLM client not available", error=str(e))
         return None

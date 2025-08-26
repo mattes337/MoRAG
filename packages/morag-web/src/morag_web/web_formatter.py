@@ -175,9 +175,9 @@ class WebFormatter:
         
         # Split content by headers to identify sections
         lines = content.split('\n')
-        current_section = {'title': '', 'content': '', 'level': 0}
-        main_content_lines = []
-        subsections = []
+        current_section: Dict[str, Any] = {'title': '', 'content': '', 'level': 0}
+        main_content_lines: List[str] = []
+        subsections: List[Dict[str, str]] = []
         
         for line in lines:
             # Check for headers

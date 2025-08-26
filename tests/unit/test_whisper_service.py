@@ -5,17 +5,16 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
 
-from morag_audio.services import WhisperService
-from morag_audio import AudioConfig, AudioProcessingResult
+from morag_audio import AudioService, AudioConfig, AudioProcessingResult
 from morag_core.exceptions import ExternalServiceError
 
-class TestWhisperService:
-    """Test cases for WhisperService."""
-    
+class TestAudioService:
+    """Test cases for AudioService."""
+
     @pytest.fixture
-    def whisper_service(self):
-        """Create whisper service instance."""
-        return WhisperService()
+    def audio_service(self):
+        """Create audio service instance."""
+        return AudioService()
     
     @pytest.fixture
     def audio_config(self):

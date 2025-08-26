@@ -55,8 +55,14 @@ class MoRAGBaseAgent(Generic[T], ABC):
     def _create_agent(self) -> Agent:
         """Create the PydanticAI agent instance."""
         try:
+            # Set the API key in environment for PydanticAI if available
+            import os
+            if self.provider.api_key and not os.getenv("GOOGLE_API_KEY"):
+                os.environ["GOOGLE_API_KEY"] = self.provider.api_key
+
+            # Create agent with proper parameter names for current PydanticAI version
             return Agent(
-                model=self.config.model,
+                self.config.model,
                 result_type=self.get_result_type(),
                 system_prompt=self.get_system_prompt(),
                 deps_type=self.get_deps_type(),
@@ -126,8 +132,15 @@ class MoRAGBaseAgent(Generic[T], ABC):
                     timeout=self.config.timeout
                 )
                 
-                # Validate the result
-                validated_result = self._validate_result(result.data)
+                # Extract and validate the result
+                # PydanticAI returns AgentRunResult, we need to extract the actual result
+                if hasattr(result, 'data'):
+                    actual_result = result.data
+                elif hasattr(result, 'output'):
+                    actual_result = result.output
+                else:
+                    actual_result = result
+                validated_result = self._validate_result(actual_result)
                 
                 self.logger.info("Agent execution successful", attempt=attempt + 1)
                 return validated_result

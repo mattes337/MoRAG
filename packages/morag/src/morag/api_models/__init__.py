@@ -4,18 +4,8 @@
 # from ..api import MoRAGAPI
 
 from .models import (
-    ProcessURLRequest,
-    ProcessBatchRequest,
-    SearchRequest,
-    ProcessingResultResponse,
-    IngestFileRequest,
-    IngestURLRequest,
-    IngestBatchRequest,
-    IngestRemoteFileRequest,
-    ProcessRemoteFileRequest,
-    IngestResponse,
-    BatchIngestResponse,
     TaskStatus,
+    WebhookProgressNotification,
 )
 
 from .utils import (
@@ -27,18 +17,8 @@ from .utils import (
 
 __all__ = [
     # Models
-    "ProcessURLRequest",
-    "ProcessBatchRequest", 
-    "SearchRequest",
-    "ProcessingResultResponse",
-    "IngestFileRequest",
-    "IngestURLRequest",
-    "IngestBatchRequest",
-    "IngestRemoteFileRequest",
-    "ProcessRemoteFileRequest",
-    "IngestResponse",
-    "BatchIngestResponse",
     "TaskStatus",
+    "WebhookProgressNotification",
     # Utils
     "download_remote_file",
     "normalize_content_type",

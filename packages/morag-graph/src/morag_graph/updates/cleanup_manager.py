@@ -1,7 +1,7 @@
 """Document cleanup management for removing outdated graph data."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from ..storage.base import BaseStorage
@@ -15,9 +15,9 @@ class CleanupResult:
     document_id: str
     entities_deleted: int = 0
     relations_deleted: int = 0
-    entity_ids_deleted: List[EntityId] = None
-    relation_ids_deleted: List[RelationId] = None
-    errors: List[str] = None
+    entity_ids_deleted: List[EntityId] = field(default_factory=list)
+    relation_ids_deleted: List[RelationId] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
     
     def __post_init__(self):
         if self.entity_ids_deleted is None:

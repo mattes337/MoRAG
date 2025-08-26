@@ -72,13 +72,14 @@ async def get_recursive_fact_retrieval_service(
     embedding_service = None
     try:
         from morag_services.embedding import GeminiEmbeddingService
-        import os
-        api_key = os.getenv('GEMINI_API_KEY')
-        if api_key:
-            embedding_service = GeminiEmbeddingService(api_key=api_key)
+        from morag_core.config import LLMConfig
+
+        llm_config = LLMConfig.from_env_and_overrides()
+        if llm_config.api_key:
+            embedding_service = GeminiEmbeddingService(api_key=llm_config.api_key)
             logger.info("Embedding service initialized for enhanced retrieval")
         else:
-            logger.warning("GEMINI_API_KEY not found - enhanced retrieval disabled")
+            logger.warning("API key not found - enhanced retrieval disabled")
     except Exception as e:
         logger.warning("Failed to initialize embedding service", error=str(e))
 

@@ -18,7 +18,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timezone
 import uuid
 
-from morag_core.models.config import ProcessingResult
+from morag_core.models import ProcessingResult
 from morag_services.embedding import GeminiEmbeddingService
 from morag_services.storage import QdrantVectorStorage
 # Chunking is implemented directly in this module
@@ -51,15 +51,16 @@ class IngestionCoordinator:
         
     async def initialize(self):
         """Initialize all services."""
-        import os
+        from morag_core.config import LLMConfig
 
-        # Initialize embedding service
-        api_key = os.getenv('GEMINI_API_KEY')
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable is required")
+        # Get LLM configuration with proper fallbacks
+        llm_config = LLMConfig.from_env_and_overrides()
+
+        if not llm_config.api_key:
+            raise ValueError("API key is required for embedding service")
 
         self.embedding_service = GeminiEmbeddingService(
-            api_key=api_key,
+            api_key=llm_config.api_key,
             embedding_model=os.getenv('GEMINI_EMBEDDING_MODEL', 'text-embedding-004')
         )
 

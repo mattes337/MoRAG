@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from datetime import datetime
 from typing import Dict, List, Optional, Any, Union, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
@@ -38,6 +39,9 @@ class Relation(BaseModel):
     source_doc_id: Optional[str] = None
     confidence: float = 1.0
     weight: float = 1.0
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    created_at: Optional[datetime] = Field(default_factory=datetime.now, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(default_factory=datetime.now, description="Last update timestamp")
     
     # Class variables for Neo4J integration
     _neo4j_type: ClassVar[str] = "RELATION"

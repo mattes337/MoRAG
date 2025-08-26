@@ -213,7 +213,7 @@ class Pipeline:
         Returns:
             Self for method chaining
         """
-        async def process_fn(texts: Dict[str, str], context: PipelineContext) -> Dict[str, List[float]]:
+        async def process_fn(texts: Dict[str, str], context: PipelineContext) -> Dict[str, Union[List[float], float]]:
             embeddings = {}
             
             # Process in batches to avoid overwhelming the embedding service

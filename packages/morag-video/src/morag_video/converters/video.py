@@ -132,23 +132,6 @@ class VideoConverter:
             logger.error("Video conversion failed", error=str(e), file_path=str(file_path))
             raise ConversionError(f"Failed to convert video file: {e}") from e
             
-            return ConversionResult(
-                content=markdown,
-                quality_score=quality_score,
-                metadata={
-                    "duration": result.metadata.duration,
-                    "resolution": f"{result.metadata.width}x{result.metadata.height}",
-                    "fps": result.metadata.fps,
-                    "format": result.metadata.format,
-                    "has_audio": result.metadata.has_audio,
-                    "thumbnails_count": len(result.thumbnails),
-                    "keyframes_count": len(result.keyframes),
-                    "has_transcript": result.audio_processing_result is not None and 
-                                     result.audio_processing_result.transcript is not None,
-                    "has_ocr": bool(result.ocr_results)
-                }
-            )
-            
         except Exception as e:
             logger.error("Video conversion failed", file_path=str(file_path), error=str(e))
             raise

@@ -31,7 +31,7 @@ class RemoteConverterConfig:
             except Exception as e:
                 logger.warning("Failed to load config file", file=self.config_file, error=str(e))
         
-        # Override with environment variables
+        # Override with environment variables using MORAG_ prefix consistently
         env_config = {
             'worker_id': os.getenv('MORAG_WORKER_ID', f'remote-worker-{os.getpid()}'),
             'api_base_url': os.getenv('MORAG_API_BASE_URL', 'http://localhost:8000'),

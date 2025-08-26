@@ -1,0 +1,76 @@
+{
+  "markdown-conversion": {
+    "include_timestamps": true,
+    "preserve_formatting": true,
+    "transcription_model": "whisper-large",
+    "speaker_diarization": true,
+    "topic_segmentation": true,
+    "ocr_enabled": true,
+    "extract_tables": true,
+    "extract_images": false,
+    "follow_links": false,
+    "max_depth": 1,
+    "extract_thumbnails": false,
+    "thumbnail_interval": 60
+  },
+  "markdown-optimizer": {
+    "enabled": true,
+    "model": "gemini-1.5-flash",
+    "max_tokens": 8192,
+    "temperature": 0.1,
+    "fix_transcription_errors": true,
+    "improve_structure": true,
+    "preserve_timestamps": true,
+    "preserve_metadata": true,
+    "content_type_prompts": {
+      "video": "Optimize this video transcript while preserving all timestamps and speaker information.",
+      "audio": "Improve this audio transcript readability while maintaining temporal structure.",
+      "document": "Enhance document structure and fix any OCR errors while preserving formatting."
+    }
+  },
+  "chunker": {
+    "chunk_strategy": "semantic",
+    "chunk_size": 4000,
+    "overlap": 200,
+    "generate_summary": true,
+    "summary_max_tokens": 1000,
+    "embedding_model": "text-embedding-004",
+    "batch_size": 50,
+    "include_context": true,
+    "context_window": 2
+  },
+  "fact-generator": {
+    "extract_entities": true,
+    "extract_relations": true,
+    "extract_keywords": true,
+    "extract_facts": true,
+    "domain": "general",
+    "entity_types": null,
+    "relation_types": null,
+    "min_confidence": 0.7,
+    "max_entities_per_chunk": 20,
+    "max_relations_per_chunk": 15,
+    "model": "gemini-1.5-flash",
+    "temperature": 0.1,
+    "max_tokens": 4096
+  },
+  "ingestor": {
+    "databases": ["qdrant", "neo4j"],
+    "collection_name": "documents",
+    "batch_size": 50,
+    "enable_deduplication": true,
+    "dedup_threshold": 0.95,
+    "conflict_resolution": "merge",
+    "qdrant_config": {
+      "host": "localhost",
+      "port": 6333,
+      "timeout": 30.0
+    },
+    "neo4j_config": {
+      "uri": "bolt://localhost:7687",
+      "username": "neo4j",
+      "password": "password",
+      "database": "neo4j"
+    }
+  }
+}

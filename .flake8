@@ -1,0 +1,49 @@
+[flake8]
+# Configuration for flake8 code style checker
+
+# Maximum line length
+max-line-length = 88
+
+# Ignore specific error codes
+ignore = 
+    # E203: whitespace before ':' (conflicts with black)
+    E203,
+    # W503: line break before binary operator (conflicts with black)
+    W503,
+    # E501: line too long (handled by black)
+    E501
+
+# Exclude directories and files
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .env,
+    build,
+    dist,
+    .pytest_cache,
+    .mypy_cache,
+    htmlcov,
+    .coverage,
+    node_modules,
+    # Exclude generated files
+    *_pb2.py,
+    # Exclude migrations if any
+    migrations/
+
+# Maximum complexity for functions
+max-complexity = 10
+
+# Show source code for each error
+show-source = True
+
+# Show pep8 error codes
+show-pep8 = True
+
+# Count errors
+count = True
+
+# Statistics
+statistics = True
