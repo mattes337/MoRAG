@@ -15,6 +15,9 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-stages" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "agents"))
 
 from morag_stages import StageManager, StageType, StageStatus
 from morag_stages.models import StageContext

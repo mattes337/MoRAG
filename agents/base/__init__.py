@@ -3,6 +3,7 @@
 from .agent import BaseAgent
 from .config import AgentConfig
 from .template import PromptTemplate
+from .response_parser import LLMResponseParser, LLMResponseParseError
 from .exceptions import (
     AgentError,
     ConfigurationError,
@@ -13,8 +14,10 @@ from .exceptions import (
 
 __all__ = [
     "BaseAgent",
-    "AgentConfig", 
+    "AgentConfig",
     "PromptTemplate",
+    "LLMResponseParser",
+    "LLMResponseParseError",
     "AgentError",
     "ConfigurationError",
     "PromptGenerationError",

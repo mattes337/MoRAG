@@ -17,6 +17,8 @@ from .base import (
     BaseAgent,
     AgentConfig,
     PromptTemplate,
+    LLMResponseParser,
+    LLMResponseParseError,
     AgentError,
     ConfigurationError,
     PromptGenerationError,
@@ -78,8 +80,10 @@ __version__ = "1.0.0"
 __all__ = [
     # Base classes
     "BaseAgent",
-    "AgentConfig", 
+    "AgentConfig",
     "PromptTemplate",
+    "LLMResponseParser",
+    "LLMResponseParseError",
     "AgentError",
     "ConfigurationError",
     "PromptGenerationError",

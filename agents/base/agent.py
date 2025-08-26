@@ -19,6 +19,7 @@ except ImportError:
 
 from .config import AgentConfig, ModelProvider
 from .template import PromptTemplate, ConfigurablePromptTemplate, GlobalPromptLoader
+from .response_parser import LLMResponseParser
 from .exceptions import (
     AgentError,
     ConfigurationError,
@@ -289,29 +290,65 @@ class BaseAgent(Generic[T], ABC):
         await asyncio.sleep(delay)
     
     def _validate_result(self, raw_result: str) -> T:
-        """Validate and parse the model result.
-        
+        """Validate and parse the model result using robust parsing.
+
         Args:
             raw_result: Raw result from the model
-            
+
         Returns:
             Validated and parsed result
-            
+
         Raises:
             ValidationError: If validation fails
         """
-        try:
-            # Try to parse as JSON if expected
-            if self.config.prompt.output_format == "json":
-                import json
-                parsed = json.loads(raw_result)
-                return self.get_result_type()(**parsed)
-            else:
-                # For non-JSON outputs, create a simple wrapper
-                return self.get_result_type()(content=raw_result)
-                
-        except Exception as e:
-            raise ValidationError(f"Result validation failed: {e}") from e
+        context = f"{self.config.name}_validation"
+        strict_json = self.config.prompt.output_format == "json"
+
+        return LLMResponseParser.parse_and_validate(
+            response=raw_result,
+            result_type=self.get_result_type(),
+            context=context,
+            strict_json=strict_json
+        )
+
+    def parse_json_response(self, response: str, fallback_value: Optional[Any] = None) -> Any:
+        """Parse JSON from LLM response with robust error handling.
+
+        Args:
+            response: Raw LLM response text
+            fallback_value: Value to return if parsing fails
+
+        Returns:
+            Parsed JSON data or fallback value
+        """
+        context = f"{self.config.name}_json_parsing"
+        return LLMResponseParser.parse_json_response(
+            response=response,
+            fallback_value=fallback_value,
+            context=context
+        )
+
+    def extract_json_from_text(self, text: str) -> Optional[Dict[str, Any]]:
+        """Extract the first valid JSON object from text.
+
+        Args:
+            text: Text that may contain JSON
+
+        Returns:
+            First valid JSON object found, or None
+        """
+        return LLMResponseParser.extract_json_from_text(text)
+
+    def clean_response(self, response: str) -> str:
+        """Clean LLM response for better parsing.
+
+        Args:
+            response: Raw LLM response
+
+        Returns:
+            Cleaned response text
+        """
+        return LLMResponseParser.clean_response(response)
 
     async def execute(self, user_input: str, **kwargs) -> T:
         """Execute the agent with the given input.
