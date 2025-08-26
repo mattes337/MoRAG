@@ -281,23 +281,31 @@ class PromptTemplate(ABC):
 
 class ConfigurablePromptTemplate(PromptTemplate):
     """A prompt template that can be configured via the config object."""
-    
-    def __init__(self, config: PromptConfig, system_template: str, user_template: str):
+
+    def __init__(self, config: PromptConfig, system_template: str, user_template: str, agent_config: Optional[Dict[str, Any]] = None):
         """Initialize with template strings.
-        
+
         Args:
             config: Prompt configuration
             system_template: System prompt template
             user_template: User prompt template
+            agent_config: Agent-specific configuration
         """
         super().__init__(config)
         self.system_template = system_template
         self.user_template = user_template
+        self.agent_config = agent_config or {}
     
     def get_system_prompt(self, **kwargs) -> str:
         """Generate system prompt from template."""
+        # Create a config object that includes agent_config for template access
+        config_with_agent = type('ConfigWithAgent', (), {
+            **self.config.model_dump(),
+            'agent_config': self.agent_config
+        })()
+
         context = {
-            'config': self.config,
+            'config': config_with_agent,
             'examples': self.format_examples(),
             'output_requirements': self.format_output_requirements(),
             **kwargs
@@ -306,4 +314,14 @@ class ConfigurablePromptTemplate(PromptTemplate):
     
     def get_user_prompt(self, **kwargs) -> str:
         """Generate user prompt from template."""
-        return self.render_template(self.user_template, **kwargs)
+        # Create a config object that includes agent_config for template access
+        config_with_agent = type('ConfigWithAgent', (), {
+            **self.config.model_dump(),
+            'agent_config': self.agent_config
+        })()
+
+        context = {
+            'config': config_with_agent,
+            **kwargs
+        }
+        return self.render_template(self.user_template, **context)

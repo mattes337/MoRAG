@@ -82,7 +82,8 @@ class BaseAgent(Generic[T], ABC):
         return ConfigurablePromptTemplate(
             self.config.prompt,
             prompts["system_prompt"],
-            prompts["user_prompt"]
+            prompts["user_prompt"],
+            self.config.agent_config
         )
     
     @abstractmethod
@@ -146,21 +147,61 @@ class BaseAgent(Generic[T], ABC):
     
     def _generate_cache_key(self, prompt: str, **kwargs) -> str:
         """Generate cache key for the request.
-        
+
         Args:
             prompt: The prompt string
             **kwargs: Additional parameters
-            
+
         Returns:
             Cache key string
         """
+        # Convert Pydantic models to dicts for serialization
+        serializable_kwargs = {}
+        for key, value in kwargs.items():
+            if hasattr(value, 'model_dump') and callable(getattr(value, 'model_dump')):
+                # Pydantic v2 instance
+                try:
+                    serializable_kwargs[key] = value.model_dump()
+                except Exception:
+                    serializable_kwargs[key] = str(value)
+            elif hasattr(value, 'dict') and callable(getattr(value, 'dict')):
+                # Pydantic v1 instance
+                try:
+                    serializable_kwargs[key] = value.dict()
+                except Exception:
+                    serializable_kwargs[key] = str(value)
+            elif isinstance(value, list) and value:
+                # Handle lists
+                serialized_list = []
+                for item in value:
+                    if hasattr(item, 'model_dump') and callable(getattr(item, 'model_dump')):
+                        try:
+                            serialized_list.append(item.model_dump())
+                        except Exception:
+                            serialized_list.append(str(item))
+                    elif hasattr(item, 'dict') and callable(getattr(item, 'dict')):
+                        try:
+                            serialized_list.append(item.dict())
+                        except Exception:
+                            serialized_list.append(str(item))
+                    else:
+                        serialized_list.append(str(item) if not isinstance(item, (str, int, float, bool, type(None))) else item)
+                serializable_kwargs[key] = serialized_list
+            else:
+                # For non-serializable objects, convert to string
+                try:
+                    json.dumps(value)
+                    serializable_kwargs[key] = value
+                except (TypeError, ValueError):
+                    serializable_kwargs[key] = str(value)
+
         # Create a hash of the prompt and relevant config
         content = {
             'prompt': prompt,
             'model': self.config.model.model,
             'temperature': self.config.model.temperature,
             'max_tokens': self.config.model.max_tokens,
-            **kwargs
+            **serializable_kwargs
         }
         content_str = json.dumps(content, sort_keys=True)
         return hashlib.md5(content_str.encode()).hexdigest()

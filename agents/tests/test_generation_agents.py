@@ -13,7 +13,7 @@ from agents.generation.response_generation import ResponseGenerationAgent
 from agents.generation.explanation import ExplanationAgent
 from agents.generation.synthesis import SynthesisAgent
 from agents.generation.models import (
-    SummarizationResult, SummaryType,
+    SummarizationResult,
     ResponseGenerationResult,
     ExplanationResult,
     SynthesisResult
@@ -56,13 +56,13 @@ class TestSummarizationAgent:
                     "Potential to reduce misdiagnosis"
                 ],
                 "compression_ratio": 0.3,
-                "confidence": 0.9
+                "confidence": "high"
             }
             
             result = await summary_agent.summarize(text, summary_type="abstractive")
             
             assert isinstance(result, SummarizationResult)
-            assert result.summary_type == SummaryType.ABSTRACTIVE
+            assert result.summary_type == "abstractive"
             assert "95% accuracy" in result.summary
             assert len(result.key_points) == 3
             assert result.compression_ratio < 0.5
@@ -86,12 +86,12 @@ class TestSummarizationAgent:
                     "Improved patient outcomes"
                 ],
                 "compression_ratio": 0.5,
-                "confidence": 0.85
+                "confidence": "high"
             }
             
             result = await summary_agent.summarize(text, summary_type="extractive")
             
-            assert result.summary_type == SummaryType.EXTRACTIVE
+            assert result.summary_type == "extractive"
             assert "Machine learning algorithms" in result.summary
             assert result.compression_ratio == 0.5
 
@@ -119,18 +119,22 @@ class TestResponseGenerationAgent:
             mock_llm.return_value = {
                 "response": "Diabetes symptoms include excessive thirst (polydipsia), frequent urination (polyuria), unexplained fatigue, and blurred vision. These symptoms occur because high blood glucose levels affect normal body functions.",
                 "response_type": "informative",
-                "confidence": 0.9,
-                "sources_used": 2,
-                "completeness": 0.85
+                "sources": [],
+                "confidence": "high",
+                "citations": [],
+                "metadata": {
+                    "sources_used": 2,
+                    "completeness": 0.85
+                }
             }
             
             result = await response_agent.generate_response(query, context)
             
             assert isinstance(result, ResponseGenerationResult)
-            assert result.response_type == ResponseType.INFORMATIVE
+            assert result.response_type == "informative"
             assert "polydipsia" in result.response
-            assert result.confidence > 0.8
-            assert result.sources_used >= 2
+            assert result.confidence == "high"
+            assert result.metadata.get("sources_used", 0) >= 2
     
     @pytest.mark.asyncio
     async def test_explanatory_response(self, response_agent):
@@ -146,16 +150,20 @@ class TestResponseGenerationAgent:
             mock_llm.return_value = {
                 "response": "Diabetes causes frequent urination through an osmotic mechanism. When blood glucose levels are high, the kidneys cannot reabsorb all the glucose, so it spills into the urine. Glucose in urine draws water with it through osmosis, resulting in increased urine volume and frequency.",
                 "response_type": "explanatory",
-                "confidence": 0.95,
-                "sources_used": 3,
-                "completeness": 0.9
+                "sources": [],
+                "confidence": "high",
+                "citations": [],
+                "metadata": {
+                    "sources_used": 3,
+                    "completeness": 0.9
+                }
             }
             
             result = await response_agent.generate_response(query, context, response_type="explanatory")
             
-            assert result.response_type == ResponseType.EXPLANATORY
+            assert result.response_type == "explanatory"
             assert "osmotic" in result.response
-            assert result.completeness > 0.8
+            assert result.metadata.get("completeness", 0) > 0.8
 
 
 class TestExplanationAgent:
@@ -186,17 +194,20 @@ class TestExplanationAgent:
                     "Viruses lack these target structures",
                     "Therefore, antibiotics cannot affect viruses"
                 ],
-                "confidence": 0.95,
-                "clarity_score": 0.9
+                "examples": [],
+                "confidence": "high",
+                "metadata": {
+                    "clarity_score": 0.9
+                }
             }
             
             result = await explanation_agent.explain(phenomenon, context)
             
             assert isinstance(result, ExplanationResult)
-            assert result.explanation_type == ExplanationType.CAUSAL
+            assert result.explanation_type == "causal"
             assert "cell walls" in result.explanation
             assert len(result.reasoning_steps) == 3
-            assert result.confidence > 0.9
+            assert result.confidence == "high"
     
     @pytest.mark.asyncio
     async def test_mechanistic_explanation(self, explanation_agent):
@@ -218,13 +229,16 @@ class TestExplanationAgent:
                     "GLUT4 transporters activated",
                     "Glucose uptake increases"
                 ],
-                "confidence": 0.9,
-                "clarity_score": 0.85
+                "examples": [],
+                "confidence": "high",
+                "metadata": {
+                    "clarity_score": 0.85
+                }
             }
             
-            result = await explanation_agent.explain(phenomenon, context, explanation_type="mechanistic")
+            result = await explanation_agent.explain(phenomenon, "mechanistic", context=context)
             
-            assert result.explanation_type == ExplanationType.MECHANISTIC
+            assert result.explanation_type == "mechanistic"
             assert "GLUT4" in result.explanation
             assert len(result.reasoning_steps) == 4
 
@@ -250,23 +264,27 @@ class TestSynthesisAgent:
         with patch.object(synthesis_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "synthesis": "Multiple studies demonstrate Drug X's effectiveness for condition Y, with efficacy rates ranging from 75-85%. While the drug shows consistent therapeutic benefit, side effects including nausea occur in approximately 20% of patients, requiring careful risk-benefit assessment.",
-                "synthesis_type": "comparative",
-                "key_insights": [
-                    "Consistent efficacy across studies (75-85%)",
-                    "Notable side effect profile (20% nausea)",
-                    "Positive risk-benefit ratio"
-                ],
-                "confidence": 0.9,
-                "source_coverage": 1.0
+                "sources_integrated": 3,
+                "coherence_score": 0.9,
+                "confidence": "high",
+                "metadata": {
+                    "synthesis_type": "comparative",
+                    "key_insights": [
+                        "Consistent efficacy across studies (75-85%)",
+                        "Notable side effect profile (20% nausea)",
+                        "Positive risk-benefit ratio"
+                    ],
+                    "source_coverage": 1.0
+                }
             }
             
             result = await synthesis_agent.synthesize(sources, synthesis_type="comparative")
             
             assert isinstance(result, SynthesisResult)
-            assert result.synthesis_type == SynthesisType.COMPARATIVE
+            assert result.metadata.get("synthesis_type") == "comparative"
             assert "75-85%" in result.synthesis
-            assert len(result.key_insights) == 3
-            assert result.source_coverage == 1.0
+            assert len(result.metadata.get("key_insights", [])) == 3
+            assert result.metadata.get("source_coverage") == 1.0
     
     @pytest.mark.asyncio
     async def test_integrative_synthesis(self, synthesis_agent):
@@ -280,21 +298,25 @@ class TestSynthesisAgent:
         with patch.object(synthesis_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "synthesis": "Diabetes development involves complex interactions between genetic predisposition and environmental factors. While genetic factors establish baseline risk, environmental influences like diet and lifestyle play crucial roles in disease manifestation, suggesting that targeted lifestyle interventions can effectively prevent type 2 diabetes even in genetically susceptible individuals.",
-                "synthesis_type": "integrative",
-                "key_insights": [
-                    "Gene-environment interaction model",
-                    "Lifestyle interventions overcome genetic risk",
-                    "Prevention possible through behavior modification"
-                ],
-                "confidence": 0.85,
-                "source_coverage": 1.0
+                "sources_integrated": 3,
+                "coherence_score": 0.85,
+                "confidence": "high",
+                "metadata": {
+                    "synthesis_type": "integrative",
+                    "key_insights": [
+                        "Gene-environment interaction model",
+                        "Lifestyle interventions overcome genetic risk",
+                        "Prevention possible through behavior modification"
+                    ],
+                    "source_coverage": 1.0
+                }
             }
             
             result = await synthesis_agent.synthesize(sources, synthesis_type="integrative")
             
-            assert result.synthesis_type == SynthesisType.INTEGRATIVE
-            assert "gene-environment" in result.synthesis.lower()
-            assert result.confidence > 0.8
+            assert result.metadata.get("synthesis_type") == "integrative"
+            assert "genetic" in result.synthesis.lower() and "environmental" in result.synthesis.lower()
+            assert result.confidence == "high"
 
 
 class TestGenerationAgentsIntegration:
@@ -329,26 +351,37 @@ class TestGenerationAgentsIntegration:
             
             mock_synthesis.return_value = {
                 "synthesis": "Diabetes significantly increases cardiovascular disease risk through multiple mechanisms including vascular damage, inflammation, and metabolic dysfunction.",
-                "synthesis_type": "integrative",
-                "key_insights": ["Vascular damage", "Inflammation", "Metabolic dysfunction"],
-                "confidence": 0.9,
-                "source_coverage": 1.0
+                "sources_integrated": 4,
+                "coherence_score": 0.9,
+                "confidence": "high",
+                "metadata": {
+                    "synthesis_type": "integrative",
+                    "key_insights": ["Vascular damage", "Inflammation", "Metabolic dysfunction"],
+                    "source_coverage": 1.0
+                }
             }
             
             mock_explanation.return_value = {
                 "explanation": "Diabetes causes cardiovascular disease through hyperglycemia-induced endothelial damage, chronic inflammation from insulin resistance, and associated metabolic abnormalities.",
                 "explanation_type": "causal",
                 "reasoning_steps": ["Hyperglycemia damages vessels", "Insulin resistance causes inflammation"],
-                "confidence": 0.9,
-                "clarity_score": 0.85
+                "examples": [],
+                "confidence": "high",
+                "metadata": {
+                    "clarity_score": 0.85
+                }
             }
-            
+
             mock_response.return_value = {
                 "response": "Diabetes and cardiovascular disease are closely linked through multiple pathophysiological mechanisms, resulting in 2-4 fold increased risk for diabetic patients.",
                 "response_type": "explanatory",
-                "confidence": 0.9,
-                "sources_used": 4,
-                "completeness": 0.9
+                "sources": [],
+                "confidence": "high",
+                "citations": [],
+                "metadata": {
+                    "sources_used": 4,
+                    "completeness": 0.9
+                }
             }
             
             # Run generation pipeline
@@ -358,8 +391,8 @@ class TestGenerationAgentsIntegration:
             
             # Verify results
             assert "cardiovascular" in synthesis_result.synthesis
-            assert explanation_result.explanation_type == ExplanationType.CAUSAL
-            assert response_result.confidence > 0.8
+            assert explanation_result.explanation_type == "causal"
+            assert response_result.confidence == "high"
             
             print("✅ Generation pipeline test completed successfully")
 

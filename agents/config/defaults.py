@@ -337,6 +337,30 @@ class DefaultConfigs:
         )
 
     @staticmethod
+    def get_reasoning_config() -> AgentConfig:
+        """Get default configuration for reasoning agent."""
+        return AgentConfig(
+            name="reasoning",
+            description="Performs logical reasoning and inference",
+            prompt=PromptConfig(
+                output_format="json",
+                strict_json=True,
+            ),
+        )
+
+    @staticmethod
+    def get_response_generation_config() -> AgentConfig:
+        """Get default configuration for response generation agent."""
+        return AgentConfig(
+            name="response_generation",
+            description="Generates comprehensive responses to user queries",
+            prompt=PromptConfig(
+                output_format="json",
+                strict_json=True,
+            ),
+        )
+
+    @staticmethod
     def get_all_configs() -> Dict[str, AgentConfig]:
         """Get all default configurations."""
         return {
@@ -358,6 +382,21 @@ class DefaultConfigs:
             "classification": DefaultConfigs.get_classification_config(),
             "validation": DefaultConfigs.get_validation_config(),
             "filtering": DefaultConfigs.get_filtering_config(),
+            "reasoning": DefaultConfigs.get_reasoning_config(),
+            "response_generation": DefaultConfigs.get_response_generation_config(),
+            # Aliases for incorrectly converted names
+            "relationextraction": DefaultConfigs.get_relation_extraction_config(),
+            "keywordextraction": DefaultConfigs.get_keyword_extraction_config(),
+            "topicanalysis": DefaultConfigs.get_topic_analysis_config(),
+            "pathselection": DefaultConfigs.get_path_selection_config(),
+            "contextanalysis": DefaultConfigs.get_context_analysis_config(),
+            "queryanalysis": DefaultConfigs.get_query_analysis_config(),
+            "factextraction": DefaultConfigs.get_fact_extraction_config(),
+            "sentimentanalysis": DefaultConfigs.get_sentiment_analysis_config(),
+            "decisionmaking": DefaultConfigs.get_decision_making_config(),
+            "contentanalysis": DefaultConfigs.get_content_analysis_config(),
+            "entityextraction": DefaultConfigs.get_entity_extraction_config(),
+            "responsegeneration": DefaultConfigs.get_response_generation_config(),
         }
 
     @staticmethod

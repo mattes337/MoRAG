@@ -11,7 +11,7 @@ os.environ["GEMINI_API_KEY"] = "test-key"
 from agents.base.config import AgentConfig, PromptConfig, ModelConfig
 from agents.base.template import ConfigurablePromptTemplate
 from agents.extraction.fact_extraction import FactExtractionAgent
-from agents.extraction.models import FactExtractionResult, ExtractedFact, FactType, ConfidenceLevel
+from agents.extraction.models import FactExtractionResult, ExtractedFact, ConfidenceLevel
 from agents.factory.utils import create_agent, get_agent
 
 
@@ -96,6 +96,7 @@ class TestFactExtractionAgent:
         agent = FactExtractionAgent()
         assert agent.get_result_type() == FactExtractionResult
     
+    @pytest.mark.asyncio
     @patch('agents.base.agent.BaseAgent._call_model')
     async def test_fact_extraction_execution(self, mock_call_model):
         """Test fact extraction execution."""
@@ -181,18 +182,17 @@ class TestConfigurationValidation:
     
     def test_invalid_configuration(self):
         """Test invalid configuration raises error."""
-        config = AgentConfig(
-            name="test_agent",
-            timeout=-1  # Invalid timeout
-        )
-        
-        with pytest.raises(Exception):  # ConfigurationError expected
-            FactExtractionAgent(config)
+        with pytest.raises(Exception):  # ValidationError expected from Pydantic
+            config = AgentConfig(
+                name="test_agent",
+                timeout=-1  # Invalid timeout
+            )
 
 
 class TestErrorHandling:
     """Test error handling."""
     
+    @pytest.mark.asyncio
     @patch('agents.base.agent.BaseAgent._call_model')
     async def test_model_error_handling(self, mock_call_model):
         """Test handling of model errors."""
@@ -203,6 +203,7 @@ class TestErrorHandling:
         with pytest.raises(Exception):
             await agent.extract_facts("Test text")
     
+    @pytest.mark.asyncio
     @patch('agents.base.agent.BaseAgent._call_model')
     async def test_invalid_json_handling(self, mock_call_model):
         """Test handling of invalid JSON responses."""

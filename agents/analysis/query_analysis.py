@@ -6,7 +6,7 @@ import structlog
 from ..base.agent import BaseAgent
 from ..base.config import AgentConfig, PromptConfig
 
-from .models import QueryAnalysisResult, QueryIntent, QueryType, ComplexityLevel, ConfidenceLevel
+from .models import QueryAnalysisResult
 
 logger = structlog.get_logger(__name__)
 
@@ -60,12 +60,12 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
         """
         if not query or not query.strip():
             return QueryAnalysisResult(
-                intent=QueryIntent.SEARCH,
+                intent="search",
                 entities=[],
                 keywords=[],
-                query_type=QueryType.FACTUAL,
-                complexity=ComplexityLevel.SIMPLE,
-                confidence=ConfidenceLevel.LOW,
+                query_type="factual",
+                complexity="simple",
+                confidence="low",
                 metadata={"error": "Empty query"}
             )
         

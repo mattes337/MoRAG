@@ -5,7 +5,7 @@ import structlog
 
 from ..base.agent import BaseAgent
 from ..base.config import AgentConfig, PromptConfig
-from .models import FactExtractionResult, ExtractedFact, FactType, ConfidenceLevel
+from .models import FactExtractionResult, ExtractedFact, ConfidenceLevel
 
 logger = structlog.get_logger(__name__)
 

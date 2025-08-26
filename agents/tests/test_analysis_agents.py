@@ -13,9 +13,9 @@ from agents.analysis.content_analysis import ContentAnalysisAgent
 from agents.analysis.sentiment_analysis import SentimentAnalysisAgent
 from agents.analysis.topic_analysis import TopicAnalysisAgent
 from agents.analysis.models import (
-    QueryAnalysisResult, QueryType, ComplexityLevel, ConfidenceLevel,
+    QueryAnalysisResult,
     ContentAnalysisResult,
-    SentimentAnalysisResult, SentimentPolarity,
+    SentimentAnalysisResult,
     TopicAnalysisResult
 )
 from agents.base.config import AgentConfig
@@ -60,10 +60,10 @@ class TestQueryAnalysisAgent:
             result = await query_agent.analyze_query(query)
             
             assert isinstance(result, QueryAnalysisResult)
-            assert result.query_type == QueryType.FACTUAL
-            assert result.complexity == ComplexityLevel.SIMPLE
+            assert result.query_type == "factual"
+            assert result.complexity == "simple"
             assert "machine learning" in result.entities
-            assert result.confidence == ConfidenceLevel.HIGH
+            assert result.confidence == "high"
     
     @pytest.mark.asyncio
     async def test_complex_query_analysis(self, query_agent):
@@ -78,13 +78,13 @@ class TestQueryAnalysisAgent:
                 "entities": ["convolutional neural networks", "transformer models", "image classification"],
                 "keywords": ["CNN", "transformers", "accuracy", "efficiency"],
                 "domain": "machine_learning",
-                "confidence": 0.95
+                "confidence": "high"
             }
             
             result = await query_agent.analyze_query(query)
             
-            assert result.query_type == QueryType.COMPARATIVE
-            assert result.complexity == QueryComplexity.COMPLEX
+            assert result.query_type == "comparative"
+            assert result.complexity == "complex"
             assert len(result.entities) >= 3
             assert result.domain == "machine_learning"
 
@@ -114,26 +114,32 @@ class TestContentAnalysisAgent:
         
         with patch.object(content_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
-                "content_type": "research_paper",
-                "domain": "computer_vision",
-                "structure": {
-                    "abstract": True,
-                    "introduction": True,
-                    "methodology": True,
-                    "results": True
-                },
+                "main_topics": ["deep learning", "computer vision", "image classification"],
                 "key_concepts": ["deep learning", "CNN", "image classification"],
+                "content_type": "research_paper",
                 "complexity": "high",
-                "quality_score": 0.9
+                "readability_score": 0.8,
+                "word_count": 453,
+                "confidence": "high",
+                "metadata": {
+                    "domain": "computer_vision",
+                    "structure": {
+                        "abstract": True,
+                        "introduction": True,
+                        "methodology": True,
+                        "results": True
+                    },
+                    "quality_score": 0.9
+                }
             }
             
             result = await content_agent.analyze_content(content)
             
             assert isinstance(result, ContentAnalysisResult)
-            assert result.content_type == ContentType.RESEARCH_PAPER
-            assert result.domain == "computer_vision"
+            assert result.content_type == "research_paper"
+            assert result.metadata.get("domain") == "computer_vision"
             assert "deep learning" in result.key_concepts
-            assert result.quality_score > 0.8
+            assert result.metadata.get("quality_score", 0) > 0.8
     
     @pytest.mark.asyncio
     async def test_medical_content_analysis(self, content_agent):
@@ -147,23 +153,29 @@ class TestContentAnalysisAgent:
         
         with patch.object(content_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
-                "content_type": "medical_record",
-                "domain": "cardiology",
-                "structure": {
-                    "symptoms": True,
-                    "diagnosis": True,
-                    "treatment": True,
-                    "outcome": True
-                },
+                "main_topics": ["cardiology", "myocardial infarction", "emergency medicine"],
                 "key_concepts": ["chest pain", "myocardial infarction", "aspirin"],
+                "content_type": "medical_record",
                 "complexity": "medium",
-                "quality_score": 0.85
+                "readability_score": 0.7,
+                "word_count": 233,
+                "confidence": "high",
+                "metadata": {
+                    "domain": "cardiology",
+                    "structure": {
+                        "symptoms": True,
+                        "diagnosis": True,
+                        "treatment": True,
+                        "outcome": True
+                    },
+                    "quality_score": 0.85
+                }
             }
             
             result = await content_agent.analyze_content(content)
             
-            assert result.content_type == ContentType.MEDICAL_RECORD
-            assert result.domain == "cardiology"
+            assert result.content_type == "medical_record"
+            assert result.metadata.get("domain") == "cardiology"
             assert "myocardial infarction" in result.key_concepts
 
 
@@ -183,18 +195,21 @@ class TestSentimentAnalysisAgent:
         
         with patch.object(sentiment_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
-                "sentiment": "positive",
-                "confidence": 0.95,
+                "polarity": "positive",
+                "confidence": "high",
                 "intensity": 0.9,
-                "emotions": ["joy", "relief", "satisfaction"],
-                "key_phrases": ["absolutely amazing", "completely cured", "feel fantastic"]
+                "emotions": {"joy": 0.8, "relief": 0.7, "satisfaction": 0.9},
+                "aspects": [],
+                "metadata": {
+                    "key_phrases": ["absolutely amazing", "completely cured", "feel fantastic"]
+                }
             }
             
             result = await sentiment_agent.analyze_sentiment(text)
             
             assert isinstance(result, SentimentAnalysisResult)
-            assert result.sentiment == SentimentType.POSITIVE
-            assert result.confidence > 0.9
+            assert result.polarity == "positive"
+            assert result.confidence == "high"
             assert result.intensity > 0.8
             assert "joy" in result.emotions
     
@@ -205,17 +220,20 @@ class TestSentimentAnalysisAgent:
         
         with patch.object(sentiment_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
-                "sentiment": "negative",
-                "confidence": 0.9,
+                "polarity": "negative",
+                "confidence": "high",
                 "intensity": 0.8,
-                "emotions": ["anger", "disappointment", "frustration"],
-                "key_phrases": ["terrible", "made worse", "severe side effects"]
+                "emotions": {"anger": 0.9, "disappointment": 0.7, "frustration": 0.8},
+                "aspects": [],
+                "metadata": {
+                    "key_phrases": ["terrible", "made worse", "severe side effects"]
+                }
             }
             
             result = await sentiment_agent.analyze_sentiment(text)
             
-            assert result.sentiment == SentimentType.NEGATIVE
-            assert result.confidence > 0.8
+            assert result.polarity == "negative"
+            assert result.confidence == "high"
             assert "anger" in result.emotions
 
 
@@ -240,20 +258,28 @@ class TestTopicAnalysisAgent:
         with patch.object(topic_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_topic": "cardiovascular_disease",
-                "category": "medical",
-                "subtopics": ["risk_factors", "prevention", "epidemiology"],
-                "confidence": 0.9,
-                "keywords": ["cardiovascular", "hypertension", "diabetes", "prevention"],
-                "domain_specificity": 0.95
+                "secondary_topics": ["risk_factors", "prevention", "epidemiology"],
+                "topic_distribution": {
+                    "cardiovascular_disease": 0.8,
+                    "risk_factors": 0.6,
+                    "prevention": 0.5
+                },
+                "coherence_score": 0.9,
+                "confidence": "high",
+                "metadata": {
+                    "category": "medical",
+                    "keywords": ["cardiovascular", "hypertension", "diabetes", "prevention"],
+                    "domain_specificity": 0.95
+                }
             }
             
             result = await topic_agent.analyze_topics(text)
             
             assert isinstance(result, TopicAnalysisResult)
             assert result.primary_topic == "cardiovascular_disease"
-            assert result.category == TopicCategory.MEDICAL
-            assert "risk_factors" in result.subtopics
-            assert result.confidence > 0.8
+            assert result.metadata.get("category") == "medical"
+            assert "risk_factors" in result.secondary_topics
+            assert result.confidence == "high"
     
     @pytest.mark.asyncio
     async def test_technology_topic_analysis(self, topic_agent):
@@ -267,18 +293,26 @@ class TestTopicAnalysisAgent:
         with patch.object(topic_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_topic": "artificial_intelligence",
-                "category": "technology",
-                "subtopics": ["machine_learning", "computer_vision", "nlp"],
-                "confidence": 0.95,
-                "keywords": ["AI", "deep learning", "computer vision", "NLP"],
-                "domain_specificity": 0.9
+                "secondary_topics": ["machine_learning", "computer_vision", "nlp"],
+                "topic_distribution": {
+                    "artificial_intelligence": 0.9,
+                    "machine_learning": 0.7,
+                    "computer_vision": 0.6
+                },
+                "coherence_score": 0.95,
+                "confidence": "high",
+                "metadata": {
+                    "category": "technology",
+                    "keywords": ["AI", "deep learning", "computer vision", "NLP"],
+                    "domain_specificity": 0.9
+                }
             }
             
             result = await topic_agent.analyze_topics(text)
             
             assert result.primary_topic == "artificial_intelligence"
-            assert result.category == TopicCategory.TECHNOLOGY
-            assert "machine_learning" in result.subtopics
+            assert result.metadata.get("category") == "technology"
+            assert "machine_learning" in result.secondary_topics
 
 
 class TestAnalysisAgentsIntegration:
@@ -306,29 +340,46 @@ class TestAnalysisAgentsIntegration:
              patch.object(content_agent, '_call_model') as mock_content:
             
             mock_sentiment.return_value = {
-                "sentiment": "positive",
-                "confidence": 0.9,
+                "polarity": "positive",
+                "confidence": "high",
                 "intensity": 0.8,
-                "emotions": ["excitement"],
-                "key_phrases": ["really excited"]
+                "emotions": {"excitement": 0.9},
+                "aspects": [],
+                "metadata": {
+                    "key_phrases": ["really excited"]
+                }
             }
             
             mock_topic.return_value = {
                 "primary_topic": "medical_ai",
-                "category": "technology",
-                "subtopics": ["AI", "medical_diagnosis"],
-                "confidence": 0.9,
-                "keywords": ["AI", "medical", "diagnosis"],
-                "domain_specificity": 0.85
+                "secondary_topics": ["AI", "medical_diagnosis"],
+                "topic_distribution": {
+                    "medical_ai": 0.8,
+                    "AI": 0.7,
+                    "medical_diagnosis": 0.6
+                },
+                "coherence_score": 0.85,
+                "confidence": "high",
+                "metadata": {
+                    "category": "technology",
+                    "keywords": ["AI", "medical", "diagnosis"],
+                    "domain_specificity": 0.85
+                }
             }
-            
+
             mock_content.return_value = {
-                "content_type": "social_media",
-                "domain": "technology",
-                "structure": {"informal": True},
+                "main_topics": ["AI", "medical diagnosis", "technology"],
                 "key_concepts": ["AI", "medical diagnosis"],
+                "content_type": "social_media",
                 "complexity": "low",
-                "quality_score": 0.7
+                "readability_score": 0.8,
+                "word_count": 71,
+                "confidence": "high",
+                "metadata": {
+                    "domain": "technology",
+                    "structure": {"informal": True},
+                    "quality_score": 0.7
+                }
             }
             
             # Run analysis pipeline
@@ -337,9 +388,9 @@ class TestAnalysisAgentsIntegration:
             content_result = await content_agent.analyze_content(text)
             
             # Verify results
-            assert sentiment_result.sentiment == SentimentType.POSITIVE
-            assert topic_result.category == TopicCategory.TECHNOLOGY
-            assert content_result.content_type == ContentType.SOCIAL_MEDIA
+            assert sentiment_result.polarity == "positive"
+            assert topic_result.primary_topic == "medical_ai"
+            assert content_result.content_type == "social_media"
             
             print("✅ Analysis pipeline test completed successfully")
 

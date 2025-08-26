@@ -21,7 +21,6 @@ from morag_core.ai import (
     create_agent_with_config,
     EntityExtractionResult,
     Entity,
-    EntityType,
     ConfidenceLevel,
     AgentError,
     ValidationError,
@@ -264,15 +263,15 @@ class TestStructuredModels:
         """Test Entity model."""
         entity = Entity(
             name="Apple Inc.",
-            type=EntityType.ORGANIZATION,
+            type="ORGANIZATION",
             confidence=0.95,
             start_pos=0,
             end_pos=10,
             context="Apple Inc. is a technology company"
         )
-        
+
         assert entity.name == "Apple Inc."
-        assert entity.type == EntityType.ORGANIZATION
+        assert entity.type == "ORGANIZATION"
         assert entity.confidence == 0.95
         assert entity.start_pos == 0
         assert entity.end_pos == 10
@@ -281,8 +280,8 @@ class TestStructuredModels:
     def test_entity_extraction_result(self):
         """Test EntityExtractionResult model."""
         entities = [
-            Entity(name="Apple", type=EntityType.ORGANIZATION, confidence=0.9),
-            Entity(name="iPhone", type=EntityType.PRODUCT, confidence=0.8)
+            Entity(name="Apple", type="ORGANIZATION", confidence=0.9),
+            Entity(name="iPhone", type="PRODUCT", confidence=0.8)
         ]
         
         result = EntityExtractionResult(

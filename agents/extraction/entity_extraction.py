@@ -6,7 +6,7 @@ import structlog
 from ..base.agent import BaseAgent
 from ..base.config import AgentConfig, PromptConfig
 from ..config.entity_types import get_agent_entity_types
-from .models import EntityExtractionResult, ExtractedEntity, EntityType, ConfidenceLevel
+from .models import EntityExtractionResult, ExtractedEntity, ConfidenceLevel
 
 logger = structlog.get_logger(__name__)
 

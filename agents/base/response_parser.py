@@ -21,23 +21,27 @@ class LLMResponseParser:
     
     @staticmethod
     def parse_json_response(
-        response: str,
+        response: Union[str, dict],
         fallback_value: Optional[Any] = None,
         context: str = "unknown"
     ) -> Any:
         """Parse JSON from LLM response with robust error handling.
-        
+
         Args:
-            response: Raw LLM response text
+            response: Raw LLM response text or dict (for testing)
             fallback_value: Value to return if parsing fails
             context: Context for logging purposes
-            
+
         Returns:
             Parsed JSON data or fallback value
-            
+
         Raises:
             LLMResponseParseError: If parsing fails and no fallback provided
         """
+        # Handle dict input (for testing)
+        if isinstance(response, dict):
+            return response
+
         if not response or not response.strip():
             if fallback_value is not None:
                 return fallback_value
@@ -175,10 +179,16 @@ class LLMResponseParser:
                     return result_type(content=response)
                     
         except Exception as e:
+            # Handle response preview for both string and dict
+            if isinstance(response, str):
+                response_preview = response[:200]
+            else:
+                response_preview = str(response)[:200]
+
             logger.error(
                 "Response parsing and validation failed",
                 context=context,
                 error=str(e),
-                response_preview=response[:200]
+                response_preview=response_preview
             )
             raise ValidationError(f"Result validation failed in {context}: {e}") from e

@@ -141,17 +141,35 @@ entity_extraction:
     - Domain-specific terminology
     - Measurable quantities and specifications
 
-    ## Entity Types
-    Focus on these entity types:
-    {% for entity_type in config.agent_config.get('entity_types', ['PERSON', 'ORGANIZATION', 'LOCATION', 'CONCEPT']) %}
+    ## Entity Type Guidelines
+    Create specific, domain-appropriate entity types that accurately describe the entities you find.
+
+    **Entity Type Principles:**
+    - Use specific, descriptive entity types rather than generic ones
+    - Make entity types domain-specific when possible (e.g., "PHARMACEUTICAL_DRUG", "MEDICAL_DEVICE" for medical domain)
+    - Use descriptive types that clearly express the nature of the entity
+    - Format as UPPERCASE_WITH_UNDERSCORES (e.g., "RESEARCH_INSTITUTION", "SOFTWARE_FRAMEWORK")
+    - Avoid overly generic types like "ENTITY", "THING", "ITEM", "OBJECT"
+
+    **Example entity categories (adapt to your domain):**
+    {% if config.agent_config.get('entity_types') %}
+    {% for entity_type in config.agent_config.get('entity_types') %}
     - **{{ entity_type }}**: {{ entity_type.lower().replace('_', ' ') }}
     {% endfor %}
+    {% else %}
+    - **People & Organizations**: Specific roles, institutions, companies
+    - **Locations & Places**: Geographic locations, facilities, addresses
+    - **Concepts & Ideas**: Theories, methodologies, abstract concepts
+    - **Objects & Products**: Specific items, tools, technologies, substances
+    - **Events & Processes**: Procedures, activities, temporal events
+    - **Measurements & Data**: Quantities, specifications, metrics
+    {% endif %}
 
     ## Entity Structure
     For each entity, provide:
     - **name**: Exact text mention as it appears
     - **canonical_name**: Normalized/standardized form
-    - **entity_type**: One of the supported types
+    - **entity_type**: Domain-specific, descriptive type (create as needed)
     - **confidence**: 0.0-1.0 confidence score
     - **attributes**: Additional properties (synonyms, descriptions, etc.)
     {% if config.agent_config.get('include_offsets', True) %}
@@ -174,7 +192,7 @@ entity_extraction:
     Text: {{ input }}
 
     {% if domain and domain != 'general' %}
-    Focus on {{ domain }}-specific entities and terminology.
+    Focus on {{ domain }}-specific entities and terminology. Create entity types that are specific to the {{ domain }} domain.
     {% endif %}
 
     Return a JSON object with the following structure:
@@ -183,7 +201,7 @@ entity_extraction:
         {
           "name": "exact text mention",
           "canonical_name": "normalized form",
-          "entity_type": "PERSON|ORGANIZATION|LOCATION|CONCEPT|PRODUCT|EVENT|DATE|QUANTITY|TECHNOLOGY|PROCESS",
+          "entity_type": "DOMAIN_SPECIFIC_ENTITY_TYPE",
           "confidence": 0.0-1.0,
           "attributes": {"key": "value"},
           {% if config.agent_config.get('include_offsets', True) %}
@@ -564,16 +582,23 @@ relation_extraction:
     - Relevant to the domain context
     - Properly categorized by relationship type
 
-    ## Relationship Types
-    - **PART_OF**: Entity A is part of entity B
-    - **LOCATED_IN**: Entity A is located in entity B
-    - **WORKS_FOR**: Person A works for organization B
-    - **CAUSES**: Entity A causes entity B
-    - **USES**: Entity A uses entity B
-    - **CREATES**: Entity A creates entity B
-    - **RELATED_TO**: General semantic relationship
-    - **TEMPORAL**: Time-based relationship
-    - **HIERARCHICAL**: Parent-child or superior-subordinate relationship
+    ## Relationship Type Guidelines
+    Create specific, domain-appropriate relationship types that accurately describe the connection between entities.
+
+    **Relationship Type Principles:**
+    - Use specific, descriptive relationship types rather than generic ones
+    - Make relationship types domain-specific when possible (e.g., "DIAGNOSES", "PRESCRIBES" for medical domain)
+    - Use action-oriented types that clearly express the nature of the relationship
+    - Format as UPPERCASE_WITH_UNDERSCORES (e.g., "WORKS_FOR", "LOCATED_IN", "CAUSES")
+    - Avoid overly generic types like "RELATED_TO", "CONNECTS", "LINKS"
+
+    **Example relationship categories (adapt to your domain):**
+    - **Organizational**: Employment, membership, ownership relationships
+    - **Spatial**: Location, containment, proximity relationships
+    - **Causal**: Cause-effect, influence, impact relationships
+    - **Temporal**: Sequence, timing, duration relationships
+    - **Functional**: Usage, purpose, operation relationships
+    - **Hierarchical**: Parent-child, superior-subordinate relationships
 
     ## Extraction Guidelines
     - Focus on explicit relationships mentioned in the text
@@ -581,6 +606,7 @@ relation_extraction:
     - Provide context for relationship extraction
     - Normalize entity names consistently
     - Avoid inferring relationships not supported by text
+    - Create relationship types that capture the semantic meaning of the connection
 
     {{ output_requirements }}
 
@@ -590,7 +616,7 @@ relation_extraction:
     Text: {{ input }}
 
     {% if domain and domain != 'general' %}
-    Focus on {{ domain }}-specific relationships and terminology.
+    Focus on {{ domain }}-specific relationships and terminology. Create relationship types that are specific to the {{ domain }} domain.
     {% endif %}
 
     Return a JSON object with the following structure:
@@ -602,7 +628,7 @@ relation_extraction:
           "object": "entity2",
           "confidence": 0.0-1.0,
           "context": "supporting text",
-          "relation_type": "PART_OF|LOCATED_IN|WORKS_FOR|CAUSES|USES|CREATES|RELATED_TO|TEMPORAL|HIERARCHICAL"
+          "relation_type": "DOMAIN_SPECIFIC_RELATIONSHIP_TYPE"
         }
       ],
       "total_relations": 0,
@@ -1048,9 +1074,13 @@ synthesis:
   user_prompt: |
     Synthesize information from the following sources:
 
+    {{ input }}
+
+    {% if sources %}
     {% for source in sources %}
     Source {{ loop.index }}: {{ source }}
     {% endfor %}
+    {% endif %}
 
     {% if synthesis_focus %}
     Focus on: {{ synthesis_focus }}

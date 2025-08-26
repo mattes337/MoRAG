@@ -63,16 +63,20 @@ class TestPathSelectionAgent:
                         "expected_quality": 0.75
                     }
                 ],
-                "primary_path": "direct_search",
-                "strategy": "medical_focused"
+                "selection_strategy": "medical_focused",
+                "confidence": "high",
+                "metadata": {
+                    "primary_path": "direct_search",
+                    "total_paths_considered": 3
+                }
             }
             
             result = await path_agent.select_paths(query, available_paths)
             
             assert isinstance(result, PathSelectionResult)
             assert len(result.selected_paths) == 2
-            assert result.primary_path == "direct_search"
-            assert result.selected_paths[0].confidence > 0.8
+            assert result.metadata.get("primary_path") == "direct_search"
+            assert result.selected_paths[0]["confidence"] > 0.8
     
     @pytest.mark.asyncio
     async def test_complex_path_selection(self, path_agent):
@@ -103,15 +107,19 @@ class TestPathSelectionAgent:
                         "expected_quality": 0.8
                     }
                 ],
-                "primary_path": "comparative_analysis",
-                "strategy": "multi_source_comparison"
+                "selection_strategy": "multi_source_comparison",
+                "confidence": "high",
+                "metadata": {
+                    "primary_path": "comparative_analysis",
+                    "total_paths_considered": 4
+                }
             }
             
             result = await path_agent.select_paths(query, available_paths)
             
-            assert result.primary_path == "comparative_analysis"
+            assert result.metadata.get("primary_path") == "comparative_analysis"
             assert len(result.selected_paths) == 2
-            assert result.strategy == "multi_source_comparison"
+            assert result.selection_strategy == "multi_source_comparison"
 
 
 class TestReasoningAgent:
@@ -156,17 +164,20 @@ class TestReasoningAgent:
                     }
                 ],
                 "conclusion": "John has elevated blood glucose",
-                "validity": True,
-                "confidence": 0.9
+                "confidence": "high",
+                "metadata": {
+                    "validity": True,
+                    "evidence": ["Medical knowledge", "Logical deduction"]
+                }
             }
             
             result = await reasoning_agent.reason(premises)
             
             assert isinstance(result, ReasoningResult)
-            assert result.reasoning_type == ReasoningType.DEDUCTIVE
+            assert result.reasoning_type == "deductive"
             assert len(result.steps) == 3
-            assert result.validity == True
-            assert result.confidence > 0.8
+            assert result.metadata.get("validity") == True
+            assert result.confidence == "high"
     
     @pytest.mark.asyncio
     async def test_inductive_reasoning(self, reasoning_agent):
@@ -195,13 +206,16 @@ class TestReasoningAgent:
                     }
                 ],
                 "conclusion": "Hypertension is likely a risk factor for heart disease",
-                "validity": True,
-                "confidence": 0.75
+                "confidence": "medium",
+                "metadata": {
+                    "validity": True,
+                    "evidence": ["Patient observations", "Statistical patterns"]
+                }
             }
             
             result = await reasoning_agent.reason(observations)
             
-            assert result.reasoning_type == ReasoningType.INDUCTIVE
+            assert result.reasoning_type == "inductive"
             assert len(result.steps) == 2
             assert "risk factor" in result.conclusion
 
@@ -229,9 +243,10 @@ class TestDecisionMakingAgent:
         with patch.object(decision_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "recommended_option": "metformin",
-                "confidence": 0.9,
+                "confidence": "high",
                 "reasoning": "First-line treatment for type 2 diabetes with good safety profile",
-                "option_scores": [
+                "metadata": {
+                    "option_scores": [
                     {
                         "option": "metformin",
                         "total_score": 0.85,
@@ -252,17 +267,18 @@ class TestDecisionMakingAgent:
                             "cost": 0.7
                         }
                     }
-                ],
-                "risk_assessment": "low_risk"
+                    ],
+                    "risk_assessment": "low_risk"
+                }
             }
             
             result = await decision_agent.make_decision(context, options, criteria)
             
             assert isinstance(result, DecisionResult)
             assert result.recommended_option == "metformin"
-            assert result.confidence > 0.8
-            assert len(result.option_scores) == 2
-            assert result.risk_assessment == "low_risk"
+            assert result.confidence == "high"
+            assert len(result.metadata.get("option_scores", [])) == 2
+            assert result.risk_assessment["level"] == "low_risk"
 
 
 class TestContextAnalysisAgent:
@@ -287,30 +303,42 @@ class TestContextAnalysisAgent:
         
         with patch.object(context_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
-                "context_type": "medical_consultation",
-                "relevance": "high",
+                "context_summary": "Medical consultation for elderly patient with diabetes and hypertension",
                 "key_factors": [
                     "patient_age",
                     "medical_history",
                     "drug_interactions",
                     "allergies"
                 ],
-                "risk_factors": ["age_related_sensitivity", "drug_interactions"],
-                "recommendations": [
-                    "Consider age-appropriate dosing",
-                    "Check for drug interactions",
-                    "Avoid penicillin-based medications"
+                "relevance_score": 0.9,
+                "relevant_context": [
+                    "Patient age: 75",
+                    "Medical history: diabetes, hypertension",
+                    "Current medications: lisinopril, metformin",
+                    "Allergies: penicillin"
                 ],
-                "confidence": 0.9
+                "confidence": "high",
+                "metadata": {
+                    "context_type": "medical_consultation",
+                    "relevance": "high",
+                    "risk_factors": ["age_related_sensitivity", "drug_interactions"],
+                    "recommendations": [
+                        "Consider age-appropriate dosing",
+                        "Check for drug interactions",
+                        "Avoid penicillin-based medications"
+                    ]
+                }
             }
             
             result = await context_agent.analyze_context(query, context_info)
             
             assert isinstance(result, ContextAnalysisResult)
-            assert result.context_type == ContextType.MEDICAL_CONSULTATION
-            assert result.relevance == ContextRelevance.HIGH
+            assert result.metadata.get("context_type") == "medical_consultation"
+            assert result.metadata.get("relevance") == "high"
             assert "drug_interactions" in result.key_factors
-            assert len(result.recommendations) >= 3
+            assert len(result.metadata.get("recommendations", [])) >= 3
+            assert result.relevance_score == 0.9
+            assert len(result.relevant_context) == 4
 
 
 class TestReasoningAgentsIntegration:
@@ -343,20 +371,32 @@ class TestReasoningAgentsIntegration:
              patch.object(decision_agent, '_call_model') as mock_decision:
             
             mock_context.return_value = {
-                "context_type": "medical_consultation",
-                "relevance": "high",
+                "context_summary": "Medical consultation for elderly patient with coronary artery disease",
                 "key_factors": ["age", "comorbidities", "surgical_risk"],
-                "risk_factors": ["advanced_age", "multiple_comorbidities"],
-                "recommendations": ["Consider non-surgical options"],
-                "confidence": 0.85
+                "relevance_score": 0.85,
+                "relevant_context": [
+                    "Patient age: 75",
+                    "Condition: coronary artery disease",
+                    "Comorbidities: diabetes, hypertension",
+                    "Surgical risk: moderate"
+                ],
+                "confidence": "high",
+                "metadata": {
+                    "context_type": "medical_consultation",
+                    "relevance": "high",
+                    "risk_factors": ["advanced_age", "multiple_comorbidities"],
+                    "recommendations": ["Consider non-surgical options"]
+                }
             }
             
             mock_decision.return_value = {
                 "recommended_option": "conservative_treatment",
-                "confidence": 0.8,
+                "confidence": "high",
                 "reasoning": "High surgical risk due to age and comorbidities",
-                "option_scores": [],
-                "risk_assessment": "high_risk"
+                "metadata": {
+                    "option_scores": [],
+                    "risk_assessment": "high_risk"
+                }
             }
             
             # Run reasoning pipeline
@@ -368,9 +408,9 @@ class TestReasoningAgentsIntegration:
             )
             
             # Verify results
-            assert context_result.relevance == ContextRelevance.HIGH
+            assert context_result.metadata.get("relevance") == "high"
             assert decision_result.recommended_option == "conservative_treatment"
-            assert decision_result.risk_assessment == "high_risk"
+            assert decision_result.risk_assessment["level"] == "high_risk"
             
             print("✅ Reasoning pipeline test completed successfully")
 

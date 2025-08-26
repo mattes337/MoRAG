@@ -13,9 +13,9 @@ from agents.extraction.entity_extraction import EntityExtractionAgent
 from agents.extraction.relation_extraction import RelationExtractionAgent
 from agents.extraction.keyword_extraction import KeywordExtractionAgent
 from agents.extraction.models import (
-    FactExtractionResult, ExtractedFact, FactType, ConfidenceLevel,
-    EntityExtractionResult, ExtractedEntity, EntityType,
-    RelationExtractionResult, ExtractedRelation, RelationType,
+    FactExtractionResult, ExtractedFact, ConfidenceLevel,
+    EntityExtractionResult, ExtractedEntity, EntityTypeExamples,
+    RelationExtractionResult, ExtractedRelation, RelationTypeExamples,
     KeywordExtractionResult, ExtractedKeyword
 )
 from agents.base.config import AgentConfig
@@ -60,7 +60,7 @@ class TestFactExtractionAgent:
         """
         
         with patch.object(fact_agent, '_call_model') as mock_llm:
-            mock_llm.return_value = {
+            mock_llm.return_value = """{
                 "facts": [
                     {
                         "subject": "Dr. Smith",
@@ -69,20 +69,24 @@ class TestFactExtractionAgent:
                         "solution": "pain reduction within 30 minutes",
                         "condition": "headache symptoms",
                         "remarks": "effective treatment",
-                        "fact_type": "treatment",
+                        "fact_type": "MEDICAL_TREATMENT",
                         "confidence": 0.9,
                         "keywords": ["aspirin", "headache", "treatment"],
                         "source_text": "Dr. Smith prescribed aspirin"
                     }
-                ]
-            }
+                ],
+                "total_facts": 1,
+                "confidence": "high",
+                "domain": "medical",
+                "metadata": {}
+            }"""
             
             result = await fact_agent.extract_facts(text, domain="medical")
             
             assert isinstance(result, FactExtractionResult)
             assert len(result.facts) == 1
             assert result.facts[0].subject == "Dr. Smith"
-            assert result.facts[0].fact_type == FactType.TREATMENT
+            assert result.facts[0].fact_type == "MEDICAL_TREATMENT"
             assert result.domain == "medical"
 
 
@@ -105,33 +109,43 @@ class TestEntityExtractionAgent:
         text = "Dr. John Smith works at Mayo Clinic in Rochester, Minnesota."
         
         with patch.object(entity_agent, '_call_model') as mock_llm:
-            mock_llm.return_value = {
+            mock_llm.return_value = """{
                 "entities": [
                     {
-                        "text": "Dr. John Smith",
-                        "entity_type": "person",
+                        "name": "Dr. John Smith",
+                        "canonical_name": "Dr. John Smith",
+                        "entity_type": "PERSON",
                         "confidence": 0.95,
-                        "start_pos": 0,
-                        "end_pos": 13,
-                        "properties": {"title": "Doctor"}
+                        "start_offset": 0,
+                        "end_offset": 13,
+                        "attributes": {"title": "Doctor"},
+                        "context": "Dr. John Smith works"
                     },
                     {
-                        "text": "Mayo Clinic",
-                        "entity_type": "organization",
+                        "name": "Mayo Clinic",
+                        "canonical_name": "Mayo Clinic",
+                        "entity_type": "ORGANIZATION",
                         "confidence": 0.9,
-                        "start_pos": 23,
-                        "end_pos": 34,
-                        "properties": {"type": "hospital"}
+                        "start_offset": 23,
+                        "end_offset": 34,
+                        "attributes": {"type": "hospital"},
+                        "context": "works at Mayo Clinic"
                     }
-                ]
-            }
+                ],
+                "total_entities": 2,
+                "confidence": "high",
+                "metadata": {}
+            }"""
             
             result = await entity_agent.extract_entities(text)
             
             assert isinstance(result, EntityExtractionResult)
             assert len(result.entities) == 2
-            assert result.entities[0].text == "Dr. John Smith"
-            assert result.entities[0].entity_type == EntityType.PERSON
+            assert result.entities[0].name == "Dr. John Smith"
+            assert result.entities[0].entity_type == "PERSON"
+            assert result.entities[0].name == "Dr. John Smith"
+            assert result.entities[1].entity_type == "ORGANIZATION"
+            assert result.entities[1].name == "Mayo Clinic"
 
 
 class TestRelationExtractionAgent:
@@ -149,40 +163,48 @@ class TestRelationExtractionAgent:
         text = "Dr. Smith works at Mayo Clinic."
         entities = [
             ExtractedEntity(
-                text="Dr. Smith",
-                entity_type=EntityType.PERSON,
+                name="Dr. Smith",
+                canonical_name="Dr. Smith",
+                entity_type="PERSON",
                 confidence=0.9,
-                start_pos=0,
-                end_pos=9
+                start_offset=0,
+                end_offset=9
             ),
             ExtractedEntity(
-                text="Mayo Clinic",
-                entity_type=EntityType.ORGANIZATION,
+                name="Mayo Clinic",
+                canonical_name="Mayo Clinic",
+                entity_type="ORGANIZATION",
                 confidence=0.9,
-                start_pos=19,
-                end_pos=30
+                start_offset=19,
+                end_offset=30
             )
         ]
         
         with patch.object(relation_agent, '_call_model') as mock_llm:
-            mock_llm.return_value = {
+            mock_llm.return_value = """{
                 "relations": [
                     {
                         "source_entity": "Dr. Smith",
                         "target_entity": "Mayo Clinic",
-                        "relation_type": "works_at",
+                        "relation_type": "WORKS_FOR",
+                        "description": "Employment relationship between Dr. Smith and Mayo Clinic",
                         "confidence": 0.9,
-                        "evidence": "Dr. Smith works at Mayo Clinic"
+                        "context": "Dr. Smith works at Mayo Clinic"
                     }
-                ]
-            }
+                ],
+                "total_relations": 1,
+                "confidence": "high",
+                "metadata": {}
+            }"""
             
             result = await relation_agent.extract_relations(text, entities)
             
             assert isinstance(result, RelationExtractionResult)
             assert len(result.relations) == 1
             assert result.relations[0].source_entity == "Dr. Smith"
-            assert result.relations[0].relation_type == RelationType.WORKS_AT
+            assert result.relations[0].relation_type == "WORKS_FOR"
+            assert result.relations[0].source_entity == "Dr. Smith"
+            assert result.relations[0].target_entity == "Mayo Clinic"
 
 
 class TestKeywordExtractionAgent:
@@ -203,35 +225,41 @@ class TestKeywordExtractionAgent:
         """
         
         with patch.object(keyword_agent, '_call_model') as mock_llm:
-            mock_llm.return_value = {
+            mock_llm.return_value = """{
                 "keywords": [
                     {
-                        "text": "machine learning",
-                        "relevance": 0.9,
+                        "keyword": "machine learning",
+                        "importance": 0.9,
                         "category": "technology",
-                        "frequency": 1
+                        "frequency": 1,
+                        "context": "Machine learning algorithms are used"
                     },
                     {
-                        "text": "image classification",
-                        "relevance": 0.85,
+                        "keyword": "image classification",
+                        "importance": 0.85,
                         "category": "task",
-                        "frequency": 1
+                        "frequency": 1,
+                        "context": "used for image classification"
                     },
                     {
-                        "text": "neural networks",
-                        "relevance": 0.8,
+                        "keyword": "neural networks",
+                        "importance": 0.8,
                         "category": "technology",
-                        "frequency": 1
+                        "frequency": 1,
+                        "context": "Deep neural networks achieve"
                     }
-                ]
-            }
+                ],
+                "total_keywords": 3,
+                "confidence": "high",
+                "metadata": {}
+            }"""
             
             result = await keyword_agent.extract_keywords(text)
             
             assert isinstance(result, KeywordExtractionResult)
             assert len(result.keywords) >= 3
-            assert any(kw.text == "machine learning" for kw in result.keywords)
-            assert all(kw.relevance > 0.7 for kw in result.keywords)
+            assert any(kw.keyword == "machine learning" for kw in result.keywords)
+            assert all(kw.importance > 0.7 for kw in result.keywords)
 
 
 class TestExtractionAgentsIntegration:
@@ -256,20 +284,25 @@ class TestExtractionAgentsIntegration:
              patch.object(fact_agent, '_call_model') as mock_fact_llm, \
              patch.object(relation_agent, '_call_model') as mock_relation_llm:
             
-            mock_entity_llm.return_value = {
+            mock_entity_llm.return_value = """{
                 "entities": [
                     {
-                        "text": "Dr. Smith",
-                        "entity_type": "person",
+                        "name": "Dr. Smith",
+                        "canonical_name": "Dr. Smith",
+                        "entity_type": "PERSON",
                         "confidence": 0.9,
-                        "start_pos": 0,
-                        "end_pos": 9,
-                        "properties": {}
+                        "start_offset": 0,
+                        "end_offset": 9,
+                        "attributes": {},
+                        "context": "Dr. Smith prescribed"
                     }
-                ]
-            }
-            
-            mock_fact_llm.return_value = {
+                ],
+                "total_entities": 1,
+                "confidence": "high",
+                "metadata": {}
+            }"""
+
+            mock_fact_llm.return_value = """{
                 "facts": [
                     {
                         "subject": "Dr. Smith",
@@ -278,15 +311,23 @@ class TestExtractionAgentsIntegration:
                         "solution": "pain relief",
                         "condition": "",
                         "remarks": "",
-                        "fact_type": "treatment",
+                        "fact_type": "MEDICAL_TREATMENT",
                         "confidence": 0.9,
                         "keywords": ["aspirin", "headache"],
-                        "source_text": text
+                        "source_text": "Dr. Smith prescribed aspirin"
                     }
-                ]
-            }
+                ],
+                "total_facts": 1,
+                "confidence": "high",
+                "metadata": {}
+            }"""
             
-            mock_relation_llm.return_value = {"relations": []}
+            mock_relation_llm.return_value = """{
+                "relations": [],
+                "total_relations": 0,
+                "confidence": "high",
+                "metadata": {}
+            }"""
             
             # Extract entities
             entity_result = await entity_agent.extract_entities(text)

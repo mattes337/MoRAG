@@ -80,17 +80,18 @@ class TestChunkingAgent:
                         "importance": 0.8
                     }
                 ],
-                "chunk_strategy": "semantic",
-                "total_chunks": 3
+                "chunking_method": "semantic",
+                "total_chunks": 3,
+                "confidence": "high"
             }
             
             result = await chunking_agent.chunk_text(text, strategy="semantic")
             
             assert isinstance(result, ChunkingResult)
             assert len(result.chunks) == 3
-            assert result.chunk_strategy == "semantic"
-            assert result.chunks[0].chunk_type == ChunkType.INTRODUCTION
-            assert all(chunk.importance > 0.7 for chunk in result.chunks)
+            assert result.chunking_method == "semantic"
+            assert result.chunks[0]["chunk_type"] == "introduction"
+            assert all(chunk["importance"] > 0.7 for chunk in result.chunks)
     
     @pytest.mark.asyncio
     async def test_fixed_size_chunking(self, chunking_agent):
@@ -117,15 +118,16 @@ class TestChunkingAgent:
                         "importance": 0.7
                     }
                 ],
-                "chunk_strategy": "fixed_size",
-                "total_chunks": 2
+                "chunking_method": "fixed_size",
+                "total_chunks": 2,
+                "confidence": "high"
             }
             
             result = await chunking_agent.chunk_text(text, strategy="fixed_size", chunk_size=200)
             
-            assert result.chunk_strategy == "fixed_size"
+            assert result.chunking_method == "fixed_size"
             assert len(result.chunks) == 2
-            assert all(len(chunk.content) <= 200 for chunk in result.chunks)
+            assert all(len(chunk["content"]) <= 200 for chunk in result.chunks)
 
 
 class TestClassificationAgent:
@@ -152,22 +154,25 @@ class TestClassificationAgent:
                 "primary_category": "medical_record",
                 "subcategories": ["cardiology", "emergency_medicine"],
                 "confidence": 0.95,
-                "classification_features": [
-                    "patient_demographics",
-                    "clinical_symptoms",
-                    "diagnostic_tests",
-                    "medical_diagnosis"
-                ],
-                "domain_specificity": 0.9
+                "confidence": "high",
+                "metadata": {
+                    "classification_features": [
+                        "patient_demographics",
+                        "clinical_symptoms",
+                        "diagnostic_tests",
+                        "medical_diagnosis"
+                    ],
+                    "domain_specificity": 0.9
+                }
             }
             
             result = await classification_agent.classify_content(text)
             
             assert isinstance(result, ClassificationResult)
-            assert result.primary_category == ClassificationCategory.MEDICAL_RECORD
+            assert result.primary_category == "medical_record"
             assert "cardiology" in result.subcategories
-            assert result.confidence > 0.9
-            assert "diagnostic_tests" in result.classification_features
+            assert result.confidence == "high"
+            assert "diagnostic_tests" in result.metadata.get("classification_features", [])
     
     @pytest.mark.asyncio
     async def test_research_paper_classification(self, classification_agent):
@@ -184,21 +189,23 @@ class TestClassificationAgent:
             mock_llm.return_value = {
                 "primary_category": "research_paper",
                 "subcategories": ["computer_science", "natural_language_processing"],
-                "confidence": 0.9,
-                "classification_features": [
-                    "abstract_section",
-                    "keywords_section",
-                    "technical_terminology",
-                    "benchmark_evaluation"
-                ],
-                "domain_specificity": 0.95
+                "confidence": "high",
+                "metadata": {
+                    "classification_features": [
+                        "abstract_section",
+                        "keywords_section",
+                        "technical_terminology",
+                        "benchmark_evaluation"
+                    ],
+                    "domain_specificity": 0.95
+                }
             }
             
             result = await classification_agent.classify_content(text)
             
-            assert result.primary_category == ClassificationCategory.RESEARCH_PAPER
+            assert result.primary_category == "research_paper"
             assert "natural_language_processing" in result.subcategories
-            assert result.domain_specificity > 0.9
+            assert result.metadata.get("domain_specificity", 0) > 0.9
 
 
 class TestValidationAgent:
@@ -224,23 +231,27 @@ class TestValidationAgent:
         with patch.object(validation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "valid",
-                "confidence": 0.9,
-                "validation_checks": [
-                    {"check": "completeness", "passed": True, "score": 0.95},
-                    {"check": "consistency", "passed": True, "score": 0.9},
-                    {"check": "plausibility", "passed": True, "score": 0.85}
-                ],
+                "validation_errors": [],
                 "issues_found": [],
-                "suggestions": ["Consider adding dosage information"]
+                "confidence": "high",
+                "metadata": {
+                    "validation_checks": [
+                        {"check": "completeness", "passed": True, "score": 0.95},
+                        {"check": "consistency", "passed": True, "score": 0.9},
+                        {"check": "plausibility", "passed": True, "score": 0.85}
+                    ],
+                    "suggestions": ["Consider adding dosage information"]
+                }
             }
             
             result = await validation_agent.validate_fact(fact)
             
             assert isinstance(result, ValidationResult)
-            assert result.validation_status == ValidationStatus.VALID
-            assert result.confidence > 0.8
-            assert len(result.validation_checks) == 3
-            assert all(check["passed"] for check in result.validation_checks)
+            assert result.validation_status == "valid"
+            assert result.is_valid == True
+            assert result.confidence == "high"
+            assert len(result.metadata.get("validation_checks", [])) == 3
+            assert all(check["passed"] for check in result.metadata.get("validation_checks", []))
     
     @pytest.mark.asyncio
     async def test_invalid_fact_validation(self, validation_agent):
@@ -256,23 +267,30 @@ class TestValidationAgent:
         with patch.object(validation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "invalid",
-                "confidence": 0.95,
-                "validation_checks": [
-                    {"check": "completeness", "passed": True, "score": 0.8},
-                    {"check": "consistency", "passed": False, "score": 0.2},
-                    {"check": "plausibility", "passed": False, "score": 0.1}
+                "validation_errors": [
+                    "Implausible medical claim",
+                    "Lacks scientific evidence"
                 ],
                 "issues_found": [
                     "Implausible medical claim",
                     "Lacks scientific evidence",
                     "Potentially harmful misinformation"
                 ],
-                "suggestions": ["Remove or correct this claim"]
+                "confidence": "high",
+                "metadata": {
+                    "validation_checks": [
+                        {"check": "completeness", "passed": True, "score": 0.8},
+                        {"check": "consistency", "passed": False, "score": 0.2},
+                        {"check": "plausibility", "passed": False, "score": 0.1}
+                    ],
+                    "suggestions": ["Remove or correct this claim"]
+                }
             }
             
             result = await validation_agent.validate_fact(fact)
             
-            assert result.validation_status == ValidationStatus.INVALID
+            assert result.validation_status == "invalid"
+            assert result.is_valid == False
             assert len(result.issues_found) > 0
             assert "implausible" in result.issues_found[0].lower()
 
@@ -304,18 +322,24 @@ class TestFilteringAgent:
                     {"text": "Insulin therapy for type 1 diabetes management", "relevance": 0.9, "keep": True},
                     {"text": "Dietary recommendations for diabetic patients", "relevance": 0.85, "keep": True}
                 ],
-                "filter_criteria": "diabetes_relevance",
-                "threshold_applied": 0.7,
-                "items_kept": 3,
-                "items_filtered": 1
+                "rejected_items": [
+                    {"text": "General health information", "relevance": 0.3, "keep": False}
+                ],
+                "filter_criteria": {"query": query, "threshold": 0.7},
+                "confidence": "high",
+                "metadata": {
+                    "threshold_applied": 0.7,
+                    "items_kept": 3,
+                    "items_filtered": 1
+                }
             }
             
-            result = await filtering_agent.filter_content(query, candidates, criteria="relevance")
+            result = await filtering_agent.filter_content(candidates, criteria={"query": query}, filter_type="relevance")
             
             assert isinstance(result, FilteringResult)
             assert len(result.filtered_items) == 3
-            assert result.items_kept == 3
-            assert result.items_filtered == 1
+            assert result.metadata.get("items_kept") == 3
+            assert result.metadata.get("items_filtered") == 1
             assert all(item["relevance"] > 0.8 for item in result.filtered_items)
     
     @pytest.mark.asyncio
@@ -334,16 +358,23 @@ class TestFilteringAgent:
                     {"text": "Peer-reviewed research study", "quality": 0.95, "keep": True},
                     {"text": "Well-researched medical article with citations", "quality": 0.9, "keep": True}
                 ],
-                "filter_criteria": "quality_threshold",
-                "threshold_applied": 0.8,
-                "items_kept": 2,
-                "items_filtered": 2
+                "rejected_items": [
+                    {"text": "Blog post with personal opinions only", "quality": 0.3, "keep": False},
+                    {"text": "Social media post with unverified claims", "quality": 0.2, "keep": False}
+                ],
+                "filter_criteria": {"threshold": 0.8},
+                "confidence": "high",
+                "metadata": {
+                    "threshold_applied": 0.8,
+                    "items_kept": 2,
+                    "items_filtered": 2
+                }
             }
             
-            result = await filtering_agent.filter_content("", candidates, criteria="quality", threshold=0.8)
+            result = await filtering_agent.filter_content(candidates, criteria={"threshold": 0.8}, filter_type="quality")
             
             assert len(result.filtered_items) == 2
-            assert result.threshold_applied == 0.8
+            assert result.metadata.get("threshold_applied") == 0.8
             assert all(item["quality"] > 0.8 for item in result.filtered_items)
 
 
@@ -404,16 +435,19 @@ class TestProcessingAgentsIntegration:
                         "importance": 0.85
                     }
                 ],
-                "chunk_strategy": "semantic",
-                "total_chunks": 2
+                "chunking_method": "semantic",
+                "total_chunks": 2,
+                "confidence": "high"
             }
             
             mock_classification.return_value = {
                 "primary_category": "medical_research",
                 "subcategories": ["endocrinology", "diabetes"],
-                "confidence": 0.9,
-                "classification_features": ["medical_terminology", "research_content"],
-                "domain_specificity": 0.95
+                "confidence": "high",
+                "metadata": {
+                    "classification_features": ["medical_terminology", "research_content"],
+                    "domain_specificity": 0.95
+                }
             }
             
             mock_filtering.return_value = {
@@ -421,24 +455,28 @@ class TestProcessingAgentsIntegration:
                     {"content": "chunk1", "relevance": 0.9, "keep": True},
                     {"content": "chunk2", "relevance": 0.85, "keep": True}
                 ],
-                "filter_criteria": "medical_relevance",
-                "threshold_applied": 0.7,
-                "items_kept": 2,
-                "items_filtered": 0
+                "rejected_items": [],
+                "filter_criteria": {"query": "diabetes treatment"},
+                "confidence": "high",
+                "metadata": {
+                    "threshold_applied": 0.7,
+                    "items_kept": 2,
+                    "items_filtered": 0
+                }
             }
             
             # Run processing pipeline
             chunking_result = await chunking_agent.chunk_text(raw_text)
             classification_result = await classification_agent.classify_content(raw_text)
             filtering_result = await filtering_agent.filter_content(
-                "diabetes treatment", 
-                [{"text": chunk.content} for chunk in chunking_result.chunks]
+                [{"text": chunk["content"]} for chunk in chunking_result.chunks],
+                criteria={"query": "diabetes treatment"}
             )
             
             # Verify results
             assert len(chunking_result.chunks) == 2
-            assert classification_result.primary_category == ClassificationCategory.MEDICAL_RESEARCH
-            assert filtering_result.items_kept == 2
+            assert classification_result.primary_category == "medical_research"
+            assert filtering_result.metadata.get("items_kept") == 2
             
             print("✅ Processing pipeline test completed successfully")
 
