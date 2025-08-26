@@ -12,6 +12,9 @@ from morag_core.exceptions import ProcessingError
 from .llm import LLMClient
 from .citation_manager import CitedFact, CitationFormat
 
+# Import agents framework
+from agents import get_agent
+
 logger = structlog.get_logger(__name__)
 
 # Optional imports for enhanced functionality
@@ -74,16 +77,19 @@ class ResponseGenerator:
     
     def __init__(
         self,
-        llm_client: LLMClient,
+        llm_client: Optional[LLMClient] = None,
         config: Optional[Dict[str, Any]] = None
     ):
         """Initialize the response generator.
-        
+
         Args:
-            llm_client: LLM client for response generation
+            llm_client: LLM client for response generation (deprecated, kept for compatibility)
             config: Optional configuration dictionary
         """
-        self.llm_client = llm_client
+        # ALWAYS use agents framework
+        self.response_agent = get_agent("response_generation")
+
+        self.llm_client = llm_client  # Keep for backward compatibility
         self.config = config or {}
         self.settings = get_settings()
         
@@ -251,76 +257,38 @@ class ResponseGenerator:
         facts: List[CitedFact],
         options: ResponseOptions
     ) -> GeneratedResponse:
-        """Generate response using LLM."""
-        # Create generation prompt
-        prompt = self._create_generation_prompt(query, facts, options)
-        
-        # Generate response
-        response = await self._llm_client.generate_content_async(prompt)
-        
-        # Parse response
-        return self._parse_llm_response(response.text, query, facts, options)
+        """Generate response using response generation agent."""
+        # Format facts for agent
+        formatted_facts = [f"{fact.fact.fact_text} (confidence: {fact.score})" for fact in facts]
+
+        # Use response generation agent - ALWAYS
+        result = await self.response_agent.execute(
+            query,
+            context=f"Based on {len(facts)} facts",
+            sources=formatted_facts,
+            max_length=options.max_length,
+            format=options.format.value,
+            language=options.language
+        )
+
+        # Convert agent result to GeneratedResponse
+        return GeneratedResponse(
+            content=result.response,
+            summary=result.response[:200] + "..." if len(result.response) > 200 else result.response,
+            key_points=formatted_facts[:3],  # Use top 3 facts as key points
+            reasoning="Generated using response generation agent",
+            confidence_score=result.confidence.value if hasattr(result.confidence, 'value') else 0.8,
+            word_count=len(result.response.split()),
+            generation_time=0.0,  # Agent handles timing internally
+            facts_used=[fact.fact.fact_text for fact in facts],
+            metadata={
+                'generation_method': 'agent',
+                'sources_used': len(result.sources),
+                'agent_confidence': result.confidence
+            }
+        )
     
-    def _create_generation_prompt(
-        self,
-        query: str,
-        facts: List[CitedFact],
-        options: ResponseOptions
-    ) -> str:
-        """Create enhanced prompt for LLM response generation."""
-        # Analyze facts for conflicts and relationships
-        fact_analysis = self._analyze_facts_for_synthesis(facts)
-
-        # Format facts with enhanced context
-        facts_text = self._format_facts_for_prompt(facts, fact_analysis)
-
-        # Create enhanced prompt
-        prompt = f"""You are an expert research assistant with advanced analytical capabilities. Generate a comprehensive, well-reasoned response to the user query based on the provided facts.
-
-USER QUERY: "{query}"
-
-FACT ANALYSIS:
-{fact_analysis['summary']}
-
-AVAILABLE FACTS:
-{facts_text}
-
-SYNTHESIS INSTRUCTIONS:
-1. **Response Format**: {options.format.value} in {options.structure.value} structure
-2. **Length**: Maximum {options.max_length} words
-3. **Tone**: {options.tone}
-4. **Language**: {options.language}
-5. **Reasoning**: {'Include detailed reasoning' if options.include_reasoning else 'Focus on conclusions'}
-6. **Confidence**: {'Include confidence assessments' if options.include_confidence else 'Standard presentation'}
-
-CRITICAL REQUIREMENTS:
-- **Fact Integration**: Synthesize facts into a coherent narrative, not just a list
-- **Conflict Resolution**: {fact_analysis['conflict_guidance']}
-- **Evidence Hierarchy**: Prioritize higher-confidence facts and multiple-source information
-- **Logical Flow**: Ensure clear progression from evidence to conclusions
-- **Query Alignment**: Directly address all aspects of the user's question
-- **Transparency**: Acknowledge limitations or uncertainties when appropriate
-
-RESPONSE STRUCTURE GUIDELINES:
-- Start with a clear, direct answer to the main query
-- Present supporting evidence in logical order
-- Address any nuances, exceptions, or conflicting information
-- Conclude with synthesis and implications
-- Use transitional phrases to maintain flow
-
-Generate a response that demonstrates sophisticated understanding and synthesis of the provided information.
-
-Format your response as JSON:
-{{
-  "content": "Main response content",
-  "summary": "Brief summary of key findings",
-  "key_points": ["Point 1", "Point 2", "Point 3"],
-  "reasoning": "Explanation of reasoning process",
-  "confidence_score": 0.85
-}}
-"""
-        
-        return prompt
+    # REMOVED: _create_generation_prompt - now using agents framework
 
     def _analyze_facts_for_synthesis(self, facts: List[CitedFact]) -> Dict[str, str]:
         """Analyze facts to guide synthesis and identify conflicts."""
@@ -447,63 +415,7 @@ Format your response as JSON:
 
         return False
     
-    def _parse_llm_response(
-        self,
-        response_text: str,
-        query: str,
-        facts: List[CitedFact],
-        options: ResponseOptions
-    ) -> GeneratedResponse:
-        """Parse LLM response into structured format."""
-        try:
-            import json
-            
-            # Extract JSON from response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
-            
-            if start_idx == -1 or end_idx == 0:
-                raise ValueError("No JSON found in response")
-            
-            json_text = response_text[start_idx:end_idx]
-            data = json.loads(json_text)
-            
-            # Extract components
-            content = data.get('content', '')
-            summary = data.get('summary', '')
-            key_points = data.get('key_points', [])
-            reasoning = data.get('reasoning', '')
-            confidence_score = float(data.get('confidence_score', 0.5))
-            
-            # Calculate word count
-            word_count = len(content.split())
-            
-            return GeneratedResponse(
-                content=content,
-                summary=summary,
-                key_points=key_points,
-                reasoning=reasoning,
-                confidence_score=confidence_score,
-                word_count=word_count,
-                generation_time=0.0,  # Will be set by caller
-                facts_used=[],  # Will be set by caller
-                metadata={}  # Will be set by caller
-            )
-            
-        except Exception as e:
-            logger.warning(f"Failed to parse LLM response: {e}")
-            # Fallback to treating entire response as content
-            return GeneratedResponse(
-                content=response_text,
-                summary="Generated response (parsing failed)",
-                key_points=[],
-                reasoning="LLM response parsing failed",
-                confidence_score=0.5,
-                word_count=len(response_text.split()),
-                generation_time=0.0,
-                facts_used=[],
-                metadata={'parsing_error': str(e)}
-            )
+    # REMOVED: _parse_llm_response - now using agents framework
     
     async def _generate_fallback(
         self,

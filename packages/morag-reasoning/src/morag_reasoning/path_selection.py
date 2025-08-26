@@ -10,6 +10,9 @@ from morag_graph.operations import GraphPath
 from morag_graph.models import Entity, Relation
 from .llm import LLMClient
 
+# Import agents framework
+from agents import get_agent
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,14 +38,18 @@ class ReasoningStrategy:
 class PathSelectionAgent:
     """Agent for LLM-guided path selection in multi-hop reasoning."""
     
-    def __init__(self, llm_client: LLMClient, max_paths: int = 10):
+    def __init__(self, llm_client: Optional[LLMClient] = None, max_paths: int = 10):
         """Initialize the path selection agent.
-        
+
         Args:
-            llm_client: LLM client for path selection
+            llm_client: LLM client for path selection (deprecated, kept for compatibility)
             max_paths: Maximum number of paths to select
         """
-        self.llm_client = llm_client
+        # ALWAYS use the agent framework
+        self.path_agent = get_agent("path_selection")
+        self.path_agent.update_config(agent_config={"max_paths": max_paths})
+
+        self.llm_client = llm_client  # Keep for backward compatibility
         self.max_paths = max_paths
         self.logger = logging.getLogger(__name__)
         
@@ -94,15 +101,15 @@ class PathSelectionAgent:
             # Create path selection prompt
             prompt = self._create_path_selection_prompt(query, available_paths)
             
-            # Get LLM response
-            response = await self.llm_client.generate(
-                prompt=prompt,
-                max_tokens=1000,
-                temperature=0.1  # Low temperature for consistent reasoning
+            # Use path selection agent - ALWAYS
+            result = await self.path_agent.execute(
+                query,
+                available_paths=[self._describe_path(path) for path in available_paths],
+                strategy=strategy
             )
-            
-            # Parse LLM response
-            selected_paths = self._parse_path_selection(response, available_paths)
+
+            # Convert agent result to legacy format
+            selected_paths = self._convert_agent_result_to_paths(result, available_paths)
             
             # Apply additional scoring
             scored_paths = await self._score_paths(query, selected_paths, strategy)
@@ -268,6 +275,30 @@ Format your response as JSON:
             fallback_paths.append(path_score)
         
         return fallback_paths
+
+    def _convert_agent_result_to_paths(self, agent_result, available_paths: List[GraphPath]) -> List[PathRelevanceScore]:
+        """Convert agent result to PathRelevanceScore objects."""
+        selected_paths = []
+
+        for selected_path in agent_result.selected_paths:
+            # Find the corresponding GraphPath
+            path_description = selected_path.get("path", "")
+            relevance_score = selected_path.get("relevance_score", 0.5)
+            reasoning = selected_path.get("reasoning", "Selected by agent")
+
+            # Match with available paths (simple matching by description)
+            for i, available_path in enumerate(available_paths):
+                if str(i+1) in path_description or self._describe_path(available_path) in path_description:
+                    path_score = PathRelevanceScore(
+                        path=available_path,
+                        relevance_score=relevance_score * 10,  # Convert 0-1 to 0-10 scale
+                        confidence=8.0,  # High confidence from agent
+                        reasoning=reasoning
+                    )
+                    selected_paths.append(path_score)
+                    break
+
+        return selected_paths
 
 
 class ReasoningPathFinder:

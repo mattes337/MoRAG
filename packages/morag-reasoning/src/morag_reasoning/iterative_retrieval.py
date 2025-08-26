@@ -9,6 +9,9 @@ from dataclasses import dataclass, field
 from morag_graph.operations import GraphPath
 from .llm import LLMClient
 
+# Import agents framework
+from agents import get_agent
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,23 +49,27 @@ class IterativeRetriever:
     """Iterative context refinement system."""
     
     def __init__(
-        self, 
-        llm_client: LLMClient,
-        graph_engine,
-        vector_retriever,
+        self,
+        llm_client: Optional[LLMClient] = None,
+        graph_engine=None,
+        vector_retriever=None,
         max_iterations: int = 5,
         sufficiency_threshold: float = 0.8
     ):
         """Initialize the iterative retriever.
-        
+
         Args:
-            llm_client: LLM client for context analysis
+            llm_client: LLM client for context analysis (deprecated, kept for compatibility)
             graph_engine: Graph engine for additional retrieval
             vector_retriever: Vector retriever for document search
             max_iterations: Maximum refinement iterations
             sufficiency_threshold: Confidence threshold for stopping
         """
-        self.llm_client = llm_client
+        # ALWAYS use agents framework
+        self.reasoning_agent = get_agent("reasoning")
+        self.context_agent = get_agent("context_analysis")
+
+        self.llm_client = llm_client  # Keep for backward compatibility
         self.graph_engine = graph_engine
         self.vector_retriever = vector_retriever
         self.max_iterations = max_iterations
@@ -135,20 +142,24 @@ class IterativeRetriever:
     async def _analyze_context(self, query: str, context: RetrievalContext) -> ContextAnalysis:
         """Analyze current context to determine if it's sufficient."""
         try:
-            # Create context analysis prompt
-            prompt = self._create_analysis_prompt(query, context)
-            
-            # Get LLM analysis
-            response = await self.llm_client.generate(
-                prompt=prompt,
-                max_tokens=800,
-                temperature=0.1
+            # Use context analysis agent - ALWAYS
+            context_summary = self._format_context_for_agent(context)
+
+            result = await self.context_agent.execute(
+                f"Query: {query}\n\nContext: {context_summary}",
+                query=query,
+                context_data=context
             )
-            
-            # Parse analysis
-            analysis = self._parse_context_analysis(response)
+
+            # Convert agent result to ContextAnalysis
+            analysis = ContextAnalysis(
+                is_sufficient=result.relevance_scores.get("sufficient", 0.0) > 0.7,
+                confidence=result.confidence.value if hasattr(result.confidence, 'value') else 0.8,
+                gaps=result.context_gaps,
+                reasoning=result.context_summary
+            )
             return analysis
-        
+
         except Exception as e:
             self.logger.error(f"Error in context analysis: {str(e)}")
             # Fallback analysis
@@ -156,9 +167,28 @@ class IterativeRetriever:
                 is_sufficient=len(context.entities) > 0 and len(context.documents) > 0,
                 confidence=0.5,
                 gaps=[],
-                reasoning="Fallback analysis due to LLM error"
+                reasoning="Fallback analysis due to agent error"
             )
-    
+
+    def _format_context_for_agent(self, context: RetrievalContext) -> str:
+        """Format context for agent analysis."""
+        context_parts = []
+
+        if context.entities:
+            entities_str = ", ".join([f"{name} ({info.get('type', 'unknown')})"
+                                    for name, info in context.entities.items()])
+            context_parts.append(f"Entities: {entities_str}")
+
+        if context.documents:
+            docs_str = f"{len(context.documents)} documents available"
+            context_parts.append(f"Documents: {docs_str}")
+
+        if context.paths:
+            paths_str = f"{len(context.paths)} reasoning paths"
+            context_parts.append(f"Paths: {paths_str}")
+
+        return "; ".join(context_parts) if context_parts else "No context available"
+
     def _create_analysis_prompt(self, query: str, context: RetrievalContext) -> str:
         """Create prompt for context analysis."""
         prompt = f"""Analyze whether the provided context is sufficient to answer the given query.

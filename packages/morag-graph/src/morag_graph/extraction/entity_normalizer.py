@@ -9,6 +9,9 @@ import re
 
 from ..utils.llm_response_parser import parse_json_response, LLMResponseParseError
 
+# Import agents framework
+from agents import get_agent
+
 try:
     import google.generativeai as genai
     GOOGLE_AI_AVAILABLE = True
@@ -100,28 +103,45 @@ class LLMEntityNormalizer:
         # Apply basic normalization first
         basic_normalized = self._apply_basic_normalization(entity_name)
         
-        # Use LLM for advanced normalization if available
-        if self.model:
-            try:
-                llm_result = await self._llm_normalize(entity_name, entity_type)
+        # Use entity extraction agent for normalization - ALWAYS
+        try:
+            entity_agent = get_agent("entity_extraction")
+
+            # Use the agent to extract and normalize the entity
+            extraction_result = await entity_agent.extract_entities(
+                text=f"Normalize this entity: {entity_name}",
+                domain="normalization"
+            )
+
+            if extraction_result.entities:
+                # Use the first normalized entity
+                normalized_entity = extraction_result.entities[0]
                 result = EntityVariation(
                     original=entity_name,
-                    normalized=llm_result[0],
-                    confidence=llm_result[1],
-                    rule_applied=llm_result[2]
+                    normalized=normalized_entity.canonical_name,
+                    confidence=normalized_entity.confidence,
+                    rule_applied="agent_normalization"
                 )
-            except Exception as e:
-                self.logger.warning(
-                    "LLM normalization failed, using basic normalization",
-                    entity=entity_name,
-                    error=str(e)
-                )
+            else:
+                # Fallback to basic normalization
                 result = EntityVariation(
                     original=entity_name,
                     normalized=basic_normalized,
                     confidence=0.7,
                     rule_applied="basic_normalization"
                 )
+        except Exception as e:
+            self.logger.warning(
+                "Agent normalization failed, using basic normalization",
+                entity=entity_name,
+                error=str(e)
+            )
+            result = EntityVariation(
+                original=entity_name,
+                normalized=basic_normalized,
+                confidence=0.7,
+                rule_applied="basic_normalization"
+            )
         else:
             result = EntityVariation(
                 original=entity_name,

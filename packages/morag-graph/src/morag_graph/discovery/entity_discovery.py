@@ -27,6 +27,16 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
+# Import agents framework
+from agents import get_agent
+
+# Import agents framework
+try:
+    from agents import get_agent
+    AGENTS_AVAILABLE = True
+except ImportError:
+    AGENTS_AVAILABLE = False
+
 
 class EntityRelevanceScore(NamedTuple):
     """Represents an entity with its relevance score."""
@@ -271,31 +281,28 @@ Provide a detailed analysis including:
 
 Be thorough and accurate in your analysis."""
 
-            # Use the LLM client to analyze the query
-            if hasattr(self, 'llm_client') and self.llm_client:
-                result = await self.llm_client.generate_structured(
-                    prompt=prompt,
-                    response_model=QueryAnalysisResult
-                )
+            # Use the query analysis agent - ALWAYS
+            query_agent = get_agent("query_analysis")
+            result = await query_agent.analyze_query(query)
 
-                # Convert to our QueryAnalysis format
-                return QueryAnalysis(
-                    query=query,
-                    intent=self._map_intent(result.intent),
-                    keywords=result.keywords,
-                    entities_mentioned=result.entities,
-                    complexity_score=self._complexity_to_score(result.complexity),
-                    domain=result.metadata.get('domain'),
-                    temporal_context=result.metadata.get('temporal_context'),
-                    metadata={
-                        'analysis_method': 'llm',
-                        'confidence': result.confidence.value if hasattr(result.confidence, 'value') else 'medium',
-                        'query_type': result.query_type
-                    }
-                )
+            # Convert to our QueryAnalysis format
+            return QueryAnalysis(
+                query=query,
+                intent=self._map_intent(result.intent),
+                keywords=result.keywords,
+                entities_mentioned=result.entities,
+                complexity_score=self._complexity_to_score(result.complexity),
+                domain=result.metadata.get('domain'),
+                temporal_context=result.metadata.get('temporal_context'),
+                metadata={
+                    'analysis_method': 'agent',
+                    'confidence': result.confidence.value if hasattr(result.confidence, 'value') else 'medium',
+                    'query_type': result.query_type
+                }
+            )
 
         except Exception as e:
-            logger.warning(f"LLM query analysis failed, falling back to basic: {e}")
+            logger.warning(f"Agent query analysis failed, falling back to basic: {e}")
 
         return None
 
