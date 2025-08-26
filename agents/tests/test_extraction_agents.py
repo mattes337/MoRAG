@@ -59,7 +59,7 @@ class TestFactExtractionAgent:
         Vitamin D deficiency increases risk of respiratory infections.
         """
         
-        with patch.object(fact_agent, '_call_llm') as mock_llm:
+        with patch.object(fact_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "facts": [
                     {
@@ -104,7 +104,7 @@ class TestEntityExtractionAgent:
         """Test entity extraction."""
         text = "Dr. John Smith works at Mayo Clinic in Rochester, Minnesota."
         
-        with patch.object(entity_agent, '_call_llm') as mock_llm:
+        with patch.object(entity_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "entities": [
                     {
@@ -164,7 +164,7 @@ class TestRelationExtractionAgent:
             )
         ]
         
-        with patch.object(relation_agent, '_call_llm') as mock_llm:
+        with patch.object(relation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "relations": [
                     {
@@ -202,7 +202,7 @@ class TestKeywordExtractionAgent:
         Deep neural networks achieve high accuracy on computer vision tasks.
         """
         
-        with patch.object(keyword_agent, '_call_llm') as mock_llm:
+        with patch.object(keyword_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "keywords": [
                     {
@@ -252,9 +252,9 @@ class TestExtractionAgentsIntegration:
         relation_agent = RelationExtractionAgent(relation_config)
         
         # Mock LLM responses
-        with patch.object(entity_agent, '_call_llm') as mock_entity_llm, \
-             patch.object(fact_agent, '_call_llm') as mock_fact_llm, \
-             patch.object(relation_agent, '_call_llm') as mock_relation_llm:
+        with patch.object(entity_agent, '_call_model') as mock_entity_llm, \
+             patch.object(fact_agent, '_call_model') as mock_fact_llm, \
+             patch.object(relation_agent, '_call_model') as mock_relation_llm:
             
             mock_entity_llm.return_value = {
                 "entities": [

@@ -13,10 +13,10 @@ from agents.processing.classification import ClassificationAgent
 from agents.processing.validation import ValidationAgent
 from agents.processing.filtering import FilteringAgent
 from agents.processing.models import (
-    ChunkingResult, ChunkType, ChunkBoundary,
-    ClassificationResult, ClassificationCategory,
-    ValidationResult, ValidationStatus,
-    FilteringResult, FilterCriteria
+    ChunkingResult,
+    ClassificationResult,
+    ValidationResult,
+    FilteringResult
 )
 from agents.base.config import AgentConfig
 
@@ -52,7 +52,7 @@ class TestChunkingAgent:
         Machine learning is used in image recognition, natural language processing, and recommendation systems.
         """
         
-        with patch.object(chunking_agent, '_call_llm') as mock_llm:
+        with patch.object(chunking_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "chunks": [
                     {
@@ -97,7 +97,7 @@ class TestChunkingAgent:
         """Test fixed size chunking."""
         text = "This is a long text that needs to be split into fixed-size chunks for processing. " * 10
         
-        with patch.object(chunking_agent, '_call_llm') as mock_llm:
+        with patch.object(chunking_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "chunks": [
                     {
@@ -147,7 +147,7 @@ class TestClassificationAgent:
         Diagnosis: Acute myocardial infarction.
         """
         
-        with patch.object(classification_agent, '_call_llm') as mock_llm:
+        with patch.object(classification_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_category": "medical_record",
                 "subcategories": ["cardiology", "emergency_medicine"],
@@ -180,7 +180,7 @@ class TestClassificationAgent:
         Keywords: transformers, BERT, natural language processing, GLUE
         """
         
-        with patch.object(classification_agent, '_call_llm') as mock_llm:
+        with patch.object(classification_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_category": "research_paper",
                 "subcategories": ["computer_science", "natural_language_processing"],
@@ -221,7 +221,7 @@ class TestValidationAgent:
             "confidence": 0.9
         }
         
-        with patch.object(validation_agent, '_call_llm') as mock_llm:
+        with patch.object(validation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "valid",
                 "confidence": 0.9,
@@ -253,7 +253,7 @@ class TestValidationAgent:
             "confidence": 0.3
         }
         
-        with patch.object(validation_agent, '_call_llm') as mock_llm:
+        with patch.object(validation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "validation_status": "invalid",
                 "confidence": 0.95,
@@ -297,7 +297,7 @@ class TestFilteringAgent:
             {"text": "Dietary recommendations for diabetic patients", "score": 0.8}
         ]
         
-        with patch.object(filtering_agent, '_call_llm') as mock_llm:
+        with patch.object(filtering_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "filtered_items": [
                     {"text": "Metformin is first-line treatment for type 2 diabetes", "relevance": 0.95, "keep": True},
@@ -328,7 +328,7 @@ class TestFilteringAgent:
             {"text": "Social media post with unverified claims", "quality": 0.2}
         ]
         
-        with patch.object(filtering_agent, '_call_llm') as mock_llm:
+        with patch.object(filtering_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "filtered_items": [
                     {"text": "Peer-reviewed research study", "quality": 0.95, "keep": True},
@@ -381,9 +381,9 @@ class TestProcessingAgentsIntegration:
         filtering_agent = FilteringAgent(filtering_config)
         
         # Mock responses
-        with patch.object(chunking_agent, '_call_llm') as mock_chunking, \
-             patch.object(classification_agent, '_call_llm') as mock_classification, \
-             patch.object(filtering_agent, '_call_llm') as mock_filtering:
+        with patch.object(chunking_agent, '_call_model') as mock_chunking, \
+             patch.object(classification_agent, '_call_model') as mock_classification, \
+             patch.object(filtering_agent, '_call_model') as mock_filtering:
             
             mock_chunking.return_value = {
                 "chunks": [

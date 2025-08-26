@@ -14,9 +14,9 @@ from agents.generation.explanation import ExplanationAgent
 from agents.generation.synthesis import SynthesisAgent
 from agents.generation.models import (
     SummarizationResult, SummaryType,
-    ResponseGenerationResult, ResponseType,
-    ExplanationResult, ExplanationType,
-    SynthesisResult, SynthesisType
+    ResponseGenerationResult,
+    ExplanationResult,
+    SynthesisResult
 )
 from agents.base.config import AgentConfig
 
@@ -46,7 +46,7 @@ class TestSummarizationAgent:
         The implications for clinical practice are substantial, potentially reducing misdiagnosis rates.
         """
         
-        with patch.object(summary_agent, '_call_llm') as mock_llm:
+        with patch.object(summary_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "summary": "Study shows deep learning models achieve 95% accuracy in pneumonia detection from chest X-rays, demonstrating AI's potential to improve medical diagnosis.",
                 "summary_type": "abstractive",
@@ -77,7 +77,7 @@ class TestSummarizationAgent:
         These technologies promise to improve patient outcomes significantly.
         """
         
-        with patch.object(summary_agent, '_call_llm') as mock_llm:
+        with patch.object(summary_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "summary": "Machine learning algorithms are transforming healthcare. These technologies promise to improve patient outcomes significantly.",
                 "summary_type": "extractive",
@@ -115,7 +115,7 @@ class TestResponseGenerationAgent:
             "Type 1 and Type 2 diabetes have similar symptoms but different causes"
         ]
         
-        with patch.object(response_agent, '_call_llm') as mock_llm:
+        with patch.object(response_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "response": "Diabetes symptoms include excessive thirst (polydipsia), frequent urination (polyuria), unexplained fatigue, and blurred vision. These symptoms occur because high blood glucose levels affect normal body functions.",
                 "response_type": "informative",
@@ -142,7 +142,7 @@ class TestResponseGenerationAgent:
             "This osmotic effect leads to increased urine production"
         ]
         
-        with patch.object(response_agent, '_call_llm') as mock_llm:
+        with patch.object(response_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "response": "Diabetes causes frequent urination through an osmotic mechanism. When blood glucose levels are high, the kidneys cannot reabsorb all the glucose, so it spills into the urine. Glucose in urine draws water with it through osmosis, resulting in increased urine volume and frequency.",
                 "response_type": "explanatory",
@@ -177,7 +177,7 @@ class TestExplanationAgent:
             "Viral replication uses host cell machinery"
         ]
         
-        with patch.object(explanation_agent, '_call_llm') as mock_llm:
+        with patch.object(explanation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "explanation": "Antibiotics don't work against viruses because they target specific bacterial structures like cell walls and ribosomes that viruses don't possess. Viruses are much simpler organisms that hijack host cell machinery for replication, making them immune to antibiotic mechanisms.",
                 "explanation_type": "causal",
@@ -208,7 +208,7 @@ class TestExplanationAgent:
             "Glucose uptake by cells increases"
         ]
         
-        with patch.object(explanation_agent, '_call_llm') as mock_llm:
+        with patch.object(explanation_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "explanation": "Insulin regulates blood glucose through a receptor-mediated mechanism. When insulin binds to insulin receptors on cell surfaces, it triggers a cascade that activates glucose transporters (GLUT4), allowing cells to take up glucose from the bloodstream, thereby lowering blood glucose levels.",
                 "explanation_type": "mechanistic",
@@ -247,7 +247,7 @@ class TestSynthesisAgent:
             "Study C: Drug X effective in 85% of cases but causes nausea in 20% of patients"
         ]
         
-        with patch.object(synthesis_agent, '_call_llm') as mock_llm:
+        with patch.object(synthesis_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "synthesis": "Multiple studies demonstrate Drug X's effectiveness for condition Y, with efficacy rates ranging from 75-85%. While the drug shows consistent therapeutic benefit, side effects including nausea occur in approximately 20% of patients, requiring careful risk-benefit assessment.",
                 "synthesis_type": "comparative",
@@ -277,7 +277,7 @@ class TestSynthesisAgent:
             "Lifestyle interventions can prevent type 2 diabetes"
         ]
         
-        with patch.object(synthesis_agent, '_call_llm') as mock_llm:
+        with patch.object(synthesis_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "synthesis": "Diabetes development involves complex interactions between genetic predisposition and environmental factors. While genetic factors establish baseline risk, environmental influences like diet and lifestyle play crucial roles in disease manifestation, suggesting that targeted lifestyle interventions can effectively prevent type 2 diabetes even in genetically susceptible individuals.",
                 "synthesis_type": "integrative",
@@ -323,9 +323,9 @@ class TestGenerationAgentsIntegration:
         synthesis_agent = SynthesisAgent(synthesis_config)
         
         # Mock responses
-        with patch.object(synthesis_agent, '_call_llm') as mock_synthesis, \
-             patch.object(explanation_agent, '_call_llm') as mock_explanation, \
-             patch.object(response_agent, '_call_llm') as mock_response:
+        with patch.object(synthesis_agent, '_call_model') as mock_synthesis, \
+             patch.object(explanation_agent, '_call_model') as mock_explanation, \
+             patch.object(response_agent, '_call_model') as mock_response:
             
             mock_synthesis.return_value = {
                 "synthesis": "Diabetes significantly increases cardiovascular disease risk through multiple mechanisms including vascular damage, inflammation, and metabolic dysfunction.",

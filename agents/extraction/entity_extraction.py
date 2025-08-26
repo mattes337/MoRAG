@@ -5,7 +5,7 @@ import structlog
 
 from ..base.agent import BaseAgent
 from ..base.config import AgentConfig, PromptConfig
-from ..base.template import ConfigurablePromptTemplate, PromptExample
+from ..config.entity_types import get_agent_entity_types
 from .models import EntityExtractionResult, ExtractedEntity, EntityType, ConfidenceLevel
 
 logger = structlog.get_logger(__name__)
@@ -29,144 +29,14 @@ class EntityExtractionAgent(BaseAgent[EntityExtractionResult]):
                 min_confidence=0.6,
             ),
             agent_config={
-                "entity_types": ["PERSON", "ORGANIZATION", "LOCATION", "CONCEPT", "PRODUCT", "EVENT", "DATE", "QUANTITY", "TECHNOLOGY", "PROCESS"],
+                "entity_types": get_agent_entity_types("entity_extraction"),
                 "include_offsets": True,
                 "normalize_entities": True,
                 "min_entity_length": 2,
             }
         )
     
-    def _create_template(self) -> ConfigurablePromptTemplate:
-        """Create the prompt template for entity extraction."""
-        
-        system_prompt = """You are an expert entity extraction agent. Your task is to identify and extract named entities from text with high precision.
 
-## Your Role
-Extract entities that are:
-- Named entities (proper nouns, specific concepts)
-- Technically significant terms
-- Domain-specific terminology
-- Measurable quantities and specifications
-
-## Entity Types
-Focus on these entity types:
-{% for entity_type in config.agent_config.get('entity_types', ['PERSON', 'ORGANIZATION', 'LOCATION', 'CONCEPT']) %}
-- **{{ entity_type }}**: {{ entity_type.lower().replace('_', ' ') }}
-{% endfor %}
-
-## Entity Structure
-For each entity, provide:
-- **name**: Exact text mention as it appears
-- **canonical_name**: Normalized/standardized form
-- **entity_type**: One of the supported types
-- **confidence**: 0.0-1.0 confidence score
-- **attributes**: Additional properties (synonyms, descriptions, etc.)
-{% if config.agent_config.get('include_offsets', True) %}
-- **start_offset**: Character position where entity starts
-- **end_offset**: Character position where entity ends
-{% endif %}
-- **context**: Surrounding text for disambiguation
-
-## Quality Standards
-- Minimum entity length: {{ config.agent_config.get('min_entity_length', 2) }} characters
-- Focus on domain-specific and technical terms
-- Avoid common words unless they're proper nouns
-- Normalize similar entities to canonical forms
-
-{% if config.include_examples %}
-{{ examples }}
-{% endif %}
-
-{{ output_requirements }}"""
-
-        user_prompt = """Extract named entities from the following text:
-
-Text: {{ input }}
-
-{% if domain and domain != 'general' %}
-Focus on {{ domain }}-specific entities and terminology.
-{% endif %}
-
-Return a JSON object with the following structure:
-{
-  "entities": [
-    {
-      "name": "exact text mention",
-      "canonical_name": "normalized form",
-      "entity_type": "PERSON|ORGANIZATION|LOCATION|CONCEPT|PRODUCT|EVENT|DATE|QUANTITY|TECHNOLOGY|PROCESS",
-      "confidence": 0.0-1.0,
-      "attributes": {"key": "value"},
-      {% if config.agent_config.get('include_offsets', True) %}
-      "start_offset": 0,
-      "end_offset": 10,
-      {% endif %}
-      "context": "surrounding text"
-    }
-  ],
-  "total_entities": 0,
-  "confidence": "low|medium|high|very_high",
-  "metadata": {}
-}"""
-
-        template = ConfigurablePromptTemplate(self.config.prompt, system_prompt, user_prompt)
-        
-        # Add examples
-        examples = [
-            PromptExample(
-                input="Apple Inc. announced a partnership with Stanford University to research machine learning applications in healthcare.",
-                output="""{
-  "entities": [
-    {
-      "name": "Apple Inc.",
-      "canonical_name": "Apple Inc.",
-      "entity_type": "ORGANIZATION",
-      "confidence": 0.95,
-      "attributes": {"type": "technology_company", "industry": "technology"},
-      "start_offset": 0,
-      "end_offset": 10,
-      "context": "Apple Inc. announced a partnership"
-    },
-    {
-      "name": "Stanford University",
-      "canonical_name": "Stanford University",
-      "entity_type": "ORGANIZATION",
-      "confidence": 0.95,
-      "attributes": {"type": "university", "sector": "education"},
-      "start_offset": 45,
-      "end_offset": 63,
-      "context": "partnership with Stanford University to research"
-    },
-    {
-      "name": "machine learning",
-      "canonical_name": "Machine Learning",
-      "entity_type": "TECHNOLOGY",
-      "confidence": 0.9,
-      "attributes": {"field": "artificial_intelligence", "domain": "computer_science"},
-      "start_offset": 76,
-      "end_offset": 92,
-      "context": "research machine learning applications"
-    },
-    {
-      "name": "healthcare",
-      "canonical_name": "Healthcare",
-      "entity_type": "CONCEPT",
-      "confidence": 0.85,
-      "attributes": {"domain": "medical", "sector": "health"},
-      "start_offset": 109,
-      "end_offset": 119,
-      "context": "applications in healthcare"
-    }
-  ],
-  "total_entities": 4,
-  "confidence": "high",
-  "metadata": {"extraction_method": "llm"}
-}""",
-                explanation="Extracted organizations, technology concepts, and domain-specific terms with proper normalization."
-            )
-        ]
-        
-        template.get_examples = lambda: examples
-        return template
     
     def get_result_type(self) -> Type[EntityExtractionResult]:
         """Get the result type for entity extraction."""

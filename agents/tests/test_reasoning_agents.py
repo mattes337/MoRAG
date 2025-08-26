@@ -13,10 +13,10 @@ from agents.reasoning.reasoning import ReasoningAgent
 from agents.reasoning.decision_making import DecisionMakingAgent
 from agents.reasoning.context_analysis import ContextAnalysisAgent
 from agents.reasoning.models import (
-    PathSelectionResult, ReasoningPath, PathType,
-    ReasoningResult, ReasoningStep, ReasoningType,
-    DecisionResult, DecisionOption, DecisionCriteria,
-    ContextAnalysisResult, ContextType, ContextRelevance
+    PathSelectionResult,
+    ReasoningResult,
+    DecisionResult,
+    ContextAnalysisResult
 )
 from agents.base.config import AgentConfig
 
@@ -45,7 +45,7 @@ class TestPathSelectionAgent:
             {"path_id": "semantic_search", "description": "Semantic similarity search"}
         ]
         
-        with patch.object(path_agent, '_call_llm') as mock_llm:
+        with patch.object(path_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "selected_paths": [
                     {
@@ -85,7 +85,7 @@ class TestPathSelectionAgent:
             {"path_id": "case_studies", "description": "Medical case studies"}
         ]
         
-        with patch.object(path_agent, '_call_llm') as mock_llm:
+        with patch.object(path_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "selected_paths": [
                     {
@@ -132,7 +132,7 @@ class TestReasoningAgent:
             "Therefore, John has elevated blood glucose"
         ]
         
-        with patch.object(reasoning_agent, '_call_llm') as mock_llm:
+        with patch.object(reasoning_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "reasoning_type": "deductive",
                 "steps": [
@@ -177,7 +177,7 @@ class TestReasoningAgent:
             "Patient C with hypertension developed heart disease"
         ]
         
-        with patch.object(reasoning_agent, '_call_llm') as mock_llm:
+        with patch.object(reasoning_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "reasoning_type": "inductive",
                 "steps": [
@@ -226,7 +226,7 @@ class TestDecisionMakingAgent:
         ]
         criteria = ["effectiveness", "side_effects", "patient_compliance", "cost"]
         
-        with patch.object(decision_agent, '_call_llm') as mock_llm:
+        with patch.object(decision_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "recommended_option": "metformin",
                 "confidence": 0.9,
@@ -285,7 +285,7 @@ class TestContextAnalysisAgent:
             "allergies": ["penicillin"]
         }
         
-        with patch.object(context_agent, '_call_llm') as mock_llm:
+        with patch.object(context_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "context_type": "medical_consultation",
                 "relevance": "high",
@@ -339,8 +339,8 @@ class TestReasoningAgentsIntegration:
         context_agent = ContextAnalysisAgent(context_config)
         
         # Mock responses
-        with patch.object(context_agent, '_call_llm') as mock_context, \
-             patch.object(decision_agent, '_call_llm') as mock_decision:
+        with patch.object(context_agent, '_call_model') as mock_context, \
+             patch.object(decision_agent, '_call_model') as mock_decision:
             
             mock_context.return_value = {
                 "context_type": "medical_consultation",

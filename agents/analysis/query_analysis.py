@@ -5,7 +5,7 @@ import structlog
 
 from ..base.agent import BaseAgent
 from ..base.config import AgentConfig, PromptConfig
-from ..base.template import ConfigurablePromptTemplate, PromptExample
+
 from .models import QueryAnalysisResult, QueryIntent, QueryType, ComplexityLevel, ConfidenceLevel
 
 logger = structlog.get_logger(__name__)
@@ -36,137 +36,7 @@ class QueryAnalysisAgent(BaseAgent[QueryAnalysisResult]):
             }
         )
     
-    def _create_template(self) -> ConfigurablePromptTemplate:
-        """Create the prompt template for query analysis."""
-        
-        system_prompt = """You are an expert query analysis agent. Your task is to analyze user queries and extract meaningful information about their intent, entities, and requirements.
 
-## Your Role
-Analyze queries to determine:
-- **Intent**: Primary purpose (search, question, comparison, analysis, etc.)
-- **Entities**: Important entities mentioned (people, places, concepts, products, etc.)
-- **Keywords**: Key terms and phrases for understanding
-- **Query Type**: Nature of the query (factual, analytical, procedural, etc.)
-- **Complexity**: Complexity level (simple, medium, complex)
-
-## Intent Categories
-- **SEARCH**: Looking for specific information or documents
-- **QUESTION**: Asking for explanations, definitions, or answers
-- **COMPARISON**: Comparing different items, concepts, or options
-- **ANALYSIS**: Requesting analysis, insights, or interpretation
-- **PROCEDURE**: Asking for step-by-step instructions or how-to information
-- **RECOMMENDATION**: Seeking suggestions or recommendations
-- **CLARIFICATION**: Asking for clarification or more details
-- **SUMMARY**: Requesting a summary or overview
-- **CREATION**: Asking for content creation or generation
-- **TROUBLESHOOTING**: Seeking help with problems or issues
-
-## Query Types
-- **FACTUAL**: Seeking specific facts or information
-- **ANALYTICAL**: Requiring analysis or interpretation
-- **PROCEDURAL**: Asking for processes or procedures
-- **COMPARATIVE**: Comparing multiple items
-- **TEMPORAL**: Related to time, dates, or sequences
-- **SPATIAL**: Related to location or geography
-- **CAUSAL**: About causes and effects
-- **HYPOTHETICAL**: About possibilities or scenarios
-
-## Complexity Assessment
-- **SIMPLE**: Single concept, direct question, clear intent
-- **MEDIUM**: Multiple concepts, some ambiguity, moderate complexity
-- **COMPLEX**: Multiple interrelated concepts, high ambiguity, requires deep analysis
-
-## Analysis Guidelines
-- Extract all relevant entities (proper nouns, technical terms, key concepts)
-- Identify the most important keywords that capture the query's essence
-- Consider context and implied meaning, not just literal text
-- Be precise about intent classification
-- Assess complexity based on number of concepts and required reasoning
-
-{% if config.include_examples %}
-{{ examples }}
-{% endif %}
-
-{{ output_requirements }}"""
-
-        user_prompt = """Analyze the following user query comprehensively:
-
-Query: "{{ input }}"
-
-{% if context %}
-Context: {{ context }}
-{% endif %}
-
-{% if user_history %}
-Previous queries from this user:
-{% for prev_query in user_history[-3:] %}
-- {{ prev_query }}
-{% endfor %}
-{% endif %}
-
-Return a JSON object with the following structure:
-{
-  "intent": "search|question|comparison|analysis|procedure|recommendation|clarification|summary|creation|troubleshooting",
-  "entities": ["entity1", "entity2"],
-  "keywords": ["keyword1", "keyword2"],
-  "query_type": "factual|analytical|procedural|comparative|temporal|spatial|causal|hypothetical",
-  "complexity": "simple|medium|complex",
-  "confidence": "low|medium|high|very_high",
-  "metadata": {
-    "original_query": "{{ input }}",
-    "query_length": {{ input|length }},
-    "word_count": {{ input.split()|length }},
-    "has_context": {% if context %}true{% else %}false{% endif %},
-    "analysis_method": "llm"
-  }
-}"""
-
-        template = ConfigurablePromptTemplate(self.config.prompt, system_prompt, user_prompt)
-        
-        # Add examples
-        examples = [
-            PromptExample(
-                input="How does machine learning compare to traditional programming approaches in terms of performance and maintainability?",
-                output="""{
-  "intent": "comparison",
-  "entities": ["machine learning", "traditional programming"],
-  "keywords": ["machine learning", "traditional programming", "performance", "maintainability", "approaches", "compare"],
-  "query_type": "comparative",
-  "complexity": "medium",
-  "confidence": "high",
-  "metadata": {
-    "original_query": "How does machine learning compare to traditional programming approaches in terms of performance and maintainability?",
-    "query_length": 118,
-    "word_count": 16,
-    "has_context": false,
-    "analysis_method": "llm"
-  }
-}""",
-                explanation="This is a comparative query asking about two different approaches with specific evaluation criteria."
-            ),
-            PromptExample(
-                input="What is Python?",
-                output="""{
-  "intent": "question",
-  "entities": ["Python"],
-  "keywords": ["Python"],
-  "query_type": "factual",
-  "complexity": "simple",
-  "confidence": "very_high",
-  "metadata": {
-    "original_query": "What is Python?",
-    "query_length": 15,
-    "word_count": 3,
-    "has_context": false,
-    "analysis_method": "llm"
-  }
-}""",
-                explanation="Simple factual question asking for a definition with clear intent and single concept."
-            )
-        ]
-        
-        template.get_examples = lambda: examples
-        return template
     
     def get_result_type(self) -> Type[QueryAnalysisResult]:
         """Get the result type for query analysis."""

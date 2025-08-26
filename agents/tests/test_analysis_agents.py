@@ -13,10 +13,10 @@ from agents.analysis.content_analysis import ContentAnalysisAgent
 from agents.analysis.sentiment_analysis import SentimentAnalysisAgent
 from agents.analysis.topic_analysis import TopicAnalysisAgent
 from agents.analysis.models import (
-    QueryAnalysisResult, QueryType, QueryComplexity,
-    ContentAnalysisResult, ContentType,
-    SentimentAnalysisResult, SentimentType,
-    TopicAnalysisResult, TopicCategory
+    QueryAnalysisResult, QueryType, ComplexityLevel, ConfidenceLevel,
+    ContentAnalysisResult,
+    SentimentAnalysisResult, SentimentPolarity,
+    TopicAnalysisResult
 )
 from agents.base.config import AgentConfig
 
@@ -40,31 +40,37 @@ class TestQueryAnalysisAgent:
         """Test analysis of a simple query."""
         query = "What is machine learning?"
         
-        with patch.object(query_agent, '_call_llm') as mock_llm:
-            mock_llm.return_value = {
-                "query_type": "factual",
-                "complexity": "simple",
-                "intent": "definition_request",
+        with patch.object(query_agent, '_call_model') as mock_llm:
+            mock_llm.return_value = """{
+                "intent": "question",
                 "entities": ["machine learning"],
                 "keywords": ["machine learning", "definition"],
-                "domain": "technology",
-                "confidence": 0.9
-            }
+                "query_type": "factual",
+                "complexity": "simple",
+                "confidence": "high",
+                "metadata": {
+                    "original_query": "What is machine learning?",
+                    "query_length": 25,
+                    "word_count": 4,
+                    "has_context": false,
+                    "analysis_method": "llm"
+                }
+            }"""
             
             result = await query_agent.analyze_query(query)
             
             assert isinstance(result, QueryAnalysisResult)
             assert result.query_type == QueryType.FACTUAL
-            assert result.complexity == QueryComplexity.SIMPLE
+            assert result.complexity == ComplexityLevel.SIMPLE
             assert "machine learning" in result.entities
-            assert result.confidence > 0.8
+            assert result.confidence == ConfidenceLevel.HIGH
     
     @pytest.mark.asyncio
     async def test_complex_query_analysis(self, query_agent):
         """Test analysis of a complex query."""
         query = "How do convolutional neural networks compare to transformer models for image classification tasks in terms of accuracy and computational efficiency?"
         
-        with patch.object(query_agent, '_call_llm') as mock_llm:
+        with patch.object(query_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "query_type": "comparative",
                 "complexity": "complex",
@@ -106,7 +112,7 @@ class TestContentAnalysisAgent:
         Results: Our model achieved state-of-the-art performance...
         """
         
-        with patch.object(content_agent, '_call_llm') as mock_llm:
+        with patch.object(content_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "content_type": "research_paper",
                 "domain": "computer_vision",
@@ -139,7 +145,7 @@ class TestContentAnalysisAgent:
         Outcome: Patient stabilized after 2 hours.
         """
         
-        with patch.object(content_agent, '_call_llm') as mock_llm:
+        with patch.object(content_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "content_type": "medical_record",
                 "domain": "cardiology",
@@ -175,7 +181,7 @@ class TestSentimentAnalysisAgent:
         """Test positive sentiment analysis."""
         text = "This new treatment is absolutely amazing! It completely cured my symptoms and I feel fantastic."
         
-        with patch.object(sentiment_agent, '_call_llm') as mock_llm:
+        with patch.object(sentiment_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "sentiment": "positive",
                 "confidence": 0.95,
@@ -197,7 +203,7 @@ class TestSentimentAnalysisAgent:
         """Test negative sentiment analysis."""
         text = "This treatment was terrible. It made my symptoms worse and caused severe side effects."
         
-        with patch.object(sentiment_agent, '_call_llm') as mock_llm:
+        with patch.object(sentiment_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "sentiment": "negative",
                 "confidence": 0.9,
@@ -231,7 +237,7 @@ class TestTopicAnalysisAgent:
         Prevention strategies focus on lifestyle modifications and medication.
         """
         
-        with patch.object(topic_agent, '_call_llm') as mock_llm:
+        with patch.object(topic_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_topic": "cardiovascular_disease",
                 "category": "medical",
@@ -258,7 +264,7 @@ class TestTopicAnalysisAgent:
         Natural language processing enables better human-computer interaction.
         """
         
-        with patch.object(topic_agent, '_call_llm') as mock_llm:
+        with patch.object(topic_agent, '_call_model') as mock_llm:
             mock_llm.return_value = {
                 "primary_topic": "artificial_intelligence",
                 "category": "technology",
@@ -295,9 +301,9 @@ class TestAnalysisAgentsIntegration:
         topic_agent = TopicAnalysisAgent(topic_config)
         
         # Mock responses
-        with patch.object(sentiment_agent, '_call_llm') as mock_sentiment, \
-             patch.object(topic_agent, '_call_llm') as mock_topic, \
-             patch.object(content_agent, '_call_llm') as mock_content:
+        with patch.object(sentiment_agent, '_call_model') as mock_sentiment, \
+             patch.object(topic_agent, '_call_model') as mock_topic, \
+             patch.object(content_agent, '_call_model') as mock_content:
             
             mock_sentiment.return_value = {
                 "sentiment": "positive",
