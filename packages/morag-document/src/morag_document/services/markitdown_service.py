@@ -105,13 +105,17 @@ class MarkitdownService:
             
             if not result or not result.text_content:
                 raise ConversionError(f"Markitdown returned empty content for file: {file_path}")
-            
+
+            # Additional validation for all supported file types
+            if not self._validate_conversion_quality(result.text_content, file_path):
+                raise ConversionError(f"Conversion failed - output does not appear to be proper markdown: {file_path}")
+
             logger.info(
-                "File converted successfully", 
+                "File converted successfully",
                 file_path=str(file_path),
                 content_length=len(result.text_content)
             )
-            
+
             return result.text_content
             
         except Exception as e:
@@ -207,3 +211,153 @@ class MarkitdownService:
             'file_size': file_path.stat().st_size,
             'service': 'markitdown'
         }
+
+    def _validate_conversion_quality(self, content: str, file_path: Path) -> bool:
+        """Validate that conversion produced proper markdown rather than raw text.
+
+        Args:
+            content: Converted content
+            file_path: Original file path
+
+        Returns:
+            True if conversion appears successful, False otherwise
+        """
+        if not content or len(content.strip()) < 10:
+            return False
+
+        file_ext = file_path.suffix.lower()
+
+        # For certain file types, we expect specific content patterns
+        if file_ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx']:
+            return self._validate_document_conversion(content, file_ext)
+        elif file_ext in ['.html', '.htm']:
+            return self._validate_html_conversion(content)
+        elif file_ext in ['.csv', '.xlsx', '.xls']:
+            return self._validate_data_conversion(content)
+        elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+            return self._validate_image_conversion(content)
+        elif file_ext in ['.json', '.xml']:
+            return self._validate_structured_data_conversion(content)
+        elif file_ext in ['.txt', '.md']:
+            return self._validate_text_conversion(content)
+        else:
+            # For other formats, use general validation
+            return self._validate_general_conversion(content)
+
+    def _validate_document_conversion(self, content: str, file_ext: str) -> bool:
+        """Validate document file conversion (PDF, DOC, PPT, etc.)."""
+        import re
+
+        # Check for basic markdown structure
+        markdown_patterns = [
+            r'^#+ ',  # Headers
+            r'^\* ',  # Bullet points
+            r'^\d+\. ',  # Numbered lists
+            r'\*\*.*?\*\*',  # Bold text
+            r'`.*?`',  # Code
+            r'^\|.*\|',  # Tables
+        ]
+
+        pattern_matches = sum(1 for pattern in markdown_patterns
+                            if re.search(pattern, content, re.MULTILINE))
+
+        # Check for signs of raw text extraction
+        lines = content.split('\n')
+        non_empty_lines = [line.strip() for line in lines if line.strip()]
+
+        if not non_empty_lines:
+            return False
+
+        # If most lines are very long, it's likely raw text
+        long_lines = sum(1 for line in non_empty_lines if len(line) > 200)
+        long_line_ratio = long_lines / len(non_empty_lines) if non_empty_lines else 0
+
+        # Check for very few line breaks relative to content length
+        line_break_ratio = content.count('\n') / max(1, len(content))
+
+        # Document should have some structure and reasonable formatting
+        has_structure = pattern_matches >= 1 or long_line_ratio < 0.7
+        has_reasonable_breaks = line_break_ratio > 0.005
+
+        return has_structure and has_reasonable_breaks
+
+    def _validate_html_conversion(self, content: str) -> bool:
+        """Validate HTML conversion."""
+        # HTML should convert to structured markdown
+        import re
+
+        # Should have some markdown structure or at least proper paragraphs
+        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
+        has_paragraphs = '\n\n' in content
+        has_lists = bool(re.search(r'^\* |^\d+\. ', content, re.MULTILINE))
+
+        # Should not contain raw HTML tags (unless intentionally preserved)
+        html_tag_ratio = len(re.findall(r'<[^>]+>', content)) / max(1, len(content.split()))
+
+        return (has_headers or has_paragraphs or has_lists) and html_tag_ratio < 0.1
+
+    def _validate_data_conversion(self, content: str) -> bool:
+        """Validate data file conversion (CSV, Excel)."""
+        # Data files should convert to tables or structured content
+        import re
+
+        # Should have table structure or clear data organization
+        has_tables = bool(re.search(r'^\|.*\|', content, re.MULTILINE))
+        has_structured_data = bool(re.search(r'^\w+:\s+\w+', content, re.MULTILINE))
+        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
+
+        # Should not be just a wall of text
+        lines = content.split('\n')
+        non_empty_lines = [line for line in lines if line.strip()]
+        avg_line_length = sum(len(line) for line in non_empty_lines) / max(1, len(non_empty_lines))
+
+        return (has_tables or has_structured_data or has_headers) and avg_line_length < 300
+
+    def _validate_image_conversion(self, content: str) -> bool:
+        """Validate image conversion (OCR results)."""
+        # Images should produce meaningful text content
+        if len(content.strip()) < 5:
+            return False
+
+        # Should not be just error messages or empty content
+        error_indicators = ['error', 'failed', 'unable', 'cannot', 'not supported']
+        content_lower = content.lower()
+
+        if any(indicator in content_lower for indicator in error_indicators):
+            return False
+
+        # Should have some readable text
+        words = content.split()
+        if len(words) < 3:
+            return False
+
+        return True
+
+    def _validate_structured_data_conversion(self, content: str) -> bool:
+        """Validate structured data conversion (JSON, XML)."""
+        # Should convert to readable markdown format
+        import re
+
+        # Should have some structure
+        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
+        has_structure = bool(re.search(r'^\w+:\s+', content, re.MULTILINE))
+        has_code_blocks = '```' in content
+
+        return has_headers or has_structure or has_code_blocks
+
+    def _validate_text_conversion(self, content: str) -> bool:
+        """Validate text file conversion."""
+        # Text files should preserve content reasonably
+        return len(content.strip()) > 0
+
+    def _validate_general_conversion(self, content: str) -> bool:
+        """General validation for unknown file types."""
+        # Basic check - should have some content and not be obviously broken
+        if len(content.strip()) < 5:
+            return False
+
+        # Should not be just error messages
+        error_indicators = ['error', 'failed', 'unable', 'cannot', 'not supported']
+        content_lower = content.lower()
+
+        return not any(indicator in content_lower for indicator in error_indicators)

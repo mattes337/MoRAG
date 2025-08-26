@@ -106,7 +106,7 @@ class TestMarkitdownConverter:
         assert converter._map_format_to_document_type('pptx') == DocumentType.POWERPOINT
         assert converter._map_format_to_document_type('txt') == DocumentType.TEXT
         assert converter._map_format_to_document_type('jpg') == DocumentType.IMAGE
-        assert converter._map_format_to_document_type('unknown') == DocumentType.OTHER
+        assert converter._map_format_to_document_type('unknown') == DocumentType.UNKNOWN
 
     @pytest.mark.asyncio
     async def test_convert_success(self, converter, tmp_path, mock_markitdown_service):
