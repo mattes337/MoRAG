@@ -10,6 +10,8 @@ import structlog
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
+logger = structlog.get_logger(__name__)
+
 # Import core exceptions
 try:
     from morag_core.exceptions import ProcessingError
@@ -17,19 +19,17 @@ except ImportError:
     class ProcessingError(Exception):  # type: ignore
         pass
 
-# Import services with graceful fallback
+# Import services - these are required for proper operation
 try:
     from morag_services import MoRAGServices, ContentType
     SERVICES_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     SERVICES_AVAILABLE = False
     # Create placeholder types for when services are not available
     class MoRAGServices:  # type: ignore
         pass
     class ContentType:  # type: ignore
         pass
-
-logger = structlog.get_logger(__name__)
 
 
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
@@ -177,18 +177,18 @@ class MarkdownConversionStage(Stage):
     
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for markdown conversion.
-        
+
         Args:
             input_files: List of input file paths
-            
+
         Returns:
             True if inputs are valid
         """
         if len(input_files) != 1:
             return False
-        
+
         input_file = input_files[0]
-        
+
         # Check if file exists (for local files)
         # Handle URLs that may have been converted to Windows paths
         file_str = str(input_file)
@@ -202,7 +202,7 @@ class MarkdownConversionStage(Stage):
         if not is_url:
             if not input_file.exists():
                 return False
-        
+
         # Check if file type is supported
         content_type = self._detect_content_type(input_file)
         return content_type is not None

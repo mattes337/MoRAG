@@ -16,8 +16,13 @@ from tenacity import (
 )
 import structlog
 
-# Import agents framework
-from agents import get_agent
+# Import agents framework with graceful fallback
+try:
+    from agents import get_agent
+    AGENTS_AVAILABLE = True
+except ImportError:
+    AGENTS_AVAILABLE = False
+    get_agent = None
 
 from morag_core.config import settings
 from morag_core.exceptions import (
@@ -560,20 +565,34 @@ class GeminiEmbeddingService(BaseService):
                     language_name = language_names.get(language, language)
                     language_instruction = f"CRITICAL: You MUST write the summary ONLY in {language_name}. Do NOT use any other language. The summary language MUST match the specified language ({language_name}). "
 
-                # Use summarization agent - ALWAYS
-                summary_agent = get_agent("summarization")
-                summary_agent.update_config(
-                    agent_config={
-                        "max_summary_length": max_length,
-                        "target_language": language
-                    }
-                )
+                # Use summarization agent if available, otherwise fallback to direct API
+                if AGENTS_AVAILABLE and get_agent:
+                    summary_agent = get_agent("summarization")
+                    summary_agent.update_config(
+                        agent_config={
+                            "max_summary_length": max_length,
+                            "target_language": language
+                        }
+                    )
 
-                result = await summary_agent.execute(
-                    text,
-                    target_length=max_length,
-                    language=language
-                )
+                    result = await summary_agent.execute(
+                        text,
+                        target_length=max_length,
+                        language=language
+                    )
+                    summary_text = result.summary
+                else:
+                    # Fallback to direct API call
+                    prompt = f"""
+{language_instruction}
+Please provide a concise summary of the following text in approximately {max_length} characters:
+
+{text}
+
+Summary:"""
+
+                    response = await model.generate_content_async(prompt)
+                    summary_text = response.text.strip()
 
                 # Record success for circuit breaker
                 self.circuit_breaker.record_success()
@@ -581,7 +600,7 @@ class GeminiEmbeddingService(BaseService):
                 # Create and return summary result
                 return SummaryResult(
                     original_text=text,
-                    summary=result.summary,
+                    summary=summary_text,
                     model=self.generation_model,
                 )
             except Exception as e:

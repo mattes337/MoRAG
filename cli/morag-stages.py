@@ -12,12 +12,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add packages directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-stages" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-core" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-services" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-graph" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages" / "morag-reasoning" / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "agents"))
+repo_root = Path(__file__).parent.parent
+sys.path.insert(0, str(repo_root / "packages" / "morag-stages" / "src"))
+sys.path.insert(0, str(repo_root / "packages" / "morag-core" / "src"))
+sys.path.insert(0, str(repo_root / "packages" / "morag-services" / "src"))
+sys.path.insert(0, str(repo_root / "packages" / "morag-graph" / "src"))
+sys.path.insert(0, str(repo_root / "packages" / "morag-reasoning" / "src"))
+sys.path.insert(0, str(repo_root / "packages" / "morag-document" / "src"))
+sys.path.insert(0, str(repo_root / "packages" / "morag-embedding" / "src"))
+sys.path.insert(0, str(repo_root / "agents"))
 
 from morag_stages import StageManager, StageType, StageStatus
 from morag_stages.models import StageContext
