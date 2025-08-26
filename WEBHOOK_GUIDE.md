@@ -6,8 +6,8 @@
 2. [Webhook Types](#webhook-types)
 3. [Quick Start](#quick-start)
 4. [Webhook Schemas](#webhook-schemas)
-   - [Task Lifecycle Webhooks](#task-lifecycle-webhooks)
-   - [Processing Step Webhooks](#processing-step-webhooks)
+   - [Stage-Based Webhooks](#stage-based-webhooks)
+   - [Step Progress Webhooks](#step-progress-webhooks)
 5. [API Endpoints](#api-endpoints)
 6. [Testing & Validation](#testing--validation)
 7. [Implementation Examples](#implementation-examples)
@@ -20,66 +20,66 @@
 
 ## Overview
 
-MoRAG provides comprehensive webhook notifications for document processing lifecycle events, enabling real-time monitoring of task progress, completion, and failures. This guide covers all webhook types, their schemas, and implementation examples for consumer applications.
+MoRAG provides comprehensive webhook notifications for document processing lifecycle events, enabling real-time monitoring of stage execution, step progress, and pipeline completion. This guide covers all webhook types, their schemas, and implementation examples for consumer applications.
 
 ### Key Features
-- **Real-time Processing Updates**: Get notified instantly when tasks start, progress, complete, or fail
-- **Detailed Step Tracking**: Monitor individual processing steps with specific data payloads
-- **Rich Metadata**: Comprehensive information for each processing stage
+- **Real-time Stage Updates**: Get notified when individual stages complete with detailed execution data
+- **Step Progress Tracking**: Monitor individual processing steps with progress percentages
+- **Pipeline Completion**: Receive comprehensive summaries when entire pipelines finish
 - **Reliable Delivery**: Automatic retry logic with exponential backoff
 - **Flexible Authentication**: Optional bearer token support
-- **Complete History**: 7-day event retention for debugging and monitoring
+- **File Management**: Download URLs for all intermediate and output files
 
 ## Webhook Types
 
-MoRAG supports two main categories of webhooks:
+MoRAG supports three main categories of webhooks:
 
-### 1. Task Lifecycle Webhooks
-- **Task Started**: Initial task creation and processing start
-- **Task Progress**: General progress updates at key milestones
-- **Task Completed**: Final completion with results summary
-- **Task Failed**: Error notifications with detailed failure information
+### 1. Stage-Based Webhooks
+- **Stage Completed**: Individual stage completion with execution details and output files
+- **Pipeline Completed**: Complete pipeline execution summary with all stages
 
-### 2. Processing Step Webhooks
+### 2. Step Progress Webhooks
 - **Step Started**: Individual processing step initiation
 - **Step Completed**: Step completion with step-specific data
 - **Step Failed**: Step-level failure notifications
 
 ### Webhook Reference Table
 
-| Event Type | Trigger | Progress % | Key Data |
-|------------|---------|------------|----------|
-| `task_started` | Task begins | 0% | `task_id`, `metadata` |
-| `task_progress` | Milestone reached | 25%, 50%, 75% | `progress`, `stage` |
-| `task_completed` | Task finishes | 100% | `result`, `processing_time` |
-| `task_failed` | Unrecoverable error | Variable | `error`, `error_details` |
-| **Step Events** | **Processing Stage** | **Range** | **Specific Data** |
-| `markdown_conversion` | Content conversion | 0-25% | `markdown_file_url`, `conversion_metadata` |
-| `metadata_extraction` | File metadata | 25-40% | `metadata`, `file_properties` |
-| `content_processing` | Content analysis | 40-70% | `summary`, `detected_topics`, `language` |
-| `chunking` | Text segmentation | 70-80% | `chunks_created`, `chunking_strategy` |
-| `graph_extraction` | Entity/relation extraction | 80-90% | `entities_extracted`, `relations_extracted` |
-| `ingestion` | Database storage | 90-100% | `embeddings_stored`, `database_collection` |
+| Event Type | Trigger | Stage Number | Key Data |
+|------------|---------|--------------|----------|
+| `stage_completed` | Individual stage finishes | 1-5 | `stage.type`, `files.output_files`, `execution_time` |
+| `pipeline_completed` | All stages finish | N/A | `pipeline.success`, `stages[]`, `total_execution_time` |
+| **Step Events** | **Processing Step** | **Progress %** | **Specific Data** |
+| `step_started` | Step begins | Variable | `step`, `status: "started"`, `progress_percent` |
+| `step_completed` | Step finishes | Variable | `step`, `status: "completed"`, `data` |
+| `step_failed` | Step fails | Variable | `step`, `status: "failed"`, `error_message` |
+
+### Stage Types and Numbers
+
+| Stage Number | Stage Type | Description |
+|--------------|------------|-------------|
+| 1 | `input_to_markdown` | Convert input files to markdown format |
+| 2 | `markdown_optimizer` | Optimize and clean markdown content |
+| 3 | `chunker` | Split content into manageable chunks |
+| 4 | `fact_generator` | Extract facts and entities from content |
+| 5 | `ingestion` | Store processed data in databases |
 
 ### Processing Flow
 
 ```mermaid
 graph TD
-    A[Task Started] --> B[Markdown Conversion]
-    B --> C[Metadata Extraction]
-    C --> D[Content Processing]
-    D --> E[Chunking]
-    E --> F[Graph Extraction]
-    F --> G[Ingestion]
-    G --> H[Task Completed]
+    A[Stage 1: Input to Markdown] --> B[Stage 2: Markdown Optimizer]
+    B --> C[Stage 3: Chunker]
+    C --> D[Stage 4: Fact Generator]
+    D --> E[Stage 5: Ingestion]
+    E --> F[Pipeline Completed]
 
-    B -.-> I[Step Failed]
-    C -.-> I
-    D -.-> I
-    E -.-> I
-    F -.-> I
-    G -.-> I
-    I --> J[Task Failed]
+    A -.-> G[Stage Failed]
+    B -.-> G
+    C -.-> G
+    D -.-> G
+    E -.-> G
+    G --> H[Pipeline Failed]
 ```
 
 ## Quick Start
@@ -130,116 +130,117 @@ Authorization: Bearer {api_key}
 
 ## Webhook Schemas
 
-All webhooks follow a consistent base structure with event-specific data payloads.
+All webhooks follow consistent structures based on the type of notification being sent.
 
-### Base Webhook Schema
+### Stage-Based Webhooks
 
-```typescript
-interface BaseWebhook {
-  event_type: string;           // Type of webhook event
-  timestamp: string;            // ISO8601 timestamp
-  data: WebhookData;           // Event-specific payload
-}
-```
-
-### Task Lifecycle Webhooks
-
-#### 1. Task Started
-Sent when a new processing task begins.
+#### 1. Stage Completed
+Sent when an individual stage completes successfully.
 
 ```json
 {
-  "event_type": "task_started",
-  "timestamp": "2024-01-01T10:00:00Z",
-  "data": {
-    "task_id": "task-abc-123-def",
-    "status": "started",
-    "message": "Task processing started",
-    "metadata": {
-      "source_type": "document",
-      "webhook_url": "https://your-app.com/webhook",
-      "document_id": "my-document-456",
-      "collection_name": "documents_en",
-      "language": "en"
-    }
-  }
-}
-```
-
-#### 2. Task Progress
-General progress updates at key milestones (25%, 50%, 75%).
-
-```json
-{
-  "event_type": "task_progress",
+  "event": "stage_completed",
   "timestamp": "2024-01-01T10:01:00Z",
-  "data": {
-    "task_id": "task-abc-123-def",
-    "status": "progress",
-    "progress": 0.5,
-    "message": "Processing content...",
-    "metadata": {
-      "stage": "content_processing",
-      "current_step": "markdown_conversion"
-    }
-  }
-}
-```
-
-#### 3. Task Completed
-Final notification when task completes successfully.
-
-```json
-{
-  "event_type": "task_completed",
-  "timestamp": "2024-01-01T10:05:00Z",
-  "data": {
-    "task_id": "task-abc-123-def",
+  "stage": {
+    "type": 1,
     "status": "completed",
-    "message": "Task completed successfully",
-    "result": {
-      "embeddings_stored": 156,
-      "chunks_created": 89,
-      "facts_extracted": 234,
-      "processing_time_seconds": 45.2,
-      "database_collection": "documents_en"
+    "execution_time": 15.5,
+    "start_time": "2024-01-01T10:00:30Z",
+    "end_time": "2024-01-01T10:01:00Z",
+    "error_message": null
+  },
+  "files": {
+    "input_files": ["/path/to/input.pdf"],
+    "output_files": ["/tmp/morag/stage_1_output.md"]
+  },
+  "context": {
+    "source_path": "/path/to/input.pdf",
+    "output_dir": "/tmp/morag/output",
+    "total_stages_completed": 1,
+    "total_stages_failed": 0
+  },
+  "metadata": {
+    "config_used": {
+      "chunk_size": 4000,
+      "overlap": 200
     },
-    "metadata": {
-      "source_type": "document",
-      "document_id": "my-document-456"
-    }
+    "metrics": {
+      "pages_processed": 15,
+      "content_length": 52428
+    },
+    "warnings": []
   }
 }
 ```
 
-#### 4. Task Failed
-Notification when task encounters unrecoverable errors.
+#### 2. Pipeline Completed
+Sent when the entire pipeline completes (successfully or with failures).
 
 ```json
 {
-  "event_type": "task_failed",
-  "timestamp": "2024-01-01T10:02:00Z",
-  "data": {
-    "task_id": "task-abc-123-def",
-    "status": "failed",
-    "message": "Task failed during content processing",
-    "error": "File format not supported: .xyz",
-    "error_details": {
-      "stage": "content_processing",
-      "step": "markdown_conversion",
-      "error_code": "UNSUPPORTED_FORMAT"
+  "event": "pipeline_completed",
+  "timestamp": "2024-01-01T10:05:00Z",
+  "pipeline": {
+    "success": true,
+    "error_message": null,
+    "total_execution_time": 45.2,
+    "stages_completed": 5,
+    "stages_failed": 0,
+    "stages_skipped": 0
+  },
+  "context": {
+    "source_path": "/path/to/input.pdf",
+    "output_dir": "/tmp/morag/output",
+    "intermediate_files": [
+      "/tmp/morag/stage_1_output.md",
+      "/tmp/morag/stage_2_output.md",
+      "/tmp/morag/stage_3_output.json",
+      "/tmp/morag/stage_4_output.json"
+    ]
+  },
+  "stages": [
+    {
+      "type": 1,
+      "status": "completed",
+      "execution_time": 15.5,
+      "output_files": ["/tmp/morag/stage_1_output.md"],
+      "error_message": null
     },
-    "metadata": {
-      "source_type": "document",
-      "document_id": "my-document-456"
+    {
+      "type": 2,
+      "status": "completed",
+      "execution_time": 8.3,
+      "output_files": ["/tmp/morag/stage_2_output.md"],
+      "error_message": null
+    },
+    {
+      "type": 3,
+      "status": "completed",
+      "execution_time": 12.1,
+      "output_files": ["/tmp/morag/stage_3_output.json"],
+      "error_message": null
+    },
+    {
+      "type": 4,
+      "status": "completed",
+      "execution_time": 18.7,
+      "output_files": ["/tmp/morag/stage_4_output.json"],
+      "error_message": null
+    },
+    {
+      "type": 5,
+      "status": "completed",
+      "execution_time": 9.4,
+      "output_files": [],
+      "error_message": null
     }
-  }
+  ]
 }
 ```
 
-### Processing Step Webhooks
+### Step Progress Webhooks
 
-These webhooks provide detailed progress for each processing stage with step-specific data.
+These webhooks provide detailed progress for individual processing steps within the MoRAG API processing tasks.
 
 #### Base Step Webhook Schema
 
@@ -256,16 +257,16 @@ interface StepWebhook {
 }
 ```
 
-#### 1. Markdown Conversion
+#### 1. Metadata Extraction
 
 **Step Started:**
 ```json
 {
   "task_id": "task-abc-123-def",
   "document_id": "my-document-456",
-  "step": "markdown_conversion",
+  "step": "metadata_extraction",
   "status": "started",
-  "progress_percent": 0.0,
+  "progress_percent": 25.0,
   "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
@@ -275,34 +276,10 @@ interface StepWebhook {
 {
   "task_id": "task-abc-123-def",
   "document_id": "my-document-456",
-  "step": "markdown_conversion",
-  "status": "completed",
-  "progress_percent": 25.0,
-  "timestamp": "2024-01-15T10:31:00Z",
-  "data": {
-    "markdown_file_url": "/api/files/temp/task-abc-123-def/markdown.md",
-    "conversion_metadata": {
-      "original_format": "pdf",
-      "file_size_bytes": 1048576,
-      "content_length": 52428,
-      "page_count": 15,
-      "conversion_time_seconds": 12.3
-    }
-  }
-}
-```
-
-#### 2. Metadata Extraction
-
-**Step Completed:**
-```json
-{
-  "task_id": "task-abc-123-def",
-  "document_id": "my-document-456",
   "step": "metadata_extraction",
   "status": "completed",
   "progress_percent": 40.0,
-  "timestamp": "2024-01-15T10:32:00Z",
+  "timestamp": "2024-01-15T10:31:00Z",
   "data": {
     "metadata_file_url": "/api/files/temp/task-abc-123-def/metadata.json",
     "metadata": {
@@ -318,7 +295,7 @@ interface StepWebhook {
 }
 ```
 
-#### 3. Content Processing & Analysis
+#### 2. Content Processing
 
 **Step Completed:**
 ```json
@@ -344,56 +321,7 @@ interface StepWebhook {
 }
 ```
 
-#### 4. Chunking
-
-**Step Completed:**
-```json
-{
-  "task_id": "task-abc-123-def",
-  "document_id": "my-document-456",
-  "step": "chunking",
-  "status": "completed",
-  "progress_percent": 80.0,
-  "timestamp": "2024-01-15T10:34:00Z",
-  "data": {
-    "chunks_created": 89,
-    "chunking_strategy": "semantic",
-    "average_chunk_size": 589,
-    "chunk_size_range": {
-      "min": 245,
-      "max": 1024
-    },
-    "chunks_file_url": "/api/files/temp/task-abc-123-def/chunks.json"
-  }
-}
-```
-
-#### 5. Graph Extraction
-
-**Step Completed:**
-```json
-{
-  "task_id": "task-abc-123-def",
-  "document_id": "my-document-456",
-  "step": "graph_extraction",
-  "status": "completed",
-  "progress_percent": 90.0,
-  "timestamp": "2024-01-15T10:35:00Z",
-  "data": {
-    "entities_extracted": 234,
-    "relations_extracted": 156,
-    "facts_extracted": 312,
-    "top_entities": [
-      {"name": "machine learning", "type": "Concept", "mentions": 23},
-      {"name": "neural networks", "type": "Technology", "mentions": 18},
-      {"name": "optimization", "type": "Process", "mentions": 15}
-    ],
-    "extraction_time_seconds": 15.4
-  }
-}
-```
-
-#### 6. Final Ingestion
+#### 3. Ingestion
 
 **Step Completed:**
 ```json
@@ -405,18 +333,10 @@ interface StepWebhook {
   "progress_percent": 100.0,
   "timestamp": "2024-01-15T10:36:00Z",
   "data": {
-    "embeddings_stored": 156,
-    "chunks_ingested": 89,
-    "facts_stored": 312,
-    "entities_stored": 234,
-    "relations_stored": 156,
-    "database_collection": "documents_en",
-    "processing_time_seconds": 45.2,
-    "storage_summary": {
-      "qdrant_points": 156,
-      "neo4j_nodes": 234,
-      "neo4j_relationships": 156
-    }
+    "chunks_processed": 89,
+    "total_text_length": 52428,
+    "database_collection": "morag_documents",
+    "processing_time_seconds": 45.2
   }
 }
 ```
@@ -427,15 +347,42 @@ interface StepWebhook {
 {
   "task_id": "task-abc-123-def",
   "document_id": "my-document-456",
-  "step": "markdown_conversion",
+  "step": "processing",
   "status": "failed",
   "progress_percent": 10.0,
   "timestamp": "2024-01-15T10:30:30Z",
-  "error_message": "Unsupported file format: .xyz files cannot be converted to markdown",
-  "data": {
-    "error_code": "UNSUPPORTED_FORMAT",
-    "attempted_format": "xyz",
-    "supported_formats": ["pdf", "docx", "txt", "md", "mp4", "mp3", "wav"]
+  "error_message": "Unsupported file format: .xyz files cannot be processed"
+}
+```
+
+### Stage Failed Example
+
+```json
+{
+  "event": "stage_completed",
+  "timestamp": "2024-01-01T10:01:00Z",
+  "stage": {
+    "type": 1,
+    "status": "failed",
+    "execution_time": 5.2,
+    "start_time": "2024-01-01T10:00:30Z",
+    "end_time": "2024-01-01T10:01:00Z",
+    "error_message": "Unsupported file format: .xyz files cannot be converted to markdown"
+  },
+  "files": {
+    "input_files": ["/path/to/input.xyz"],
+    "output_files": []
+  },
+  "context": {
+    "source_path": "/path/to/input.xyz",
+    "output_dir": "/tmp/morag/output",
+    "total_stages_completed": 0,
+    "total_stages_failed": 1
+  },
+  "metadata": {
+    "config_used": {},
+    "metrics": {},
+    "warnings": ["Unsupported file format detected"]
   }
 }
 ```
@@ -507,66 +454,113 @@ import jsonschema
 from typing import Dict, Any, List
 
 # JSON Schema for webhook validation
-WEBHOOK_SCHEMA = {
+STAGE_WEBHOOK_SCHEMA = {
     "type": "object",
-    "required": ["event_type", "timestamp", "data"],
+    "required": ["event", "timestamp"],
     "properties": {
-        "event_type": {"type": "string"},
+        "event": {"type": "string", "enum": ["stage_completed", "pipeline_completed"]},
         "timestamp": {"type": "string", "format": "date-time"},
-        "data": {
+        "stage": {
             "type": "object",
-            "required": ["task_id", "status"],
             "properties": {
-                "task_id": {"type": "string"},
+                "type": {"type": "integer"},
                 "status": {"type": "string"},
-                "step": {"type": "string"},
-                "progress_percent": {"type": "number", "minimum": 0, "maximum": 100},
-                "message": {"type": "string"},
-                "error_message": {"type": "string"},
-                "data": {"type": "object"},
-                "result": {"type": "object"},
-                "metadata": {"type": "object"}
+                "execution_time": {"type": "number"},
+                "error_message": {"type": ["string", "null"]}
+            }
+        },
+        "pipeline": {
+            "type": "object",
+            "properties": {
+                "success": {"type": "boolean"},
+                "total_execution_time": {"type": "number"},
+                "stages_completed": {"type": "integer"},
+                "stages_failed": {"type": "integer"}
+            }
+        },
+        "files": {
+            "type": "object",
+            "properties": {
+                "input_files": {"type": "array", "items": {"type": "string"}},
+                "output_files": {"type": "array", "items": {"type": "string"}}
+            }
+        },
+        "context": {
+            "type": "object",
+            "properties": {
+                "source_path": {"type": "string"},
+                "output_dir": {"type": "string"}
             }
         }
     }
 }
 
+STEP_WEBHOOK_SCHEMA = {
+    "type": "object",
+    "required": ["task_id", "step", "status", "progress_percent", "timestamp"],
+    "properties": {
+        "task_id": {"type": "string"},
+        "document_id": {"type": ["string", "null"]},
+        "step": {"type": "string"},
+        "status": {"type": "string", "enum": ["started", "completed", "failed"]},
+        "progress_percent": {"type": "number", "minimum": 0, "maximum": 100},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "data": {"type": "object"},
+        "error_message": {"type": ["string", "null"]}
+    }
+}
+
 def validate_webhook(payload: Dict[str, Any]) -> List[str]:
-    """Validate webhook payload against schema."""
+    """Validate webhook payload against appropriate schema."""
     errors = []
 
     try:
-        jsonschema.validate(payload, WEBHOOK_SCHEMA)
+        if 'event' in payload:
+            # Stage-based webhook
+            jsonschema.validate(payload, STAGE_WEBHOOK_SCHEMA)
+
+            # Additional validation for stage webhooks
+            event = payload.get('event')
+            if event == 'stage_completed' and 'stage' not in payload:
+                errors.append("stage_completed event must include stage information")
+            elif event == 'pipeline_completed' and 'pipeline' not in payload:
+                errors.append("pipeline_completed event must include pipeline information")
+
+        elif 'task_id' in payload and 'step' in payload:
+            # Step-based webhook
+            jsonschema.validate(payload, STEP_WEBHOOK_SCHEMA)
+
+            # Additional validation for step webhooks
+            progress = payload.get('progress_percent', 0)
+            if not 0 <= progress <= 100:
+                errors.append(f"Invalid progress percentage: {progress}")
+
+        else:
+            errors.append("Webhook payload must be either stage-based or step-based")
+
     except jsonschema.ValidationError as e:
         errors.append(f"Schema validation error: {e.message}")
 
-    # Additional business logic validation
-    data = payload.get('data', {})
-
-    # Validate progress percentage for step webhooks
-    if 'step' in data and 'progress_percent' in data:
-        progress = data['progress_percent']
-        if not 0 <= progress <= 100:
-            errors.append(f"Invalid progress percentage: {progress}")
-
-    # Validate event type consistency
-    event_type = payload.get('event_type')
-    status = data.get('status')
-
-    if event_type == 'task_completed' and status != 'completed':
-        errors.append(f"Event type '{event_type}' inconsistent with status '{status}'")
-
     return errors
 
-# Usage example
-def test_webhook_payload():
+# Usage examples
+def test_stage_webhook_payload():
     test_payload = {
-        "event_type": "task_completed",
+        "event": "stage_completed",
         "timestamp": "2024-01-15T10:30:00Z",
-        "data": {
-            "task_id": "test-123",
+        "stage": {
+            "type": 3,
             "status": "completed",
-            "result": {"chunks_created": 25}
+            "execution_time": 15.5,
+            "error_message": None
+        },
+        "files": {
+            "input_files": ["/path/to/input.md"],
+            "output_files": ["/tmp/morag/stage_3_chunks.json"]
+        },
+        "context": {
+            "source_path": "/path/to/input.pdf",
+            "output_dir": "/tmp/morag/output"
         }
     }
 
@@ -574,7 +568,23 @@ def test_webhook_payload():
     if errors:
         print("Validation errors:", errors)
     else:
-        print("Webhook payload is valid")
+        print("Stage webhook payload is valid")
+
+def test_step_webhook_payload():
+    test_payload = {
+        "task_id": "test-123",
+        "step": "ingestion",
+        "status": "completed",
+        "progress_percent": 100.0,
+        "timestamp": "2024-01-15T10:30:00Z",
+        "data": {"chunks_processed": 25}
+    }
+
+    errors = validate_webhook(test_payload)
+    if errors:
+        print("Validation errors:", errors)
+    else:
+        print("Step webhook payload is valid")
 ```
 
 #### 3. Integration Test Examples
@@ -608,55 +618,46 @@ class TestWebhookIntegration:
         with patch('requests.post', side_effect=mock_post):
             yield received_webhooks
 
-    def test_task_lifecycle_webhooks(self, mock_webhook_server):
-        """Test complete task lifecycle webhook sequence."""
+    def test_step_webhook_sequence(self, mock_webhook_server):
+        """Test step-based webhook sequence."""
         from morag.services.enhanced_webhook_service import get_webhook_service
 
         webhook_service = get_webhook_service()
         webhook_url = "https://example.com/webhook"
         task_id = "test-task-123"
 
-        # Test task started
-        webhook_service.send_task_started(
-            task_id=task_id,
-            webhook_url=webhook_url,
-            metadata={"source_type": "document"}
-        )
-
         # Test step progress
         webhook_service.send_step_completed(
             webhook_url=webhook_url,
             task_id=task_id,
             document_id="doc-456",
-            step="markdown_conversion",
-            progress_percent=25.0,
-            data={"conversion_metadata": {"page_count": 10}}
+            step="metadata_extraction",
+            progress_percent=40.0,
+            data={"metadata": {"page_count": 10}}
         )
 
-        # Test task completion
-        webhook_service.send_task_completed(
-            task_id=task_id,
+        # Test ingestion step
+        webhook_service.send_step_completed(
             webhook_url=webhook_url,
-            result={"chunks_created": 25, "processing_time": 45.2}
+            task_id=task_id,
+            document_id="doc-456",
+            step="ingestion",
+            progress_percent=100.0,
+            data={"chunks_processed": 25, "processing_time_seconds": 45.2}
         )
 
         # Verify webhook sequence
-        assert len(mock_webhook_server) == 3
+        assert len(mock_webhook_server) == 2
 
-        # Verify task started webhook
-        started_webhook = mock_webhook_server[0]
-        assert started_webhook['event_type'] == 'task_started'
-        assert started_webhook['data']['task_id'] == task_id
+        # Verify metadata extraction webhook
+        metadata_webhook = mock_webhook_server[0]
+        assert metadata_webhook['step'] == 'metadata_extraction'
+        assert metadata_webhook['progress_percent'] == 40.0
 
-        # Verify step webhook
-        step_webhook = mock_webhook_server[1]
-        assert step_webhook['data']['step'] == 'markdown_conversion'
-        assert step_webhook['data']['progress_percent'] == 25.0
-
-        # Verify completion webhook
-        completed_webhook = mock_webhook_server[2]
-        assert completed_webhook['event_type'] == 'task_completed'
-        assert completed_webhook['data']['result']['chunks_created'] == 25
+        # Verify ingestion webhook
+        ingestion_webhook = mock_webhook_server[1]
+        assert ingestion_webhook['step'] == 'ingestion'
+        assert ingestion_webhook['progress_percent'] == 100.0
 
     def test_webhook_retry_logic(self, mock_webhook_server):
         """Test webhook retry mechanism."""
@@ -681,9 +682,13 @@ class TestWebhookIntegration:
             return response
 
         with patch('requests.post', side_effect=mock_post_with_failures):
-            result = webhook_service.send_task_started(
+            result = webhook_service.send_step_completed(
+                webhook_url="https://example.com/webhook",
                 task_id="test-retry",
-                webhook_url="https://example.com/webhook"
+                document_id="doc-123",
+                step="ingestion",
+                progress_percent=100.0,
+                data={"chunks_processed": 25}
             )
 
             assert result is True  # Should eventually succeed
@@ -703,13 +708,20 @@ python test_webhook_server.py
 # Terminal 2: Start MoRAG API
 python -m uvicorn src.morag.main:app --reload
 
-# Terminal 3: Test webhook with file upload
+# Terminal 3: Test webhook with stage-based processing
+curl -X POST "http://localhost:8000/api/v1/stages/execute" \
+  -H "Authorization: Bearer test-api-key" \
+  -F "file=@test-document.pdf" \
+  -F 'webhook_config={"url":"http://localhost:8001/webhook"}' \
+  -F 'stages=[1,2,3,4,5]'
+
+# Terminal 4: Test webhook with step-based processing
 curl -X POST "http://localhost:8000/api/v1/process" \
   -H "Authorization: Bearer test-api-key" \
   -F "file=@test-document.pdf" \
   -F 'request_data={"mode":"ingest","webhook_config":{"url":"http://localhost:8001/webhook"}}'
 
-# Terminal 4: Monitor received webhooks
+# Terminal 5: Monitor received webhooks
 curl http://localhost:8001/webhooks | jq '.'
 ```
 
@@ -804,48 +816,73 @@ celery -A morag.core.celery_app inspect active
 ### TypeScript/JavaScript Consumer
 
 ```typescript
-interface WebhookPayload {
-  event_type: string;
+interface StageWebhookPayload {
+  event: "stage_completed" | "pipeline_completed";
   timestamp: string;
-  data: any;
+  stage?: {
+    type: number;
+    status: string;
+    execution_time: number;
+    error_message?: string;
+  };
+  pipeline?: {
+    success: boolean;
+    total_execution_time: number;
+    stages_completed: number;
+    stages_failed: number;
+  };
+  files?: {
+    input_files: string[];
+    output_files: string[];
+  };
+  context: {
+    source_path: string;
+    output_dir: string;
+  };
+}
+
+interface StepWebhookPayload {
+  task_id: string;
+  document_id?: string;
+  step: string;
+  status: "started" | "completed" | "failed";
+  progress_percent: number;
+  timestamp: string;
+  data?: any;
+  error_message?: string;
 }
 
 // Express.js webhook handler
 app.post('/webhook', (req: Request, res: Response) => {
-  const payload: WebhookPayload = req.body;
+  const payload = req.body;
 
-  switch (payload.event_type) {
-    case 'task_started':
-      handleTaskStarted(payload.data);
-      break;
-    case 'task_completed':
-      handleTaskCompleted(payload.data);
-      break;
-    case 'task_failed':
-      handleTaskFailed(payload.data);
-      break;
-    default:
-      // Handle step webhooks
-      if (payload.data.step) {
-        handleStepUpdate(payload.data);
-      }
+  if (payload.event) {
+    // Stage-based webhook
+    handleStageWebhook(payload as StageWebhookPayload);
+  } else if (payload.task_id && payload.step) {
+    // Step-based webhook
+    handleStepWebhook(payload as StepWebhookPayload);
   }
 
   res.json({ status: 'received' });
 });
 
-function handleTaskStarted(data: any) {
-  console.log(`Task ${data.task_id} started`);
-  // Update UI, database, etc.
+function handleStageWebhook(payload: StageWebhookPayload) {
+  if (payload.event === 'stage_completed') {
+    console.log(`Stage ${payload.stage?.type} completed in ${payload.stage?.execution_time}s`);
+    // Process stage completion, download files, etc.
+  } else if (payload.event === 'pipeline_completed') {
+    console.log(`Pipeline completed: ${payload.pipeline?.success ? 'SUCCESS' : 'FAILED'}`);
+    console.log(`Total time: ${payload.pipeline?.total_execution_time}s`);
+    // Process final results
+  }
 }
 
-function handleTaskCompleted(data: any) {
-  console.log(`Task ${data.task_id} completed with ${data.result.chunks_created} chunks`);
-  // Process final results
-}
-
-function handleStepUpdate(data: any) {
-  console.log(`Step ${data.step} ${data.status} - ${data.progress_percent}%`);
+function handleStepWebhook(payload: StepWebhookPayload) {
+  console.log(`Step ${payload.step} ${payload.status} - ${payload.progress_percent}%`);
+  if (payload.status === 'failed') {
+    console.error(`Step failed: ${payload.error_message}`);
+  }
   // Update progress bar, log progress, etc.
 }
 ```
@@ -862,18 +899,14 @@ logger = logging.getLogger(__name__)
 @app.route('/webhook', methods=['POST'])
 def handle_webhook():
     payload = request.json
-    event_type = payload.get('event_type')
-    data = payload.get('data', {})
 
     try:
-        if event_type == 'task_started':
-            handle_task_started(data)
-        elif event_type == 'task_completed':
-            handle_task_completed(data)
-        elif event_type == 'task_failed':
-            handle_task_failed(data)
-        elif 'step' in data:
-            handle_step_update(data)
+        if 'event' in payload:
+            # Stage-based webhook
+            handle_stage_webhook(payload)
+        elif 'task_id' in payload and 'step' in payload:
+            # Step-based webhook
+            handle_step_webhook(payload)
 
         return jsonify({'status': 'received'})
 
@@ -881,48 +914,74 @@ def handle_webhook():
         logger.error(f"Webhook processing error: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-def handle_task_started(data):
-    task_id = data['task_id']
-    logger.info(f"Task {task_id} started")
-    # Update database, send notifications, etc.
+def handle_stage_webhook(payload):
+    event = payload['event']
+    timestamp = payload['timestamp']
 
-def handle_task_completed(data):
-    task_id = data['task_id']
-    result = data.get('result', {})
-    logger.info(f"Task {task_id} completed: {result.get('chunks_created', 0)} chunks")
-    # Process final results, update UI, etc.
+    if event == 'stage_completed':
+        stage = payload['stage']
+        stage_type = stage['type']
+        status = stage['status']
+        execution_time = stage['execution_time']
 
-def handle_task_failed(data):
-    task_id = data['task_id']
-    error = data.get('error', 'Unknown error')
-    logger.error(f"Task {task_id} failed: {error}")
-    # Handle failure, notify users, etc.
+        logger.info(f"Stage {stage_type} {status} in {execution_time}s")
 
-def handle_step_update(data):
-    task_id = data['task_id']
-    step = data['step']
-    status = data['status']
-    progress = data['progress_percent']
+        if status == 'completed':
+            # Process output files
+            output_files = payload['files']['output_files']
+            for file_path in output_files:
+                logger.info(f"Output file available: {file_path}")
+                # Download and process file
+
+        elif status == 'failed':
+            error_message = stage.get('error_message', 'Unknown error')
+            logger.error(f"Stage {stage_type} failed: {error_message}")
+
+    elif event == 'pipeline_completed':
+        pipeline = payload['pipeline']
+        success = pipeline['success']
+        total_time = pipeline['total_execution_time']
+        stages_completed = pipeline['stages_completed']
+
+        logger.info(f"Pipeline completed: {success}, {stages_completed} stages, {total_time}s")
+
+        if success:
+            # Process all stage results
+            stages = payload['stages']
+            for stage in stages:
+                logger.info(f"Stage {stage['type']}: {stage['status']}")
+        else:
+            error_message = pipeline.get('error_message', 'Unknown error')
+            logger.error(f"Pipeline failed: {error_message}")
+
+def handle_step_webhook(payload):
+    task_id = payload['task_id']
+    step = payload['step']
+    status = payload['status']
+    progress = payload['progress_percent']
 
     logger.info(f"Task {task_id} - {step} {status} ({progress}%)")
 
-    if status == 'completed' and 'data' in data:
-        step_data = data['data']
+    if status == 'completed' and 'data' in payload:
+        step_data = payload['data']
         # Process step-specific data
-        if step == 'markdown_conversion':
-            handle_markdown_conversion(step_data)
+        if step == 'metadata_extraction':
+            handle_metadata_extraction(step_data)
         elif step == 'ingestion':
             handle_ingestion_complete(step_data)
+    elif status == 'failed':
+        error_message = payload.get('error_message', 'Unknown error')
+        logger.error(f"Step {step} failed: {error_message}")
 
-def handle_markdown_conversion(data):
-    markdown_url = data.get('markdown_file_url')
-    metadata = data.get('conversion_metadata', {})
-    logger.info(f"Markdown conversion complete: {metadata.get('page_count', 0)} pages")
+def handle_metadata_extraction(data):
+    metadata_url = data.get('metadata_file_url')
+    metadata = data.get('metadata', {})
+    logger.info(f"Metadata extraction complete: {metadata.get('page_count', 0)} pages")
 
 def handle_ingestion_complete(data):
-    chunks = data.get('chunks_ingested', 0)
-    facts = data.get('facts_stored', 0)
-    logger.info(f"Ingestion complete: {chunks} chunks, {facts} facts")
+    chunks = data.get('chunks_processed', 0)
+    total_length = data.get('total_text_length', 0)
+    logger.info(f"Ingestion complete: {chunks} chunks, {total_length} characters")
 ```
 
 ### Go Consumer
@@ -935,32 +994,65 @@ import (
     "fmt"
     "log"
     "net/http"
-    "time"
 )
 
-type WebhookPayload struct {
-    EventType string                 `json:"event_type"`
+type StageWebhookPayload struct {
+    Event     string                 `json:"event"`
     Timestamp string                 `json:"timestamp"`
-    Data      map[string]interface{} `json:"data"`
+    Stage     *StageInfo             `json:"stage,omitempty"`
+    Pipeline  *PipelineInfo          `json:"pipeline,omitempty"`
+    Files     *FileInfo              `json:"files,omitempty"`
+    Context   map[string]interface{} `json:"context"`
+}
+
+type StageInfo struct {
+    Type          int     `json:"type"`
+    Status        string  `json:"status"`
+    ExecutionTime float64 `json:"execution_time"`
+    ErrorMessage  *string `json:"error_message,omitempty"`
+}
+
+type PipelineInfo struct {
+    Success            bool    `json:"success"`
+    TotalExecutionTime float64 `json:"total_execution_time"`
+    StagesCompleted    int     `json:"stages_completed"`
+    StagesFailed       int     `json:"stages_failed"`
+}
+
+type FileInfo struct {
+    InputFiles  []string `json:"input_files"`
+    OutputFiles []string `json:"output_files"`
+}
+
+type StepWebhookPayload struct {
+    TaskID          string                 `json:"task_id"`
+    DocumentID      *string                `json:"document_id,omitempty"`
+    Step            string                 `json:"step"`
+    Status          string                 `json:"status"`
+    ProgressPercent float64                `json:"progress_percent"`
+    Timestamp       string                 `json:"timestamp"`
+    Data            map[string]interface{} `json:"data,omitempty"`
+    ErrorMessage    *string                `json:"error_message,omitempty"`
 }
 
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
-    var payload WebhookPayload
-    if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+    var rawPayload map[string]interface{}
+    if err := json.NewDecoder(r.Body).Decode(&rawPayload); err != nil {
         http.Error(w, "Invalid JSON", http.StatusBadRequest)
         return
     }
 
-    switch payload.EventType {
-    case "task_started":
-        handleTaskStarted(payload.Data)
-    case "task_completed":
-        handleTaskCompleted(payload.Data)
-    case "task_failed":
-        handleTaskFailed(payload.Data)
-    default:
-        if step, exists := payload.Data["step"]; exists {
-            handleStepUpdate(payload.Data, step.(string))
+    if event, exists := rawPayload["event"]; exists {
+        // Stage-based webhook
+        var payload StageWebhookPayload
+        if err := json.Unmarshal(r.Body, &payload); err == nil {
+            handleStageWebhook(payload)
+        }
+    } else if taskID, exists := rawPayload["task_id"]; exists {
+        // Step-based webhook
+        var payload StepWebhookPayload
+        if err := json.Unmarshal(r.Body, &payload); err == nil {
+            handleStepWebhook(payload)
         }
     }
 
@@ -968,24 +1060,36 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"status": "received"})
 }
 
-func handleTaskStarted(data map[string]interface{}) {
-    taskID := data["task_id"].(string)
-    log.Printf("Task %s started", taskID)
+func handleStageWebhook(payload StageWebhookPayload) {
+    if payload.Event == "stage_completed" && payload.Stage != nil {
+        log.Printf("Stage %d %s in %.1fs",
+            payload.Stage.Type,
+            payload.Stage.Status,
+            payload.Stage.ExecutionTime)
+
+        if payload.Files != nil {
+            for _, file := range payload.Files.OutputFiles {
+                log.Printf("Output file: %s", file)
+            }
+        }
+    } else if payload.Event == "pipeline_completed" && payload.Pipeline != nil {
+        log.Printf("Pipeline completed: %t, %d stages, %.1fs",
+            payload.Pipeline.Success,
+            payload.Pipeline.StagesCompleted,
+            payload.Pipeline.TotalExecutionTime)
+    }
 }
 
-func handleTaskCompleted(data map[string]interface{}) {
-    taskID := data["task_id"].(string)
-    result := data["result"].(map[string]interface{})
-    chunks := result["chunks_created"].(float64)
-    log.Printf("Task %s completed with %.0f chunks", taskID, chunks)
-}
+func handleStepWebhook(payload StepWebhookPayload) {
+    log.Printf("Task %s - %s %s (%.1f%%)",
+        payload.TaskID,
+        payload.Step,
+        payload.Status,
+        payload.ProgressPercent)
 
-func handleStepUpdate(data map[string]interface{}, step string) {
-    taskID := data["task_id"].(string)
-    status := data["status"].(string)
-    progress := data["progress_percent"].(float64)
-
-    log.Printf("Task %s - %s %s (%.1f%%)", taskID, step, status, progress)
+    if payload.Status == "failed" && payload.ErrorMessage != nil {
+        log.Printf("Step failed: %s", *payload.ErrorMessage)
+    }
 }
 
 func main() {
@@ -1074,12 +1178,18 @@ def store_webhook_event(payload):
 const socket = io();
 
 // Handle webhook data forwarded via WebSocket
-socket.on('task_update', (data) => {
-    updateProgressBar(data.progress_percent);
-    updateStatusMessage(data.message);
-
-    if (data.event_type === 'task_completed') {
-        showCompletionNotification(data.result);
+socket.on('webhook_update', (data) => {
+    if (data.event === 'stage_completed') {
+        updateStageProgress(data.stage.type, data.stage.status);
+        if (data.stage.status === 'completed') {
+            showStageCompletion(data.stage.type, data.files.output_files);
+        }
+    } else if (data.event === 'pipeline_completed') {
+        showPipelineCompletion(data.pipeline.success, data.pipeline.total_execution_time);
+    } else if (data.step) {
+        // Step-based webhook
+        updateProgressBar(data.progress_percent);
+        updateStatusMessage(`${data.step} ${data.status}`);
     }
 });
 
@@ -1131,20 +1241,21 @@ class WebhookProcessor:
             # Validate payload structure
             self._validate_payload(payload)
 
-            # Process based on event type
-            event_type = payload.get('event_type')
-            data = payload.get('data', {})
-
-            if event_type == 'task_started':
-                self._handle_task_started(data)
-            elif event_type == 'task_completed':
-                self._handle_task_completed(data)
-            elif event_type == 'task_failed':
-                self._handle_task_failed(data)
-            elif 'step' in data:
-                self._handle_step_update(data)
+            # Process based on webhook type
+            if 'event' in payload:
+                # Stage-based webhook
+                event = payload['event']
+                if event == 'stage_completed':
+                    self._handle_stage_completed(payload)
+                elif event == 'pipeline_completed':
+                    self._handle_pipeline_completed(payload)
+                else:
+                    raise ValueError(f"Unknown stage event: {event}")
+            elif 'task_id' in payload and 'step' in payload:
+                # Step-based webhook
+                self._handle_step_update(payload)
             else:
-                raise ValueError(f"Unknown event type: {event_type}")
+                raise ValueError("Unknown webhook format")
 
             self.processing_stats['successful'] += 1
             logger.info(f"Successfully processed webhook: {event_type}")
@@ -1189,25 +1300,30 @@ class WebhookProcessor:
 
 ## Webhook Event Summary
 
-### Complete Event Sequence Example
+### Complete Event Sequence Examples
 
-For a typical document processing task, you can expect the following webhook sequence:
+#### Stage-Based Processing (Recommended)
+For a typical document processing pipeline, you can expect the following webhook sequence:
 
 ```
-1. task_started (0%)
-2. markdown_conversion started (0%)
-3. markdown_conversion completed (25%)
-4. metadata_extraction started (25%)
-5. metadata_extraction completed (40%)
-6. content_processing started (40%)
-7. content_processing completed (70%)
-8. chunking started (70%)
-9. chunking completed (80%)
-10. graph_extraction started (80%)
-11. graph_extraction completed (90%)
-12. ingestion started (90%)
-13. ingestion completed (100%)
-14. task_completed (100%)
+1. stage_completed (Stage 1: input_to_markdown)
+2. stage_completed (Stage 2: markdown_optimizer)
+3. stage_completed (Stage 3: chunker)
+4. stage_completed (Stage 4: fact_generator)
+5. stage_completed (Stage 5: ingestion)
+6. pipeline_completed (success: true)
+```
+
+#### Step-Based Processing (Legacy API)
+For the legacy processing API, you can expect:
+
+```
+1. step_started (metadata_extraction, 25%)
+2. step_completed (metadata_extraction, 40%)
+3. step_started (content_processing, 40%)
+4. step_completed (content_processing, 70%)
+5. step_started (ingestion, 90%)
+6. step_completed (ingestion, 100%)
 ```
 
 ### Best Practices for Consumers
@@ -1219,16 +1335,18 @@ For a typical document processing task, you can expect the following webhook seq
 5. **Security**: Use HTTPS and validate signatures in production
 6. **Performance**: Process webhooks asynchronously
 7. **Logging**: Log all webhook events for debugging
-8. **Retry Logic**: Implement client-side retry for critical operations
+8. **File Management**: Download and process output files promptly
 
 ### Common Integration Patterns
 
-- **Progress Tracking**: Update UI progress bars based on `progress_percent`
-- **Status Dashboard**: Display current processing stage and step
+- **Stage Tracking**: Monitor individual stage completion and download output files
+- **Pipeline Monitoring**: Track overall pipeline success and execution times
+- **Progress Tracking**: Update UI progress bars based on `progress_percent` (step webhooks)
+- **File Processing**: Download and process intermediate files from each stage
 - **Notification System**: Send alerts on completion or failure
-- **Data Pipeline**: Trigger downstream processes on completion
-- **Analytics**: Track processing times and success rates
-- **Debugging**: Store webhook history for troubleshooting
+- **Data Pipeline**: Trigger downstream processes on pipeline completion
+- **Analytics**: Track processing times and success rates per stage
+- **Debugging**: Store webhook history and stage outputs for troubleshooting
 
 ## Support
 
@@ -1245,5 +1363,8 @@ For issues or questions:
 ### Additional Resources
 
 - [API Usage Guide](API_USAGE_GUIDE.md) - Complete API documentation
+- [Stage System Documentation](packages/morag-stages/README.md) - Stage-based processing system
 - [Integration Tests](tests/integration/test_webhooks.py) - Example test implementations
 - [Webhook Receiver Example](webhook_receiver.py) - Simple webhook server for testing
+- [Enhanced Webhook Service](packages/morag/src/morag/services/enhanced_webhook_service.py) - Step-based webhook implementation
+- [Stage Webhook Service](packages/morag-stages/src/morag_stages/webhook.py) - Stage-based webhook implementation
