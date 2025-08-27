@@ -949,11 +949,11 @@ class MarkdownConversionStage(Stage):
         if self.services:
             # Configure YouTube processing options from stage config
             youtube_options = {
-                'transcript_only': config.get('transcript_only', False),  # Default to full processing
+                'transcript_only': config.get('transcript_only', True),  # Default to transcript-only to avoid yt-dlp issues
                 'transcript_language': config.get('transcript_language', None),
                 'extract_transcript': True,
                 'extract_metadata_only': False,
-                'extract_audio': not config.get('transcript_only', False),  # Only extract audio if not transcript-only
+                'extract_audio': not config.get('transcript_only', True),  # Only extract audio if not transcript-only
                 'download_subtitles': False,
                 'download_thumbnails': False,
                 'quality': 'worst'  # Use lowest quality for faster download if needed

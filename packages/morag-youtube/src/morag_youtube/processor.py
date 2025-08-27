@@ -127,17 +127,26 @@ class YouTubeProcessor(BaseProcessor):
             # Extract metadata only if not in transcript-only mode or if explicitly requested
             metadata = None
             if not config.transcript_only or config.extract_metadata_only:
-                try:
-                    metadata = await self._extract_metadata_only(url, config)
-                except Exception as e:
-                    if config.transcript_only:
-                        # In transcript-only mode, metadata extraction failure is not critical
-                        logger.warning("Metadata extraction failed in transcript-only mode, continuing without metadata",
-                                     url=url, error=str(e))
-                        metadata = None
-                    else:
-                        # In normal mode, metadata extraction failure is critical
-                        raise
+                # Check if we have cookies available before attempting metadata extraction
+                cookies_available = self._has_cookies_available(config)
+
+                if config.transcript_only and not cookies_available:
+                    # In transcript-only mode without cookies, skip metadata extraction to avoid yt-dlp bot detection
+                    logger.info("Skipping metadata extraction in transcript-only mode without cookies to avoid bot detection",
+                               url=url)
+                    metadata = None
+                else:
+                    try:
+                        metadata = await self._extract_metadata_only(url, config)
+                    except Exception as e:
+                        if config.transcript_only:
+                            # In transcript-only mode, metadata extraction failure is not critical
+                            logger.warning("Metadata extraction failed in transcript-only mode, continuing without metadata",
+                                         url=url, error=str(e))
+                            metadata = None
+                        else:
+                            # In normal mode, metadata extraction failure is critical
+                            raise
 
             # Initialize result
             result = YouTubeDownloadResult(
@@ -191,6 +200,26 @@ class YouTubeProcessor(BaseProcessor):
                     result.transcript_language = transcript_result.get('transcript_language')
                     if transcript_result.get('transcript_path'):
                         result.temp_files.append(transcript_result['transcript_path'])
+                else:
+                    # If transcript extraction failed and transcript_only mode is enabled, fail the operation
+                    if config.transcript_only:
+                        error_msg = "Transcript extraction failed in transcript-only mode"
+                        logger.error(error_msg, url=url)
+                        return YouTubeDownloadResult(
+                            video_path=None,
+                            audio_path=None,
+                            subtitle_paths=[],
+                            thumbnail_paths=[],
+                            metadata=metadata,
+                            processing_time=time.time() - start_time,
+                            file_size=0,
+                            temp_files=[],
+                            success=False,
+                            error_message=error_msg
+                        )
+                    else:
+                        # In normal mode, transcript failure is not critical
+                        logger.warning("Transcript extraction failed, continuing without transcript", url=url)
 
             result.processing_time = time.time() - start_time
 
@@ -486,8 +515,9 @@ class YouTubeProcessor(BaseProcessor):
         """Extract transcript using intelligent fallback strategy.
 
         Strategy:
-        1. If cookies are available and audio transcription is preferred, try audio transcription
-        2. If audio transcription fails or cookies not available, fallback to direct transcript API
+        1. If no cookies available, use direct transcript API only (avoid yt-dlp)
+        2. If cookies are available and audio transcription is preferred, try audio transcription first
+        3. Fallback to direct transcript API if audio transcription fails
 
         Args:
             url: YouTube video URL
@@ -497,6 +527,19 @@ class YouTubeProcessor(BaseProcessor):
         Returns:
             Dictionary containing transcript data or None if all methods fail
         """
+        # Determine if we have cookies available
+        cookies_available = self._has_cookies_available(config)
+
+        # If no cookies available, use direct transcript API only to avoid yt-dlp bot detection
+        if not cookies_available:
+            logger.info("No cookies available, using direct transcript API only to avoid bot detection")
+            try:
+                return await self._extract_transcript(url, config)
+            except Exception as e:
+                logger.error("Direct transcript extraction failed without cookies",
+                           url=url, error=str(e))
+                return None
+
         # If transcript_only is True, skip video download and go directly to transcript API
         if config.transcript_only:
             logger.info("Transcript-only mode enabled, using direct transcript API")
@@ -506,9 +549,6 @@ class YouTubeProcessor(BaseProcessor):
                 logger.error("Direct transcript extraction failed in transcript-only mode",
                            url=url, error=str(e))
                 return None
-
-        # Determine if we have cookies available
-        cookies_available = self._has_cookies_available(config)
 
         # Strategy 1: Try audio transcription if preferred and cookies available
         if (config.prefer_audio_transcription and
@@ -526,7 +566,7 @@ class YouTubeProcessor(BaseProcessor):
                 logger.warning("Audio transcription failed, falling back to direct transcript API",
                               error=str(e))
 
-        # Strategy 2: Try direct transcript API first
+        # Strategy 2: Try direct transcript API
         logger.info("Using direct transcript API extraction")
         try:
             return await self._extract_transcript(url, config)
@@ -534,8 +574,9 @@ class YouTubeProcessor(BaseProcessor):
             logger.warning("Direct transcript extraction failed, trying audio transcription fallback",
                           url=url, error=str(e))
 
-        # Strategy 3: Fallback to audio transcription if we have an audio file
-        if (audio_path and
+        # Strategy 3: Fallback to audio transcription if we have an audio file and cookies
+        if (cookies_available and
+            audio_path and
             audio_path.exists() and
             self.audio_processor):
 
