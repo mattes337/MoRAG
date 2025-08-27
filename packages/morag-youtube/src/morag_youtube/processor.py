@@ -663,9 +663,12 @@ class YouTubeProcessor(BaseProcessor):
                        language=detected_language,
                        segments_count=len(audio_result.segments))
 
+            # Format transcript with timestamps for markdown
+            formatted_transcript = self._format_audio_segments_with_timestamps(audio_result.segments)
+
             return {
                 'transcript_path': transcript_path,
-                'transcript_text': audio_result.transcript,
+                'transcript_text': formatted_transcript,
                 'transcript_language': detected_language,
                 'is_audio_transcription': True,
                 'segments_count': len(audio_result.segments),
@@ -724,6 +727,56 @@ class YouTubeProcessor(BaseProcessor):
 
         return f"{hours:02d}:{minutes:02d}:{secs:02d}.{milliseconds:03d}"
 
+    def _format_audio_segments_with_timestamps(self, segments) -> str:
+        """Format audio segments with timestamps for markdown.
+
+        Args:
+            segments: List of audio segments with start, end, and text
+
+        Returns:
+            Formatted transcript text with timestamps
+        """
+        formatted_lines = []
+
+        for segment in segments:
+            # Format timestamp as [MM:SS]
+            start_time = segment.start
+            minutes = int(start_time // 60)
+            seconds = int(start_time % 60)
+            timestamp = f"[{minutes:02d}:{seconds:02d}]"
+
+            # Clean up the text
+            text = segment.text.strip()
+            if text:
+                formatted_lines.append(f"{timestamp} {text}")
+
+        return '\n'.join(formatted_lines)
+
+    def _format_transcript_with_timestamps(self, segments) -> str:
+        """Format transcript segments with timestamps for markdown.
+
+        Args:
+            segments: List of transcript segments with start, duration, and text
+
+        Returns:
+            Formatted transcript text with timestamps
+        """
+        formatted_lines = []
+
+        for segment in segments:
+            # Format timestamp as [MM:SS]
+            start_time = segment.start
+            minutes = int(start_time // 60)
+            seconds = int(start_time % 60)
+            timestamp = f"[{minutes:02d}:{seconds:02d}]"
+
+            # Clean up the text
+            text = segment.text.strip()
+            if text:
+                formatted_lines.append(f"{timestamp} {text}")
+
+        return '\n'.join(formatted_lines)
+
     async def _extract_transcript(self, url: str, config: YouTubeConfig) -> Dict[str, Any]:
         """Extract transcript using youtube-transcript-api.
 
@@ -763,9 +816,12 @@ class YouTubeProcessor(BaseProcessor):
                        segments_count=len(transcript.segments),
                        is_auto_generated=transcript.is_auto_generated)
 
+            # Format transcript with timestamps for markdown
+            formatted_transcript = self._format_transcript_with_timestamps(transcript.segments)
+
             return {
                 'transcript_path': transcript_path,
-                'transcript_text': transcript.full_text,
+                'transcript_text': formatted_transcript,
                 'transcript_language': transcript.language,
                 'is_auto_generated': transcript.is_auto_generated,
                 'segments_count': len(transcript.segments),

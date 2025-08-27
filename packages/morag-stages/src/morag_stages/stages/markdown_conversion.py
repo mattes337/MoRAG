@@ -139,6 +139,8 @@ class MarkdownConversionStage(Stage):
                 result_data = await self._process_document(input_file, output_file, config)
             elif content_type == ContentType.WEB:
                 result_data = await self._process_web(input_file, output_file, config)
+            elif content_type == ContentType.YOUTUBE:
+                result_data = await self._process_youtube(input_file, output_file, config)
             else:
                 result_data = await self._process_text(input_file, output_file, config)
             
@@ -258,6 +260,10 @@ class MarkdownConversionStage(Stage):
         )
 
         if is_url:
+            # Check for YouTube URLs first
+            youtube_domains = ["youtube.com", "youtu.be", "youtube-nocookie.com"]
+            if any(domain in file_str for domain in youtube_domains):
+                return ContentType.YOUTUBE
             return ContentType.WEB
         
         # Video files
@@ -714,19 +720,29 @@ class MarkdownConversionStage(Stage):
         Returns:
             Processing result data
         """
-        # Normalize URL - fix Windows path conversion issue
+        # Convert Path back to URL string and fix Windows path conversion issues
         url = str(input_file)
 
-        # Check if this looks like a URL that got mangled by Windows Path conversion
-        if ('http:' in url or 'https:' in url) and ('\\' in url or not url.startswith(('http://', 'https://'))):
-            # Convert backslashes to forward slashes first
+        # Handle Windows path conversion issue - Path() mangles URLs
+        if not url.startswith(('http://', 'https://')):
+            # Convert backslashes to forward slashes
             url = url.replace('\\', '/')
 
-            # Then fix the protocol if needed
-            if url.startswith('https:/') and not url.startswith('https://'):
-                url = url.replace('https:/', 'https://', 1)
-            elif url.startswith('http:/') and not url.startswith('http://'):
-                url = url.replace('http:/', 'http://', 1)
+            # Fix common URL mangling patterns
+            if url.startswith('https:') and not url.startswith('https://'):
+                # Pattern: https:/www.example.com -> https://www.example.com
+                url = url.replace('https:/', 'https://')
+            elif url.startswith('http:') and not url.startswith('http://'):
+                # Pattern: http:/www.example.com -> http://www.example.com
+                url = url.replace('http:/', 'http://')
+
+            # Handle case where the URL got completely mangled
+            if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+                # Try to reconstruct from fragments - default to https
+                if not url.startswith(('http', 'www')):
+                    url = 'https://' + url
+                elif url.startswith('www'):
+                    url = 'https://' + url
 
         logger.info("Processing web URL", url=url)
 
@@ -766,6 +782,93 @@ class MarkdownConversionStage(Stage):
                 "url": url,
                 "content_length": len(result.text_content or ""),
                 "links_followed": config.get('follow_links', False)
+            }
+        }
+
+    async def _process_youtube(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Process YouTube URL to markdown.
+
+        Args:
+            input_file: Input URL (as Path object)
+            output_file: Output markdown file
+            config: Stage configuration
+
+        Returns:
+            Processing result data
+        """
+        # Convert Path back to URL string and fix Windows path conversion issues
+        url = str(input_file)
+
+        # Handle Windows path conversion issue - Path() mangles URLs
+        if not url.startswith(('http://', 'https://')):
+            # Convert backslashes to forward slashes
+            url = url.replace('\\', '/')
+
+            # Fix common URL mangling patterns
+            if url.startswith('https:') and not url.startswith('https://'):
+                # Pattern: https:/www.youtube.com -> https://www.youtube.com
+                url = url.replace('https:/', 'https://')
+            elif url.startswith('http:') and not url.startswith('http://'):
+                # Pattern: http:/www.youtube.com -> http://www.youtube.com
+                url = url.replace('http:/', 'http://')
+
+            # Handle case where the URL got completely mangled
+            if 'youtube.com' in url and not url.startswith(('http://', 'https://')):
+                # Try to reconstruct from fragments
+                if 'https' in url:
+                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+                else:
+                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+
+        logger.info("Processing YouTube URL", url=url)
+
+        # Use YouTube service with transcript-only configuration
+        if not self.services:
+            raise ProcessingError("MoRAG services not available")
+
+        # Configure YouTube processing options from stage config
+        youtube_options = {
+            'transcript_only': config.get('transcript_only', False),  # Default to full processing
+            'transcript_language': config.get('transcript_language', None),
+            'extract_transcript': True,
+            'extract_metadata_only': False,
+            'extract_audio': not config.get('transcript_only', False),  # Only extract audio if not transcript-only
+            'download_subtitles': False,
+            'download_thumbnails': False,
+            'quality': 'worst'  # Use lowest quality for faster download if needed
+        }
+
+        result = await self.services.process_youtube(url, youtube_options)
+
+        # Create markdown with metadata header
+        markdown_content = self._create_markdown_with_metadata(
+            content=result.text_content or "",
+            metadata={
+                "title": result.metadata.get('title', "YouTube Video"),
+                "source": url,
+                "type": "youtube",
+                "url": url,
+                "video_id": result.metadata.get('video_id'),
+                "uploader": result.metadata.get('uploader'),
+                "duration": result.metadata.get('duration'),
+                "language": result.metadata.get('language'),
+                "created_at": datetime.now().isoformat(),
+                **result.metadata
+            }
+        )
+
+        # Write to file
+        output_file.write_text(markdown_content, encoding='utf-8')
+
+        return {
+            "content_type": "youtube",
+            "title": result.metadata.get('title', "YouTube Video"),
+            "metadata": result.metadata,
+            "metrics": {
+                "url": url,
+                "video_id": result.metadata.get('video_id'),
+                "content_length": len(result.text_content or ""),
+                "transcript_only": config.get('transcript_only', True)
             }
         }
 
@@ -822,7 +925,9 @@ class MarkdownConversionStage(Stage):
         """
         content_type = metadata.get('type', 'document')
 
-        if content_type in ['audio', 'video']:
+        if content_type == 'youtube':
+            return self._create_youtube_markdown(content, metadata)
+        elif content_type in ['audio', 'video']:
             return self._create_media_markdown(content, metadata)
         else:
             return self._create_document_markdown(content, metadata)
@@ -910,6 +1015,125 @@ class MarkdownConversionStage(Stage):
 
         # Add transcript section
         markdown_lines.append("## Transcript")
+        markdown_lines.append("")
+
+        # Add the actual transcript content
+        if content:
+            # If content already contains timestamps, use it directly
+            if '[' in content and ']' in content:
+                markdown_lines.append(content)
+            else:
+                # If no timestamps, add as plain text
+                markdown_lines.append(content)
+        else:
+            markdown_lines.append("*No transcript available*")
+
+        return "\n".join(markdown_lines)
+
+    def _create_youtube_markdown(self, content: str, metadata: Dict[str, Any]) -> str:
+        """Create markdown for YouTube videos with comprehensive metadata."""
+        title = metadata.get('title', 'YouTube Video')
+
+        # Start with title
+        markdown_lines = [f"# Youtube Analysis: {title}", ""]
+
+        # Add YouTube Information section
+        markdown_lines.append("## Youtube Information")
+        markdown_lines.append("")
+
+        # Format duration in a user-friendly way
+        if metadata.get('duration'):
+            duration = metadata['duration']
+            if isinstance(duration, (int, float)):
+                hours = int(duration // 3600)
+                minutes = int((duration % 3600) // 60)
+                seconds = int(duration % 60)
+                if hours > 0:
+                    duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                else:
+                    duration_str = f"{minutes:02d}:{seconds:02d}"
+                markdown_lines.append(f"- **Duration**: {duration_str}")
+
+        # Add channel information
+        if metadata.get('uploader'):
+            markdown_lines.append(f"- **Channel**: {metadata['uploader']}")
+
+        # Add language if available
+        if metadata.get('language'):
+            markdown_lines.append(f"- **Language**: {metadata['language']}")
+
+        # Add upload date if available
+        if metadata.get('upload_date'):
+            upload_date = metadata['upload_date']
+            # Format upload_date if it's in YYYYMMDD format
+            if isinstance(upload_date, str) and len(upload_date) == 8 and upload_date.isdigit():
+                formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+                markdown_lines.append(f"- **Upload Date**: {formatted_date}")
+            else:
+                markdown_lines.append(f"- **Upload Date**: {upload_date}")
+
+        # Add view count if available
+        if metadata.get('view_count'):
+            view_count = metadata['view_count']
+            if isinstance(view_count, int):
+                # Format with commas for readability
+                formatted_views = f"{view_count:,}"
+                markdown_lines.append(f"- **Views**: {formatted_views}")
+
+        # Add like count if available
+        if metadata.get('like_count'):
+            like_count = metadata['like_count']
+            if isinstance(like_count, int):
+                formatted_likes = f"{like_count:,}"
+                markdown_lines.append(f"- **Likes**: {formatted_likes}")
+
+        # Add comment count if available
+        if metadata.get('comment_count'):
+            comment_count = metadata['comment_count']
+            if isinstance(comment_count, int):
+                formatted_comments = f"{comment_count:,}"
+                markdown_lines.append(f"- **Comments**: {formatted_comments}")
+
+        # Add video ID
+        if metadata.get('video_id'):
+            markdown_lines.append(f"- **Video ID**: {metadata['video_id']}")
+
+        # Add categories if available
+        if metadata.get('categories') and isinstance(metadata['categories'], list):
+            categories = ", ".join(metadata['categories'])
+            markdown_lines.append(f"- **Categories**: {categories}")
+
+        # Add tags if available (limit to first 10 for readability)
+        if metadata.get('tags') and isinstance(metadata['tags'], list):
+            tags = metadata['tags'][:10]  # Limit to first 10 tags
+            tags_str = ", ".join(tags)
+            if len(metadata['tags']) > 10:
+                tags_str += f" (and {len(metadata['tags']) - 10} more)"
+            markdown_lines.append(f"- **Tags**: {tags_str}")
+
+        # Add description if available (truncated for readability)
+        if metadata.get('description'):
+            description = metadata['description']
+            if isinstance(description, str) and description.strip():
+                # Truncate description if it's too long
+                if len(description) > 300:
+                    description = description[:300] + "..."
+                # Replace newlines with spaces for better formatting
+                description = description.replace('\n', ' ').replace('\r', ' ')
+                markdown_lines.append(f"- **Description**: {description}")
+
+        # Add processing timestamp
+        if metadata.get('created_at'):
+            markdown_lines.append(f"- **Created At**: {metadata['created_at']}")
+
+        # Add source URL
+        if metadata.get('source'):
+            markdown_lines.append(f"- **Source**: {metadata['source']}")
+
+        markdown_lines.extend(["", ""])
+
+        # Add content section
+        markdown_lines.append("## Content")
         markdown_lines.append("")
 
         # Add the actual transcript content

@@ -770,12 +770,32 @@ class MoRAGServices:
             ProcessingResult with extracted content and metadata
         """
         try:
-            # Convert ProcessingConfig to YouTubeConfig if needed
+            # Convert options to YouTubeConfig
             youtube_config = None
-            if self.config.youtube_config:
-                # For now, pass None since we need to handle the type mismatch
-                # TODO: Create proper config conversion
-                youtube_config = None
+            if options:
+                # Import YouTubeConfig here to avoid circular imports
+                from morag_youtube.processor import YouTubeConfig
+
+                # Create YouTubeConfig from options
+                youtube_config = YouTubeConfig(
+                    quality=options.get('quality', 'best'),
+                    format_preference=options.get('format_preference', 'mp4'),
+                    extract_audio=options.get('extract_audio', True),
+                    download_subtitles=options.get('download_subtitles', True),
+                    subtitle_languages=options.get('subtitle_languages', ['en']),
+                    max_filesize=options.get('max_filesize', None),
+                    download_thumbnails=options.get('download_thumbnails', True),
+                    extract_metadata_only=options.get('extract_metadata_only', False),
+                    extract_transcript=options.get('extract_transcript', True),
+                    transcript_language=options.get('transcript_language', None),
+                    transcript_format=options.get('transcript_format', 'text'),
+                    prefer_audio_transcription=options.get('prefer_audio_transcription', True),
+                    cookies_file=options.get('cookies_file', None),
+                    transcript_only=options.get('transcript_only', False)
+                )
+            elif self.config.youtube_config:
+                # Use default config if available
+                youtube_config = self.config.youtube_config
 
             result = await self.youtube_service.process_video(
                 url,
@@ -816,7 +836,7 @@ class MoRAGServices:
             return ProcessingResult(
                 content_type=ContentType.YOUTUBE,
                 content_url=url,
-                text_content=None,  # YouTube doesn't directly provide text content
+                text_content=result.transcript_text,  # Include transcript text if available
                 metadata=metadata,
                 extracted_files=extracted_files,
                 processing_time=result.processing_time,

@@ -7,25 +7,16 @@ from dataclasses import dataclass
 import asyncio
 import re
 
-# Import agents framework for robust parsing
-try:
-    from agents.base import LLMResponseParser, LLMResponseParseError
-    from agents import get_agent
-    AGENTS_PARSER_AVAILABLE = True
-except ImportError:
-    # Fallback to local parser if agents framework not available
-    from ..utils.llm_response_parser import parse_json_response as _parse_json_response, LLMResponseParseError
-    LLMResponseParser = None
-    AGENTS_PARSER_AVAILABLE = False
+# Import agents framework - required dependency
+import sys
+import os
+# Add the project root to the path if not already there
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-    # Create a simple wrapper for backward compatibility
-    def parse_json_response(response, fallback_value=None, context="unknown"):
-        return _parse_json_response(response, fallback_value, context)
-
-    try:
-        from agents import get_agent
-    except ImportError:
-        get_agent = None
+from agents.base import LLMResponseParser, LLMResponseParseError
+from agents import get_agent
 
 try:
     import google.generativeai as genai
@@ -271,19 +262,12 @@ class LLMEntityNormalizer:
                 'reasoning': 'fallback_due_to_parse_error'
             }
 
-            # Use centralized parser if available, otherwise fallback
-            if AGENTS_PARSER_AVAILABLE and LLMResponseParser:
-                result = LLMResponseParser.parse_json_response(
-                    response=response_text,
-                    fallback_value=fallback_result,
-                    context=f"entity_normalization:{entity_name}"
-                )
-            else:
-                result = parse_json_response(
-                    response_text,
-                    fallback_value=fallback_result,
-                    context=f"entity_normalization:{entity_name}"
-                )
+            # Use agent system for response parsing
+            result = LLMResponseParser.parse_json_response(
+                response=response_text,
+                fallback_value=fallback_result,
+                context=f"entity_normalization:{entity_name}"
+            )
             
             return (
                 result.get('normalized', entity_name),

@@ -53,6 +53,12 @@ async def execute_stage(args):
     if hasattr(args, 'domain') and args.domain:
         stage_overrides['domain'] = args.domain
 
+    # YouTube-specific overrides
+    if hasattr(args, 'transcript_only') and args.transcript_only:
+        stage_overrides['transcript_only'] = args.transcript_only
+    if hasattr(args, 'transcript_language') and args.transcript_language:
+        stage_overrides['transcript_language'] = args.transcript_language
+
     # Combine overrides
     config_overrides = {args.stage: {**cli_overrides, **stage_overrides}} if cli_overrides or stage_overrides else {}
 
@@ -121,6 +127,14 @@ async def execute_stage_chain(args):
         cli_overrides['temperature'] = args.llm_temperature
     if hasattr(args, 'llm_max_tokens') and args.llm_max_tokens:
         cli_overrides['max_tokens'] = args.llm_max_tokens
+
+    # YouTube-specific overrides
+    if hasattr(args, 'transcript_only') and args.transcript_only:
+        cli_overrides['transcript_only'] = args.transcript_only
+    if hasattr(args, 'transcript_language') and args.transcript_language:
+        cli_overrides['transcript_language'] = args.transcript_language
+    if hasattr(args, 'transcript_format') and args.transcript_format:
+        cli_overrides['transcript_format'] = args.transcript_format
 
     # Apply overrides to all stages in the chain
     config_overrides = {}
@@ -236,6 +250,10 @@ def setup_parser():
     stage_parser.add_argument("--max-chunk-size", type=int, help="Override max chunk size for markdown optimizer")
     stage_parser.add_argument("--domain", help="Override domain for fact generator")
 
+    # YouTube-specific overrides
+    stage_parser.add_argument("--transcript-only", action="store_true", help="For YouTube URLs: only extract transcript, don't download video")
+    stage_parser.add_argument("--transcript-language", help="For YouTube URLs: transcript language code (e.g., 'en', 'es')")
+
     # Stage chain execution using canonical names
     chain_parser = subparsers.add_parser("stages", help="Execute a chain of stages")
     chain_parser.add_argument("stages", help="Comma-separated stage names (e.g., 'markdown-conversion,chunker,fact-generator')")
@@ -248,6 +266,10 @@ def setup_parser():
     chain_parser.add_argument("--llm-provider", help="Override LLM provider for all stages")
     chain_parser.add_argument("--llm-temperature", type=float, help="Override LLM temperature for all stages")
     chain_parser.add_argument("--llm-max-tokens", type=int, help="Override LLM max tokens for all stages")
+
+    # YouTube-specific overrides for chain
+    chain_parser.add_argument("--transcript-only", action="store_true", help="For YouTube URLs: only extract transcript, don't download video")
+    chain_parser.add_argument("--transcript-language", help="For YouTube URLs: transcript language code (e.g., 'en', 'es')")
     
     # Full pipeline (backward compatibility)
     pipeline_parser = subparsers.add_parser("process", help="Execute full pipeline")
