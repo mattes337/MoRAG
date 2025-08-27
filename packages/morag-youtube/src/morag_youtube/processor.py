@@ -505,7 +505,7 @@ class YouTubeProcessor(BaseProcessor):
             audio_path.exists() and
             self.audio_processor):
 
-            logger.info("Attempting audio transcription with downloaded file",
+            logger.info("Attempting audio transcription with downloaded file (cookies available)",
                        audio_path=str(audio_path))
 
             try:
@@ -514,13 +514,30 @@ class YouTubeProcessor(BaseProcessor):
                 logger.warning("Audio transcription failed, falling back to direct transcript API",
                               error=str(e))
 
-        # Strategy 2: Fallback to direct transcript API
+        # Strategy 2: Try direct transcript API first
         logger.info("Using direct transcript API extraction")
         try:
             return await self._extract_transcript(url, config)
         except Exception as e:
-            logger.error("Direct transcript extraction failed", url=url, error=str(e))
-            return None
+            logger.warning("Direct transcript extraction failed, trying audio transcription fallback",
+                          url=url, error=str(e))
+
+        # Strategy 3: Fallback to audio transcription if we have an audio file
+        if (audio_path and
+            audio_path.exists() and
+            self.audio_processor):
+
+            logger.info("Attempting audio transcription as fallback method",
+                       audio_path=str(audio_path))
+
+            try:
+                return await self._transcribe_audio_file(audio_path, config)
+            except Exception as e:
+                logger.error("Audio transcription fallback also failed",
+                           audio_path=str(audio_path), error=str(e))
+
+        logger.error("All transcript extraction methods failed")
+        return None
 
     def _has_cookies_available(self, config: YouTubeConfig) -> bool:
         """Check if cookies are available for YouTube access.
@@ -594,6 +611,13 @@ class YouTubeProcessor(BaseProcessor):
 
             if not audio_result.success:
                 raise ProcessingError(f"Audio transcription failed: {audio_result.error_message}")
+
+            # Validate that we have actual transcript content
+            if not audio_result.transcript or not audio_result.transcript.strip():
+                raise ProcessingError("Audio transcription produced empty transcript")
+
+            if not audio_result.segments or len(audio_result.segments) == 0:
+                raise ProcessingError("Audio transcription produced no segments")
 
             # Create output directory for transcript
             output_dir = self.temp_dir / f"transcript_audio_{int(time.time())}"

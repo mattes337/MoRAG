@@ -6,11 +6,12 @@ from pathlib import Path
 import tempfile
 
 from morag_youtube.transcript import (
-    YouTubeTranscriptService, 
-    YouTubeTranscript, 
+    YouTubeTranscriptService,
+    YouTubeTranscript,
     TranscriptSegment
 )
 from morag_core.exceptions import ProcessingError
+from youtube_transcript_api import YouTubeTranscriptApi
 
 
 class TestYouTubeTranscriptService:
@@ -50,8 +51,8 @@ class TestYouTubeTranscriptService:
             transcript_service.extract_video_id("https://example.com/invalid")
     
     @pytest.mark.asyncio
-    @patch('youtube_transcript_api.YouTubeTranscriptApi.list_transcripts')
-    async def test_get_available_transcripts(self, mock_list_transcripts, transcript_service):
+    @patch.object(YouTubeTranscriptApi, 'list')
+    async def test_get_available_transcripts(self, mock_list, transcript_service):
         """Test getting available transcripts."""
         # Mock transcript list
         mock_transcript = Mock()
@@ -59,10 +60,10 @@ class TestYouTubeTranscriptService:
         mock_transcript.language = 'English (auto-generated)'
         mock_transcript.is_generated = True
         mock_transcript.is_translatable = True
-        
+
         mock_transcript_list = Mock()
         mock_transcript_list.__iter__ = Mock(return_value=iter([mock_transcript]))
-        mock_list_transcripts.return_value = mock_transcript_list
+        mock_list.return_value = mock_transcript_list
         
         # Test the method
         video_id = "dQw4w9WgXcQ"

@@ -340,56 +340,18 @@ class YouTubeService(BaseService):
             # Use processor's intelligent fallback logic
             result = await self.processor.process_url(url, config)
 
-            # If processor failed, try direct transcript extraction as final fallback
+            # If processor failed and we're NOT in transcript-only mode, the processor already tried fallback
             if not result.success or not result.transcript_text:
-                logger.info("Processor failed, trying direct transcript extraction as final fallback")
-                try:
-                    # Extract transcript using the transcript service directly
-                    transcript = await self.transcript_service.extract_transcript(url, language)
-
-                    # Create output directory for transcript
-                    if output_dir:
-                        output_dir = Path(output_dir)
-                        output_dir.mkdir(exist_ok=True, parents=True)
-                        transcript_filename = f"{transcript.video_id}_transcript.{format_type}"
-                        transcript_path = output_dir / transcript_filename
-                    else:
-                        # Use temp directory
-                        import tempfile
-                        temp_dir = Path(tempfile.gettempdir()) / "morag_youtube_transcripts"
-                        temp_dir.mkdir(exist_ok=True)
-                        transcript_filename = f"{transcript.video_id}_transcript.{format_type}"
-                        transcript_path = temp_dir / transcript_filename
-
-                    # Save transcript to file
-                    await self.transcript_service.save_transcript_to_file(
-                        transcript,
-                        transcript_path,
-                        format_type=format_type
-                    )
-
-                    logger.info("Successfully extracted transcript using direct API fallback",
-                               video_id=transcript.video_id,
-                               language=transcript.language,
-                               path=str(transcript_path),
-                               format=format_type)
-
-                    return {
-                        'video_id': transcript.video_id,
-                        'language': transcript.language,
-                        'transcript_path': transcript_path,
-                        'transcript_text': transcript.full_text,
-                        'segments_count': len(transcript.segments),
-                        'duration': transcript.duration,
-                        'is_auto_generated': transcript.is_auto_generated,
-                        'format': format_type,
-                        'method': 'direct_api_fallback'
-                    }
-
-                except Exception as fallback_error:
-                    logger.error("Direct transcript API fallback also failed",
-                                url=url, error=str(fallback_error))
-                    raise ProcessingError(f"All transcript extraction methods failed. Last error: {str(fallback_error)}")
+                if transcript_only:
+                    # In transcript-only mode, if it failed, don't try again - transcript is not available
+                    logger.error("Transcript-only mode failed - transcript not available for this video",
+                               url=url)
+                    raise ProcessingError("Transcript not available for this video in transcript-only mode")
+                else:
+                    # In full processing mode, the processor already tried fallback, so this is a real failure
+                    logger.error("All transcript extraction methods failed in processor",
+                               url=url)
+                    raise ProcessingError("All transcript extraction methods failed")
 
             # If output_dir is specified, move the transcript file there
             if output_dir and result.transcript_path:
@@ -397,7 +359,9 @@ class YouTubeService(BaseService):
                 output_dir.mkdir(exist_ok=True, parents=True)
 
                 new_transcript_path = output_dir / result.transcript_path.name
-                result.transcript_path.rename(new_transcript_path)
+                # Use copy instead of rename to handle cross-drive moves
+                import shutil
+                shutil.copy2(result.transcript_path, new_transcript_path)
                 transcript_path = new_transcript_path
             else:
                 transcript_path = result.transcript_path

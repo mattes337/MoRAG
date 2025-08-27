@@ -9,6 +9,7 @@ import structlog
 
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.formatters import TextFormatter
+from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable, CouldNotRetrieveTranscript
 from morag_core.exceptions import ProcessingError
 
 logger = structlog.get_logger(__name__)
@@ -50,6 +51,54 @@ class YouTubeTranscriptService:
     def __init__(self):
         """Initialize the transcript service."""
         self.text_formatter = TextFormatter()
+
+    def _get_transcript_with_headers(self, video_id: str, target_language: str) -> List[Dict[str, Any]]:
+        """Get transcript using the correct API with enhanced headers.
+
+        Args:
+            video_id: YouTube video ID
+            target_language: Target language code
+
+        Returns:
+            List of transcript segments
+        """
+        # Use the correct API with enhanced headers
+        import requests
+
+        # Create a session with realistic browser headers
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0'
+        })
+
+        try:
+            # Use the correct new API
+            ytt_api = YouTubeTranscriptApi(http_client=session)
+
+            # Fetch transcript using the new API
+            fetched_transcript = ytt_api.fetch(video_id, languages=[target_language])
+
+            # Convert to raw data format
+            return fetched_transcript.to_raw_data()
+
+        except (TranscriptsDisabled, VideoUnavailable) as e:
+            raise ProcessingError(f"Transcript unavailable for video {video_id}: {str(e)}")
+        except (NoTranscriptFound, CouldNotRetrieveTranscript) as e:
+            raise ProcessingError(f"Could not retrieve transcript for video {video_id} in language {target_language}: {str(e)}")
+        except Exception as e:
+            # For other errors (like XML parsing), provide detailed info
+            raise ProcessingError(f"Failed to extract transcript for video {video_id}: {str(e)}")
     
     def extract_video_id(self, url: str) -> str:
         """Extract video ID from YouTube URL.
@@ -91,8 +140,10 @@ class YouTubeTranscriptService:
             Dictionary mapping language codes to transcript metadata
         """
         try:
+            # Use the correct API
+            ytt_api = YouTubeTranscriptApi()
             transcript_list = await asyncio.to_thread(
-                YouTubeTranscriptApi.list_transcripts, video_id
+                ytt_api.list, video_id
             )
             
             available = {}
@@ -149,16 +200,26 @@ class YouTubeTranscriptService:
                 available_transcripts, language
             )
             
-            logger.info("Extracting transcript", 
-                       video_id=video_id, 
+            logger.info("Extracting transcript",
+                       video_id=video_id,
                        target_language=target_language)
-            
-            # Extract the transcript
+
+            logger.debug("Calling YouTubeTranscriptApi.get_transcript",
+                        video_id=video_id,
+                        target_language=target_language)
+
+            # Extract the transcript with enhanced headers to bypass bot detection
             transcript_data = await asyncio.to_thread(
-                YouTubeTranscriptApi.get_transcript,
+                self._get_transcript_with_headers,
                 video_id,
-                languages=[target_language]
+                target_language
             )
+
+            logger.debug("Raw transcript data received",
+                        video_id=video_id,
+                        data_type=type(transcript_data).__name__,
+                        data_length=len(transcript_data) if transcript_data else 0,
+                        first_few_items=transcript_data[:3] if transcript_data else None)
             
             # Convert to our format
             segments = [
@@ -195,10 +256,12 @@ class YouTubeTranscriptService:
             return transcript
             
         except Exception as e:
+            logger.error("Transcript extraction failed",
+                        video_id=video_id,
+                        error=str(e),
+                        error_type=type(e).__name__)
+
             error_msg = f"Failed to extract transcript for video {video_id}: {str(e)}"
-            logger.error("Transcript extraction failed", 
-                        video_id=video_id, 
-                        error=str(e))
             raise ProcessingError(error_msg)
     
     async def _determine_target_language(
