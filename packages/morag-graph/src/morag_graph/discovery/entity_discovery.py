@@ -260,7 +260,7 @@ class QueryEntityDiscovery:
     async def _analyze_query_with_llm(self, query: str) -> Optional[QueryAnalysis]:
         """Analyze query using LLM for enhanced understanding."""
         try:
-            from morag_core.ai.models import QueryAnalysisResult
+            from agents.analysis.models import QueryAnalysisResult
 
             prompt = f"""Analyze this user query comprehensively:
 
@@ -277,7 +277,8 @@ Provide a detailed analysis including:
 
 Be thorough and accurate in your analysis."""
 
-            # Use the query analysis agent - ALWAYS
+            # Use the query analysis agent from agents framework
+            from agents import get_agent
             query_agent = get_agent("query_analysis")
             result = await query_agent.analyze_query(query)
 

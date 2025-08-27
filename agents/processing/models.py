@@ -69,3 +69,22 @@ class FilteringResult(BaseModel):
     filter_criteria: Dict[str, Any] = Field(..., description="Criteria used for filtering")
     confidence: str = Field(..., description="Confidence in filtering (domain-specific, LLM-generated)")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
+class TopicBoundary(BaseModel):
+    """Represents a topic boundary in text."""
+
+    position: int = Field(..., description="Character position of the boundary")
+    confidence: float = Field(..., description="Confidence score for this boundary")
+    topic_change: bool = Field(..., description="Whether this represents a topic change")
+    boundary_type: str = Field(..., description="Type of boundary (topic, section, paragraph)")
+
+
+class SemanticChunkingResult(BaseModel):
+    """Result from semantic chunking."""
+
+    chunks: List[str] = Field(..., description="Text chunks")
+    boundaries: List[TopicBoundary] = Field(..., description="Identified topic boundaries")
+    chunking_strategy: str = Field(..., description="Strategy used for chunking")
+    confidence: str = Field(..., description="Confidence in chunking (domain-specific, LLM-generated)")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
