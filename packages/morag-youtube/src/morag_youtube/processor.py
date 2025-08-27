@@ -37,6 +37,9 @@ class YouTubeConfig(ProcessingConfig):
     prefer_audio_transcription: bool = True  # Prefer audio transcription when cookies available
     cookies_file: Optional[str] = None  # Path to cookies file (overrides env var)
     transcript_only: bool = False  # If True, skip video download and use only transcript API
+    # Metadata override options
+    skip_metadata_extraction: bool = False  # If True, skip YouTube metadata extraction
+    provided_metadata: Optional[Dict[str, Any]] = None  # User-provided metadata to use instead
 
 @dataclass
 class YouTubeMetadata:
@@ -115,18 +118,30 @@ class YouTubeProcessor(BaseProcessor):
     async def process_url(
         self,
         url: str,
-        config: Optional[YouTubeConfig] = None
+        config: Optional[YouTubeConfig] = None,
+        provided_file: Optional[Path] = None
     ) -> YouTubeDownloadResult:
-        """Process YouTube URL with download and metadata extraction."""
+        """Process YouTube URL with download and metadata extraction.
+
+        Args:
+            url: YouTube video URL
+            config: Processing configuration
+            provided_file: Optional pre-downloaded file (video or transcript)
+                          If provided, skips download/transcription and uses this file
+        """
         start_time = time.time()
         config = config or YouTubeConfig()
 
         try:
-            logger.info("Starting YouTube processing", url=url)
+            logger.info("Starting YouTube processing", url=url, provided_file=str(provided_file) if provided_file else None)
 
             # Extract metadata only if not in transcript-only mode or if explicitly requested
             metadata = None
-            if not config.transcript_only or config.extract_metadata_only:
+            if config.skip_metadata_extraction and config.provided_metadata:
+                # Use provided metadata instead of extracting from YouTube
+                logger.info("Using provided metadata instead of extracting from YouTube", url=url)
+                metadata = self._create_metadata_from_dict(config.provided_metadata, url)
+            elif not config.transcript_only or config.extract_metadata_only:
                 # Check if we have cookies available before attempting metadata extraction
                 cookies_available = self._has_cookies_available(config)
 
@@ -166,8 +181,12 @@ class YouTubeProcessor(BaseProcessor):
                 result.processing_time = time.time() - start_time
                 return result
 
+            # Handle provided file case
+            if provided_file and provided_file.exists():
+                logger.info("Using provided file instead of downloading", provided_file=str(provided_file))
+                download_result = await self._handle_provided_file(provided_file, config)
             # Skip video download if transcript_only mode is enabled
-            if config.transcript_only:
+            elif config.transcript_only:
                 logger.info("Transcript-only mode: skipping video download")
                 download_result = {
                     'video_path': None,
@@ -189,8 +208,8 @@ class YouTubeProcessor(BaseProcessor):
             result.file_size = download_result.get('file_size', 0)
             result.temp_files = download_result.get('temp_files', [])
 
-            # Extract transcript if requested using intelligent fallback strategy
-            if config.extract_transcript:
+            # Extract transcript if requested and not already provided
+            if config.extract_transcript and not (provided_file and self._is_transcript_file(provided_file)):
                 transcript_result = await self._extract_transcript_with_fallback(
                     url, config, result.audio_path
                 )
@@ -220,6 +239,12 @@ class YouTubeProcessor(BaseProcessor):
                     else:
                         # In normal mode, transcript failure is not critical
                         logger.warning("Transcript extraction failed, continuing without transcript", url=url)
+            elif provided_file and self._is_transcript_file(provided_file):
+                # Use provided transcript file
+                logger.info("Using provided transcript file", provided_file=str(provided_file))
+                result.transcript_path = provided_file
+                result.transcript_text = provided_file.read_text(encoding='utf-8')
+                result.transcript_language = config.transcript_language or 'en'
 
             result.processing_time = time.time() - start_time
 
@@ -905,3 +930,168 @@ class YouTubeProcessor(BaseProcessor):
                         file_path.rmdir()
             except Exception as e:
                 logger.warning(f"Failed to clean up file {file_path}: {str(e)}")
+
+    async def _handle_provided_file(self, provided_file: Path, config: YouTubeConfig) -> Dict[str, Any]:
+        """Handle a provided file (video or transcript) instead of downloading.
+
+        Args:
+            provided_file: Path to the provided file
+            config: YouTube configuration
+
+        Returns:
+            Dictionary containing file paths and metadata
+        """
+        logger.info("Processing provided file", file_path=str(provided_file), file_size=provided_file.stat().st_size)
+
+        if self._is_transcript_file(provided_file):
+            # Provided file is a transcript (markdown)
+            return {
+                'video_path': None,
+                'audio_path': None,
+                'subtitle_paths': [],
+                'thumbnail_paths': [],
+                'file_size': provided_file.stat().st_size,
+                'temp_files': []
+            }
+        else:
+            # Provided file is a video/audio file
+            file_extension = provided_file.suffix.lower()
+
+            if file_extension in ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv']:
+                # Video file
+                video_path = provided_file
+                audio_path = None
+
+                # Extract audio if requested
+                if config.extract_audio and self.audio_processor:
+                    try:
+                        # Create audio output path
+                        audio_output = provided_file.parent / f"{provided_file.stem}.mp3"
+
+                        # Extract audio using audio processor
+                        await self.audio_processor.extract_audio(provided_file, audio_output)
+                        audio_path = audio_output
+
+                        logger.info("Extracted audio from provided video", audio_path=str(audio_path))
+                    except Exception as e:
+                        logger.warning("Failed to extract audio from provided video", error=str(e))
+
+                return {
+                    'video_path': video_path,
+                    'audio_path': audio_path,
+                    'subtitle_paths': [],
+                    'thumbnail_paths': [],
+                    'file_size': provided_file.stat().st_size,
+                    'temp_files': [audio_path] if audio_path else []
+                }
+            elif file_extension in ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac']:
+                # Audio file
+                return {
+                    'video_path': None,
+                    'audio_path': provided_file,
+                    'subtitle_paths': [],
+                    'thumbnail_paths': [],
+                    'file_size': provided_file.stat().st_size,
+                    'temp_files': []
+                }
+            else:
+                # Unknown file type, treat as video
+                logger.warning("Unknown file type, treating as video", file_extension=file_extension)
+                return {
+                    'video_path': provided_file,
+                    'audio_path': None,
+                    'subtitle_paths': [],
+                    'thumbnail_paths': [],
+                    'file_size': provided_file.stat().st_size,
+                    'temp_files': []
+                }
+
+    def _is_transcript_file(self, file_path: Path) -> bool:
+        """Check if the provided file is a transcript file (markdown).
+
+        Args:
+            file_path: Path to check
+
+        Returns:
+            True if file appears to be a transcript
+        """
+        if not file_path.exists():
+            return False
+
+        # Check file extension
+        if file_path.suffix.lower() in ['.md', '.txt']:
+            return True
+
+        # For other extensions, check content
+        try:
+            content = file_path.read_text(encoding='utf-8', errors='ignore')[:1000]  # Read first 1KB
+
+            # Look for transcript-like patterns
+            transcript_indicators = [
+                '# Youtube Analysis:',
+                '## Youtube Information',
+                '## Transcript',
+                'youtube.com',
+                'youtu.be',
+                'Video ID:',
+                'Duration:',
+                'Uploader:'
+            ]
+
+            content_lower = content.lower()
+            return any(indicator.lower() in content_lower for indicator in transcript_indicators)
+
+        except Exception:
+            return False
+
+    def _create_metadata_from_dict(self, metadata_dict: Dict[str, Any], url: str) -> YouTubeMetadata:
+        """Create YouTubeMetadata from a dictionary of provided metadata.
+
+        Args:
+            metadata_dict: Dictionary containing metadata fields
+            url: YouTube URL for fallback values
+
+        Returns:
+            YouTubeMetadata object
+        """
+        # Extract video ID from URL for fallback
+        video_id = "unknown"
+        try:
+            if self.youtube_service:
+                video_id = self.youtube_service.transcript_service.extract_video_id(url)
+            else:
+                # Fallback: extract video ID using regex
+                import re
+                patterns = [
+                    r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
+                    r'youtube\.com/v/([a-zA-Z0-9_-]{11})',
+                    r'youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})'
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, url)
+                    if match:
+                        video_id = match.group(1)
+                        break
+        except Exception:
+            pass
+
+        return YouTubeMetadata(
+            id=metadata_dict.get('id', video_id),
+            title=metadata_dict.get('title', 'Unknown Title'),
+            description=metadata_dict.get('description', ''),
+            uploader=metadata_dict.get('uploader', 'Unknown'),
+            upload_date=metadata_dict.get('upload_date', ''),
+            duration=float(metadata_dict.get('duration', 0)),
+            view_count=int(metadata_dict.get('view_count', 0)),
+            like_count=metadata_dict.get('like_count'),
+            comment_count=metadata_dict.get('comment_count'),
+            tags=metadata_dict.get('tags', []),
+            categories=metadata_dict.get('categories', []),
+            thumbnail_url=metadata_dict.get('thumbnail_url', ''),
+            webpage_url=metadata_dict.get('webpage_url', url),
+            channel_id=metadata_dict.get('channel_id', ''),
+            channel_url=metadata_dict.get('channel_url', ''),
+            playlist_id=metadata_dict.get('playlist_id'),
+            playlist_title=metadata_dict.get('playlist_title'),
+            playlist_index=metadata_dict.get('playlist_index')
+        )

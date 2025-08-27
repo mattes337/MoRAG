@@ -945,6 +945,10 @@ class MarkdownConversionStage(Stage):
 
         logger.info("Processing YouTube URL", url=url)
 
+        # Check if a provided file is specified in config
+        provided_file_path = config.get('provided_file_path')
+        provided_file = Path(provided_file_path) if provided_file_path else None
+
         # Try MoRAG services first, fallback to YouTube service if not available
         if self.services:
             # Configure YouTube processing options from stage config
@@ -956,35 +960,61 @@ class MarkdownConversionStage(Stage):
                 'extract_audio': not config.get('transcript_only', True),  # Only extract audio if not transcript-only
                 'download_subtitles': False,
                 'download_thumbnails': False,
-                'quality': 'worst'  # Use lowest quality for faster download if needed
+                'quality': 'worst',  # Use lowest quality for faster download if needed
+                # Metadata override options
+                'skip_metadata_extraction': config.get('skip_metadata_extraction', False),
+                'provided_metadata': config.get('provided_metadata', None)
             }
 
-            result = await self.services.process_youtube(url, youtube_options)
+            # Pass provided file if available
+            if provided_file and provided_file.exists():
+                result = await self.services.process_youtube_with_file(url, provided_file, youtube_options)
+            else:
+                result = await self.services.process_youtube(url, youtube_options)
         elif self.youtube_service:
             # Fallback to direct YouTube service
             logger.info("Using fallback YouTube service for transcript extraction")
 
-            # Use transcript-only mode for fallback to avoid downloading video
-            transcript_result = await self.youtube_service.extract_transcript(
-                url=url,
-                language=config.get('transcript_language', None),
-                transcript_only=True
-            )
+            # Use provided file if available
+            if provided_file and provided_file.exists():
+                youtube_result = await self.youtube_service.process_with_file(url, provided_file)
 
-            # Create a result object compatible with the rest of the method
-            class FallbackResult:
-                def __init__(self, transcript_data):
-                    self.text_content = transcript_data.get('transcript_text', '')
-                    self.metadata = {
-                        'title': f"YouTube Video {transcript_data.get('video_id', '')}",
-                        'video_id': transcript_data.get('video_id'),
-                        'language': transcript_data.get('language'),
-                        'duration': transcript_data.get('duration', 0),
-                        'uploader': 'Unknown',
-                        'method': 'fallback_transcript_only'
-                    }
+                # Create a result object compatible with the rest of the method
+                class FallbackResult:
+                    def __init__(self, youtube_result):
+                        self.text_content = youtube_result.transcript_text or ''
+                        self.metadata = {
+                            'title': youtube_result.metadata.title if youtube_result.metadata else f"YouTube Video",
+                            'video_id': youtube_result.metadata.id if youtube_result.metadata else '',
+                            'language': youtube_result.transcript_language or 'en',
+                            'duration': youtube_result.metadata.duration if youtube_result.metadata else 0,
+                            'uploader': youtube_result.metadata.uploader if youtube_result.metadata else 'Unknown',
+                            'method': 'fallback_with_provided_file'
+                        }
 
-            result = FallbackResult(transcript_result)
+                result = FallbackResult(youtube_result)
+            else:
+                # Use transcript-only mode for fallback to avoid downloading video
+                transcript_result = await self.youtube_service.extract_transcript(
+                    url=url,
+                    language=config.get('transcript_language', None),
+                    transcript_only=True
+                )
+
+                # Create a result object compatible with the rest of the method
+                class FallbackResult:
+                    def __init__(self, transcript_data):
+                        self.text_content = transcript_data.get('transcript_text', '')
+                        self.metadata = {
+                            'title': f"YouTube Video {transcript_data.get('video_id', '')}",
+                            'video_id': transcript_data.get('video_id'),
+                            'language': transcript_data.get('language'),
+                            'duration': transcript_data.get('duration', 0),
+                            'uploader': 'Unknown',
+                            'method': 'fallback_transcript_only'
+                        }
+
+                result = FallbackResult(transcript_result)
         else:
             raise ProcessingError("Neither MoRAG services nor YouTube fallback service are available")
 

@@ -255,25 +255,40 @@ async def execute_stage(
             request_input_files = json.loads(input_files) if input_files else []
             request_webhook_url = webhook_url
 
-        # Handle file upload if provided
+        # Handle file upload and input_files
         input_file_paths = []
         job_id = None
+        uploaded_file_path = None
+
         if file:
             upload_handler = get_upload_handler()
-            temp_path = await upload_handler.save_upload(file)
-            input_file_paths = [temp_path]
+            uploaded_file_path = await upload_handler.save_upload(file)
 
             # Extract job_id from the uploaded file path (first 8 chars of UUID)
-            job_id = temp_path.name.split('_')[0]
+            job_id = uploaded_file_path.name.split('_')[0]
 
             # Set output directory relative to the temp directory
-            temp_dir = temp_path.parent
+            temp_dir = uploaded_file_path.parent
             output_path = temp_dir / "output"
-        elif request_input_files:
-            input_file_paths = [Path(f) for f in request_input_files]
+        else:
             output_path = Path(request_output_dir)
+
+        # Handle input files (URLs or file paths)
+        if request_input_files:
+            input_file_paths = [Path(f) for f in request_input_files]
+        elif uploaded_file_path:
+            input_file_paths = [uploaded_file_path]
         else:
             raise HTTPException(status_code=400, detail="Either file upload or input_files must be provided")
+
+        # Special case: if both file upload and input_files are provided,
+        # treat this as YouTube processing with provided file
+        if uploaded_file_path and request_input_files:
+            # Store the uploaded file path in context for YouTube processing
+            if not hasattr(request_config, 'provided_file_path'):
+                request_config['provided_file_path'] = str(uploaded_file_path)
+            # Use the URL from input_files as the primary input
+            input_file_paths = [Path(f) for f in request_input_files]
 
         # Create output directory
         output_path.mkdir(parents=True, exist_ok=True)

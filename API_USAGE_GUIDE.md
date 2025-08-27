@@ -58,6 +58,110 @@ curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
     "language": "en"
   }'
 
+# Process YouTube video with provided transcript file
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F "file=@transcript.md" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
+    "include_timestamps": true,
+    "language": "en"
+  }'
+
+# Process YouTube video with provided video file
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F "file=@video.mp4" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
+    "extract_audio": true,
+    "include_timestamps": true,
+    "language": "en"
+  }'
+
+# Process YouTube video with provided file and custom metadata (skip YouTube metadata extraction)
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F "file=@transcript.md" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
+    "skip_metadata_extraction": true,
+    "provided_metadata": {
+      "id": "dQw4w9WgXcQ",
+      "title": "Custom Video Title",
+      "description": "Custom description provided by user",
+      "uploader": "Custom Channel Name",
+      "upload_date": "20231201",
+      "duration": 212,
+      "view_count": 1500000,
+      "like_count": 75000,
+      "comment_count": 2500,
+      "tags": ["custom", "tags", "provided"],
+      "categories": ["Entertainment"],
+      "thumbnail_url": "https://example.com/custom-thumb.jpg",
+      "channel_id": "UCCustomChannelId",
+      "channel_url": "https://www.youtube.com/channel/UCCustomChannelId"
+    },
+    "include_timestamps": true,
+    "language": "en"
+  }'
+
+## YouTube Processing Modes
+
+The API supports several YouTube processing modes to handle different scenarios:
+
+### 1. Standard YouTube Processing (URL only)
+Downloads video/audio and extracts transcript automatically:
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={"include_timestamps": true, "language": "en"}'
+```
+
+### 2. YouTube with Provided Transcript
+Use a manually downloaded transcript file with YouTube metadata:
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F "file=@transcript.md" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={"include_timestamps": true, "language": "en"}'
+```
+
+### 3. YouTube with Provided Video File
+Use a manually downloaded video file with YouTube metadata:
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F "file=@video.mp4" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={"extract_audio": true, "include_timestamps": true}'
+```
+
+### 4. YouTube with Custom Metadata (No YouTube API calls)
+Provide all metadata manually to avoid YouTube API restrictions:
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F "file=@transcript.md" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
+    "skip_metadata_extraction": true,
+    "provided_metadata": {
+      "id": "dQw4w9WgXcQ",
+      "title": "Never Gonna Give You Up",
+      "description": "Official music video",
+      "uploader": "Rick Astley",
+      "upload_date": "20091025",
+      "duration": 212,
+      "view_count": 1500000000,
+      "like_count": 15000000,
+      "tags": ["rick astley", "never gonna give you up", "music"],
+      "categories": ["Music"]
+    }
+  }'
+```
+
+**Benefits of each mode:**
+- **Mode 1**: Fully automated, requires YouTube access
+- **Mode 2**: Faster processing, uses provided transcript, gets fresh metadata
+- **Mode 3**: Uses provided video, gets fresh metadata, can extract audio
+- **Mode 4**: No YouTube API calls, completely offline processing, user controls all metadata
+
 # Process webpage URL
 curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
   -F 'input_files=["https://example.com/article"]' \

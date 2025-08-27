@@ -853,6 +853,109 @@ class MoRAGServices:
                 success=False,
                 error_message=str(e)
             )
+
+    async def process_youtube_with_file(self, url: str, file_path: Path, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
+        """Process a YouTube URL with a provided file (video or transcript).
+
+        This method combines YouTube metadata extraction with a manually provided file,
+        avoiding the need to download the video when the user already has it.
+
+        Args:
+            url: YouTube URL to process
+            file_path: Path to provided file (video, audio, or transcript)
+            options: Processing options
+
+        Returns:
+            ProcessingResult with extracted content and metadata
+        """
+        try:
+            # Convert options to YouTubeConfig
+            youtube_config = None
+            if options:
+                # Import YouTubeConfig here to avoid circular imports
+                from morag_youtube.processor import YouTubeConfig
+
+                youtube_config = YouTubeConfig(
+                    quality=options.get('quality', 'best'),
+                    format_preference=options.get('format_preference', 'mp4'),
+                    extract_audio=options.get('extract_audio', True),
+                    download_subtitles=options.get('download_subtitles', True),
+                    subtitle_languages=options.get('subtitle_languages', ['en']),
+                    max_filesize=options.get('max_filesize', None),
+                    download_thumbnails=options.get('download_thumbnails', True),
+                    extract_metadata_only=options.get('extract_metadata_only', False),
+                    extract_transcript=options.get('extract_transcript', True),
+                    transcript_language=options.get('transcript_language', None),
+                    transcript_format=options.get('transcript_format', 'text'),
+                    prefer_audio_transcription=options.get('prefer_audio_transcription', True),
+                    cookies_file=options.get('cookies_file', None),
+                    transcript_only=options.get('transcript_only', False)
+                )
+            elif self.config.youtube_config:
+                # Use default config if available
+                youtube_config = self.config.youtube_config
+
+            result = await self.youtube_service.process_with_file(
+                url,
+                file_path,
+                config=youtube_config
+            )
+
+            # Convert YouTube-specific result to unified format
+            extracted_files = []
+            if result.video_path:
+                extracted_files.append(str(result.video_path))
+            if result.audio_path:
+                extracted_files.append(str(result.audio_path))
+            extracted_files.extend([str(p) for p in result.subtitle_paths])
+            extracted_files.extend([str(p) for p in result.thumbnail_paths])
+
+            # Convert metadata to dictionary with required document fields
+            metadata = self._create_youtube_comprehensive_metadata(url, result)
+            if result.metadata:
+                # Add YouTube-specific metadata
+                metadata.update({
+                    'id': result.metadata.id,
+                    'title': result.metadata.title,
+                    'description': result.metadata.description,
+                    'uploader': result.metadata.uploader,
+                    'upload_date': result.metadata.upload_date,
+                    'duration': result.metadata.duration,
+                    'view_count': result.metadata.view_count,
+                    'like_count': result.metadata.like_count,
+                    'comment_count': result.metadata.comment_count,
+                    'tags': result.metadata.tags,
+                    'categories': result.metadata.categories,
+                    'thumbnail_url': result.metadata.thumbnail_url,
+                    'webpage_url': result.metadata.webpage_url,
+                    'channel_id': result.metadata.channel_id,
+                    'channel_url': result.metadata.channel_url,
+                })
+
+            # Add information about the provided file
+            metadata['provided_file'] = str(file_path)
+            metadata['provided_file_size'] = file_path.stat().st_size if file_path.exists() else 0
+
+            return ProcessingResult(
+                content_type=ContentType.YOUTUBE,
+                content_url=url,
+                text_content=result.transcript_text,  # Include transcript text if available
+                metadata=metadata,
+                extracted_files=extracted_files,
+                processing_time=result.processing_time,
+                success=result.success,
+                error_message=result.error_message,
+                raw_result=result
+            )
+        except Exception as e:
+            logger.exception(f"Error processing YouTube URL with provided file", url=url, file_path=str(file_path))
+            return ProcessingResult(
+                content_type=ContentType.YOUTUBE,
+                content_url=url,
+                text_content="",
+                success=False,
+                error_message=str(e)
+            )
     
     async def process_batch(self, items: List[str]) -> Dict[str, ProcessingResult]:
         """Process multiple content items concurrently.

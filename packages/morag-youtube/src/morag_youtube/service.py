@@ -51,19 +51,45 @@ class YouTubeService(BaseService):
         """
         return {"status": "healthy", "processor": "ready"}
     
-    async def process_video(self, url: str, config: Optional[YouTubeConfig] = None) -> YouTubeDownloadResult:
+    async def process_video(self, url: str, config: Optional[YouTubeConfig] = None,
+                          provided_file: Optional[Path] = None) -> YouTubeDownloadResult:
         """Process a single YouTube video.
-        
+
         Args:
             url: YouTube video URL
             config: Processing configuration
-            
+            provided_file: Optional pre-downloaded file (video or transcript)
+                          If provided, skips download/transcription and uses this file
+
         Returns:
             YouTubeDownloadResult with video information and paths
         """
         async with self.semaphore:
-            return await self.processor.process_url(url, config)
-    
+            return await self.processor.process_url(url, config, provided_file)
+
+    async def process_with_file(self, url: str, file_path: Path,
+                               config: Optional[YouTubeConfig] = None) -> YouTubeDownloadResult:
+        """Process YouTube video with a provided file (video or transcript).
+
+        This method combines YouTube metadata extraction with a manually provided file,
+        avoiding the need to download the video when the user already has it.
+
+        Args:
+            url: YouTube video URL (for metadata extraction)
+            file_path: Path to provided file (video, audio, or transcript)
+            config: Processing configuration
+
+        Returns:
+            YouTubeDownloadResult with metadata from YouTube and content from provided file
+        """
+        if not file_path.exists():
+            raise ValueError(f"Provided file does not exist: {file_path}")
+
+        logger.info("Processing YouTube video with provided file",
+                   url=url, file_path=str(file_path))
+
+        return await self.process_video(url, config, file_path)
+
     async def process_videos(self, urls: List[str], config: Optional[YouTubeConfig] = None) -> List[Union[YouTubeDownloadResult, BaseException]]:
         """Process multiple YouTube videos concurrently.
         
