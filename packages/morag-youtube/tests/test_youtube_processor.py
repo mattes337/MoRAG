@@ -21,7 +21,7 @@ SAMPLE_METADATA = {
     'comment_count': 10000,
     'tags': ['Rick Astley', 'Never Gonna Give You Up'],
     'categories': ['Music'],
-    'thumbnail': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+    'thumbnail_url': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
     'webpage_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     'channel_id': 'UCuAXFkgsw1L7xaCfnd5JJOw',
     'channel_url': 'https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw',
@@ -51,9 +51,15 @@ async def test_youtube_config_defaults():
     assert config.extract_audio is True
     assert config.download_subtitles is True
     assert config.subtitle_languages == ["en"]
-    assert config.max_filesize == "500M"
+    assert config.max_filesize is None  # Disabled to avoid yt-dlp comparison bug
     assert config.download_thumbnails is True
     assert config.extract_metadata_only is False
+    assert config.extract_transcript is True
+    assert config.transcript_language is None
+    assert config.transcript_format == "text"
+    assert config.prefer_audio_transcription is True
+    assert config.cookies_file is None
+    assert config.transcript_only is False
 
 @pytest.mark.asyncio
 async def test_supports_format(youtube_processor):
@@ -81,7 +87,8 @@ async def test_extract_metadata_only(mock_ytdl, youtube_processor):
     
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    metadata = await youtube_processor._extract_metadata_only(url)
+    config = YouTubeConfig()
+    metadata = await youtube_processor._extract_metadata_only(url, config)
     
     # Verify the result
     assert metadata.id == SAMPLE_METADATA['id']

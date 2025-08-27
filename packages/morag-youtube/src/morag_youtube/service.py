@@ -9,6 +9,7 @@ from morag_core.interfaces.service import BaseService
 from morag_core.exceptions import ProcessingError
 
 from .processor import YouTubeProcessor, YouTubeConfig, YouTubeDownloadResult
+from .transcript import YouTubeTranscriptService, YouTubeTranscript
 
 logger = structlog.get_logger(__name__)
 
@@ -26,6 +27,7 @@ class YouTubeService(BaseService):
             max_concurrent_downloads: Maximum number of concurrent downloads
         """
         self.processor = YouTubeProcessor()
+        self.transcript_service = YouTubeTranscriptService()
         self.max_concurrent_downloads = max_concurrent_downloads
         self.semaphore = asyncio.Semaphore(max_concurrent_downloads)
 
@@ -297,7 +299,146 @@ class YouTubeService(BaseService):
             return new_thumbnail_path
         
         return thumbnail_path
-    
+
+    async def extract_transcript(
+        self,
+        url: str,
+        language: Optional[str] = None,
+        output_dir: Optional[Path] = None,
+        format_type: str = "text",
+        cookies_file: Optional[str] = None,
+        transcript_only: bool = False
+    ) -> Dict[str, Any]:
+        """Extract transcript from a YouTube video using intelligent fallback strategy.
+
+        Args:
+            url: YouTube video URL
+            language: Preferred language code (if None, uses original language)
+            output_dir: Directory to save transcript file (uses temp dir if None)
+            format_type: Format type ("text", "srt", "vtt")
+            cookies_file: Path to cookies file for YouTube access
+            transcript_only: If True, skip video download and use only transcript API
+
+        Returns:
+            Dictionary containing transcript information and file path
+        """
+        try:
+            # Create config for transcript extraction
+            config = YouTubeConfig(
+                extract_transcript=True,
+                transcript_language=language,
+                transcript_format=format_type,
+                cookies_file=cookies_file,
+                transcript_only=transcript_only,
+                extract_metadata_only=False,  # Need full processing for transcript fallback
+                extract_audio=True,  # Enable audio extraction for fallback transcription
+                download_subtitles=False,  # Don't need subtitle files
+                download_thumbnails=False,  # Don't need thumbnails
+                quality="worst"  # Use lowest quality for faster download if needed
+            )
+
+            # Use processor's intelligent fallback logic
+            result = await self.processor.process_url(url, config)
+
+            # If processor failed, try direct transcript extraction as final fallback
+            if not result.success or not result.transcript_text:
+                logger.info("Processor failed, trying direct transcript extraction as final fallback")
+                try:
+                    # Extract transcript using the transcript service directly
+                    transcript = await self.transcript_service.extract_transcript(url, language)
+
+                    # Create output directory for transcript
+                    if output_dir:
+                        output_dir = Path(output_dir)
+                        output_dir.mkdir(exist_ok=True, parents=True)
+                        transcript_filename = f"{transcript.video_id}_transcript.{format_type}"
+                        transcript_path = output_dir / transcript_filename
+                    else:
+                        # Use temp directory
+                        import tempfile
+                        temp_dir = Path(tempfile.gettempdir()) / "morag_youtube_transcripts"
+                        temp_dir.mkdir(exist_ok=True)
+                        transcript_filename = f"{transcript.video_id}_transcript.{format_type}"
+                        transcript_path = temp_dir / transcript_filename
+
+                    # Save transcript to file
+                    await self.transcript_service.save_transcript_to_file(
+                        transcript,
+                        transcript_path,
+                        format_type=format_type
+                    )
+
+                    logger.info("Successfully extracted transcript using direct API fallback",
+                               video_id=transcript.video_id,
+                               language=transcript.language,
+                               path=str(transcript_path),
+                               format=format_type)
+
+                    return {
+                        'video_id': transcript.video_id,
+                        'language': transcript.language,
+                        'transcript_path': transcript_path,
+                        'transcript_text': transcript.full_text,
+                        'segments_count': len(transcript.segments),
+                        'duration': transcript.duration,
+                        'is_auto_generated': transcript.is_auto_generated,
+                        'format': format_type,
+                        'method': 'direct_api_fallback'
+                    }
+
+                except Exception as fallback_error:
+                    logger.error("Direct transcript API fallback also failed",
+                                url=url, error=str(fallback_error))
+                    raise ProcessingError(f"All transcript extraction methods failed. Last error: {str(fallback_error)}")
+
+            # If output_dir is specified, move the transcript file there
+            if output_dir and result.transcript_path:
+                output_dir = Path(output_dir)
+                output_dir.mkdir(exist_ok=True, parents=True)
+
+                new_transcript_path = output_dir / result.transcript_path.name
+                result.transcript_path.rename(new_transcript_path)
+                transcript_path = new_transcript_path
+            else:
+                transcript_path = result.transcript_path
+
+            # Extract video ID for response
+            video_id = self.transcript_service.extract_video_id(url)
+
+            return {
+                'video_id': video_id,
+                'language': result.transcript_language,
+                'transcript_path': transcript_path,
+                'transcript_text': result.transcript_text,
+                'segments_count': 0,  # Will be updated if we have segment info
+                'duration': 0.0,  # Will be updated if we have duration info
+                'is_auto_generated': False,  # Will be updated based on method used
+                'format': format_type,
+                'method': 'fallback_strategy'
+            }
+
+        except Exception as e:
+            error_msg = f"Failed to extract transcript: {str(e)}"
+            logger.error("Transcript extraction failed", url=url, error=str(e))
+            raise ProcessingError(error_msg)
+
+    async def get_available_transcript_languages(self, url: str) -> Dict[str, Dict[str, Any]]:
+        """Get available transcript languages for a YouTube video.
+
+        Args:
+            url: YouTube video URL
+
+        Returns:
+            Dictionary mapping language codes to transcript metadata
+        """
+        try:
+            video_id = self.transcript_service.extract_video_id(url)
+            return await self.transcript_service.get_available_transcripts(video_id)
+        except Exception as e:
+            error_msg = f"Failed to get available transcripts: {str(e)}"
+            logger.error("Failed to get transcript languages", url=url, error=str(e))
+            raise ProcessingError(error_msg)
+
     def cleanup(self, result: Union[YouTubeDownloadResult, List[YouTubeDownloadResult]]) -> None:
         """Clean up temporary files.
         

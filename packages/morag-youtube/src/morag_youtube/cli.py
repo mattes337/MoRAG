@@ -18,7 +18,14 @@ def setup_parser() -> argparse.ArgumentParser:
         description="YouTube video processing tool",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    
+
+    # Global arguments
+    parser.add_argument(
+        "--cookies",
+        type=Path,
+        help="Path to cookies file for YouTube access (overrides YOUTUBE_COOKIES_FILE env var)"
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
     
     # Download command
@@ -115,18 +122,55 @@ def setup_parser() -> argparse.ArgumentParser:
         help="Output directory for downloaded files"
     )
     subtitles_parser.add_argument(
-        "--langs", 
+        "--langs",
         default="en",
         help="Subtitle languages (comma-separated)"
     )
-    
+
+    # Transcript command
+    transcript_parser = subparsers.add_parser("transcript", help="Extract transcript from YouTube video")
+    transcript_parser.add_argument("url", help="YouTube video URL")
+    transcript_parser.add_argument(
+        "-o", "--output-dir",
+        type=Path,
+        default=Path.cwd(),
+        help="Output directory for transcript file"
+    )
+    transcript_parser.add_argument(
+        "--language",
+        help="Preferred transcript language (if not specified, uses original language)"
+    )
+    transcript_parser.add_argument(
+        "--format",
+        choices=["text", "srt", "vtt"],
+        default="text",
+        help="Transcript format"
+    )
+    transcript_parser.add_argument(
+        "--transcript-only",
+        action="store_true",
+        help="Skip video download and use only transcript API (faster but may have limited access)"
+    )
+
+    # Transcript languages command
+    transcript_langs_parser = subparsers.add_parser("transcript-langs", help="List available transcript languages")
+    transcript_langs_parser.add_argument("url", help="YouTube video URL")
+
     return parser
+
+def _create_config_with_cookies(args, **kwargs) -> YouTubeConfig:
+    """Create YouTubeConfig with cookies from args."""
+    config_kwargs = kwargs.copy()
+    if hasattr(args, 'cookies') and args.cookies:
+        config_kwargs['cookies_file'] = str(args.cookies)
+    return YouTubeConfig(**config_kwargs)
 
 async def download_video(args):
     """Download YouTube video."""
     service = YouTubeService()
     
-    config = YouTubeConfig(
+    config = _create_config_with_cookies(
+        args,
         quality=args.quality,
         extract_audio=not args.no_audio,
         download_subtitles=not args.no_subtitles,
@@ -302,6 +346,67 @@ async def download_subtitles(args):
     
     return 0
 
+async def extract_transcript(args):
+    """Extract transcript from YouTube video."""
+    service = YouTubeService()
+
+    try:
+        result = await service.extract_transcript(
+            args.url,
+            language=args.language,
+            output_dir=args.output_dir,
+            format_type=args.format,
+            cookies_file=str(args.cookies) if args.cookies else None,
+            transcript_only=args.transcript_only
+        )
+
+        print(f"\nTranscript extracted successfully:")
+        print(f"Video ID: {result['video_id']}")
+        print(f"Language: {result['language']}")
+        print(f"Format: {result['format']}")
+        print(f"Method: {result.get('method', 'unknown')}")
+        print(f"Segments: {result['segments_count']}")
+        print(f"Duration: {result['duration']:.2f} seconds")
+        print(f"Auto-generated: {result['is_auto_generated']}")
+        print(f"File: {result['transcript_path']}")
+
+        if args.format == "text":
+            # Show first 200 characters of transcript
+            preview = result['transcript_text'][:200]
+            if len(result['transcript_text']) > 200:
+                preview += "..."
+            print(f"\nPreview: {preview}")
+
+    except Exception as e:
+        logger.exception("Error extracting transcript", error=str(e))
+        print(f"Error: {str(e)}")
+        return 1
+
+    return 0
+
+async def list_transcript_languages(args):
+    """List available transcript languages for YouTube video."""
+    service = YouTubeService()
+
+    try:
+        languages = await service.get_available_transcript_languages(args.url)
+
+        if languages:
+            print(f"\nAvailable transcript languages:")
+            for lang_code, info in languages.items():
+                status = "Auto-generated" if info.get('is_generated', False) else "Manual"
+                translatable = "Yes" if info.get('is_translatable', False) else "No"
+                print(f"- {lang_code}: {info.get('language', 'Unknown')} ({status}, Translatable: {translatable})")
+        else:
+            print(f"\nNo transcripts available for this video.")
+
+    except Exception as e:
+        logger.exception("Error listing transcript languages", error=str(e))
+        print(f"Error: {str(e)}")
+        return 1
+
+    return 0
+
 async def main_async():
     """Async entry point for the CLI."""
     parser = setup_parser()
@@ -318,6 +423,8 @@ async def main_async():
         "playlist": process_playlist,
         "thumbnail": download_thumbnail,
         "subtitles": download_subtitles,
+        "transcript": extract_transcript,
+        "transcript-langs": list_transcript_languages,
     }
     
     handler = command_handlers.get(args.command)
