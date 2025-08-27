@@ -27,15 +27,11 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
-# Import agents framework
-from agents import get_agent
-
-# Import agents framework
+# Import agents framework - required
 try:
     from agents import get_agent
-    AGENTS_AVAILABLE = True
 except ImportError:
-    AGENTS_AVAILABLE = False
+    raise ImportError("Agents framework is required. Please install the agents package.")
 
 
 class EntityRelevanceScore(NamedTuple):

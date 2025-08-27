@@ -12,12 +12,11 @@ from .fact_validator import FactValidator
 from .fact_filter import FactFilter, DomainFilterConfig
 from .fact_filter_config import create_domain_configs_for_language
 
-# Import agents framework
+# Import agents framework - required
 try:
     from agents import get_agent
-    AGENTS_AVAILABLE = True
 except ImportError:
-    AGENTS_AVAILABLE = False
+    raise ImportError("Agents framework is required. Please install the agents package.")
 
 
 class FactExtractor:
@@ -59,10 +58,7 @@ class FactExtractor:
         self.fact_filter = FactFilter(domain_configs)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
 
-        # Initialize fact extraction agent - ALWAYS use agent
-        if not AGENTS_AVAILABLE:
-            raise ImportError("Agents framework is required. Please install the agents package.")
-
+        # Initialize fact extraction agent
         self.fact_agent = get_agent("fact_extraction")
         # Configure agent for this domain
         self.fact_agent.update_config(
