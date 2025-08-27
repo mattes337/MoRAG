@@ -120,13 +120,25 @@ class YouTubeProcessor(BaseProcessor):
         """Process YouTube URL with download and metadata extraction."""
         start_time = time.time()
         config = config or YouTubeConfig()
-        
+
         try:
             logger.info("Starting YouTube processing", url=url)
-            
-            # Extract metadata first
-            metadata = await self._extract_metadata_only(url, config)
-            
+
+            # Extract metadata only if not in transcript-only mode or if explicitly requested
+            metadata = None
+            if not config.transcript_only or config.extract_metadata_only:
+                try:
+                    metadata = await self._extract_metadata_only(url, config)
+                except Exception as e:
+                    if config.transcript_only:
+                        # In transcript-only mode, metadata extraction failure is not critical
+                        logger.warning("Metadata extraction failed in transcript-only mode, continuing without metadata",
+                                     url=url, error=str(e))
+                        metadata = None
+                    else:
+                        # In normal mode, metadata extraction failure is critical
+                        raise
+
             # Initialize result
             result = YouTubeDownloadResult(
                 video_path=None,
@@ -139,7 +151,7 @@ class YouTubeProcessor(BaseProcessor):
                 temp_files=[],
                 success=True
             )
-            
+
             # If only metadata extraction is requested, return early
             if config.extract_metadata_only:
                 result.processing_time = time.time() - start_time

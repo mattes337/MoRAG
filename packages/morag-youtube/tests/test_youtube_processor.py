@@ -4,7 +4,7 @@ import pytest
 import os
 from pathlib import Path
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 
 from morag_youtube.processor import YouTubeProcessor, YouTubeConfig, YouTubeMetadata
 
@@ -77,6 +77,79 @@ async def test_process_file_not_supported(youtube_processor):
         await youtube_processor.process(Path("test.txt"))
 
 @pytest.mark.asyncio
+async def test_transcript_only_mode_skips_metadata_extraction():
+    """Test that transcript-only mode skips metadata extraction when no cookies available."""
+    processor = YouTubeProcessor()
+
+    # Mock the transcript service to return a successful transcript
+    mock_transcript_result = {
+        'transcript_path': '/tmp/test_transcript.txt',
+        'transcript_text': 'This is a test transcript.',
+        'transcript_language': 'en'
+    }
+
+    with patch.object(processor, '_extract_transcript', return_value=mock_transcript_result) as mock_extract_transcript:
+        # Create config with transcript_only=True
+        config = YouTubeConfig(
+            transcript_only=True,
+            extract_transcript=True,
+            cookies_file=None  # No cookies available
+        )
+
+        # Process URL in transcript-only mode
+        result = await processor.process_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ", config)
+
+        # Verify that the result is successful
+        assert result.success is True
+        assert result.transcript_text == 'This is a test transcript.'
+        assert result.transcript_language == 'en'
+
+        # Verify that metadata is None (not extracted due to transcript-only mode)
+        assert result.metadata is None
+
+        # Verify that transcript extraction was called
+        mock_extract_transcript.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_transcript_only_mode_with_metadata_extraction_failure():
+    """Test that transcript-only mode continues even if metadata extraction fails."""
+    processor = YouTubeProcessor()
+
+    # Mock the transcript service to return a successful transcript
+    mock_transcript_result = {
+        'transcript_path': '/tmp/test_transcript.txt',
+        'transcript_text': 'This is a test transcript.',
+        'transcript_language': 'en'
+    }
+
+    with patch.object(processor, '_extract_transcript', return_value=mock_transcript_result) as mock_extract_transcript, \
+         patch.object(processor, '_extract_metadata_only', side_effect=Exception("Cookies required")) as mock_extract_metadata:
+
+        # Create config with transcript_only=True (don't request metadata-only since that would return early)
+        config = YouTubeConfig(
+            transcript_only=True,
+            extract_transcript=True,
+            extract_metadata_only=False,  # Don't request metadata-only to avoid early return
+            cookies_file=None  # No cookies available
+        )
+
+        # Process URL in transcript-only mode
+        result = await processor.process_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ", config)
+
+        # Verify that the result is successful despite metadata extraction failure
+        assert result.success is True
+        assert result.transcript_text == 'This is a test transcript.'
+        assert result.transcript_language == 'en'
+
+        # Verify that metadata is None due to extraction failure
+        assert result.metadata is None
+
+        # Verify that metadata extraction was NOT attempted (due to transcript_only mode)
+        mock_extract_metadata.assert_not_called()
+        # Verify that transcript extraction was called
+        mock_extract_transcript.assert_called_once()
+
+@pytest.mark.asyncio
 @patch('yt_dlp.YoutubeDL')
 async def test_extract_metadata_only(mock_ytdl, youtube_processor):
     """Test extracting metadata without downloading."""
@@ -137,7 +210,7 @@ async def test_process_url(mock_download, mock_metadata, youtube_processor):
     assert result.file_size == 10000
     
     # Verify the mocks were called correctly
-    mock_metadata.assert_called_once_with(url)
+    mock_metadata.assert_called_once_with(url, ANY)  # Called with URL and config
     mock_download.assert_called_once()
 
 @pytest.mark.asyncio
@@ -163,7 +236,7 @@ async def test_process_url_metadata_only(mock_metadata, youtube_processor):
     assert result.file_size == 0
     
     # Verify the mock was called correctly
-    mock_metadata.assert_called_once_with(url)
+    mock_metadata.assert_called_once_with(url, ANY)  # Called with URL and config
 
 @pytest.mark.asyncio
 @patch('yt_dlp.YoutubeDL')

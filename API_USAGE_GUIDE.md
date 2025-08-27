@@ -47,6 +47,26 @@ curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
 curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
   -F "file=@image.png" \
   -F 'config={"extract_text": true, "generate_descriptions": false}'
+
+# Process YouTube video URL
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
+    "include_timestamps": true,
+    "speaker_diarization": true,
+    "topic_segmentation": true,
+    "language": "en"
+  }'
+
+# Process webpage URL
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://example.com/article"]' \
+  -F 'config={
+    "follow_links": false,
+    "max_depth": 1,
+    "extract_metadata": true,
+    "clean_content": true
+  }'
 ```
 
 ### 2. Stage Chain Execution - Multiple Stages
@@ -84,6 +104,59 @@ curl -X POST "http://localhost:8000/api/v1/stages/chain" \
       }
     }
   }'
+
+# Process YouTube video with full pipeline
+curl -X POST "http://localhost:8000/api/v1/stages/chain" \
+  -F 'request={
+    "input_files": ["https://www.youtube.com/watch?v=VIDEO_ID"],
+    "stages": ["markdown-conversion", "markdown-optimizer", "chunker"],
+    "stage_configs": {
+      "markdown-conversion": {
+        "include_timestamps": true,
+        "speaker_diarization": true,
+        "topic_segmentation": true,
+        "language": "en"
+      },
+      "markdown-optimizer": {
+        "fix_transcription_errors": true,
+        "improve_readability": true,
+        "preserve_timestamps": true
+      },
+      "chunker": {
+        "chunk_strategy": "topic",
+        "chunk_size": 4000,
+        "generate_summary": true
+      }
+    },
+    "output_dir": "./output"
+  }'
+
+# Process multiple web pages with content extraction
+curl -X POST "http://localhost:8000/api/v1/stages/chain" \
+  -F 'request={
+    "input_files": [
+      "https://example.com/article1",
+      "https://example.com/article2"
+    ],
+    "stages": ["markdown-conversion", "chunker", "fact-generator"],
+    "stage_configs": {
+      "markdown-conversion": {
+        "follow_links": false,
+        "extract_metadata": true,
+        "clean_content": true
+      },
+      "chunker": {
+        "chunk_strategy": "semantic",
+        "chunk_size": 3000,
+        "generate_summary": true
+      },
+      "fact-generator": {
+        "extract_entities": true,
+        "extract_relations": true,
+        "domain": "general"
+      }
+    }
+  }'
 ```
 
 ### 3. Full Pipeline - Complete Processing with Storage
@@ -113,6 +186,93 @@ curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
   -F 'webhook_url=https://your-app.com/webhook' \
   -F 'output_dir=./output' \
   -F 'stop_on_failure=true'
+
+# Process YouTube video with full pipeline and storage
+curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
+  -F 'input_files=["https://www.youtube.com/watch?v=VIDEO_ID"]' \
+  -F 'stages=["markdown-conversion", "markdown-optimizer", "chunker", "fact-generator", "ingestor"]' \
+  -F 'global_config={"language": "en"}' \
+  -F 'stage_configs={
+    "markdown-conversion": {
+      "include_timestamps": true,
+      "speaker_diarization": true,
+      "topic_segmentation": true
+    },
+    "markdown-optimizer": {
+      "fix_transcription_errors": true,
+      "improve_readability": true,
+      "preserve_timestamps": true
+    },
+    "chunker": {
+      "chunk_strategy": "topic",
+      "chunk_size": 4000,
+      "generate_summary": true
+    },
+    "fact-generator": {
+      "extract_entities": true,
+      "extract_relations": true,
+      "domain": "general"
+    },
+    "ingestor": {
+      "databases": ["qdrant", "neo4j"],
+      "collection_name": "youtube_videos",
+      "qdrant_config": {
+        "host": "localhost",
+        "port": 6333
+      },
+      "neo4j_config": {
+        "uri": "bolt://localhost:7687",
+        "username": "neo4j",
+        "password": "password"
+      }
+    }
+  }' \
+  -F 'webhook_url=https://your-app.com/webhook' \
+  -F 'output_dir=./output'
+
+# Process webpage with full pipeline and storage
+curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
+  -F 'input_files=["https://example.com/important-article"]' \
+  -F 'stages=["markdown-conversion", "markdown-optimizer", "chunker", "fact-generator", "ingestor"]' \
+  -F 'global_config={"language": "en"}' \
+  -F 'stage_configs={
+    "markdown-conversion": {
+      "follow_links": false,
+      "extract_metadata": true,
+      "clean_content": true
+    },
+    "markdown-optimizer": {
+      "improve_readability": true,
+      "normalize_formatting": true,
+      "enhance_structure": true
+    },
+    "chunker": {
+      "chunk_strategy": "semantic",
+      "chunk_size": 3000,
+      "generate_summary": true
+    },
+    "fact-generator": {
+      "extract_entities": true,
+      "extract_relations": true,
+      "extract_keywords": true,
+      "domain": "general"
+    },
+    "ingestor": {
+      "databases": ["qdrant", "neo4j"],
+      "collection_name": "web_articles",
+      "qdrant_config": {
+        "host": "localhost",
+        "port": 6333
+      },
+      "neo4j_config": {
+        "uri": "bolt://localhost:7687",
+        "username": "neo4j",
+        "password": "password"
+      }
+    }
+  }' \
+  -F 'webhook_url=https://your-app.com/webhook' \
+  -F 'output_dir=./output'
 ```
 
 ### 4. Ingestor Stage with Explicit Database Configuration
@@ -280,11 +440,28 @@ curl -X POST "http://localhost:8000/api/v1/stages/ingestor/execute" \
     "ocr_engine": "tesseract",
     "resize_max_dimension": 1024,
 
+    // YouTube processing
+    "download_subtitles": true,
+    "subtitle_languages": ["en", "auto"],
+    "extract_audio": true,
+    "quality": "best",
+    "max_filesize": "100M",
+    "cookies_file": null,  // Path to cookies file for private videos
+
     // Web processing
     "follow_links": false,
     "max_depth": 1,
     "respect_robots": true,
-    "extract_metadata": true
+    "extract_metadata": true,
+    "clean_content": true,
+    "timeout": 30,
+    "max_retries": 3,
+    "rate_limit_delay": 1.0,
+    "extract_links": true,
+    "remove_navigation": true,
+    "remove_footer": true,
+    "preserve_tables": true,
+    "preserve_lists": true
   }
 }
 ```
@@ -394,7 +571,7 @@ curl -X POST "http://localhost:8000/api/v1/stages/ingestor/execute" \
 
 | Stage | Purpose | Input | Output |
 |-------|---------|-------|--------|
-| `markdown-conversion` | Convert content to markdown | Raw files (PDF, audio, video, images, web) | `.md` files |
+| `markdown-conversion` | Convert content to markdown | Raw files (PDF, audio, video, images), URLs (YouTube, web) | `.md` files |
 | `markdown-optimizer` | Clean and optimize markdown | `.md` files | Optimized `.md` files |
 | `chunker` | Split content into chunks | `.md` files | `.chunks.json` files |
 | `fact-generator` | Extract facts and entities | `.chunks.json` files | `.facts.json` files |
@@ -405,6 +582,17 @@ curl -X POST "http://localhost:8000/api/v1/stages/ingestor/execute" \
 | Single Stage | `/api/v1/stages/{stage}/execute` | Execute one stage, debug, testing |
 | Stage Chain | `/api/v1/stages/chain` | Execute multiple stages with JSON config |
 | Execute All | `/api/v1/stages/execute-all` | Execute all stages with form data |
+
+### Supported Input Types
+
+| Input Type | Format | Example | Processing Features |
+|------------|--------|---------|-------------------|
+| **Documents** | PDF, DOCX, TXT, MD, HTML, RTF | `document.pdf` | Text extraction, formatting preservation |
+| **Audio** | MP3, WAV, FLAC, M4A, OGG, AAC | `audio.mp3` | Transcription, speaker diarization, timestamps |
+| **Video** | MP4, AVI, MOV, MKV, WEBM, FLV | `video.mp4` | Audio extraction, transcription, metadata |
+| **Images** | JPG, PNG, GIF, WEBP, BMP, TIFF | `image.png` | OCR, text extraction, descriptions |
+| **YouTube** | YouTube URLs | `https://youtube.com/watch?v=...` | Download, transcription, subtitles, metadata |
+| **Web Pages** | HTTP/HTTPS URLs | `https://example.com/article` | Content extraction, link following, metadata |
 
 ## 🔧 Webhook Configuration
 
@@ -499,6 +687,37 @@ async def main():
             )
         conversion_result = response.json()
 
+        # Process YouTube video
+        response = await client.post(
+            f"{base_url}/api/v1/stages/markdown-conversion/execute",
+            data={
+                "input_files": json.dumps(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]),
+                "config": json.dumps({
+                    "include_timestamps": True,
+                    "speaker_diarization": True,
+                    "language": "en",
+                    "download_subtitles": True,
+                    "quality": "720p"
+                })
+            }
+        )
+        youtube_result = response.json()
+
+        # Process webpage
+        response = await client.post(
+            f"{base_url}/api/v1/stages/markdown-conversion/execute",
+            data={
+                "input_files": json.dumps(["https://example.com/article"]),
+                "config": json.dumps({
+                    "extract_metadata": True,
+                    "clean_content": True,
+                    "extract_links": True,
+                    "preserve_tables": True
+                })
+            }
+        )
+        webpage_result = response.json()
+
         # Execute stage chain - conversion + chunking
         with open("audio.mp3", "rb") as f:
             response = await client.post(
@@ -520,39 +739,49 @@ async def main():
             )
         chain_result = response.json()
 
-        # Execute full pipeline with database storage
-        with open("document.pdf", "rb") as f:
-            response = await client.post(
-                f"{base_url}/api/v1/stages/execute-all",
-                files={"file": f},
-                data={
-                    "stages": json.dumps([
-                        "markdown-conversion", "markdown-optimizer",
-                        "chunker", "fact-generator", "ingestor"
-                    ]),
-                    "stage_configs": json.dumps({
-                        "ingestor": {
-                            "databases": ["qdrant", "neo4j"],
-                            "collection_name": "documents",
-                            "qdrant_config": {
-                                "host": "localhost",
-                                "port": 6333
-                            },
-                            "neo4j_config": {
-                                "uri": "bolt://localhost:7687",
-                                "username": "neo4j",
-                                "password": "password"
-                            }
+        # Process multiple URLs with full pipeline
+        response = await client.post(
+            f"{base_url}/api/v1/stages/execute-all",
+            data={
+                "input_files": json.dumps([
+                    "https://www.youtube.com/watch?v=VIDEO_ID",
+                    "https://example.com/article1",
+                    "https://example.com/article2"
+                ]),
+                "stages": json.dumps([
+                    "markdown-conversion", "markdown-optimizer",
+                    "chunker", "fact-generator", "ingestor"
+                ]),
+                "stage_configs": json.dumps({
+                    "markdown-conversion": {
+                        "include_timestamps": True,
+                        "extract_metadata": True,
+                        "clean_content": True
+                    },
+                    "ingestor": {
+                        "databases": ["qdrant", "neo4j"],
+                        "collection_name": "mixed_content",
+                        "qdrant_config": {
+                            "host": "localhost",
+                            "port": 6333
+                        },
+                        "neo4j_config": {
+                            "uri": "bolt://localhost:7687",
+                            "username": "neo4j",
+                            "password": "password"
                         }
-                    }),
-                    "webhook_url": "https://your-app.com/webhook"
-                }
-            )
-        full_pipeline_result = response.json()
+                    }
+                }),
+                "webhook_url": "https://your-app.com/webhook"
+            }
+        )
+        url_pipeline_result = response.json()
 
-        print(f"Conversion: {conversion_result['success']}")
-        print(f"Chain: {chain_result['success']}")
-        print(f"Full Pipeline: {full_pipeline_result['success']}")
+        print(f"Document Conversion: {conversion_result['success']}")
+        print(f"YouTube Processing: {youtube_result['success']}")
+        print(f"Webpage Processing: {webpage_result['success']}")
+        print(f"Audio Chain: {chain_result['success']}")
+        print(f"URL Pipeline: {url_pipeline_result['success']}")
 
 asyncio.run(main())
 ```
@@ -679,16 +908,137 @@ export MORAG_TEMP_DIR=/tmp/morag
 export MORAG_OUTPUT_DIR=./output
 ```
 
+## 🌐 URL Processing Examples
+
+### YouTube Video Processing
+
+```bash
+# Basic YouTube video processing
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
+    "include_timestamps": true,
+    "speaker_diarization": true,
+    "language": "en",
+    "download_subtitles": true,
+    "subtitle_languages": ["en", "auto"]
+  }'
+
+# YouTube video with custom quality and audio extraction
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://youtu.be/VIDEO_ID"]' \
+  -F 'config={
+    "quality": "720p",
+    "extract_audio": true,
+    "max_filesize": "50M",
+    "include_timestamps": true,
+    "topic_segmentation": true
+  }'
+
+# YouTube playlist processing (first video)
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://www.youtube.com/playlist?list=PLAYLIST_ID"]' \
+  -F 'config={
+    "include_timestamps": true,
+    "speaker_diarization": true,
+    "download_subtitles": true
+  }'
+```
+
+### Webpage Processing
+
+```bash
+# Basic webpage processing
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://example.com/article"]' \
+  -F 'config={
+    "extract_metadata": true,
+    "clean_content": true,
+    "extract_links": true,
+    "preserve_tables": true
+  }'
+
+# News article processing with link following
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://news.example.com/breaking-news"]' \
+  -F 'config={
+    "follow_links": true,
+    "max_depth": 2,
+    "extract_metadata": true,
+    "clean_content": true,
+    "remove_navigation": true,
+    "remove_footer": true,
+    "timeout": 60,
+    "rate_limit_delay": 2.0
+  }'
+
+# Documentation page processing
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://docs.example.com/api-reference"]' \
+  -F 'config={
+    "preserve_tables": true,
+    "preserve_lists": true,
+    "extract_metadata": true,
+    "clean_content": false,
+    "extract_links": true
+  }'
+```
+
+### Batch URL Processing
+
+```bash
+# Process multiple URLs in one request
+curl -X POST "http://localhost:8000/api/v1/stages/chain" \
+  -F 'request={
+    "input_files": [
+      "https://www.youtube.com/watch?v=VIDEO1",
+      "https://example.com/article1",
+      "https://example.com/article2",
+      "https://www.youtube.com/watch?v=VIDEO2"
+    ],
+    "stages": ["markdown-conversion", "chunker"],
+    "stage_configs": {
+      "markdown-conversion": {
+        "include_timestamps": true,
+        "extract_metadata": true,
+        "clean_content": true
+      },
+      "chunker": {
+        "chunk_strategy": "semantic",
+        "chunk_size": 3000
+      }
+    }
+  }'
+```
+
 ## 🔍 Content Type Auto-Detection
 
-MoRAG automatically detects content types based on file extensions and patterns:
+MoRAG automatically detects content types based on file extensions and URL patterns:
 
 - **Documents**: `.pdf`, `.docx`, `.txt`, `.md`, `.html`, `.rtf`
 - **Audio**: `.mp3`, `.wav`, `.flac`, `.m4a`, `.ogg`, `.aac`
 - **Video**: `.mp4`, `.avi`, `.mov`, `.mkv`, `.webm`, `.flv`
 - **Images**: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.tiff`
-- **Web**: URLs starting with `http://` or `https://`
-- **YouTube**: URLs containing `youtube.com` or `youtu.be`
+- **YouTube**: URLs containing `youtube.com`, `youtu.be`, or `youtube-nocookie.com`
+- **Web**: All other URLs starting with `http://` or `https://`
+
+### URL Processing Features
+
+**YouTube Processing:**
+- Automatic video ID extraction from various YouTube URL formats
+- Transcript extraction using YouTube's API or audio transcription fallback
+- Support for cookies file for private/age-restricted videos
+- Configurable video quality and audio extraction
+- Subtitle download in multiple languages
+- Speaker diarization and topic segmentation for long videos
+
+**Web Processing:**
+- Intelligent content extraction using MarkItDown
+- Automatic removal of navigation, ads, and footer content
+- Metadata extraction (title, description, author, etc.)
+- Link extraction and optional link following
+- Rate limiting and respectful crawling
+- Support for various content types (HTML, plain text, etc.)
 
 ## 🔄 Migration from Legacy API
 
