@@ -61,7 +61,6 @@ class SentimentAnalysisAgent(BaseAgent[SentimentAnalysisResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=text,
-                result_type=SentimentAnalysisResult,
                 **context
             )
 

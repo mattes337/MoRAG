@@ -65,7 +65,6 @@ class DecisionMakingAgent(BaseAgent[DecisionResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=decision_context,
-                result_type=DecisionResult,
                 **context_data
             )
 

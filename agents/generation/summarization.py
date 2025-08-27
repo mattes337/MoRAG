@@ -66,7 +66,6 @@ class SummarizationAgent(BaseAgent[SummarizationResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=text,
-                result_type=SummarizationResult,
                 **context
             )
 

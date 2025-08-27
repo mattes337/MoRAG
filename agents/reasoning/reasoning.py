@@ -65,7 +65,6 @@ class ReasoningAgent(BaseAgent[ReasoningResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=problem,
-                result_type=ReasoningResult,
                 **context_data
             )
 

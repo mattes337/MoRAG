@@ -65,7 +65,6 @@ class ResponseGenerationAgent(BaseAgent[ResponseGenerationResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=query,
-                result_type=ResponseGenerationResult,
                 **context_data
             )
 

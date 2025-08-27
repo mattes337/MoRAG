@@ -61,7 +61,6 @@ class ClassificationAgent(BaseAgent[ClassificationResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=content,
-                result_type=ClassificationResult,
                 **context_data
             )
 

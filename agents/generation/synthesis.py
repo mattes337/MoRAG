@@ -67,7 +67,6 @@ class SynthesisAgent(BaseAgent[SynthesisResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=combined_input,
-                result_type=SynthesisResult,
                 **context_data
             )
 

@@ -61,7 +61,6 @@ class ValidationAgent(BaseAgent[ValidationResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=fact,
-                result_type=ValidationResult,
                 **context_data
             )
 

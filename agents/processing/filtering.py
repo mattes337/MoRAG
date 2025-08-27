@@ -62,7 +62,6 @@ class FilteringAgent(BaseAgent[FilteringResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=f"Filter {len(content_items)} content items using {filter_type} criteria",
-                result_type=FilteringResult,
                 **context_data
             )
 

@@ -64,7 +64,6 @@ class ExplanationAgent(BaseAgent[ExplanationResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=topic,
-                result_type=ExplanationResult,
                 **context_data
             )
 

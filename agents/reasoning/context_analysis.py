@@ -61,7 +61,6 @@ class ContextAnalysisAgent(BaseAgent[ContextAnalysisResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=query,
-                result_type=ContextAnalysisResult,
                 **context_data
             )
 

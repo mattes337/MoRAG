@@ -67,7 +67,6 @@ class PathSelectionAgent(BaseAgent[PathSelectionResult]):
             # Execute the agent
             result = await self.execute(
                 user_input=f"Select optimal reasoning paths from {start_node} to {end_node}",
-                result_type=PathSelectionResult,
                 **context_data
             )
 
