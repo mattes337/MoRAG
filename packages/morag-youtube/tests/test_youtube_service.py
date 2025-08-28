@@ -34,7 +34,7 @@ SAMPLE_METADATA = {
 @pytest.fixture
 def youtube_service():
     """Create a YouTubeService instance for testing."""
-    return YouTubeService(max_concurrent_downloads=2)
+    return YouTubeService(service_url="http://localhost:8000", service_timeout=60)
 
 @pytest.fixture
 def temp_dir():

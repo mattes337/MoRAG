@@ -1,4 +1,4 @@
-"""YouTube service for high-level YouTube processing operations."""
+"""YouTube service for high-level YouTube processing operations using external API."""
 
 import asyncio
 from typing import List, Optional, Dict, Any, Union
@@ -9,27 +9,26 @@ from morag_core.interfaces.service import BaseService
 from morag_core.exceptions import ProcessingError
 
 from .processor import YouTubeProcessor, YouTubeConfig, YouTubeDownloadResult
-from .transcript import YouTubeTranscriptService, YouTubeTranscript
+from .external_service import YouTubeExternalService
 
 logger = structlog.get_logger(__name__)
 
 class YouTubeService(BaseService):
-    """Service for processing YouTube videos and playlists.
-    
-    This service provides high-level methods for downloading videos,
-    extracting metadata, and processing playlists with configurable options.
+    """Service for processing YouTube videos using external transcription API.
+
+    This service provides high-level methods for transcribing videos and
+    optionally downloading video files using an external service.
     """
-    
-    def __init__(self, max_concurrent_downloads: int = 3):
+
+    def __init__(self, service_url: Optional[str] = None, service_timeout: int = 300):
         """Initialize YouTube service.
 
         Args:
-            max_concurrent_downloads: Maximum number of concurrent downloads
+            service_url: URL of external YouTube service
+            service_timeout: Timeout for external service requests in seconds
         """
         self.processor = YouTubeProcessor()
-        self.transcript_service = YouTubeTranscriptService()
-        self.max_concurrent_downloads = max_concurrent_downloads
-        self.semaphore = asyncio.Semaphore(max_concurrent_downloads)
+        self.external_service = YouTubeExternalService(service_url, service_timeout)
 
     async def initialize(self) -> bool:
         """Initialize the service.
@@ -49,28 +48,44 @@ class YouTubeService(BaseService):
         Returns:
             Dictionary with health status information
         """
-        return {"status": "healthy", "processor": "ready"}
+        try:
+            # Check external service health
+            external_health = await self.external_service.health_check()
+
+            return {
+                "status": "healthy" if external_health["status"] == "healthy" else "unhealthy",
+                "external_service": external_health,
+                "processor_available": True
+            }
+
+        except Exception as e:
+            logger.warning("Health check failed", error=str(e))
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "external_service": {"status": "unhealthy", "error": str(e)},
+                "processor_available": False
+            }
     
     async def process_video(self, url: str, config: Optional[YouTubeConfig] = None) -> YouTubeDownloadResult:
-        """Process a single YouTube video.
-        
+        """Process a single YouTube video using external service.
+
         Args:
             url: YouTube video URL
             config: Processing configuration
-            
+
         Returns:
             YouTubeDownloadResult with video information and paths
         """
-        async with self.semaphore:
-            return await self.processor.process_url(url, config)
+        return await self.processor.process_url(url, config)
     
     async def process_videos(self, urls: List[str], config: Optional[YouTubeConfig] = None) -> List[Union[YouTubeDownloadResult, BaseException]]:
-        """Process multiple YouTube videos concurrently.
-        
+        """Process multiple YouTube videos using external service.
+
         Args:
             urls: List of YouTube video URLs
             config: Processing configuration
-            
+
         Returns:
             List of YouTubeDownloadResult objects
         """

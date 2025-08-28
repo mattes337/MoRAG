@@ -24,7 +24,6 @@ dependencies = [
     "morag-core>=0.1.0,<0.2.0",
     "morag-video>=0.1.0,<0.2.0",
     "morag-audio>=0.1.0,<0.2.0",
-    "yt-dlp>=2023.3.4",
     "youtube-transcript-api>=0.6.0",
     "structlog>=24.4.0,<25.0.0",
     "aiofiles>=24.1.0,<25.0.0",

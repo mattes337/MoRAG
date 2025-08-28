@@ -51,7 +51,7 @@ async def test_youtube_config_defaults():
     assert config.extract_audio is True
     assert config.download_subtitles is True
     assert config.subtitle_languages == ["en"]
-    assert config.max_filesize is None  # Disabled to avoid yt-dlp comparison bug
+    assert config.max_filesize is None
     assert config.download_thumbnails is True
     assert config.extract_metadata_only is False
     assert config.extract_transcript is True
@@ -77,30 +77,34 @@ async def test_process_file_not_supported(youtube_processor):
         await youtube_processor.process(Path("test.txt"))
 
 @pytest.mark.asyncio
-@patch('yt_dlp.YoutubeDL')
-async def test_extract_metadata_only(mock_ytdl, youtube_processor):
-    """Test extracting metadata without downloading."""
+@patch('morag_youtube.external_service.YouTubeExternalService.transcribe_video')
+async def test_process_url_transcribe_only(mock_transcribe, youtube_processor):
+    """Test processing URL for transcription only."""
     # Configure the mock
-    mock_instance = MagicMock()
-    mock_ytdl.return_value.__enter__.return_value = mock_instance
-    mock_instance.extract_info.return_value = SAMPLE_METADATA
-    
+    mock_transcribe.return_value = {
+        "success": True,
+        "metadata": SAMPLE_METADATA,
+        "transcript": {
+            "entries": [
+                {"text": "Never gonna give you up", "start": 0.0, "duration": 3.0}
+            ]
+        },
+        "transcript_languages": [{"language": "en"}]
+    }
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    config = YouTubeConfig()
-    metadata = await youtube_processor._extract_metadata_only(url, config)
-    
+    config = YouTubeConfig(download_video=False)
+    result = await youtube_processor.process_url(url, config)
+
     # Verify the result
-    assert metadata.id == SAMPLE_METADATA['id']
-    assert metadata.title == SAMPLE_METADATA['title']
-    assert metadata.uploader == SAMPLE_METADATA['uploader']
-    assert metadata.duration == SAMPLE_METADATA['duration']
-    assert metadata.view_count == SAMPLE_METADATA['view_count']
-    assert metadata.like_count == SAMPLE_METADATA['like_count']
-    assert metadata.comment_count == SAMPLE_METADATA['comment_count']
-    
+    assert result.success
+    assert result.metadata.id == SAMPLE_METADATA['id']
+    assert result.metadata.title == SAMPLE_METADATA['title']
+    assert result.transcript is not None
+
     # Verify the mock was called correctly
-    mock_ytdl.assert_called_once()
+    mock_transcribe.assert_called_once()
     mock_instance.extract_info.assert_called_once_with(url, download=False)
 
 @pytest.mark.asyncio
