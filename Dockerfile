@@ -50,6 +50,7 @@ FROM dependencies AS builder
 # Copy package files and agents framework
 COPY packages/ ./packages/
 COPY agents/ ./agents/
+COPY mock/ ./mock/
 
 # Install agents framework first (required by other packages)
 RUN pip install /build/agents
