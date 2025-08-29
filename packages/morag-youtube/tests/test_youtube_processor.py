@@ -246,3 +246,75 @@ async def test_process_playlist(mock_process_url, youtube_processor):
         assert mock_process_url.call_count == 2
         mock_process_url.assert_any_call('https://www.youtube.com/watch?v=video1', config)
         mock_process_url.assert_any_call('https://www.youtube.com/watch?v=video2', config)
+
+
+def test_convert_apify_result_with_nested_transcript():
+    """Test that _convert_apify_result correctly handles nested transcript structure from Apify."""
+    processor = YouTubeProcessor()
+
+    # Sample Apify service result with nested transcript structure (like in apify_output.json)
+    apify_result = {
+        "url": "https://www.youtube.com/watch?v=siBSKuWmV8s",
+        "videoId": "siBSKuWmV8s",
+        "metadata": {
+            "videoId": "siBSKuWmV8s",
+            "title": "Building Conversational AI With GPT 5",
+            "description": "Test description",
+            "viewCount": 102,
+            "likeCount": 4,
+            "publishDate": "Aug 25, 2025",
+            "channelName": "Mosleh",
+            "channelId": "UCb-qWVAUsVZ_HnMY3xn43Nw",
+            "category": "Science & Technology",
+            "keywords": [],
+            "thumbnails": [
+                {
+                    "url": "https://i.ytimg.com/vi/siBSKuWmV8s/maxresdefault.jpg",
+                    "width": 1920,
+                    "height": 1080
+                }
+            ]
+        },
+        "transcript": {
+            "transcript": [
+                {
+                    "index": 0,
+                    "text": "In this video, we're going to look into",
+                    "start": 0.08,
+                    "duration": 1.28,
+                    "end": 1.36
+                },
+                {
+                    "index": 1,
+                    "text": "how to make a conversational AI agent",
+                    "start": 1.36,
+                    "duration": 2.079,
+                    "end": 3.439
+                }
+            ]
+        }
+    }
+
+    # Convert the result
+    result = processor._convert_apify_result(apify_result, 0.0)
+
+    # Verify transcript was extracted correctly
+    assert result.transcript is not None
+    assert result.transcript["text"] == "In this video, we're going to look into how to make a conversational AI agent"
+    assert len(result.transcript["segments"]) == 2
+    assert result.transcript["segments"][0]["text"] == "In this video, we're going to look into"
+    assert result.transcript["segments"][1]["text"] == "how to make a conversational AI agent"
+
+    # Verify metadata was extracted correctly
+    assert result.metadata is not None
+    assert result.metadata.id == "siBSKuWmV8s"
+    assert result.metadata.title == "Building Conversational AI With GPT 5"
+    assert result.metadata.uploader == "Mosleh"
+    assert result.metadata.view_count == 102
+    assert result.metadata.like_count == 4
+    assert result.metadata.channel_id == "UCb-qWVAUsVZ_HnMY3xn43Nw"
+    assert result.metadata.thumbnail_url == "https://i.ytimg.com/vi/siBSKuWmV8s/maxresdefault.jpg"
+    assert result.metadata.categories == ["Science & Technology"]
+
+    # Verify legacy transcript_text field is set
+    assert result.transcript_text == "In this video, we're going to look into how to make a conversational AI agent"

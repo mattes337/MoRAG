@@ -302,19 +302,32 @@ class YouTubeProcessor(BaseProcessor):
         metadata = None
         if service_result.get("metadata"):
             metadata_dict = service_result["metadata"]
+
+            # Extract thumbnail URL from thumbnails array
+            thumbnail_url = ""
+            if metadata_dict.get("thumbnails") and len(metadata_dict["thumbnails"]) > 0:
+                thumbnail_url = metadata_dict["thumbnails"][0].get("url", "")
+
+            # Parse duration from various possible formats
+            duration = 0
+            if metadata_dict.get("duration"):
+                duration = self._parse_duration(str(metadata_dict["duration"]))
+            elif metadata_dict.get("lengthSeconds"):
+                duration = float(metadata_dict["lengthSeconds"])
+
             metadata = YouTubeMetadata(
-                id=self._extract_video_id(metadata_dict.get("url", "")),
+                id=metadata_dict.get("videoId", ""),
                 title=metadata_dict.get("title", ""),
                 description=metadata_dict.get("description", ""),
-                uploader=metadata_dict.get("channel", ""),
-                upload_date=metadata_dict.get("uploadDate", ""),
-                duration=self._parse_duration(metadata_dict.get("duration", "0")),
+                uploader=metadata_dict.get("channelName", ""),
+                upload_date=metadata_dict.get("publishDate", ""),
+                duration=duration,
                 view_count=int(metadata_dict.get("viewCount", 0)),
                 like_count=metadata_dict.get("likeCount"),
                 comment_count=metadata_dict.get("commentCount"),
-                tags=metadata_dict.get("tags", []),
-                categories=metadata_dict.get("categories", []),
-                thumbnail_url=metadata_dict.get("thumbnail", ""),
+                tags=metadata_dict.get("keywords", []),
+                categories=[metadata_dict.get("category", "")] if metadata_dict.get("category") else [],
+                thumbnail_url=thumbnail_url,
                 webpage_url=metadata_dict.get("url", ""),
                 channel_id=metadata_dict.get("channelId", ""),
                 channel_url=metadata_dict.get("channelUrl", ""),
@@ -330,7 +343,13 @@ class YouTubeProcessor(BaseProcessor):
 
         if service_result.get("transcript"):
             transcript_data = service_result["transcript"]
-            if isinstance(transcript_data, list):
+            # Handle nested transcript structure from Apify
+            if isinstance(transcript_data, dict) and "transcript" in transcript_data:
+                transcript_segments_data = transcript_data["transcript"]
+                if isinstance(transcript_segments_data, list):
+                    transcript_segments = transcript_segments_data
+                    transcript_text = " ".join(segment.get("text", "") for segment in transcript_segments_data)
+            elif isinstance(transcript_data, list):
                 # Handle segment format
                 transcript_segments = transcript_data
                 transcript_text = " ".join(segment.get("text", "") for segment in transcript_data)
