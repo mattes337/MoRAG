@@ -7,12 +7,12 @@ try:
     from .fact_extractor import FactExtractor
     from .fact_graph_builder import FactGraphBuilder
     from .fact_validator import FactValidator
-    from .fact_prompts import FactExtractionPrompts, FactPromptTemplates
+    # Removed obsolete fact_prompts - now using agents framework
     from .entity_normalizer import LLMEntityNormalizer as EntityNormalizer
 
     __all__ = [
         "EntityExtractor", "RelationExtractor", "BaseExtractor", "Entity", "Relation", "DummyExtractor",
-        "FactExtractor", "FactGraphBuilder", "FactValidator", "FactExtractionPrompts", "FactPromptTemplates",
+        "FactExtractor", "FactGraphBuilder", "FactValidator",
         "EntityNormalizer"
     ]
 except ImportError:

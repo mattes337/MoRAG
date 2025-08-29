@@ -1,0 +1,229 @@
+# Centralized Entity Type Configuration for MoRAG Agents
+# This file defines EXAMPLE entity types used across the MoRAG agent framework
+# NOTE: These are SUGGESTIONS only - the system supports dynamic, domain-specific types
+
+# Standard Entity Types
+# These are common entity types that can serve as inspiration
+standard_entity_types:
+  - PERSON
+  - ORGANIZATION
+  - LOCATION
+  - CONCEPT
+  - PRODUCT
+  - EVENT
+  - DATE
+  - QUANTITY
+  - TECHNOLOGY
+  - PROCESS
+
+# Extended Entity Types
+# Additional entity types for specialized domains
+extended_entity_types:
+  - DOCUMENT
+  - WEBSITE
+  - EMAIL
+  - PHONE_NUMBER
+  - ADDRESS
+  - CURRENCY
+  - PERCENTAGE
+  - TIME
+  - DURATION
+  - MEASUREMENT
+  - CHEMICAL
+  - MEDICAL_CONDITION
+  - MEDICATION
+  - PROCEDURE
+  - REGULATION
+  - LAW
+  - POLICY
+
+# Domain-Specific Entity Types
+# Organized by domain for specialized use cases
+domain_specific:
+  medical:
+    - SYMPTOM
+    - DIAGNOSIS
+    - TREATMENT
+    - MEDICATION
+    - DOSAGE
+    - SIDE_EFFECT
+    - MEDICAL_DEVICE
+    - ANATOMY
+    - PATHOGEN
+    - GENE
+    - PROTEIN
+    
+  legal:
+    - STATUTE
+    - CASE_LAW
+    - REGULATION
+    - CONTRACT
+    - CLAUSE
+    - JURISDICTION
+    - COURT
+    - JUDGE
+    - LAWYER
+    - PLAINTIFF
+    - DEFENDANT
+    
+  technical:
+    - SOFTWARE
+    - HARDWARE
+    - ALGORITHM
+    - PROTOCOL
+    - API
+    - DATABASE
+    - FRAMEWORK
+    - LIBRARY
+    - VERSION
+    - CONFIGURATION
+    - PARAMETER
+    
+  business:
+    - COMPANY
+    - DEPARTMENT
+    - ROLE
+    - REVENUE
+    - PROFIT
+    - MARKET
+    - COMPETITOR
+    - STRATEGY
+    - METRIC
+    - KPI
+    - BUDGET
+    
+  academic:
+    - RESEARCH_PAPER
+    - AUTHOR
+    - JOURNAL
+    - CONFERENCE
+    - UNIVERSITY
+    - DEPARTMENT
+    - DEGREE
+    - COURSE
+    - THESIS
+    - CITATION
+    - METHODOLOGY
+
+# Entity Type Hierarchies
+# Define parent-child relationships between entity types
+hierarchies:
+  PERSON:
+    - AUTHOR
+    - RESEARCHER
+    - DOCTOR
+    - LAWYER
+    - ENGINEER
+    - MANAGER
+    - STUDENT
+    
+  ORGANIZATION:
+    - COMPANY
+    - UNIVERSITY
+    - HOSPITAL
+    - GOVERNMENT_AGENCY
+    - NGO
+    - RESEARCH_INSTITUTE
+    
+  LOCATION:
+    - COUNTRY
+    - STATE
+    - CITY
+    - ADDRESS
+    - BUILDING
+    - ROOM
+    
+  DOCUMENT:
+    - RESEARCH_PAPER
+    - REPORT
+    - MANUAL
+    - SPECIFICATION
+    - CONTRACT
+    - POLICY
+
+# Dynamic Entity Types Configuration
+# Settings for allowing LLM-generated entity types
+dynamic_entity_types:
+  enabled: true
+  max_custom_types: 50  # Increased to allow more domain-specific types
+  confidence_threshold: 0.7  # Lowered to be more permissive
+  validation_required: false  # Allow more flexibility
+  fallback_to_standard: false  # Encourage domain-specific types
+  encourage_specificity: true  # Prefer specific over generic types
+
+# Entity Type Validation Rules
+validation_rules:
+  min_entity_length: 2
+  max_entity_length: 100
+  allowed_characters: "alphanumeric_spaces_hyphens_underscores"
+  case_sensitive: false
+  normalize_to_uppercase: true
+
+# Default Entity Type Sets by Agent
+# Predefined sets for different agent types
+agent_defaults:
+  entity_extraction:
+    - PERSON
+    - ORGANIZATION
+    - LOCATION
+    - CONCEPT
+    - PRODUCT
+    - EVENT
+    - DATE
+    - QUANTITY
+    - TECHNOLOGY
+    - PROCESS
+    
+  relation_extraction:
+    - PERSON
+    - ORGANIZATION
+    - CONCEPT
+    - TECHNOLOGY
+    - PROCESS
+    
+  content_analysis:
+    - CONCEPT
+    - TECHNOLOGY
+    - PROCESS
+    - DOCUMENT
+    - ORGANIZATION
+    
+  query_analysis:
+    - PERSON
+    - ORGANIZATION
+    - LOCATION
+    - CONCEPT
+    - PRODUCT
+    - TECHNOLOGY
+
+# Entity Type Descriptions
+# Human-readable descriptions for each entity type
+descriptions:
+  PERSON: "Individual people, including names, roles, and titles"
+  ORGANIZATION: "Companies, institutions, agencies, and other organizational entities"
+  LOCATION: "Geographic locations, addresses, and spatial references"
+  CONCEPT: "Abstract ideas, theories, methodologies, and conceptual frameworks"
+  PRODUCT: "Commercial products, services, and offerings"
+  EVENT: "Occurrences, meetings, conferences, and temporal events"
+  DATE: "Specific dates, time periods, and temporal references"
+  QUANTITY: "Numerical values, measurements, and quantitative data"
+  TECHNOLOGY: "Technical systems, tools, software, and technological concepts"
+  PROCESS: "Procedures, workflows, methodologies, and systematic approaches"
+  DOCUMENT: "Written materials, publications, and information artifacts"
+  WEBSITE: "Web addresses, domains, and online resources"
+  EMAIL: "Email addresses and electronic communication identifiers"
+  PHONE_NUMBER: "Telephone numbers and communication contacts"
+  ADDRESS: "Physical addresses and location identifiers"
+  CURRENCY: "Monetary values and financial amounts"
+  PERCENTAGE: "Percentage values and proportional measurements"
+  TIME: "Time references and temporal specifications"
+  DURATION: "Time periods and temporal intervals"
+  MEASUREMENT: "Physical measurements and dimensional values"
+
+# Configuration Metadata
+metadata:
+  version: "1.1.0"
+  last_updated: "2024-01-01"
+  maintainer: "MoRAG Development Team"
+  description: "Centralized entity type configuration for consistent entity extraction across all MoRAG agents"
+  note: "These types are suggestions only - the system supports dynamic, domain-specific types generated by LLMs"

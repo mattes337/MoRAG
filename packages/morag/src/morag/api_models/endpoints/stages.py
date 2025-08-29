@@ -341,8 +341,21 @@ async def execute_stage(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Stage execution failed", stage=stage_name, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log detailed error information
+        logger.error("Stage execution failed",
+                    stage=stage_name,
+                    error=str(e),
+                    error_type=e.__class__.__name__,
+                    exc_info=True)
+
+        # Provide more detailed error message
+        error_detail = f"Stage '{stage_name}' execution failed: {str(e)}"
+        if hasattr(e, 'stage_type'):
+            error_detail = f"Stage '{e.stage_type}' failed: {str(e)}"
+        if hasattr(e, 'invalid_files'):
+            error_detail += f" (Invalid files: {e.invalid_files})"
+
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @router.post("/chain", response_model=StageChainResponse)
@@ -500,8 +513,19 @@ async def execute_stage_chain(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Stage chain execution failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Stage chain execution failed",
+                    error=str(e),
+                    error_type=e.__class__.__name__,
+                    exc_info=True)
+
+        # Provide more detailed error message
+        error_detail = f"Stage chain execution failed: {str(e)}"
+        if hasattr(e, 'stage_type'):
+            error_detail = f"Stage '{e.stage_type}' in chain failed: {str(e)}"
+        if hasattr(e, 'invalid_files'):
+            error_detail += f" (Invalid files: {e.invalid_files})"
+
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @router.post("/execute-all", response_model=StageChainResponse)
@@ -560,8 +584,19 @@ async def execute_all_stages(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid stage name: {str(e)}")
     except Exception as e:
-        logger.error("Execute all stages failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Execute all stages failed",
+                    error=str(e),
+                    error_type=e.__class__.__name__,
+                    exc_info=True)
+
+        # Provide more detailed error message
+        error_detail = f"Execute all stages failed: {str(e)}"
+        if hasattr(e, 'stage_type'):
+            error_detail = f"Stage '{e.stage_type}' failed during execution: {str(e)}"
+        if hasattr(e, 'invalid_files'):
+            error_detail += f" (Invalid files: {e.invalid_files})"
+
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 async def send_webhook_notification_for_chain(webhook_config, stage_responses, success, total_time):

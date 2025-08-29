@@ -21,7 +21,7 @@ SAMPLE_METADATA = {
     'comment_count': 10000,
     'tags': ['Rick Astley', 'Never Gonna Give You Up'],
     'categories': ['Music'],
-    'thumbnail': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+    'thumbnail_url': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
     'webpage_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     'channel_id': 'UCuAXFkgsw1L7xaCfnd5JJOw',
     'channel_url': 'https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw',
@@ -51,9 +51,15 @@ async def test_youtube_config_defaults():
     assert config.extract_audio is True
     assert config.download_subtitles is True
     assert config.subtitle_languages == ["en"]
-    assert config.max_filesize == "500M"
+    assert config.max_filesize is None
     assert config.download_thumbnails is True
     assert config.extract_metadata_only is False
+    assert config.extract_transcript is True
+    assert config.transcript_language is None
+    assert config.transcript_format == "text"
+    assert config.prefer_audio_transcription is True
+    assert config.cookies_file is None
+    assert config.transcript_only is False
 
 @pytest.mark.asyncio
 async def test_supports_format(youtube_processor):
@@ -71,29 +77,34 @@ async def test_process_file_not_supported(youtube_processor):
         await youtube_processor.process(Path("test.txt"))
 
 @pytest.mark.asyncio
-@patch('yt_dlp.YoutubeDL')
-async def test_extract_metadata_only(mock_ytdl, youtube_processor):
-    """Test extracting metadata without downloading."""
+@patch('morag_youtube.external_service.YouTubeExternalService.transcribe_video')
+async def test_process_url_transcribe_only(mock_transcribe, youtube_processor):
+    """Test processing URL for transcription only."""
     # Configure the mock
-    mock_instance = MagicMock()
-    mock_ytdl.return_value.__enter__.return_value = mock_instance
-    mock_instance.extract_info.return_value = SAMPLE_METADATA
-    
+    mock_transcribe.return_value = {
+        "success": True,
+        "metadata": SAMPLE_METADATA,
+        "transcript": {
+            "entries": [
+                {"text": "Never gonna give you up", "start": 0.0, "duration": 3.0}
+            ]
+        },
+        "transcript_languages": [{"language": "en"}]
+    }
+
     # Call the method
     url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    metadata = await youtube_processor._extract_metadata_only(url)
-    
+    config = YouTubeConfig(download_video=False)
+    result = await youtube_processor.process_url(url, config)
+
     # Verify the result
-    assert metadata.id == SAMPLE_METADATA['id']
-    assert metadata.title == SAMPLE_METADATA['title']
-    assert metadata.uploader == SAMPLE_METADATA['uploader']
-    assert metadata.duration == SAMPLE_METADATA['duration']
-    assert metadata.view_count == SAMPLE_METADATA['view_count']
-    assert metadata.like_count == SAMPLE_METADATA['like_count']
-    assert metadata.comment_count == SAMPLE_METADATA['comment_count']
-    
+    assert result.success
+    assert result.metadata.id == SAMPLE_METADATA['id']
+    assert result.metadata.title == SAMPLE_METADATA['title']
+    assert result.transcript is not None
+
     # Verify the mock was called correctly
-    mock_ytdl.assert_called_once()
+    mock_transcribe.assert_called_once()
     mock_instance.extract_info.assert_called_once_with(url, download=False)
 
 @pytest.mark.asyncio
@@ -235,3 +246,75 @@ async def test_process_playlist(mock_process_url, youtube_processor):
         assert mock_process_url.call_count == 2
         mock_process_url.assert_any_call('https://www.youtube.com/watch?v=video1', config)
         mock_process_url.assert_any_call('https://www.youtube.com/watch?v=video2', config)
+
+
+def test_convert_apify_result_with_nested_transcript():
+    """Test that _convert_apify_result correctly handles nested transcript structure from Apify."""
+    processor = YouTubeProcessor()
+
+    # Sample Apify service result with nested transcript structure (like in apify_output.json)
+    apify_result = {
+        "url": "https://www.youtube.com/watch?v=siBSKuWmV8s",
+        "videoId": "siBSKuWmV8s",
+        "metadata": {
+            "videoId": "siBSKuWmV8s",
+            "title": "Building Conversational AI With GPT 5",
+            "description": "Test description",
+            "viewCount": 102,
+            "likeCount": 4,
+            "publishDate": "Aug 25, 2025",
+            "channelName": "Mosleh",
+            "channelId": "UCb-qWVAUsVZ_HnMY3xn43Nw",
+            "category": "Science & Technology",
+            "keywords": [],
+            "thumbnails": [
+                {
+                    "url": "https://i.ytimg.com/vi/siBSKuWmV8s/maxresdefault.jpg",
+                    "width": 1920,
+                    "height": 1080
+                }
+            ]
+        },
+        "transcript": {
+            "transcript": [
+                {
+                    "index": 0,
+                    "text": "In this video, we're going to look into",
+                    "start": 0.08,
+                    "duration": 1.28,
+                    "end": 1.36
+                },
+                {
+                    "index": 1,
+                    "text": "how to make a conversational AI agent",
+                    "start": 1.36,
+                    "duration": 2.079,
+                    "end": 3.439
+                }
+            ]
+        }
+    }
+
+    # Convert the result
+    result = processor._convert_apify_result(apify_result, 0.0)
+
+    # Verify transcript was extracted correctly
+    assert result.transcript is not None
+    assert result.transcript["text"] == "In this video, we're going to look into how to make a conversational AI agent"
+    assert len(result.transcript["segments"]) == 2
+    assert result.transcript["segments"][0]["text"] == "In this video, we're going to look into"
+    assert result.transcript["segments"][1]["text"] == "how to make a conversational AI agent"
+
+    # Verify metadata was extracted correctly
+    assert result.metadata is not None
+    assert result.metadata.id == "siBSKuWmV8s"
+    assert result.metadata.title == "Building Conversational AI With GPT 5"
+    assert result.metadata.uploader == "Mosleh"
+    assert result.metadata.view_count == 102
+    assert result.metadata.like_count == 4
+    assert result.metadata.channel_id == "UCb-qWVAUsVZ_HnMY3xn43Nw"
+    assert result.metadata.thumbnail_url == "https://i.ytimg.com/vi/siBSKuWmV8s/maxresdefault.jpg"
+    assert result.metadata.categories == ["Science & Technology"]
+
+    # Verify legacy transcript_text field is set
+    assert result.transcript_text == "In this video, we're going to look into how to make a conversational AI agent"

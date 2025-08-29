@@ -15,325 +15,272 @@ logger = structlog.get_logger(__name__)
 def setup_parser() -> argparse.ArgumentParser:
     """Set up command-line argument parser."""
     parser = argparse.ArgumentParser(
-        description="YouTube video processing tool",
+        description="YouTube video transcription tool using external service",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    
+
+    # Global arguments
+    parser.add_argument(
+        "--service-url",
+        type=str,
+        help="URL of external YouTube transcription service (overrides YOUTUBE_SERVICE_URL env var)"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Timeout for external service requests in seconds"
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
-    
-    # Download command
-    download_parser = subparsers.add_parser("download", help="Download YouTube video")
-    download_parser.add_argument("url", help="YouTube video URL")
-    download_parser.add_argument(
-        "-o", "--output-dir", 
-        type=Path, 
+
+    # Transcribe command (replaces download)
+    transcribe_parser = subparsers.add_parser("transcribe", help="Transcribe YouTube video")
+    transcribe_parser.add_argument("url", help="YouTube video URL")
+    transcribe_parser.add_argument(
+        "-o", "--output-dir",
+        type=Path,
         default=Path.cwd(),
-        help="Output directory for downloaded files"
+        help="Output directory for downloaded video files (if --download-video is used)"
     )
-    download_parser.add_argument(
-        "-q", "--quality", 
-        default="best",
-        help="Video quality (best, worst, or specific format)"
-    )
-    download_parser.add_argument(
-        "--no-audio", 
+    transcribe_parser.add_argument(
+        "--download-video",
         action="store_true",
-        help="Don't extract audio"
+        help="Download video file in addition to transcription"
     )
-    download_parser.add_argument(
-        "--no-subtitles", 
+    transcribe_parser.add_argument(
+        "--output-format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format for transcription results"
+    )
+
+    # Health check command
+    health_parser = subparsers.add_parser("health", help="Check external service health")
+
+    # Batch command for multiple videos
+    batch_parser = subparsers.add_parser("batch", help="Process multiple YouTube videos")
+    batch_parser.add_argument("urls", nargs="+", help="YouTube video URLs")
+    batch_parser.add_argument(
+        "-o", "--output-dir",
+        type=Path,
+        default=Path.cwd(),
+        help="Output directory for downloaded video files (if --download-video is used)"
+    )
+    batch_parser.add_argument(
+        "--download-video",
         action="store_true",
-        help="Don't download subtitles"
+        help="Download video files in addition to transcription"
     )
-    download_parser.add_argument(
-        "--subtitle-langs", 
-        default="en",
-        help="Subtitle languages (comma-separated)"
+    batch_parser.add_argument(
+        "--output-format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format for transcription results"
     )
-    
-    # Audio command
-    audio_parser = subparsers.add_parser("audio", help="Download only audio from YouTube video")
-    audio_parser.add_argument("url", help="YouTube video URL")
-    audio_parser.add_argument(
-        "-o", "--output-dir", 
-        type=Path, 
-        default=Path.cwd(),
-        help="Output directory for downloaded files"
+    batch_parser.add_argument(
+        "--max-concurrent",
+        type=int,
+        default=3,
+        help="Maximum number of concurrent transcriptions"
     )
-    
-    # Metadata command
-    metadata_parser = subparsers.add_parser("metadata", help="Extract metadata from YouTube video")
-    metadata_parser.add_argument("url", help="YouTube video URL")
-    metadata_parser.add_argument(
-        "-o", "--output-file", 
-        type=Path, 
-        help="Output file for metadata (JSON format)"
-    )
-    
-    # Playlist command
-    playlist_parser = subparsers.add_parser("playlist", help="Process YouTube playlist")
-    playlist_parser.add_argument("url", help="YouTube playlist URL")
-    playlist_parser.add_argument(
-        "-o", "--output-dir", 
-        type=Path, 
-        default=Path.cwd(),
-        help="Output directory for downloaded files"
-    )
-    playlist_parser.add_argument(
-        "-q", "--quality", 
-        default="best",
-        help="Video quality (best, worst, or specific format)"
-    )
-    playlist_parser.add_argument(
-        "--no-audio", 
-        action="store_true",
-        help="Don't extract audio"
-    )
-    playlist_parser.add_argument(
-        "--no-subtitles", 
-        action="store_true",
-        help="Don't download subtitles"
-    )
-    
-    # Thumbnail command
-    thumbnail_parser = subparsers.add_parser("thumbnail", help="Download thumbnail from YouTube video")
-    thumbnail_parser.add_argument("url", help="YouTube video URL")
-    thumbnail_parser.add_argument(
-        "-o", "--output-dir", 
-        type=Path, 
-        default=Path.cwd(),
-        help="Output directory for downloaded files"
-    )
-    
-    # Subtitles command
-    subtitles_parser = subparsers.add_parser("subtitles", help="Download subtitles from YouTube video")
-    subtitles_parser.add_argument("url", help="YouTube video URL")
-    subtitles_parser.add_argument(
-        "-o", "--output-dir", 
-        type=Path, 
-        default=Path.cwd(),
-        help="Output directory for downloaded files"
-    )
-    subtitles_parser.add_argument(
-        "--langs", 
-        default="en",
-        help="Subtitle languages (comma-separated)"
-    )
-    
+
     return parser
 
-async def download_video(args):
-    """Download YouTube video."""
-    service = YouTubeService()
-    
-    config = YouTubeConfig(
-        quality=args.quality,
-        extract_audio=not args.no_audio,
-        download_subtitles=not args.no_subtitles,
-        subtitle_languages=args.subtitle_langs.split(",")
-    )
-    
-    try:
-        result = await service.download_video(
-            args.url,
-            output_dir=args.output_dir,
-            quality=args.quality,
-            extract_audio=not args.no_audio,
-            download_subtitles=not args.no_subtitles
-        )
-        
-        print(f"\nDownload completed successfully!")
-        print(f"Video: {result.video_path}")
-        if result.audio_path:
-            print(f"Audio: {result.audio_path}")
-        if result.subtitle_paths:
-            print(f"Subtitles: {', '.join(str(p) for p in result.subtitle_paths)}")
-        if result.thumbnail_paths:
-            print(f"Thumbnails: {', '.join(str(p) for p in result.thumbnail_paths)}")
-        print(f"Total size: {result.file_size / (1024*1024):.2f} MB")
-        print(f"Processing time: {result.processing_time:.2f} seconds")
-        
-    except Exception as e:
-        logger.exception("Error downloading video", error=str(e))
-        print(f"Error: {str(e)}")
-        return 1
-    
-    return 0
+def _create_config_from_args(args, **kwargs) -> YouTubeConfig:
+    """Create YouTubeConfig from command line arguments."""
+    config_kwargs = kwargs.copy()
 
-async def download_audio(args):
-    """Download audio from YouTube video."""
-    service = YouTubeService()
-    
-    try:
-        audio_path = await service.download_audio(args.url, output_dir=args.output_dir)
-        print(f"\nAudio downloaded successfully: {audio_path}")
-        
-    except Exception as e:
-        logger.exception("Error downloading audio", error=str(e))
-        print(f"Error: {str(e)}")
-        return 1
-    
-    return 0
+    # Set external service options
+    if hasattr(args, 'service_url') and args.service_url:
+        config_kwargs['service_url'] = args.service_url
+    if hasattr(args, 'timeout') and args.timeout:
+        config_kwargs['service_timeout'] = args.timeout
 
-async def extract_metadata(args):
-    """Extract metadata from YouTube video."""
-    service = YouTubeService()
-    
-    try:
-        metadata = await service.extract_metadata(args.url)
-        
-        # Pretty print metadata
-        if args.output_file:
-            with open(args.output_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
-            print(f"Metadata saved to {args.output_file}")
-        else:
-            print("\nVideo Metadata:")
-            print(json.dumps(metadata, indent=2, ensure_ascii=False))
-        
-    except Exception as e:
-        logger.exception("Error extracting metadata", error=str(e))
-        print(f"Error: {str(e)}")
-        return 1
-    
-    return 0
+    # Set download options
+    if hasattr(args, 'download_video') and args.download_video:
+        config_kwargs['download_video'] = True
+    if hasattr(args, 'output_dir') and args.output_dir:
+        config_kwargs['output_dir'] = args.output_dir
 
-async def process_playlist(args):
-    """Process YouTube playlist."""
-    service = YouTubeService()
-    
-    config = YouTubeConfig(
-        quality=args.quality,
-        extract_audio=not args.no_audio,
-        download_subtitles=not args.no_subtitles
-    )
-    
+    return YouTubeConfig(**config_kwargs)
+
+async def transcribe_video(args):
+    """Transcribe YouTube video using external service."""
+    service = YouTubeService(service_url=args.service_url, service_timeout=args.timeout)
+
+    config = _create_config_from_args(args)
+
     try:
-        print(f"Processing playlist: {args.url}")
-        print("This may take some time depending on the playlist size...")
-        
-        results = await service.process_playlist(args.url, config)
-        
-        # Move files to output directory
-        output_dir = args.output_dir
-        output_dir.mkdir(exist_ok=True, parents=True)
-        
-        success_count = 0
-        failed_count = 0
-        
-        for i, result in enumerate(results):
-            if result.success:
-                success_count += 1
-                
-                # Move video file
-                if result.video_path and result.video_path.exists():
-                    new_video_path = output_dir / result.video_path.name
-                    result.video_path.rename(new_video_path)
-                
-                # Move audio file
-                if result.audio_path and result.audio_path.exists():
-                    new_audio_path = output_dir / result.audio_path.name
-                    result.audio_path.rename(new_audio_path)
-                
-                # Move subtitle files
-                for sub_path in result.subtitle_paths:
-                    if sub_path.exists():
-                        new_sub_path = output_dir / sub_path.name
-                        sub_path.rename(new_sub_path)
-                
-                # Move thumbnail files
-                for thumb_path in result.thumbnail_paths:
-                    if thumb_path.exists():
-                        new_thumb_path = output_dir / thumb_path.name
-                        thumb_path.rename(new_thumb_path)
+        print(f"Transcribing video: {args.url}")
+        print("This may take several minutes...")
+
+        result = await service.process_video(args.url, config)
+
+        if result.success:
+            print(f"\nTranscription completed successfully!")
+
+            # Display metadata if available
+            if result.metadata:
+                print(f"Title: {result.metadata.title}")
+                print(f"Duration: {result.metadata.duration} seconds")
+                print(f"Uploader: {result.metadata.uploader}")
+
+            # Display transcript info
+            if result.transcript:
+                print(f"Transcript available in {len(result.transcript_languages)} languages")
+                if result.transcript.get('entries'):
+                    print(f"Transcript segments: {len(result.transcript['entries'])}")
+
+            # Display video download info if applicable
+            if result.video_path:
+                print(f"Video downloaded: {result.video_path}")
+
+            # Save results based on format
+            if args.output_format == "json":
+                output_file = args.output_dir / f"{result.metadata.id if result.metadata else 'transcript'}.json"
+                with open(output_file, "w", encoding="utf-8") as f:
+                    json.dump({
+                        "metadata": result.metadata.__dict__ if result.metadata else None,
+                        "transcript": result.transcript,
+                        "transcript_languages": result.transcript_languages,
+                        "video_path": str(result.video_path) if result.video_path else None
+                    }, f, indent=2, ensure_ascii=False, default=str)
+                print(f"Results saved to: {output_file}")
             else:
-                failed_count += 1
-        
-        print(f"\nPlaylist processing completed!")
-        print(f"Successfully processed: {success_count} videos")
-        print(f"Failed: {failed_count} videos")
-        print(f"Files saved to: {output_dir}")
-        
-    except Exception as e:
-        logger.exception("Error processing playlist", error=str(e))
-        print(f"Error: {str(e)}")
-        return 1
-    
-    return 0
+                # Text format - save transcript text
+                if result.transcript_text:
+                    output_file = args.output_dir / f"{result.metadata.id if result.metadata else 'transcript'}.txt"
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        f.write(result.transcript_text)
+                    print(f"Transcript saved to: {output_file}")
 
-async def download_thumbnail(args):
-    """Download thumbnail from YouTube video."""
-    service = YouTubeService()
-    
-    try:
-        thumbnail_path = await service.download_thumbnail(args.url, output_dir=args.output_dir)
-        print(f"\nThumbnail downloaded successfully: {thumbnail_path}")
-        
-    except Exception as e:
-        logger.exception("Error downloading thumbnail", error=str(e))
-        print(f"Error: {str(e)}")
-        return 1
-    
-    return 0
-
-async def download_subtitles(args):
-    """Download subtitles from YouTube video."""
-    service = YouTubeService()
-    
-    try:
-        languages = args.langs.split(",")
-        subtitle_paths = await service.download_subtitles(
-            args.url, 
-            languages=languages,
-            output_dir=args.output_dir
-        )
-        
-        if subtitle_paths:
-            print(f"\nSubtitles downloaded successfully:")
-            for path in subtitle_paths:
-                print(f"- {path}")
+            print(f"Processing time: {result.processing_time:.2f} seconds")
         else:
-            print(f"\nNo subtitles found for the requested languages: {languages}")
-        
+            print(f"Transcription failed: {result.error_message}")
+            return 1
+
     except Exception as e:
-        logger.exception("Error downloading subtitles", error=str(e))
+        logger.exception("Error transcribing video", error=str(e))
         print(f"Error: {str(e)}")
         return 1
-    
+
     return 0
 
-async def main_async():
-    """Async entry point for the CLI."""
+async def check_health(args):
+    """Check external service health."""
+    service = YouTubeService(service_url=args.service_url, service_timeout=args.timeout)
+
+    try:
+        health = await service.health_check()
+
+        print("\nService Health Check:")
+        print(json.dumps(health, indent=2, ensure_ascii=False))
+
+        if health["status"] == "healthy":
+            print("\n✅ Service is healthy and ready")
+            return 0
+        else:
+            print("\n❌ Service is unhealthy")
+            return 1
+
+    except Exception as e:
+        logger.exception("Error checking service health", error=str(e))
+        print(f"Error: {str(e)}")
+        return 1
+
+async def process_batch(args):
+    """Process multiple YouTube videos."""
+    service = YouTubeService(service_url=args.service_url, service_timeout=args.timeout)
+
+    config = _create_config_from_args(args)
+
+    try:
+        print(f"Processing {len(args.urls)} videos...")
+        print("This may take several minutes per video...")
+
+        results = await service.process_videos(args.urls, config)
+
+        successful = 0
+        failed = 0
+
+        for i, result in enumerate(results):
+            url = args.urls[i]
+            if isinstance(result, Exception):
+                print(f"❌ Failed: {url} - {str(result)}")
+                failed += 1
+            else:
+                if result.success:
+                    print(f"✅ Success: {url}")
+                    if result.metadata:
+                        print(f"   Title: {result.metadata.title}")
+                    if result.video_path:
+                        print(f"   Video: {result.video_path}")
+                    successful += 1
+                else:
+                    print(f"❌ Failed: {url} - {result.error_message}")
+                    failed += 1
+
+        print(f"\nBatch processing completed:")
+        print(f"✅ Successful: {successful}")
+        print(f"❌ Failed: {failed}")
+
+        return 0 if failed == 0 else 1
+
+    except Exception as e:
+        logger.exception("Error processing batch", error=str(e))
+        print(f"Error: {str(e)}")
+        return 1
+async def main():
+    """Main CLI entry point."""
     parser = setup_parser()
     args = parser.parse_args()
-    
-    if args.command is None:
-        parser.print_help()
-        return 0
-    
-    command_handlers = {
-        "download": download_video,
-        "audio": download_audio,
-        "metadata": extract_metadata,
-        "playlist": process_playlist,
-        "thumbnail": download_thumbnail,
-        "subtitles": download_subtitles,
-    }
-    
-    handler = command_handlers.get(args.command)
-    if handler:
-        return await handler(args)
-    else:
-        parser.print_help()
-        return 0
 
-def main():
-    """Entry point for the CLI."""
+    if not args.command:
+        parser.print_help()
+        return 1
+
+    # Set up logging
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.JSONRenderer()
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+    # Route to appropriate command handler
+    if args.command == "transcribe":
+        return await transcribe_video(args)
+    elif args.command == "health":
+        return await check_health(args)
+    elif args.command == "batch":
+        return await process_batch(args)
+    else:
+        print(f"Unknown command: {args.command}")
+        parser.print_help()
+        return 1
+
+def cli_main():
+    """Entry point for console script."""
     try:
-        return asyncio.run(main_async())
+        return asyncio.run(main())
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
-        return 130
+        return 1
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return 1
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(cli_main())

@@ -240,7 +240,6 @@ def analyze_usage_patterns():
         'pillow': 'PIL',
         'scikit-learn': 'sklearn',
         'google-genai': 'google.genai',
-        'yt-dlp': 'yt_dlp',
         'faster-whisper': 'faster_whisper',
         'sentence-transformers': 'sentence_transformers',
         'pyannote.audio': 'pyannote',

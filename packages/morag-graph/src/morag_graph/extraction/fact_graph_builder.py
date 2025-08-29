@@ -9,7 +9,7 @@ import structlog
 from morag_reasoning.llm import LLMClient, LLMConfig
 from ..models.fact import Fact, FactRelation, FactRelationType
 from ..models.graph import Graph
-from .fact_prompts import FactExtractionPrompts
+# Removed obsolete fact_prompts - now using agents framework
 
 
 class FactGraphBuilder:
@@ -184,8 +184,8 @@ class FactGraphBuilder:
                     fact_ids=[f.id for f in facts]
                 )
 
-                # Create relationship extraction prompt
-                prompt = FactExtractionPrompts.create_relationship_prompt(fact_dicts, self.language)
+                # Create relationship extraction prompt using agents framework
+                prompt = self._create_relationship_extraction_prompt(fact_dicts, self.language)
 
                 self.logger.debug(f"Sending relationship extraction prompt to LLM", prompt_length=len(prompt), prompt_preview=prompt[:300])
 
@@ -880,3 +880,35 @@ class FactGraphBuilder:
                         stack.append(neighbor)
         
         return cluster
+
+    def _create_relationship_extraction_prompt(self, fact_dicts: List[Dict], language: str = "en") -> str:
+        """Create relationship extraction prompt using agents framework pattern.
+
+        Args:
+            fact_dicts: List of fact dictionaries
+            language: Language for the prompt
+
+        Returns:
+            Formatted prompt string
+        """
+        facts_text = "\n".join([
+            f"Fact {i+1}: {fact.get('subject', '')} {fact.get('predicate', '')} {fact.get('object', '')}"
+            for i, fact in enumerate(fact_dicts)
+        ])
+
+        prompt = f"""Analyze the following facts and identify relationships between them.
+
+Facts to analyze:
+{facts_text}
+
+Please identify semantic relationships between these facts and return them in JSON format.
+Each relationship should have:
+- source_fact_id: ID of the source fact
+- target_fact_id: ID of the target fact
+- relationship_type: Type of relationship (e.g., "supports", "contradicts", "elaborates", "temporal")
+- confidence: Confidence score (0.0 to 1.0)
+- explanation: Brief explanation of the relationship
+
+Return only valid JSON without any additional text."""
+
+        return prompt

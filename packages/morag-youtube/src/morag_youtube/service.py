@@ -1,4 +1,4 @@
-"""YouTube service for high-level YouTube processing operations."""
+"""YouTube service for high-level YouTube processing operations using external API."""
 
 import asyncio
 from typing import List, Optional, Dict, Any, Union
@@ -9,25 +9,21 @@ from morag_core.interfaces.service import BaseService
 from morag_core.exceptions import ProcessingError
 
 from .processor import YouTubeProcessor, YouTubeConfig, YouTubeDownloadResult
+from .apify_service import ApifyYouTubeService, ApifyYouTubeServiceError
 
 logger = structlog.get_logger(__name__)
 
 class YouTubeService(BaseService):
-    """Service for processing YouTube videos and playlists.
-    
-    This service provides high-level methods for downloading videos,
-    extracting metadata, and processing playlists with configurable options.
-    """
-    
-    def __init__(self, max_concurrent_downloads: int = 3):
-        """Initialize YouTube service.
+    """Service for processing YouTube videos using Apify transcription API.
 
-        Args:
-            max_concurrent_downloads: Maximum number of concurrent downloads
-        """
+    This service provides high-level methods for transcribing videos and
+    extracting metadata using Apify's cloud infrastructure.
+    """
+
+    def __init__(self):
+        """Initialize YouTube service."""
         self.processor = YouTubeProcessor()
-        self.max_concurrent_downloads = max_concurrent_downloads
-        self.semaphore = asyncio.Semaphore(max_concurrent_downloads)
+        self.apify_service = None  # Initialize on demand
 
     async def initialize(self) -> bool:
         """Initialize the service.
@@ -47,28 +43,44 @@ class YouTubeService(BaseService):
         Returns:
             Dictionary with health status information
         """
-        return {"status": "healthy", "processor": "ready"}
+        try:
+            # Check external service health
+            external_health = await self.external_service.health_check()
+
+            return {
+                "status": "healthy" if external_health["status"] == "healthy" else "unhealthy",
+                "external_service": external_health,
+                "processor_available": True
+            }
+
+        except Exception as e:
+            logger.warning("Health check failed", error=str(e))
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "external_service": {"status": "unhealthy", "error": str(e)},
+                "processor_available": False
+            }
     
     async def process_video(self, url: str, config: Optional[YouTubeConfig] = None) -> YouTubeDownloadResult:
-        """Process a single YouTube video.
-        
+        """Process a single YouTube video using external service.
+
         Args:
             url: YouTube video URL
             config: Processing configuration
-            
+
         Returns:
             YouTubeDownloadResult with video information and paths
         """
-        async with self.semaphore:
-            return await self.processor.process_url(url, config)
+        return await self.processor.process_url(url, config)
     
     async def process_videos(self, urls: List[str], config: Optional[YouTubeConfig] = None) -> List[Union[YouTubeDownloadResult, BaseException]]:
-        """Process multiple YouTube videos concurrently.
-        
+        """Process multiple YouTube videos using external service.
+
         Args:
             urls: List of YouTube video URLs
             config: Processing configuration
-            
+
         Returns:
             List of YouTubeDownloadResult objects
         """
@@ -297,7 +309,111 @@ class YouTubeService(BaseService):
             return new_thumbnail_path
         
         return thumbnail_path
-    
+
+
+
+    async def transcribe_video(
+        self,
+        url: str,
+        config: Optional[YouTubeConfig] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        transcript: Optional[str] = None,
+        transcript_segments: Optional[List[Dict[str, Any]]] = None
+    ) -> YouTubeDownloadResult:
+        """Transcribe a YouTube video using Apify service or process pre-transcribed content.
+
+        Args:
+            url: YouTube video URL
+            config: Optional configuration for transcription
+            metadata: Pre-provided metadata (for pre-transcribed videos)
+            transcript: Pre-provided transcript text (for pre-transcribed videos)
+            transcript_segments: Pre-provided transcript segments (for pre-transcribed videos)
+
+        Returns:
+            YouTubeDownloadResult containing transcription and metadata
+
+        Raises:
+            ProcessingError: If transcription fails or Apify is not configured
+        """
+        try:
+            logger.info("Starting video transcription", url=url, pre_transcribed=bool(transcript))
+
+            # Create config with pre-transcribed data if provided
+            if metadata or transcript or transcript_segments:
+                config = config or YouTubeConfig()
+                config.pre_transcribed = True
+                config.provided_metadata = metadata
+                config.provided_transcript = transcript
+                config.provided_transcript_segments = transcript_segments
+
+            # Use the processor's process_url method
+            result = await self.processor.process_url(url, config)
+
+            if not result.success:
+                raise ProcessingError(f"YouTube transcription failed: {result.error_message}")
+
+            logger.info("Video transcription completed", url=url, success=result.success)
+            return result
+
+        except ProcessingError:
+            raise
+        except Exception as e:
+            error_msg = f"Video transcription failed for {url}: {str(e)}"
+            logger.error("Video transcription failed", url=url, error=str(e))
+            raise ProcessingError(error_msg)
+
+
+    async def transcribe_videos(
+        self,
+        urls: List[str],
+        config: Optional[YouTubeConfig] = None
+    ) -> List[YouTubeDownloadResult]:
+        """Transcribe multiple YouTube videos.
+
+        Args:
+            urls: List of YouTube video URLs
+            config: Optional configuration for transcription
+
+        Returns:
+            List of YouTubeDownloadResult objects
+
+        Raises:
+            ProcessingError: If transcription fails
+        """
+        results = []
+        config = config or YouTubeConfig()
+
+        logger.info("Starting batch transcription", video_count=len(urls))
+
+        for url in urls:
+            try:
+                result = await self.transcribe_video(url, config)
+                results.append(result)
+            except Exception as e:
+                logger.error("Failed to transcribe video in batch", url=url, error=str(e))
+                # Create a failed result
+                failed_result = YouTubeDownloadResult(
+                    metadata=None,
+                    transcript=None,
+                    transcript_segments=[],
+                    transcript_languages=[],
+                    formats=[],
+                    total_formats=0,
+                    video_path=None,
+                    output_file=None,
+                    video_download=None,
+                    processing_time=0.0,
+                    success=False,
+                    error_message=str(e)
+                )
+                results.append(failed_result)
+
+        logger.info("Batch transcription completed",
+                   video_count=len(urls),
+                   successful_count=sum(1 for r in results if r.success))
+
+        return results
+
     def cleanup(self, result: Union[YouTubeDownloadResult, List[YouTubeDownloadResult]]) -> None:
         """Clean up temporary files.
         

@@ -1,0 +1,269 @@
+# Centralized Relation Type Configuration for MoRAG Agents
+# This file defines example relation types used across the MoRAG agent framework
+# NOTE: These are SUGGESTIONS only - the system supports dynamic, domain-specific types
+
+# Standard Relation Types
+# These are common relation types that can serve as inspiration
+standard_relation_types:
+  - WORKS_FOR
+  - LOCATED_IN
+  - PART_OF
+  - CREATED_BY
+  - USES
+  - CAUSES
+  - SUPPORTS
+  - ELABORATES
+  - CONTRADICTS
+  - RELATED_TO
+
+# Extended Relation Types
+# Additional relation types for various contexts
+extended_relation_types:
+  - MANAGES
+  - OWNS
+  - FOUNDED
+  - ACQUIRED
+  - COLLABORATES_WITH
+  - COMPETES_WITH
+  - SUPPLIES_TO
+  - DEPENDS_ON
+  - INFLUENCES
+  - PRECEDES
+  - FOLLOWS
+  - CONTAINS
+  - BELONGS_TO
+  - IMPLEMENTS
+  - EXTENDS
+
+# Domain-Specific Relation Types
+# Organized by domain for specialized use cases
+domain_specific:
+  medical:
+    - TREATS
+    - DIAGNOSES
+    - PRESCRIBES
+    - ADMINISTERS
+    - MONITORS
+    - CAUSES
+    - PREVENTS
+    - INDICATES
+    - CONTRAINDICATES
+    - INTERACTS_WITH
+    - MANIFESTS_AS
+    - PRESCRIBED_FOR
+    - SIDE_EFFECT_OF
+    - DOSAGE_FOR
+    - SYMPTOM_OF
+    
+  legal:
+    - GOVERNS
+    - REGULATES
+    - ENFORCES
+    - VIOLATES
+    - COMPLIES_WITH
+    - CITES
+    - OVERRULES
+    - AMENDS
+    - REPEALS
+    - INTERPRETS
+    - APPLIES_TO
+    - JURISDICTION_OVER
+    - PROSECUTES
+    - DEFENDS
+    - JUDGES
+    
+  technical:
+    - IMPLEMENTS
+    - EXTENDS
+    - INHERITS_FROM
+    - DEPENDS_ON
+    - IMPORTS
+    - EXPORTS
+    - CALLS
+    - RETURNS
+    - CONFIGURES
+    - DEPLOYS
+    - MONITORS
+    - TESTS
+    - BUILDS
+    - COMPILES
+    - EXECUTES
+    
+  business:
+    - EMPLOYS
+    - REPORTS_TO
+    - MANAGES
+    - LEADS
+    - INVESTS_IN
+    - PARTNERS_WITH
+    - ACQUIRES
+    - MERGES_WITH
+    - COMPETES_WITH
+    - SUPPLIES
+    - PURCHASES_FROM
+    - MARKETS_TO
+    - SELLS_TO
+    - DISTRIBUTES
+    - LICENSES
+    
+  academic:
+    - RESEARCHES
+    - PUBLISHES
+    - CITES
+    - REVIEWS
+    - SUPERVISES
+    - TEACHES
+    - STUDIES
+    - GRADUATES_FROM
+    - ATTENDS
+    - PRESENTS_AT
+    - EDITS
+    - PEER_REVIEWS
+    - COLLABORATES_ON
+    - FUNDS
+    - SPONSORS
+
+# Relation Type Categories
+# Semantic categories for better organization
+categories:
+  organizational:
+    - WORKS_FOR
+    - MANAGES
+    - REPORTS_TO
+    - EMPLOYS
+    - LEADS
+    
+  spatial:
+    - LOCATED_IN
+    - CONTAINS
+    - PART_OF
+    - BELONGS_TO
+    - SITUATED_IN
+    
+  causal:
+    - CAUSES
+    - RESULTS_IN
+    - LEADS_TO
+    - TRIGGERS
+    - PREVENTS
+    
+  temporal:
+    - PRECEDES
+    - FOLLOWS
+    - CONCURRENT_WITH
+    - DURING
+    - AFTER
+    
+  functional:
+    - USES
+    - IMPLEMENTS
+    - OPERATES
+    - CONTROLS
+    - PROCESSES
+    
+  logical:
+    - SUPPORTS
+    - CONTRADICTS
+    - ELABORATES
+    - IMPLIES
+    - PROVES
+
+# Dynamic Relation Types Configuration
+# Settings for allowing LLM-generated relation types
+dynamic_relation_types:
+  enabled: true
+  max_custom_types: 30
+  confidence_threshold: 0.7
+  validation_required: true
+  fallback_to_standard: true
+  encourage_specificity: true
+
+# Relation Type Validation Rules
+validation_rules:
+  min_relation_length: 3
+  max_relation_length: 50
+  allowed_characters: "alphanumeric_spaces_hyphens_underscores"
+  case_sensitive: false
+  normalize_to_uppercase: true
+  avoid_generic_types: ["RELATED_TO", "CONNECTS", "LINKS", "MENTIONS"]
+
+# Default Relation Type Sets by Agent
+# Predefined sets for different agent types
+agent_defaults:
+  relation_extraction:
+    - WORKS_FOR
+    - LOCATED_IN
+    - PART_OF
+    - CREATED_BY
+    - USES
+    - CAUSES
+    - MANAGES
+    - COLLABORATES_WITH
+    
+  content_analysis:
+    - SUPPORTS
+    - ELABORATES
+    - CONTRADICTS
+    - CAUSES
+    - INFLUENCES
+    - PRECEDES
+    - FOLLOWS
+    
+  query_analysis:
+    - RELATED_TO
+    - PART_OF
+    - LOCATED_IN
+    - WORKS_FOR
+    - USES
+
+# Relation Type Descriptions
+# Human-readable descriptions for each relation type
+descriptions:
+  WORKS_FOR: "Employment or professional affiliation relationship"
+  LOCATED_IN: "Geographic or spatial containment relationship"
+  PART_OF: "Component or membership relationship"
+  CREATED_BY: "Authorship, creation, or origination relationship"
+  USES: "Utilization or application relationship"
+  CAUSES: "Direct causal relationship where one entity causes another"
+  SUPPORTS: "Evidence or logical support relationship"
+  ELABORATES: "Detailed explanation or expansion relationship"
+  CONTRADICTS: "Conflicting or opposing relationship"
+  MANAGES: "Administrative or supervisory relationship"
+  COLLABORATES_WITH: "Cooperative working relationship"
+  COMPETES_WITH: "Competitive or rival relationship"
+  SUPPLIES_TO: "Provider-consumer relationship"
+  DEPENDS_ON: "Dependency or reliance relationship"
+  INFLUENCES: "Impact or effect relationship"
+  PRECEDES: "Temporal sequence relationship (before)"
+  FOLLOWS: "Temporal sequence relationship (after)"
+  CONTAINS: "Physical or logical containment relationship"
+  BELONGS_TO: "Ownership or membership relationship"
+  IMPLEMENTS: "Technical implementation relationship"
+
+# Relationship Strength Indicators
+strength_indicators:
+  strong:
+    - CAUSES
+    - CREATES
+    - OWNS
+    - MANAGES
+    - EMPLOYS
+  medium:
+    - INFLUENCES
+    - SUPPORTS
+    - COLLABORATES_WITH
+    - USES
+    - DEPENDS_ON
+  weak:
+    - RELATED_TO
+    - MENTIONS
+    - ASSOCIATED_WITH
+    - CONNECTED_TO
+
+# Configuration Metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2024-01-01"
+  maintainer: "MoRAG Development Team"
+  description: "Centralized relation type configuration for consistent relation extraction across all MoRAG agents"
+  note: "These types are suggestions only - the system supports dynamic, domain-specific types generated by LLMs"

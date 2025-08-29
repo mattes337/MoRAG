@@ -1,33 +1,32 @@
-"""YouTube processing with yt-dlp for video download and metadata extraction."""
+"""YouTube processing using Apify transcription service."""
 
-import os
-import tempfile
-from typing import Dict, Any, List, Optional, Tuple
+import time
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 from dataclasses import dataclass, field
-import asyncio
 import structlog
-import time
-import json
 
-import yt_dlp
-
-from morag_core.exceptions import ProcessingError, ExternalServiceError
+from morag_core.exceptions import ProcessingError
 from morag_core.interfaces.processor import BaseProcessor, ProcessingConfig, ProcessingResult
 
 logger = structlog.get_logger(__name__)
 
 @dataclass
 class YouTubeConfig(ProcessingConfig):
-    """Configuration for YouTube processing."""
-    quality: str = "best"
-    format_preference: str = "mp4"
-    extract_audio: bool = True
-    download_subtitles: bool = True
-    subtitle_languages: List[str] = field(default_factory=lambda: ["en"])
-    max_filesize: Optional[str] = "500M"
-    download_thumbnails: bool = True
-    extract_metadata_only: bool = False
+    """Configuration for YouTube processing using Apify service."""
+    # Apify service options
+    apify_timeout: int = 600  # Timeout in seconds (10 minutes default)
+    use_proxy: bool = True  # Whether to use Apify proxy
+
+    # Processing options
+    extract_metadata: bool = True  # Whether to extract video metadata
+    extract_transcript: bool = True  # Whether to extract video transcript
+
+    # Pre-transcribed video support
+    pre_transcribed: bool = False  # Whether video is already transcribed
+    provided_metadata: Optional[Dict[str, Any]] = None  # Pre-provided metadata
+    provided_transcript: Optional[str] = None  # Pre-provided transcript text
+    provided_transcript_segments: Optional[List[Dict[str, Any]]] = None  # Pre-provided transcript segments
 
 @dataclass
 class YouTubeMetadata:
@@ -53,367 +52,409 @@ class YouTubeMetadata:
 
 @dataclass
 class YouTubeDownloadResult(ProcessingResult):
-    """Result of YouTube download operation."""
+    """Result of YouTube processing operation using external service."""
+    # External service response data
+    metadata: Optional[YouTubeMetadata] = None
+    transcript: Optional[Dict[str, Any]] = None
+    transcript_languages: List[Dict[str, Any]] = field(default_factory=list)
+    formats: List[Dict[str, Any]] = field(default_factory=list)
+    total_formats: int = 0
+
+    # Optional video download (when download_video=True)
     video_path: Optional[Path] = None
+    output_file: Optional[str] = None
+    video_download: Optional[Dict[str, Any]] = None
+
+    # Legacy fields (kept for backward compatibility)
     audio_path: Optional[Path] = None
     subtitle_paths: List[Path] = field(default_factory=list)
     thumbnail_paths: List[Path] = field(default_factory=list)
-    metadata: Optional[YouTubeMetadata] = None
     file_size: int = 0
     temp_files: List[Path] = field(default_factory=list)
+    transcript_path: Optional[Path] = None
+    transcript_text: Optional[str] = None
+    transcript_language: Optional[str] = None
 
 class YouTubeProcessor(BaseProcessor):
-    """YouTube processing service using yt-dlp."""
-    
+    """YouTube processing service using Apify transcription API."""
+
     def __init__(self):
         """Initialize YouTube processor."""
-        self.temp_dir = Path(tempfile.gettempdir()) / "morag_youtube"
-        self.temp_dir.mkdir(exist_ok=True)
-        
+        from .apify_service import ApifyYouTubeService, ApifyYouTubeServiceError
+        self.apify_service = None  # Initialize on demand
+        self.ApifyYouTubeServiceError = ApifyYouTubeServiceError
+        logger.info("YouTube processor initialized with Apify service")
+
+    def _get_apify_service(self):
+        """Get or create Apify service instance.
+
+        Returns:
+            ApifyYouTubeService instance
+
+        Raises:
+            ProcessingError: If Apify service cannot be initialized
+        """
+        if self.apify_service is None:
+            try:
+                from .apify_service import ApifyYouTubeService
+                self.apify_service = ApifyYouTubeService()
+            except self.ApifyYouTubeServiceError as e:
+                raise ProcessingError(f"Failed to initialize Apify service: {e}. Please check your APIFY_API_TOKEN configuration.")
+        return self.apify_service
+
     async def process_url(
         self,
         url: str,
         config: Optional[YouTubeConfig] = None
     ) -> YouTubeDownloadResult:
-        """Process YouTube URL with download and metadata extraction."""
+        """Process YouTube URL using Apify transcription service."""
         start_time = time.time()
         config = config or YouTubeConfig()
-        
+
         try:
-            logger.info("Starting YouTube processing", url=url)
-            
-            # Extract metadata first
-            metadata = await self._extract_metadata_only(url)
-            
-            # Initialize result
-            result = YouTubeDownloadResult(
-                video_path=None,
-                audio_path=None,
-                subtitle_paths=[],
-                thumbnail_paths=[],
-                metadata=metadata,
-                processing_time=0.0,
-                file_size=0,
-                temp_files=[],
-                success=True
+            logger.info("Starting YouTube processing with Apify service", url=url, pre_transcribed=config.pre_transcribed)
+
+            # Handle pre-transcribed videos
+            if config.pre_transcribed:
+                logger.info("Processing pre-transcribed video", url=url)
+                return self._process_pre_transcribed_video(url, config, start_time)
+
+            # Get Apify service (will fail if not configured)
+            apify_service = self._get_apify_service()
+
+            # Check service health
+            is_healthy = await apify_service.health_check()
+            if not is_healthy:
+                raise ProcessingError("Apify service is not available. Please check your APIFY_API_TOKEN configuration.")
+
+            # Call Apify service
+            service_result = await apify_service.transcribe_video(
+                video_url=url,
+                extract_metadata=config.extract_metadata,
+                extract_transcript=config.extract_transcript,
+                use_proxy=config.use_proxy
             )
-            
-            # If only metadata extraction is requested, return early
-            if config.extract_metadata_only:
-                result.processing_time = time.time() - start_time
-                return result
-            
-            # Download video
-            download_result = await self._download_video(url, config)
-            
-            # Update result with download info
-            result.video_path = download_result.get('video_path')
-            result.audio_path = download_result.get('audio_path')
-            result.subtitle_paths = download_result.get('subtitle_paths', [])
-            result.thumbnail_paths = download_result.get('thumbnail_paths', [])
-            result.file_size = download_result.get('file_size', 0)
-            result.temp_files = download_result.get('temp_files', [])
-            result.processing_time = time.time() - start_time
-            
+
+            # Convert Apify service response to our result format
+            result = self._convert_apify_result(service_result, start_time)
+
+            logger.info("YouTube processing completed successfully",
+                       url=url,
+                       has_transcript=bool(result.transcript),
+                       has_metadata=bool(result.metadata))
+
             return result
-            
-        except Exception as e:
-            logger.exception("Error processing YouTube URL", url=url, error=str(e))
+
+        except self.ApifyYouTubeServiceError as e:
+            error_msg = f"Apify service error: {str(e)}"
+            logger.error("Apify service failed", url=url, error=str(e))
             return YouTubeDownloadResult(
+                metadata=None,
+                transcript=None,
+                transcript_languages=[],
+                formats=[],
+                total_formats=0,
                 video_path=None,
-                audio_path=None,
-                subtitle_paths=[],
-                thumbnail_paths=[],
-                metadata=None,  # type: ignore
+                output_file=None,
+                video_download=None,
                 processing_time=time.time() - start_time,
-                file_size=0,
-                temp_files=[],
+                success=False,
+                error_message=error_msg
+            )
+        except ProcessingError as e:
+            logger.error("Processing error", url=url, error=str(e))
+            return YouTubeDownloadResult(
+                metadata=None,
+                transcript=None,
+                transcript_languages=[],
+                formats=[],
+                total_formats=0,
+                video_path=None,
+                output_file=None,
+                video_download=None,
+                processing_time=time.time() - start_time,
                 success=False,
                 error_message=str(e)
             )
-    
-    async def _extract_metadata_only(self, url: str) -> YouTubeMetadata:
-        """Extract metadata without downloading."""
-        try:
-            logger.debug("Extracting YouTube metadata", url=url)
-            
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': False,
-                # Add user agent to avoid bot detection
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                # Add headers to appear more like a regular browser
-                'http_headers': {
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-us,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'DNT': '1',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                },
-                # Use cookies if available
-                'cookiefile': os.getenv('YOUTUBE_COOKIES_FILE'),
-                # Add retry options
-                'retries': 3,
-                'fragment_retries': 3,
-                # Use IPv4 to avoid some blocking
-                'force_ipv4': True,
-            }
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await asyncio.to_thread(
-                    ydl.extract_info,
-                    url,
-                    download=False
-                )
-            
-            if not info:
-                raise ProcessingError(f"Failed to extract metadata from {url}")
-            
-            # Extract relevant metadata
-            metadata = YouTubeMetadata(
-                id=info.get('id', ''),
-                title=info.get('title', ''),
-                description=info.get('description', ''),
-                uploader=info.get('uploader', ''),
-                upload_date=info.get('upload_date', ''),
-                duration=float(info.get('duration', 0)),
-                view_count=int(info.get('view_count', 0)),
-                like_count=int(info.get('like_count', 0)) if info.get('like_count') else None,
-                comment_count=int(info.get('comment_count', 0)) if info.get('comment_count') else None,
-                tags=info.get('tags', []),
-                categories=info.get('categories', []),
-                thumbnail_url=info.get('thumbnail', ''),
-                webpage_url=info.get('webpage_url', ''),
-                channel_id=info.get('channel_id', ''),
-                channel_url=info.get('channel_url', ''),
-                playlist_id=info.get('playlist_id'),
-                playlist_title=info.get('playlist_title'),
-                playlist_index=info.get('playlist_index')
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.exception("Error processing YouTube URL", url=url, error=str(e))
+            return YouTubeDownloadResult(
+                metadata=None,
+                transcript=None,
+                transcript_languages=[],
+                formats=[],
+                total_formats=0,
+                video_path=None,
+                output_file=None,
+                video_download=None,
+                processing_time=time.time() - start_time,
+                success=False,
+                error_message=error_msg
             )
-            
-            return metadata
-            
-        except Exception as e:
-            logger.exception("Error extracting YouTube metadata", url=url, error=str(e))
-            raise ProcessingError(f"Failed to extract YouTube metadata: {str(e)}")
-    
-    async def _download_video(self, url: str, config: YouTubeConfig) -> Dict[str, Any]:
-        """Download video with yt-dlp."""
+
+    def _process_pre_transcribed_video(
+        self,
+        url: str,
+        config: YouTubeConfig,
+        start_time: float
+    ) -> YouTubeDownloadResult:
+        """Process a pre-transcribed video using provided metadata and transcript.
+
+        Args:
+            url: YouTube video URL
+            config: Configuration with pre-provided data
+            start_time: Processing start time
+
+        Returns:
+            YouTubeDownloadResult with provided data
+        """
+        logger.info("Processing pre-transcribed video", url=url)
+
+        # Extract video ID from URL
+        video_id = self._extract_video_id(url)
+
+        # Create metadata from provided data
+        metadata = None
+        if config.provided_metadata:
+            metadata = YouTubeMetadata(
+                id=video_id,
+                title=config.provided_metadata.get('title', 'Unknown Title'),
+                description=config.provided_metadata.get('description', ''),
+                uploader=config.provided_metadata.get('channel', 'Unknown Channel'),
+                upload_date=config.provided_metadata.get('uploadDate', ''),
+                duration=float(config.provided_metadata.get('duration', 0)),
+                view_count=int(config.provided_metadata.get('viewCount', 0)),
+                like_count=config.provided_metadata.get('likeCount'),
+                comment_count=config.provided_metadata.get('commentCount'),
+                tags=config.provided_metadata.get('tags', []),
+                categories=config.provided_metadata.get('categories', []),
+                thumbnail_url=config.provided_metadata.get('thumbnail', ''),
+                webpage_url=f"https://www.youtube.com/watch?v={video_id}",
+                channel_id=config.provided_metadata.get('channelId', ''),
+                channel_url=config.provided_metadata.get('channelUrl', ''),
+                playlist_id=None,
+                playlist_title=None,
+                playlist_index=None
+            )
+
+        # Use provided transcript
+        transcript = config.provided_transcript or ""
+        transcript_segments = config.provided_transcript_segments or []
+
+        # Store transcript segments in the transcript field as a dict
+        transcript_data = {
+            "text": transcript,
+            "segments": transcript_segments
+        }
+
+        return YouTubeDownloadResult(
+            metadata=metadata,
+            transcript=transcript_data,
+            transcript_languages=['en'],  # Default to English
+            formats=[],
+            total_formats=0,
+            video_path=None,
+            output_file=None,
+            video_download=None,
+            transcript_text=transcript,  # Legacy field
+            processing_time=time.time() - start_time,
+            success=True,
+            error_message=None
+        )
+
+    def _extract_video_id(self, url: str) -> str:
+        """Extract video ID from YouTube URL.
+
+        Args:
+            url: YouTube video URL
+
+        Returns:
+            Video ID string
+        """
+        import re
+        from urllib.parse import urlparse, parse_qs
+
+        # Handle different YouTube URL formats
+        if "youtu.be/" in url:
+            return url.split("youtu.be/")[1].split("?")[0]
+        elif "youtube.com/watch" in url:
+            parsed = urlparse(url)
+            return parse_qs(parsed.query).get("v", ["unknown"])[0]
+        elif "youtube.com/embed/" in url:
+            return url.split("youtube.com/embed/")[1].split("?")[0]
+        else:
+            # Try to extract 11-character video ID pattern
+            match = re.search(r'[a-zA-Z0-9_-]{11}', url)
+            return match.group(0) if match else "unknown"
+
+    def _convert_apify_result(self, service_result: Dict[str, Any], start_time: float) -> YouTubeDownloadResult:
+        """Convert Apify service result to YouTubeDownloadResult format.
+
+        Args:
+            service_result: Result from Apify service
+            start_time: Processing start time
+
+        Returns:
+            YouTubeDownloadResult object
+        """
+        # Convert metadata if available
+        metadata = None
+        if service_result.get("metadata"):
+            metadata_dict = service_result["metadata"]
+
+            # Extract thumbnail URL from thumbnails array
+            thumbnail_url = ""
+            if metadata_dict.get("thumbnails") and len(metadata_dict["thumbnails"]) > 0:
+                thumbnail_url = metadata_dict["thumbnails"][0].get("url", "")
+
+            # Parse duration from various possible formats
+            duration = 0
+            if metadata_dict.get("duration"):
+                duration = self._parse_duration(str(metadata_dict["duration"]))
+            elif metadata_dict.get("lengthSeconds"):
+                duration = float(metadata_dict["lengthSeconds"])
+
+            metadata = YouTubeMetadata(
+                id=metadata_dict.get("videoId", ""),
+                title=metadata_dict.get("title", ""),
+                description=metadata_dict.get("description", ""),
+                uploader=metadata_dict.get("channelName", ""),
+                upload_date=metadata_dict.get("publishDate", ""),
+                duration=duration,
+                view_count=int(metadata_dict.get("viewCount", 0)),
+                like_count=metadata_dict.get("likeCount"),
+                comment_count=metadata_dict.get("commentCount"),
+                tags=metadata_dict.get("keywords", []),
+                categories=[metadata_dict.get("category", "")] if metadata_dict.get("category") else [],
+                thumbnail_url=thumbnail_url,
+                webpage_url=metadata_dict.get("url", ""),
+                channel_id=metadata_dict.get("channelId", ""),
+                channel_url=metadata_dict.get("channelUrl", ""),
+                playlist_id=None,
+                playlist_title=None,
+                playlist_index=None
+            )
+
+        # Process transcript
+        transcript_segments = []
+        transcript_text = ""
+        transcript_languages = ["en"]  # Default to English
+
+        if service_result.get("transcript"):
+            transcript_data = service_result["transcript"]
+            # Handle nested transcript structure from Apify
+            if isinstance(transcript_data, dict) and "transcript" in transcript_data:
+                transcript_segments_data = transcript_data["transcript"]
+                if isinstance(transcript_segments_data, list):
+                    transcript_segments = transcript_segments_data
+                    transcript_text = " ".join(segment.get("text", "") for segment in transcript_segments_data)
+            elif isinstance(transcript_data, list):
+                # Handle segment format
+                transcript_segments = transcript_data
+                transcript_text = " ".join(segment.get("text", "") for segment in transcript_data)
+            elif isinstance(transcript_data, str):
+                # Handle plain text format
+                transcript_text = transcript_data
+
+        # Store transcript data in the expected format
+        transcript_result = {
+            "text": transcript_text,
+            "segments": transcript_segments
+        }
+
+        return YouTubeDownloadResult(
+            metadata=metadata,
+            transcript=transcript_result,
+            transcript_languages=transcript_languages,
+            formats=[],  # Apify doesn't provide format info
+            total_formats=0,
+            video_path=None,  # Apify doesn't download videos by default
+            output_file=None,
+            video_download=None,
+            # Legacy fields for backward compatibility
+            transcript_text=transcript_text,
+            transcript_language="en",
+            processing_time=time.time() - start_time,
+            success=True,
+            error_message=None
+        )
+
+    def _parse_duration(self, duration_str: str) -> float:
+        """Parse duration string to float seconds.
+
+        Args:
+            duration_str: Duration string (e.g., "3:45", "1:23:45", "180")
+
+        Returns:
+            Duration in seconds as float
+        """
+        if not duration_str:
+            return 0.0
+
         try:
-            logger.debug("Downloading YouTube video", url=url)
-            
-            # Create output directory
-            output_dir = self.temp_dir / f"youtube_{int(time.time())}"
-            output_dir.mkdir(exist_ok=True)
-            
-            # Prepare format selection
-            format_selection = config.quality
-            if config.extract_audio:
-                format_selection = f"{format_selection}+bestaudio/best"
-            
-            # Prepare subtitle options
-            subtitle_options = {}
-            if config.download_subtitles:
-                subtitle_options = {
-                    'writesubtitles': True,
-                    'subtitleslangs': config.subtitle_languages,
-                    'writeautomaticsub': True,
-                }
-            
-            # Prepare yt-dlp options
-            ydl_opts = {
-                'format': format_selection,
-                'outtmpl': str(output_dir / '%(title)s-%(id)s.%(ext)s'),
-                'quiet': True,
-                'no_warnings': True,
-                'writethumbnail': config.download_thumbnails,
-                'postprocessors': [],
-                # Add user agent to avoid bot detection
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                # Add headers to appear more like a regular browser
-                'http_headers': {
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-us,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'DNT': '1',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                },
-                # Use cookies if available
-                'cookiefile': os.getenv('YOUTUBE_COOKIES_FILE'),
-                # Add retry options
-                'retries': 3,
-                'fragment_retries': 3,
-                # Use IPv4 to avoid some blocking
-                'force_ipv4': True,
-                **subtitle_options
-            }
-            
-            # Add filesize limit if specified
-            if config.max_filesize:
-                ydl_opts['max_filesize'] = config.max_filesize
-            
-            # Add audio extraction if requested
-            if config.extract_audio:
-                ydl_opts['postprocessors'].append({
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                })
-            
-            # Download video
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await asyncio.to_thread(
-                    ydl.extract_info,
-                    url,
-                    download=True
-                )
-            
-            if not info:
-                raise ProcessingError(f"Failed to download video from {url}")
-            
-            # Find downloaded files
-            video_path = None
-            audio_path = None
-            subtitle_paths = []
-            thumbnail_paths = []
-            temp_files = []
-            
-            for file_path in output_dir.glob("*"):
-                temp_files.append(file_path)
-                
-                if file_path.suffix.lower() in [".mp4", ".webm", ".mkv"]:
-                    video_path = file_path
-                elif file_path.suffix.lower() in [".mp3", ".m4a", ".wav"]:
-                    audio_path = file_path
-                elif file_path.suffix.lower() in [".vtt", ".srt", ".ass"]:
-                    subtitle_paths.append(file_path)
-                elif file_path.suffix.lower() in [".jpg", ".png", ".webp"]:
-                    thumbnail_paths.append(file_path)
-            
-            # Calculate total file size
-            file_size = sum(file.stat().st_size for file in temp_files if file.is_file())
-            
-            return {
-                'video_path': video_path,
-                'audio_path': audio_path,
-                'subtitle_paths': subtitle_paths,
-                'thumbnail_paths': thumbnail_paths,
-                'file_size': file_size,
-                'temp_files': temp_files
-            }
-            
-        except Exception as e:
-            logger.exception("Error downloading YouTube video", url=url, error=str(e))
-            raise ProcessingError(f"Failed to download YouTube video: {str(e)}")
-    
-    async def process_playlist(self, url: str, config: Optional[YouTubeConfig] = None) -> List[YouTubeDownloadResult]:
-        """Process YouTube playlist."""
+            # If it's already a number, return it
+            return float(duration_str)
+        except ValueError:
+            pass
+
+        try:
+            # Parse time format (e.g., "3:45" or "1:23:45")
+            parts = duration_str.split(":")
+            if len(parts) == 2:  # MM:SS
+                return float(parts[0]) * 60 + float(parts[1])
+            elif len(parts) == 3:  # HH:MM:SS
+                return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+            else:
+                return 0.0
+        except (ValueError, IndexError):
+            return 0.0
+
+    async def process_playlist(
+        self,
+        playlist_url: str,
+        config: Optional[YouTubeConfig] = None
+    ) -> List[YouTubeDownloadResult]:
+        """Process YouTube playlist using Apify service.
+
+        Args:
+            playlist_url: YouTube playlist URL
+            config: Processing configuration
+
+        Returns:
+            List of YouTubeDownloadResult objects for each video
+        """
         config = config or YouTubeConfig()
-        results = []
-        
-        try:
-            logger.info("Processing YouTube playlist", url=url)
-            
-            # Extract playlist info
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': True,
-                'skip_download': True,
-                # Add user agent to avoid bot detection
-                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                # Add headers to appear more like a regular browser
-                'http_headers': {
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': 'en-us,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'DNT': '1',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                },
-                # Use cookies if available
-                'cookiefile': os.getenv('YOUTUBE_COOKIES_FILE'),
-                # Add retry options
-                'retries': 3,
-                'fragment_retries': 3,
-                # Use IPv4 to avoid some blocking
-                'force_ipv4': True,
-            }
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                playlist_info = await asyncio.to_thread(
-                    ydl.extract_info,
-                    url,
-                    download=False
-                )
-            
-            if not playlist_info or 'entries' not in playlist_info:
-                raise ProcessingError(f"Failed to extract playlist info from {url}")
-            
-            # Process each video in the playlist
-            for entry in playlist_info['entries']:
-                video_url = entry.get('url')
-                if not video_url:
-                    continue
-                
-                try:
-                    result = await self.process_url(video_url, config)
-                    results.append(result)
-                except Exception as e:
-                    logger.error(
-                        "Error processing playlist video",
-                        url=video_url,
-                        error=str(e)
-                    )
-                    # Continue with next video
-            
-            return results
-            
-        except Exception as e:
-            logger.exception("Error processing YouTube playlist", url=url, error=str(e))
-            raise ProcessingError(f"Failed to process YouTube playlist: {str(e)}")
-    
+
+        # For now, playlist processing is not implemented
+        # This would require extracting individual video URLs and processing them
+        # or using a specialized Apify actor for playlist processing
+        logger.warning("Playlist processing not yet implemented with Apify service")
+        raise ProcessingError("Playlist processing is not currently supported. Please process individual video URLs.")
+
+    def cleanup(self, result: YouTubeDownloadResult) -> None:
+        """Clean up temporary files."""
+        # For Apify service, cleanup is minimal since files are managed by Apify
+        logger.debug("Cleanup completed for Apify service result")
+
     async def process(self, file_path: Path, config: Optional[ProcessingConfig] = None) -> ProcessingResult:
         """Process content from file.
-        
+
         This method is required by the BaseProcessor interface but is not applicable
         for YouTube processing. Use process_url instead.
-        
+
         Raises:
             ProcessingError: Always raises this error as this method is not supported
         """
         raise ProcessingError("YouTubeProcessor does not support file processing. Use process_url instead.")
-    
+
     def supports_format(self, format_type: str) -> bool:
         """Check if processor supports the given format.
-        
+
         Args:
             format_type: Format type to check
-            
+
         Returns:
             True if format is supported, False otherwise
         """
         return format_type.lower() in ['youtube', 'yt']
-    
-    def cleanup(self, result: YouTubeDownloadResult) -> None:
-        """Clean up temporary files."""
-        if not result.temp_files:
-            return
-        
-        logger.debug(f"Cleaning up {len(result.temp_files)} temporary files")
-        
-        for file_path in result.temp_files:
-            try:
-                if file_path.exists():
-                    if file_path.is_file():
-                        file_path.unlink()
-                    elif file_path.is_dir():
-                        for child in file_path.glob("*"):
-                            if child.is_file():
-                                child.unlink()
-                        file_path.rmdir()
-            except Exception as e:
-                logger.warning(f"Failed to clean up file {file_path}: {str(e)}")

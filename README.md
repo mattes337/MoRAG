@@ -311,10 +311,10 @@ chunks = await chunker.chunk_text(
 ### Query Analysis
 
 ```python
-from morag_core.ai import QueryAnalysisAgent
+from agents import get_agent
 
 # Create query analysis agent
-agent = QueryAnalysisAgent()
+agent = get_agent("query_analysis")
 
 # Analyze user query
 result = await agent.analyze_query(

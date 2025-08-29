@@ -16,6 +16,12 @@ from tenacity import (
 )
 import structlog
 
+# Import agents framework - required
+try:
+    from agents import get_agent
+except ImportError:
+    raise ImportError("Agents framework is required. Please install the agents package.")
+
 from morag_core.config import settings
 from morag_core.exceptions import (
     ExternalServiceError,
@@ -557,15 +563,21 @@ class GeminiEmbeddingService(BaseService):
                     language_name = language_names.get(language, language)
                     language_instruction = f"CRITICAL: You MUST write the summary ONLY in {language_name}. Do NOT use any other language. The summary language MUST match the specified language ({language_name}). "
 
-                prompt = f"{language_instruction}Summarize the following text in {max_length} characters or less:\n\n{text}"
+                # Use summarization agent - required
+                summary_agent = get_agent("summarization")
+                summary_agent.update_config(
+                    agent_config={
+                        "max_summary_length": max_length,
+                        "target_language": language
+                    }
+                )
 
-                # Generate summary
-                response = model.generate_content(prompt)
-                summary = response.text
-
-                # Ensure summary is within max length
-                if len(summary) > max_length:
-                    summary = summary[:max_length-3] + "..."
+                result = await summary_agent.execute(
+                    text,
+                    target_length=max_length,
+                    language=language
+                )
+                summary_text = result.summary
 
                 # Record success for circuit breaker
                 self.circuit_breaker.record_success()
@@ -573,7 +585,7 @@ class GeminiEmbeddingService(BaseService):
                 # Create and return summary result
                 return SummaryResult(
                     original_text=text,
-                    summary=summary,
+                    summary=summary_text,
                     model=self.generation_model,
                 )
             except Exception as e:

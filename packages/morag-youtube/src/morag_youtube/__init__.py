@@ -7,6 +7,12 @@ from morag_youtube.processor import (
     YouTubeDownloadResult
 )
 from morag_youtube.service import YouTubeService
+from morag_youtube.apify_service import ApifyYouTubeService, ApifyYouTubeServiceError
+from morag_youtube.transcript import (
+    YouTubeTranscriptService,
+    YouTubeTranscript,
+    TranscriptSegment
+)
 from morag_youtube.tasks import (
     ProcessYouTubeVideoTask,
     ProcessYouTubePlaylistTask,
@@ -23,6 +29,11 @@ __all__ = [
     "YouTubeMetadata",
     "YouTubeDownloadResult",
     "YouTubeService",
+    "ApifyYouTubeService",
+    "ApifyYouTubeServiceError",
+    "YouTubeTranscriptService",
+    "YouTubeTranscript",
+    "TranscriptSegment",
     "ProcessYouTubeVideoTask",
     "ProcessYouTubePlaylistTask",
     "ExtractYouTubeMetadataTask",

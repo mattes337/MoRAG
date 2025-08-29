@@ -85,16 +85,7 @@ class SemanticChunkingResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
-class QueryAnalysisResult(BaseModel):
-    """Result of query analysis."""
-    
-    intent: str = Field(description="The detected intent of the query")
-    entities: List[str] = Field(description="Entities mentioned in the query")
-    keywords: List[str] = Field(description="Important keywords from the query")
-    query_type: str = Field(description="Type of query (factual, analytical, etc.)")
-    complexity: str = Field(description="Complexity level (simple, medium, complex)")
-    confidence: ConfidenceLevel = Field(description="Confidence in the analysis")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
 
 
 class ContentAnalysisResult(BaseModel):

@@ -5,7 +5,11 @@ from typing import List, Optional, Dict, Any
 import structlog
 
 from .config import ChunkingConfig, ChunkingStrategy
-from ..ai import SemanticChunkingAgent
+try:
+    from agents import get_agent
+    AGENTS_AVAILABLE = True
+except ImportError:
+    AGENTS_AVAILABLE = False
 
 logger = structlog.get_logger(__name__)
 
@@ -23,10 +27,8 @@ class SemanticChunker:
         self.config.validate_config()
         
         # Initialize AI agent if semantic analysis is enabled
-        if self.config.use_ai_analysis:
-            self.agent = SemanticChunkingAgent(
-                min_confidence=self.config.min_confidence
-            )
+        if self.config.use_ai_analysis and AGENTS_AVAILABLE:
+            self.agent = get_agent("semantic_chunking")
         else:
             self.agent = None
         

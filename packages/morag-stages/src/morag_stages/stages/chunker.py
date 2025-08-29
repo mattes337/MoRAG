@@ -12,24 +12,22 @@ from ..exceptions import StageExecutionError, StageValidationError
 
 # Import services with graceful fallback
 if TYPE_CHECKING:
-    from morag_core.ai import create_agent, AgentConfig, SummarizationAgent
+    from agents import get_agent, SummarizationAgent
     from morag_embedding import GeminiEmbeddingService
     from morag_core.config.unified import ChunkerConfig
 
 try:
-    from morag_core.ai import create_agent as _create_agent, AgentConfig as _AgentConfig, SummarizationAgent as _SummarizationAgent
+    from agents import get_agent as _get_agent, SummarizationAgent as _SummarizationAgent
     from morag_embedding import GeminiEmbeddingService as _GeminiEmbeddingService
     from morag_core.config.unified import ChunkerConfig as _ChunkerConfig
-    create_agent = _create_agent
-    AgentConfig = _AgentConfig
+    get_agent = _get_agent
     SummarizationAgent = _SummarizationAgent
     GeminiEmbeddingService = _GeminiEmbeddingService
     ChunkerConfig = _ChunkerConfig
     SERVICES_AVAILABLE = True
 except ImportError:
     SERVICES_AVAILABLE = False
-    create_agent = None  # type: ignore
-    AgentConfig = None  # type: ignore
+    get_agent = None  # type: ignore
     SummarizationAgent = None  # type: ignore
     GeminiEmbeddingService = None  # type: ignore
     ChunkerConfig = None  # type: ignore
@@ -319,7 +317,7 @@ class ChunkerStage(Stage):
         Returns:
             Document summary
         """
-        if not SERVICES_AVAILABLE or create_agent is None:
+        if not SERVICES_AVAILABLE or get_agent is None:
             return ""
 
         # Check if API key is available before attempting to create agent
@@ -331,20 +329,17 @@ class ChunkerStage(Stage):
 
         try:
             if not self.summarization_agent:
-                agent_config = AgentConfig(
-                    model=self._get_config_value(config, 'model', 'google-gla:gemini-1.5-flash'),
-                    temperature=0.1,
-                    max_tokens=self._get_config_value(config, 'summary_max_tokens', 1000)
-                )
-                self.summarization_agent = create_agent(SummarizationAgent, config=agent_config)
+                # Use the agents framework to get a summarization agent
+                self.summarization_agent = get_agent("summarization")
             
-            # Create summarization prompt
+            # Create summarization using the agents framework
             content_type = metadata.get('type', 'text')
 
-            user_prompt = f"Please create a summary of this {content_type} content:\n\n{content[:8000]}"  # Limit content length
-
-            response = await self.summarization_agent.run(user_prompt)
-            # The base agent's run method returns the validated result directly
+            response = await self.summarization_agent.summarize(
+                text=content[:8000],  # Limit content length
+                content_type=content_type
+            )
+            # The agents framework returns a SummarizationResult
             return response.summary if hasattr(response, 'summary') else str(response)
             
         except Exception as e:

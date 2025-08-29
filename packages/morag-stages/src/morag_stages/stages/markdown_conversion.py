@@ -10,6 +10,8 @@ import structlog
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
+logger = structlog.get_logger(__name__)
+
 # Import core exceptions
 try:
     from morag_core.exceptions import ProcessingError
@@ -17,11 +19,11 @@ except ImportError:
     class ProcessingError(Exception):  # type: ignore
         pass
 
-# Import services with graceful fallback
+# Import services - these are required for proper operation
 try:
     from morag_services import MoRAGServices, ContentType
     SERVICES_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     SERVICES_AVAILABLE = False
     # Create placeholder types for when services are not available
     class MoRAGServices:  # type: ignore
@@ -29,7 +31,14 @@ except ImportError:
     class ContentType:  # type: ignore
         pass
 
-logger = structlog.get_logger(__name__)
+# Import YouTube processor for fallback when services are not available
+try:
+    from morag_youtube.service import YouTubeService
+    YOUTUBE_AVAILABLE = True
+except ImportError:
+    YOUTUBE_AVAILABLE = False
+    class YouTubeService:  # type: ignore
+        pass
 
 
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
@@ -78,6 +87,12 @@ class MarkdownConversionStage(Stage):
             self.services = None
         else:
             self.services = MoRAGServices()
+
+        # Initialize YouTube service for fallback processing
+        if YOUTUBE_AVAILABLE:
+            self.youtube_service = YouTubeService()
+        else:
+            self.youtube_service = None
     
     async def execute(self, 
                      input_files: List[Path], 
@@ -104,8 +119,12 @@ class MarkdownConversionStage(Stage):
         # Determine content type
         content_type = self._detect_content_type(input_file)
 
-        # Check if we need MoRAG services (not needed for MarkItDown processing)
+        # Check if we need MoRAG services (not needed for MarkItDown processing or YouTube fallback)
         needs_services = not self._should_use_markitdown(input_file, content_type)
+
+        # Allow YouTube processing with fallback service even when MoRAG services are not available
+        if self._is_content_type(content_type, "YOUTUBE") and YOUTUBE_AVAILABLE:
+            needs_services = False
 
         if needs_services and (not SERVICES_AVAILABLE or self.services is None):
             raise StageExecutionError(
@@ -120,25 +139,28 @@ class MarkdownConversionStage(Stage):
         try:
             
             # Generate output filename
-            sanitized_name = sanitize_filename(input_file.stem)
-            output_file = context.output_dir / f"{sanitized_name}.md"
+            output_filename = self._generate_output_filename(input_file, content_type)
+            output_file = context.output_dir / output_filename
+
             context.output_dir.mkdir(parents=True, exist_ok=True)
             
             # Check if we should use MarkItDown for better quality
             if self._should_use_markitdown(input_file, content_type):
                 logger.info("Using MarkItDown for high-quality conversion",
                            input_file=str(input_file),
-                           content_type=content_type.value if content_type else "unknown")
+                           content_type=str(content_type))
                 result_data = await self._process_with_markitdown(input_file, output_file, config)
             # Otherwise use specialized processors
-            elif content_type == ContentType.VIDEO:
+            elif self._is_content_type(content_type, "VIDEO"):
                 result_data = await self._process_video(input_file, output_file, config)
-            elif content_type == ContentType.AUDIO:
+            elif self._is_content_type(content_type, "AUDIO"):
                 result_data = await self._process_audio(input_file, output_file, config)
-            elif content_type == ContentType.DOCUMENT:
+            elif self._is_content_type(content_type, "DOCUMENT"):
                 result_data = await self._process_document(input_file, output_file, config)
-            elif content_type == ContentType.WEB:
+            elif self._is_content_type(content_type, "WEB"):
                 result_data = await self._process_web(input_file, output_file, config)
+            elif self._is_content_type(content_type, "YOUTUBE"):
+                result_data = await self._process_youtube(input_file, output_file, config)
             else:
                 result_data = await self._process_text(input_file, output_file, config)
             
@@ -150,7 +172,7 @@ class MarkdownConversionStage(Stage):
                 output_files=[str(output_file)],
                 config_used=config,
                 metrics={
-                    "content_type": content_type.value if content_type else "unknown",
+                    "content_type": str(content_type) if content_type else "unknown",
                     "input_size_bytes": input_file.stat().st_size if input_file.exists() else 0,
                     "output_size_bytes": output_file.stat().st_size if output_file.exists() else 0,
                     **result_data.get("metrics", {})
@@ -177,21 +199,33 @@ class MarkdownConversionStage(Stage):
     
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for markdown conversion.
-        
+
         Args:
             input_files: List of input file paths
-            
+
         Returns:
             True if inputs are valid
         """
+        logger.debug("Validating markdown conversion inputs",
+                    input_count=len(input_files),
+                    input_files=[str(f) for f in input_files])
+
         if len(input_files) != 1:
+            logger.error("Invalid input count for markdown conversion",
+                        expected=1,
+                        actual=len(input_files),
+                        files=[str(f) for f in input_files])
             return False
-        
+
         input_file = input_files[0]
-        
+        file_str = str(input_file)
+
+        logger.debug("Validating input file",
+                    file_path=file_str,
+                    file_type=type(input_file).__name__)
+
         # Check if file exists (for local files)
         # Handle URLs that may have been converted to Windows paths
-        file_str = str(input_file)
         is_url = (
             file_str.startswith(('http://', 'https://')) or
             file_str.replace('\\', '/').startswith(('http://', 'https://')) or
@@ -199,13 +233,34 @@ class MarkdownConversionStage(Stage):
             ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
         )
 
+        logger.debug("URL detection result",
+                    file_path=file_str,
+                    is_url=is_url)
+
         if not is_url:
-            if not input_file.exists():
+            file_exists = input_file.exists()
+            logger.debug("Local file existence check",
+                        file_path=file_str,
+                        exists=file_exists)
+            if not file_exists:
+                logger.error("Local file does not exist", file_path=file_str)
                 return False
-        
+
         # Check if file type is supported
         content_type = self._detect_content_type(input_file)
-        return content_type is not None
+        logger.debug("Content type detection result",
+                    file_path=file_str,
+                    content_type=content_type.value if content_type else None,
+                    is_supported=content_type is not None)
+
+        if content_type is None:
+            logger.error("Unsupported content type", file_path=file_str)
+            return False
+
+        logger.debug("Input validation successful",
+                    file_path=file_str,
+                    content_type=content_type.value)
+        return True
     
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
@@ -217,20 +272,21 @@ class MarkdownConversionStage(Stage):
     
     def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output file paths.
-        
+
         Args:
             input_files: List of input file paths
             context: Stage execution context
-            
+
         Returns:
             List of expected output file paths
         """
         if len(input_files) != 1:
             return []
-        
+
         input_file = input_files[0]
-        sanitized_name = sanitize_filename(input_file.stem)
-        output_file = context.output_dir / f"{sanitized_name}.md"
+        content_type = self._detect_content_type(input_file)
+        output_filename = self._generate_output_filename(input_file, content_type)
+        output_file = context.output_dir / output_filename
         return [output_file]
     
     def _detect_content_type(self, file_path: Path) -> Optional[ContentType]:
@@ -242,10 +298,8 @@ class MarkdownConversionStage(Stage):
         Returns:
             Detected content type or None
         """
-        if not SERVICES_AVAILABLE:
-            return None
-
         file_str = str(file_path)
+        logger.debug("Starting content type detection", file_path=file_str)
 
         # Web URLs - handle Windows path conversion issue
         # On Windows, Path() converts URLs to backslash format, so we need to check both
@@ -257,38 +311,162 @@ class MarkdownConversionStage(Stage):
             ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
         )
 
+        logger.debug("URL detection in content type",
+                    file_path=file_str,
+                    is_url=is_url)
+
         if is_url:
-            return ContentType.WEB
+            # Check for YouTube URLs first
+            youtube_domains = ["youtube.com", "youtu.be", "youtube-nocookie.com"]
+            is_youtube = any(domain in file_str for domain in youtube_domains)
+            logger.debug("URL type detection",
+                        file_path=file_str,
+                        is_youtube=is_youtube,
+                        services_available=SERVICES_AVAILABLE)
+
+            if is_youtube:
+                # Create ContentType.YOUTUBE if services available, otherwise use a placeholder
+                if SERVICES_AVAILABLE:
+                    logger.debug("Returning YOUTUBE content type", file_path=file_str)
+                    return ContentType.YOUTUBE
+                else:
+                    # Return a string identifier when services not available
+                    logger.debug("Returning YOUTUBE string (services not available)", file_path=file_str)
+                    return "YOUTUBE"  # type: ignore
+            # Create ContentType.WEB if services available, otherwise use a placeholder
+            if SERVICES_AVAILABLE:
+                logger.debug("Returning WEB content type", file_path=file_str)
+                return ContentType.WEB
+            else:
+                logger.debug("Returning WEB string (services not available)", file_path=file_str)
+                return "WEB"  # type: ignore
         
         # Video files
+        file_suffix = file_path.suffix.lower()
+        logger.debug("Checking file extension",
+                    file_path=file_str,
+                    suffix=file_suffix)
+
         video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv'}
-        if file_path.suffix.lower() in video_extensions:
-            return ContentType.VIDEO
-        
+        if file_suffix in video_extensions:
+            logger.debug("Detected video file", file_path=file_str, suffix=file_suffix)
+            if SERVICES_AVAILABLE:
+                return ContentType.VIDEO
+            else:
+                return "VIDEO"  # type: ignore
+
         # Audio files
         audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'}
-        if file_path.suffix.lower() in audio_extensions:
-            return ContentType.AUDIO
-        
+        if file_suffix in audio_extensions:
+            logger.debug("Detected audio file", file_path=file_str, suffix=file_suffix)
+            if SERVICES_AVAILABLE:
+                return ContentType.AUDIO
+            else:
+                return "AUDIO"  # type: ignore
+
         # Document files
         doc_extensions = {'.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'}
-        if file_path.suffix.lower() in doc_extensions:
-            return ContentType.DOCUMENT
-        
+        if file_suffix in doc_extensions:
+            logger.debug("Detected document file", file_path=file_str, suffix=file_suffix)
+            if SERVICES_AVAILABLE:
+                return ContentType.DOCUMENT
+            else:
+                return "DOCUMENT"  # type: ignore
+
         # Text files (default)
         text_extensions = {'.txt', '.md', '.rst', '.html', '.xml', '.json', '.csv'}
-        if file_path.suffix.lower() in text_extensions:
-            return ContentType.TEXT
-        
-        # Default to text for unknown types
-        return ContentType.TEXT
+        if file_suffix in text_extensions:
+            logger.debug("Detected text file", file_path=file_str, suffix=file_suffix)
+            if SERVICES_AVAILABLE:
+                return ContentType.TEXT
+            else:
+                return "TEXT"  # type: ignore
 
-    def _should_use_markitdown(self, file_path: Path, content_type: ContentType) -> bool:
+        # Default to text for unknown types
+        logger.debug("Using default text type for unknown extension",
+                    file_path=file_str,
+                    suffix=file_suffix)
+        if SERVICES_AVAILABLE:
+            return ContentType.TEXT
+        else:
+            return "TEXT"  # type: ignore
+
+    def _is_content_type(self, content_type, expected_type: str) -> bool:
+        """Check if content type matches expected type, handling both enum and string types.
+
+        Args:
+            content_type: Content type (ContentType enum or string)
+            expected_type: Expected type as string (e.g., "VIDEO", "AUDIO")
+
+        Returns:
+            True if content type matches expected type
+        """
+        if SERVICES_AVAILABLE and hasattr(ContentType, expected_type):
+            return content_type == getattr(ContentType, expected_type)
+        else:
+            return str(content_type).upper() == expected_type.upper()
+
+    def _generate_output_filename(self, input_file: Path, content_type) -> str:
+        """Generate appropriate output filename based on input type.
+
+        Args:
+            input_file: Input file path or URL
+            content_type: Detected content type
+
+        Returns:
+            Output filename with .md extension
+        """
+
+
+        if self._is_content_type(content_type, "YOUTUBE"):
+            # Extract video ID from YouTube URL
+            try:
+                # Fix URL mangling from Windows path conversion
+                url_str = str(input_file)
+                # Convert backslashes to forward slashes
+                url_str = url_str.replace('\\', '/')
+                # Fix common URL mangling patterns
+                if url_str.startswith('https:') and not url_str.startswith('https://'):
+                    url_str = url_str.replace('https:/', 'https://')
+                elif url_str.startswith('http:') and not url_str.startswith('http://'):
+                    url_str = url_str.replace('http:/', 'http://')
+
+                if YOUTUBE_AVAILABLE and self.youtube_service:
+                    video_id = self.youtube_service.transcript_service.extract_video_id(url_str)
+                    return f"{video_id}.md"
+                else:
+                    # Fallback: extract video ID using regex
+                    import re
+                    patterns = [
+                        r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
+                        r'youtube\.com/v/([a-zA-Z0-9_-]{11})',
+                        r'youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})'
+                    ]
+
+                    for pattern in patterns:
+                        match = re.search(pattern, url_str)
+                        if match:
+                            video_id = match.group(1)
+                            return f"{video_id}.md"
+
+                    # If no pattern matches, fall back to sanitized stem
+                    sanitized_name = sanitize_filename(input_file.stem)
+                    return f"{sanitized_name}.md"
+            except Exception:
+                # If video ID extraction fails, fall back to sanitized stem
+                sanitized_name = sanitize_filename(input_file.stem)
+                return f"{sanitized_name}.md"
+        else:
+            # For non-YouTube content, use sanitized stem
+            sanitized_name = sanitize_filename(input_file.stem)
+            return f"{sanitized_name}.md"
+
+    def _should_use_markitdown(self, file_path: Path, content_type) -> bool:
         """Check if MarkItDown should be used for this file type.
 
         Args:
             file_path: File path to check
-            content_type: Detected content type
+            content_type: Detected content type (ContentType enum or string)
 
         Returns:
             True if MarkItDown should be used
@@ -311,15 +489,178 @@ class MarkdownConversionStage(Stage):
         if file_ext in markitdown_extensions:
             return True
 
+        # Handle both ContentType enums and string content types
+        content_type_str = str(content_type).upper() if content_type else ""
+
         # Don't use MarkItDown for audio/video files (they need specialized processing)
-        if content_type in [ContentType.AUDIO, ContentType.VIDEO]:
-            return False
+        if SERVICES_AVAILABLE:
+            if content_type in [ContentType.AUDIO, ContentType.VIDEO]:
+                return False
+        else:
+            if content_type_str in ["AUDIO", "VIDEO"]:
+                return False
 
         # Don't use MarkItDown for web URLs (we have custom web processing)
-        if content_type == ContentType.WEB:
-            return False
+        if SERVICES_AVAILABLE:
+            if content_type == ContentType.WEB:
+                return False
+        else:
+            if content_type_str == "WEB":
+                return False
 
         return False
+
+    def _validate_conversion_quality(self, content: str, file_path: Path) -> bool:
+        """Validate that conversion produced proper markdown for any supported file type.
+
+        Args:
+            content: Converted content
+            file_path: Original file path
+
+        Returns:
+            True if conversion appears successful, False otherwise
+        """
+        if not content or len(content.strip()) < 5:
+            return False
+
+        file_ext = file_path.suffix.lower()
+
+        # Format-specific validation
+        if file_ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx']:
+            return self._validate_document_conversion(content)
+        elif file_ext in ['.html', '.htm']:
+            return self._validate_html_conversion(content)
+        elif file_ext in ['.csv', '.xlsx', '.xls']:
+            return self._validate_data_conversion(content)
+        elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+            return self._validate_image_conversion(content)
+        elif file_ext in ['.json', '.xml']:
+            return self._validate_structured_data_conversion(content)
+        elif file_ext in ['.txt', '.md', '.rst']:
+            return self._validate_text_conversion(content)
+        elif file_ext in ['.mp3', '.wav', '.mp4', '.avi', '.mov', '.wmv', '.flv']:
+            return self._validate_media_conversion(content)
+        else:
+            return self._validate_general_conversion(content)
+
+    def _validate_document_conversion(self, content: str) -> bool:
+        """Validate document file conversion (PDF, DOC, PPT, etc.)."""
+        import re
+
+        # Check for markdown structure
+        markdown_patterns = [
+            r'^#+ ',  # Headers
+            r'^\* ',  # Bullet points
+            r'^\d+\. ',  # Numbered lists
+            r'\*\*.*?\*\*',  # Bold text
+            r'`.*?`',  # Code
+            r'^\|.*\|',  # Tables
+        ]
+
+        pattern_matches = sum(1 for pattern in markdown_patterns
+                            if re.search(pattern, content, re.MULTILINE))
+
+        # Check for signs of poor conversion
+        lines = content.split('\n')
+        non_empty_lines = [line.strip() for line in lines if line.strip()]
+
+        if not non_empty_lines:
+            return False
+
+        # Check for very long lines (sign of poor text extraction)
+        long_lines = sum(1 for line in non_empty_lines if len(line) > 200)
+        long_line_ratio = long_lines / len(non_empty_lines) if non_empty_lines else 0
+
+        # Check line break density
+        line_break_ratio = content.count('\n') / max(1, len(content))
+
+        # Document should have some structure and reasonable formatting
+        has_structure = pattern_matches >= 1 or '\n\n' in content
+        has_reasonable_formatting = long_line_ratio < 0.7 and line_break_ratio > 0.005
+
+        return has_structure and has_reasonable_formatting
+
+    def _validate_html_conversion(self, content: str) -> bool:
+        """Validate HTML conversion."""
+        import re
+
+        # HTML should convert to structured markdown
+        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
+        has_paragraphs = '\n\n' in content
+        has_lists = bool(re.search(r'^\* |^\d+\. ', content, re.MULTILINE))
+
+        # Should not contain excessive raw HTML tags
+        html_tag_ratio = len(re.findall(r'<[^>]+>', content)) / max(1, len(content.split()))
+
+        return (has_headers or has_paragraphs or has_lists) and html_tag_ratio < 0.1
+
+    def _validate_data_conversion(self, content: str) -> bool:
+        """Validate data file conversion (CSV, Excel)."""
+        import re
+
+        # Data files should convert to tables or structured content
+        has_tables = bool(re.search(r'^\|.*\|', content, re.MULTILINE))
+        has_structured_data = bool(re.search(r'^\w+:\s+\w+', content, re.MULTILINE))
+        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
+
+        # Should not be just a wall of text
+        lines = content.split('\n')
+        non_empty_lines = [line for line in lines if line.strip()]
+        avg_line_length = sum(len(line) for line in non_empty_lines) / max(1, len(non_empty_lines))
+
+        return (has_tables or has_structured_data or has_headers) and avg_line_length < 300
+
+    def _validate_image_conversion(self, content: str) -> bool:
+        """Validate image conversion (OCR results)."""
+        # Images should produce meaningful text content
+        if len(content.strip()) < 3:
+            return False
+
+        # Should not be just error messages
+        error_indicators = ['error', 'failed', 'unable', 'cannot', 'not supported', 'no text found']
+        content_lower = content.lower()
+
+        return not any(indicator in content_lower for indicator in error_indicators)
+
+    def _validate_structured_data_conversion(self, content: str) -> bool:
+        """Validate structured data conversion (JSON, XML)."""
+        import re
+
+        # Should convert to readable markdown format
+        has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
+        has_structure = bool(re.search(r'^\w+:\s+', content, re.MULTILINE))
+        has_code_blocks = '```' in content
+
+        return has_headers or has_structure or has_code_blocks
+
+    def _validate_text_conversion(self, content: str) -> bool:
+        """Validate text file conversion."""
+        # Text files should preserve content reasonably
+        return len(content.strip()) > 0
+
+    def _validate_media_conversion(self, content: str) -> bool:
+        """Validate media file conversion (audio/video transcription)."""
+        # Media files should produce transcribed text
+        if len(content.strip()) < 10:
+            return False
+
+        # Should not be just error messages
+        error_indicators = ['error', 'failed', 'unable', 'cannot', 'not supported', 'no audio', 'no video']
+        content_lower = content.lower()
+
+        return not any(indicator in content_lower for indicator in error_indicators)
+
+    def _validate_general_conversion(self, content: str) -> bool:
+        """General validation for unknown file types."""
+        # Basic check - should have some content and not be obviously broken
+        if len(content.strip()) < 5:
+            return False
+
+        # Should not be just error messages
+        error_indicators = ['error', 'failed', 'unable', 'cannot', 'not supported']
+        content_lower = content.lower()
+
+        return not any(indicator in content_lower for indicator in error_indicators)
 
     async def _process_with_markitdown(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process file using MarkItDown for high-quality conversion.
@@ -345,6 +686,16 @@ class MarkdownConversionStage(Stage):
 
             if not result or not result.text_content:
                 raise ProcessingError(f"MarkItDown failed to extract content from {input_file}")
+
+            # Quality validation for all supported file types
+            logger.debug("Validating conversion quality",
+                       file_type=input_file.suffix.lower(),
+                       content_preview=result.text_content[:200] + "..." if len(result.text_content) > 200 else result.text_content)
+            if not self._validate_conversion_quality(result.text_content, input_file):
+                logger.error("Conversion quality validation failed",
+                           file_type=input_file.suffix.lower(),
+                           content_preview=result.text_content[:200] + "..." if len(result.text_content) > 200 else result.text_content)
+                raise ProcessingError(f"Conversion failed for {input_file.suffix.lower()} - output does not appear to be proper markdown: {input_file}")
 
             # Create markdown with metadata header
             markdown_content = self._create_markdown_with_metadata(
@@ -552,19 +903,29 @@ class MarkdownConversionStage(Stage):
         Returns:
             Processing result data
         """
-        # Normalize URL - fix Windows path conversion issue
+        # Convert Path back to URL string and fix Windows path conversion issues
         url = str(input_file)
 
-        # Check if this looks like a URL that got mangled by Windows Path conversion
-        if ('http:' in url or 'https:' in url) and ('\\' in url or not url.startswith(('http://', 'https://'))):
-            # Convert backslashes to forward slashes first
+        # Handle Windows path conversion issue - Path() mangles URLs
+        if not url.startswith(('http://', 'https://')):
+            # Convert backslashes to forward slashes
             url = url.replace('\\', '/')
 
-            # Then fix the protocol if needed
-            if url.startswith('https:/') and not url.startswith('https://'):
-                url = url.replace('https:/', 'https://', 1)
-            elif url.startswith('http:/') and not url.startswith('http://'):
-                url = url.replace('http:/', 'http://', 1)
+            # Fix common URL mangling patterns
+            if url.startswith('https:') and not url.startswith('https://'):
+                # Pattern: https:/www.example.com -> https://www.example.com
+                url = url.replace('https:/', 'https://')
+            elif url.startswith('http:') and not url.startswith('http://'):
+                # Pattern: http:/www.example.com -> http://www.example.com
+                url = url.replace('http:/', 'http://')
+
+            # Handle case where the URL got completely mangled
+            if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+                # Try to reconstruct from fragments - default to https
+                if not url.startswith(('http', 'www')):
+                    url = 'https://' + url
+                elif url.startswith('www'):
+                    url = 'https://' + url
 
         logger.info("Processing web URL", url=url)
 
@@ -604,6 +965,118 @@ class MarkdownConversionStage(Stage):
                 "url": url,
                 "content_length": len(result.text_content or ""),
                 "links_followed": config.get('follow_links', False)
+            }
+        }
+
+    async def _process_youtube(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Process YouTube URL to markdown.
+
+        Args:
+            input_file: Input URL (as Path object)
+            output_file: Output markdown file
+            config: Stage configuration
+
+        Returns:
+            Processing result data
+        """
+        # Convert Path back to URL string and fix Windows path conversion issues
+        url = str(input_file)
+
+        # Handle Windows path conversion issue - Path() mangles URLs
+        if not url.startswith(('http://', 'https://')):
+            # Convert backslashes to forward slashes
+            url = url.replace('\\', '/')
+
+            # Fix common URL mangling patterns
+            if url.startswith('https:') and not url.startswith('https://'):
+                # Pattern: https:/www.youtube.com -> https://www.youtube.com
+                url = url.replace('https:/', 'https://')
+            elif url.startswith('http:') and not url.startswith('http://'):
+                # Pattern: http:/www.youtube.com -> http://www.youtube.com
+                url = url.replace('http:/', 'http://')
+
+            # Handle case where the URL got completely mangled
+            if 'youtube.com' in url and not url.startswith(('http://', 'https://')):
+                # Try to reconstruct from fragments
+                if 'https' in url:
+                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+                else:
+                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+
+        logger.info("Processing YouTube URL", url=url)
+
+        # Try MoRAG services first, fallback to YouTube service if not available
+        if self.services:
+            # Configure YouTube processing options from stage config
+            youtube_options = {
+                'transcript_only': config.get('transcript_only', False),  # Default to full processing
+                'transcript_language': config.get('transcript_language', None),
+                'extract_transcript': True,
+                'extract_metadata_only': False,
+                'extract_audio': not config.get('transcript_only', False),  # Only extract audio if not transcript-only
+                'download_subtitles': False,
+                'download_thumbnails': False,
+                'quality': 'worst'  # Use lowest quality for faster download if needed
+            }
+
+            result = await self.services.process_youtube(url, youtube_options)
+        elif self.youtube_service:
+            # Fallback to direct YouTube service
+            logger.info("Using fallback YouTube service for transcript extraction")
+
+            # Use transcript-only mode for fallback to avoid downloading video
+            transcript_result = await self.youtube_service.extract_transcript(
+                url=url,
+                language=config.get('transcript_language', None),
+                transcript_only=True
+            )
+
+            # Create a result object compatible with the rest of the method
+            class FallbackResult:
+                def __init__(self, transcript_data):
+                    self.text_content = transcript_data.get('transcript_text', '')
+                    self.metadata = {
+                        'title': f"YouTube Video {transcript_data.get('video_id', '')}",
+                        'video_id': transcript_data.get('video_id'),
+                        'language': transcript_data.get('language'),
+                        'duration': transcript_data.get('duration', 0),
+                        'uploader': 'Unknown',
+                        'method': 'fallback_transcript_only'
+                    }
+
+            result = FallbackResult(transcript_result)
+        else:
+            raise ProcessingError("Neither MoRAG services nor YouTube fallback service are available")
+
+        # Create markdown with metadata header
+        markdown_content = self._create_markdown_with_metadata(
+            content=result.text_content or "",
+            metadata={
+                "title": result.metadata.get('title', "YouTube Video"),
+                "source": url,
+                "type": "youtube",
+                "url": url,
+                "video_id": result.metadata.get('video_id'),
+                "uploader": result.metadata.get('uploader'),
+                "duration": result.metadata.get('duration'),
+                "language": result.metadata.get('language'),
+                "created_at": datetime.now().isoformat(),
+                **result.metadata
+            }
+        )
+
+        # Write to file
+        output_file.write_text(markdown_content, encoding='utf-8')
+
+        return {
+            "content_type": "youtube",
+            "title": result.metadata.get('title', "YouTube Video"),
+            "metadata": result.metadata,
+            "metrics": {
+                "url": url,
+                "video_id": result.metadata.get('video_id'),
+                "content_length": len(result.text_content or ""),
+                "transcript_only": config.get('transcript_only', True)
             }
         }
 
@@ -660,7 +1133,9 @@ class MarkdownConversionStage(Stage):
         """
         content_type = metadata.get('type', 'document')
 
-        if content_type in ['audio', 'video']:
+        if content_type == 'youtube':
+            return self._create_youtube_markdown(content, metadata)
+        elif content_type in ['audio', 'video']:
             return self._create_media_markdown(content, metadata)
         else:
             return self._create_document_markdown(content, metadata)
@@ -748,6 +1223,125 @@ class MarkdownConversionStage(Stage):
 
         # Add transcript section
         markdown_lines.append("## Transcript")
+        markdown_lines.append("")
+
+        # Add the actual transcript content
+        if content:
+            # If content already contains timestamps, use it directly
+            if '[' in content and ']' in content:
+                markdown_lines.append(content)
+            else:
+                # If no timestamps, add as plain text
+                markdown_lines.append(content)
+        else:
+            markdown_lines.append("*No transcript available*")
+
+        return "\n".join(markdown_lines)
+
+    def _create_youtube_markdown(self, content: str, metadata: Dict[str, Any]) -> str:
+        """Create markdown for YouTube videos with comprehensive metadata."""
+        title = metadata.get('title', 'YouTube Video')
+
+        # Start with title
+        markdown_lines = [f"# Youtube Analysis: {title}", ""]
+
+        # Add YouTube Information section
+        markdown_lines.append("## Youtube Information")
+        markdown_lines.append("")
+
+        # Format duration in a user-friendly way
+        if metadata.get('duration'):
+            duration = metadata['duration']
+            if isinstance(duration, (int, float)):
+                hours = int(duration // 3600)
+                minutes = int((duration % 3600) // 60)
+                seconds = int(duration % 60)
+                if hours > 0:
+                    duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                else:
+                    duration_str = f"{minutes:02d}:{seconds:02d}"
+                markdown_lines.append(f"- **Duration**: {duration_str}")
+
+        # Add channel information
+        if metadata.get('uploader'):
+            markdown_lines.append(f"- **Channel**: {metadata['uploader']}")
+
+        # Add language if available
+        if metadata.get('language'):
+            markdown_lines.append(f"- **Language**: {metadata['language']}")
+
+        # Add upload date if available
+        if metadata.get('upload_date'):
+            upload_date = metadata['upload_date']
+            # Format upload_date if it's in YYYYMMDD format
+            if isinstance(upload_date, str) and len(upload_date) == 8 and upload_date.isdigit():
+                formatted_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+                markdown_lines.append(f"- **Upload Date**: {formatted_date}")
+            else:
+                markdown_lines.append(f"- **Upload Date**: {upload_date}")
+
+        # Add view count if available
+        if metadata.get('view_count'):
+            view_count = metadata['view_count']
+            if isinstance(view_count, int):
+                # Format with commas for readability
+                formatted_views = f"{view_count:,}"
+                markdown_lines.append(f"- **Views**: {formatted_views}")
+
+        # Add like count if available
+        if metadata.get('like_count'):
+            like_count = metadata['like_count']
+            if isinstance(like_count, int):
+                formatted_likes = f"{like_count:,}"
+                markdown_lines.append(f"- **Likes**: {formatted_likes}")
+
+        # Add comment count if available
+        if metadata.get('comment_count'):
+            comment_count = metadata['comment_count']
+            if isinstance(comment_count, int):
+                formatted_comments = f"{comment_count:,}"
+                markdown_lines.append(f"- **Comments**: {formatted_comments}")
+
+        # Add video ID
+        if metadata.get('video_id'):
+            markdown_lines.append(f"- **Video ID**: {metadata['video_id']}")
+
+        # Add categories if available
+        if metadata.get('categories') and isinstance(metadata['categories'], list):
+            categories = ", ".join(metadata['categories'])
+            markdown_lines.append(f"- **Categories**: {categories}")
+
+        # Add tags if available (limit to first 10 for readability)
+        if metadata.get('tags') and isinstance(metadata['tags'], list):
+            tags = metadata['tags'][:10]  # Limit to first 10 tags
+            tags_str = ", ".join(tags)
+            if len(metadata['tags']) > 10:
+                tags_str += f" (and {len(metadata['tags']) - 10} more)"
+            markdown_lines.append(f"- **Tags**: {tags_str}")
+
+        # Add description if available (truncated for readability)
+        if metadata.get('description'):
+            description = metadata['description']
+            if isinstance(description, str) and description.strip():
+                # Truncate description if it's too long
+                if len(description) > 300:
+                    description = description[:300] + "..."
+                # Replace newlines with spaces for better formatting
+                description = description.replace('\n', ' ').replace('\r', ' ')
+                markdown_lines.append(f"- **Description**: {description}")
+
+        # Add processing timestamp
+        if metadata.get('created_at'):
+            markdown_lines.append(f"- **Created At**: {metadata['created_at']}")
+
+        # Add source URL
+        if metadata.get('source'):
+            markdown_lines.append(f"- **Source**: {metadata['source']}")
+
+        markdown_lines.extend(["", ""])
+
+        # Add content section
+        markdown_lines.append("## Content")
         markdown_lines.append("")
 
         # Add the actual transcript content

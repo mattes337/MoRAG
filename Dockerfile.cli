@@ -47,8 +47,12 @@ RUN pip install webdavclient3
 # Download spaCy model (optional, will fallback if not available)
 RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed, will use fallback"
 
-# Copy package files and install MoRAG packages
+# Copy package files and agents framework
 COPY packages/ ./packages/
+COPY agents/ ./agents/
+
+# Install agents framework first (required by other packages)
+RUN pip install -e agents
 
 # Install MoRAG packages in development mode
 RUN pip install -e packages/morag-core

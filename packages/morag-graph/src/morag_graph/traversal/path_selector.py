@@ -11,7 +11,14 @@ from morag_core.config import get_settings
 from morag_core.exceptions import ProcessingError
 from ..models import Entity, Relation
 from ..operations.traversal import GraphTraversal, GraphPath
-from ..utils.llm_response_parser import parse_json_response
+# Import robust parser from agents framework with fallback
+try:
+    from agents.base import LLMResponseParser
+    AGENTS_PARSER_AVAILABLE = True
+except ImportError:
+    from ..utils.llm_response_parser import parse_json_response
+    LLMResponseParser = None
+    AGENTS_PARSER_AVAILABLE = False
 
 logger = structlog.get_logger(__name__)
 
@@ -419,13 +426,20 @@ Format as JSON:
     ) -> List[PathRelevanceScore]:
         """Parse LLM response into path scores."""
         try:
-            # Use robust JSON parser with fallback
+            # Use centralized parser if available, otherwise fallback
             fallback_data = {'evaluations': []}
-            data = parse_json_response(
-                response_text,
-                fallback_value=fallback_data,
-                context="path_evaluation"
-            )
+            if AGENTS_PARSER_AVAILABLE and LLMResponseParser:
+                data = LLMResponseParser.parse_json_response(
+                    response=response_text,
+                    fallback_value=fallback_data,
+                    context="path_evaluation"
+                )
+            else:
+                data = parse_json_response(
+                    response_text,
+                    fallback_value=fallback_data,
+                    context="path_evaluation"
+                )
             
             scored_paths = []
             evaluations = data.get('evaluations', [])

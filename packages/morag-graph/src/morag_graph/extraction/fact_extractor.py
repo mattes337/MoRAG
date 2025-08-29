@@ -7,12 +7,16 @@ from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 import structlog
 
-from morag_reasoning.llm import LLMClient
 from ..models.fact import Fact, FactType
-from .fact_prompts import FactExtractionPrompts, FactPromptTemplates
 from .fact_validator import FactValidator
 from .fact_filter import FactFilter, DomainFilterConfig
 from .fact_filter_config import create_domain_configs_for_language
+
+# Import agents framework - required
+try:
+    from agents import get_agent
+except ImportError:
+    raise ImportError("Agents framework is required. Please install the agents package.")
 
 
 class FactExtractor:
@@ -54,16 +58,17 @@ class FactExtractor:
         self.fact_filter = FactFilter(domain_configs)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
 
-        # Initialize LLM client
-        from morag_reasoning.llm import LLMConfig
-        llm_config = LLMConfig(
-            provider="gemini",
-            model=model_id,
-            api_key=api_key,
-            temperature=0.1,
-            max_tokens=2000
+        # Initialize fact extraction agent
+        self.fact_agent = get_agent("fact_extraction")
+        # Configure agent for this domain
+        self.fact_agent.update_config(
+            agent_config={
+                "max_facts": max_facts_per_chunk,
+                "domain": domain,
+                "language": language,
+                "min_confidence": min_confidence
+            }
         )
-        self.llm_client = LLMClient(llm_config)
     
     async def extract_facts(
         self, 
@@ -310,46 +315,46 @@ class FactExtractor:
         domain = context.get('domain', 'general')
         language = context.get('language', 'en')
         
-        # Create extraction prompt with query context if available
+        # Extract query context for agent
         query_context = context.get('query_context')
-        prompt = FactExtractionPrompts.create_extraction_prompt(
-            chunk_text=text,
-            domain=domain,
-            language=language,
-            max_facts=self.max_facts_per_chunk,
-            query_context=query_context
-        )
-        
-        # Enhance prompt for specific domains
-        if domain != 'general':
-            prompt = FactPromptTemplates.get_domain_prompt(domain, prompt)
         
         try:
-            # Call LLM for extraction
-            response = await self.llm_client.generate(prompt)
-
-            # Debug: Log the raw LLM response
-            self.logger.debug(
-                "Raw LLM response received",
-                response_length=len(response) if response else 0,
-                response_preview=response[:300] if response else "None",
-                response_type=type(response).__name__
+            # Use the agents framework - ALWAYS
+            result = await self.fact_agent.extract_facts(
+                text=text,
+                domain=domain,
+                query_context=query_context,
+                max_facts=self.max_facts_per_chunk
             )
 
-            # Parse JSON response
-            fact_candidates = self._parse_llm_response(response)
-            
+            # Convert agent result to legacy format
+            fact_candidates = []
+            for fact in result.facts:
+                fact_candidates.append({
+                    'subject': fact.subject,
+                    'object': fact.object,
+                    'approach': fact.approach,
+                    'solution': fact.solution,
+                    'condition': fact.condition,
+                    'remarks': fact.remarks,
+                    'fact_type': fact.fact_type,
+                    'confidence': fact.confidence,
+                    'keywords': fact.keywords,
+                    'source_text': fact.source_text
+                })
+
             self.logger.debug(
-                "LLM fact extraction completed",
+                "Agent fact extraction completed",
                 candidates_found=len(fact_candidates),
-                domain=domain
+                domain=domain,
+                total_facts_from_agent=result.total_facts
             )
-            
+
             return fact_candidates
-            
+
         except Exception as e:
             self.logger.error(
-                "LLM fact extraction failed",
+                "Agent fact extraction failed",
                 error=str(e),
                 domain=domain
             )

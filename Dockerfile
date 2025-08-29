@@ -47,8 +47,12 @@ RUN python -m spacy download en_core_web_sm || echo "spaCy model download failed
 # Builder stage - install MoRAG packages with full source code
 FROM dependencies AS builder
 
-# Copy package files and install MoRAG packages
+# Copy package files and agents framework
 COPY packages/ ./packages/
+COPY agents/ ./agents/
+
+# Install agents framework first (required by other packages)
+RUN pip install /build/agents
 
 # Install MoRAG packages in dependency order (non-editable for Docker)
 RUN pip install /build/packages/morag-core && \
@@ -128,6 +132,7 @@ WORKDIR /app
 
 # Copy application code and configuration (this layer changes frequently)
 COPY packages/ ./packages/
+COPY agents/ ./agents/
 COPY scripts/ ./scripts/
 COPY examples/ ./examples/
 COPY docs/ ./docs/
@@ -152,6 +157,7 @@ WORKDIR /app
 
 # Copy application code and configuration (this layer changes frequently)
 COPY packages/ ./packages/
+COPY agents/ ./agents/
 COPY scripts/ ./scripts/
 COPY examples/ ./examples/
 COPY docs/ ./docs/

@@ -30,6 +30,14 @@ except ImportError:
     FactExtractor = None  # type: ignore
     EntityNormalizer = None  # type: ignore
 
+# Import robust LLM response parser from agents framework
+try:
+    from agents.base import LLMResponseParser
+    PARSER_AVAILABLE = True
+except ImportError:
+    PARSER_AVAILABLE = False
+    LLMResponseParser = None
+
 logger = structlog.get_logger(__name__)
 
 
@@ -354,56 +362,129 @@ class FactGeneratorStage(Stage):
         Returns:
             Extraction results
         """
-        if not SERVICES_AVAILABLE or create_agent is None:
-            return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
+        # We can still use LLM fallback even if services are not available
+        # Only return empty if we can't import the LLM client
 
         try:
             # Use direct LLM call instead of agent for better JSON control
-            from morag_reasoning.llm import LLMClient, LLMConfig as ReasoningLLMConfig
-
-            if not hasattr(self, '_llm_client') or self._llm_client is None:
-                # Get LLM configuration with stage-specific overrides
-                llm_config = config.get_llm_config() if hasattr(config, 'get_llm_config') else config
-
-                # Convert to reasoning LLMConfig format
-                reasoning_config = ReasoningLLMConfig(
-                    provider=getattr(llm_config, 'provider', 'gemini'),
-                    model=getattr(llm_config, 'model', 'gemini-2.0-flash'),
-                    api_key=getattr(llm_config, 'api_key', ''),
-                    temperature=getattr(llm_config, 'temperature', 0.1),
-                    max_tokens=getattr(llm_config, 'max_tokens', 4000),
-                    max_retries=getattr(llm_config, 'max_retries', 3),
-                )
-                self._llm_client = LLMClient(reasoning_config)
-
-            # Create extraction prompt
-            system_prompt = self._get_extraction_system_prompt(config)
-            user_prompt = self._get_extraction_user_prompt(content, config)
-
-            # Use LLM client for direct JSON response
-            response_text = await self._llm_client.generate_from_messages([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ])
-
-            # Parse response (expecting JSON format)
             try:
-                results = json.loads(response_text)
+                from morag_reasoning.llm import LLMClient, LLMConfig as ReasoningLLMConfig
+            except ImportError:
+                # Fallback to direct Google AI API if morag_reasoning is not available
+                try:
+                    import google.generativeai as genai
+                    import os
+
+                    # Configure Google AI
+                    api_key = os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY')
+                    if not api_key:
+                        logger.warning("No Google AI API key found, cannot use LLM fallback")
+                        return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
+
+                    genai.configure(api_key=api_key)
+
+                    # Create model
+                    model = genai.GenerativeModel(
+                        model_name=getattr(config, 'model', 'gemini-1.5-flash'),
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=getattr(config, 'temperature', 0.1),
+                            max_output_tokens=getattr(config, 'max_tokens', 4000)
+                        )
+                    )
+
+                    # Create extraction prompt
+                    system_prompt = self._get_extraction_system_prompt(config)
+                    user_prompt = self._get_extraction_user_prompt(content, config)
+
+                    # Generate response
+                    full_prompt = f"{system_prompt}\n\n{user_prompt}"
+                    response = model.generate_content(full_prompt)
+                    response_text = response.text if response.text else ""
+
+                except ImportError:
+                    logger.warning("Neither morag_reasoning nor google.generativeai available, cannot use LLM fallback")
+                    return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
+                except Exception as e:
+                    logger.warning("Direct Google AI fallback failed", error=str(e))
+                    return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
+            else:
+                # Use morag_reasoning LLM client
+                if not hasattr(self, '_llm_client') or self._llm_client is None:
+                    # Get LLM configuration with stage-specific overrides
+                    llm_config = config.get_llm_config() if hasattr(config, 'get_llm_config') else config
+
+                    # Convert to reasoning LLMConfig format
+                    reasoning_config = ReasoningLLMConfig(
+                        provider=getattr(llm_config, 'provider', 'gemini'),
+                        model=getattr(llm_config, 'model', 'gemini-2.0-flash'),
+                        api_key=getattr(llm_config, 'api_key', ''),
+                        temperature=getattr(llm_config, 'temperature', 0.1),
+                        max_tokens=getattr(llm_config, 'max_tokens', 4000),
+                        max_retries=getattr(llm_config, 'max_retries', 3),
+                    )
+                    self._llm_client = LLMClient(reasoning_config)
+
+                # Create extraction prompt
+                system_prompt = self._get_extraction_system_prompt(config)
+                user_prompt = self._get_extraction_user_prompt(content, config)
+
+                # Use LLM client for direct JSON response
+                response_text = await self._llm_client.generate_from_messages([
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ])
+
+            # Parse response (expecting JSON format) using robust parser
+            try:
+                # Use centralized parser if available, otherwise fallback to basic parsing
+                fallback_result = {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
+
+                if PARSER_AVAILABLE and LLMResponseParser:
+                    # Use the robust parser from agents framework
+                    results = LLMResponseParser.parse_json_response(
+                        response=response_text,
+                        fallback_value=fallback_result,
+                        context=f"fact_generator_{chunk_id}"
+                    )
+                else:
+                    # Fallback to basic JSON parsing
+                    import re
+                    try:
+                        results = json.loads(response_text.strip())
+                    except json.JSONDecodeError:
+                        # Try to extract JSON from markdown code blocks
+                        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                        if json_match:
+                            try:
+                                results = json.loads(json_match.group(1))
+                            except json.JSONDecodeError:
+                                logger.warning("Failed to parse LLM extraction response as JSON", response_preview=response_text[:500])
+                                results = fallback_result
+                        else:
+                            logger.warning("No JSON found in LLM response", response_preview=response_text[:500])
+                            results = fallback_result
+
+                # Ensure results has the expected structure
+                if not isinstance(results, dict):
+                    results = fallback_result
 
                 # Add source chunk information
                 for entity in results.get('entities', []):
-                    entity['source_chunks'] = [chunk_id]
+                    if isinstance(entity, dict):
+                        entity['source_chunks'] = [chunk_id]
 
                 for relation in results.get('relations', []):
-                    relation['source_chunks'] = [chunk_id]
+                    if isinstance(relation, dict):
+                        relation['source_chunks'] = [chunk_id]
 
                 for fact in results.get('facts', []):
-                    fact['source_chunk'] = chunk_id
+                    if isinstance(fact, dict):
+                        fact['source_chunk'] = chunk_id
 
                 return results
 
-            except json.JSONDecodeError:
-                logger.warning("Failed to parse LLM extraction response as JSON")
+            except Exception as e:
+                logger.warning("Failed to parse LLM extraction response", error=str(e), response_preview=response_text[:500])
                 return {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
 
         except Exception as e:
