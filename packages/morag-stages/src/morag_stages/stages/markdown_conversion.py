@@ -206,14 +206,26 @@ class MarkdownConversionStage(Stage):
         Returns:
             True if inputs are valid
         """
+        logger.debug("Validating markdown conversion inputs",
+                    input_count=len(input_files),
+                    input_files=[str(f) for f in input_files])
+
         if len(input_files) != 1:
+            logger.error("Invalid input count for markdown conversion",
+                        expected=1,
+                        actual=len(input_files),
+                        files=[str(f) for f in input_files])
             return False
 
         input_file = input_files[0]
+        file_str = str(input_file)
+
+        logger.debug("Validating input file",
+                    file_path=file_str,
+                    file_type=type(input_file).__name__)
 
         # Check if file exists (for local files)
         # Handle URLs that may have been converted to Windows paths
-        file_str = str(input_file)
         is_url = (
             file_str.startswith(('http://', 'https://')) or
             file_str.replace('\\', '/').startswith(('http://', 'https://')) or
@@ -221,13 +233,34 @@ class MarkdownConversionStage(Stage):
             ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
         )
 
+        logger.debug("URL detection result",
+                    file_path=file_str,
+                    is_url=is_url)
+
         if not is_url:
-            if not input_file.exists():
+            file_exists = input_file.exists()
+            logger.debug("Local file existence check",
+                        file_path=file_str,
+                        exists=file_exists)
+            if not file_exists:
+                logger.error("Local file does not exist", file_path=file_str)
                 return False
 
         # Check if file type is supported
         content_type = self._detect_content_type(input_file)
-        return content_type is not None
+        logger.debug("Content type detection result",
+                    file_path=file_str,
+                    content_type=content_type.value if content_type else None,
+                    is_supported=content_type is not None)
+
+        if content_type is None:
+            logger.error("Unsupported content type", file_path=file_str)
+            return False
+
+        logger.debug("Input validation successful",
+                    file_path=file_str,
+                    content_type=content_type.value)
+        return True
     
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
@@ -266,6 +299,7 @@ class MarkdownConversionStage(Stage):
             Detected content type or None
         """
         file_str = str(file_path)
+        logger.debug("Starting content type detection", file_path=file_str)
 
         # Web URLs - handle Windows path conversion issue
         # On Windows, Path() converts URLs to backslash format, so we need to check both
@@ -277,25 +311,45 @@ class MarkdownConversionStage(Stage):
             ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
         )
 
+        logger.debug("URL detection in content type",
+                    file_path=file_str,
+                    is_url=is_url)
+
         if is_url:
             # Check for YouTube URLs first
             youtube_domains = ["youtube.com", "youtu.be", "youtube-nocookie.com"]
-            if any(domain in file_str for domain in youtube_domains):
+            is_youtube = any(domain in file_str for domain in youtube_domains)
+            logger.debug("URL type detection",
+                        file_path=file_str,
+                        is_youtube=is_youtube,
+                        services_available=SERVICES_AVAILABLE)
+
+            if is_youtube:
                 # Create ContentType.YOUTUBE if services available, otherwise use a placeholder
                 if SERVICES_AVAILABLE:
+                    logger.debug("Returning YOUTUBE content type", file_path=file_str)
                     return ContentType.YOUTUBE
                 else:
                     # Return a string identifier when services not available
+                    logger.debug("Returning YOUTUBE string (services not available)", file_path=file_str)
                     return "YOUTUBE"  # type: ignore
             # Create ContentType.WEB if services available, otherwise use a placeholder
             if SERVICES_AVAILABLE:
+                logger.debug("Returning WEB content type", file_path=file_str)
                 return ContentType.WEB
             else:
+                logger.debug("Returning WEB string (services not available)", file_path=file_str)
                 return "WEB"  # type: ignore
         
         # Video files
+        file_suffix = file_path.suffix.lower()
+        logger.debug("Checking file extension",
+                    file_path=file_str,
+                    suffix=file_suffix)
+
         video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv'}
-        if file_path.suffix.lower() in video_extensions:
+        if file_suffix in video_extensions:
+            logger.debug("Detected video file", file_path=file_str, suffix=file_suffix)
             if SERVICES_AVAILABLE:
                 return ContentType.VIDEO
             else:
@@ -303,7 +357,8 @@ class MarkdownConversionStage(Stage):
 
         # Audio files
         audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'}
-        if file_path.suffix.lower() in audio_extensions:
+        if file_suffix in audio_extensions:
+            logger.debug("Detected audio file", file_path=file_str, suffix=file_suffix)
             if SERVICES_AVAILABLE:
                 return ContentType.AUDIO
             else:
@@ -311,7 +366,8 @@ class MarkdownConversionStage(Stage):
 
         # Document files
         doc_extensions = {'.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'}
-        if file_path.suffix.lower() in doc_extensions:
+        if file_suffix in doc_extensions:
+            logger.debug("Detected document file", file_path=file_str, suffix=file_suffix)
             if SERVICES_AVAILABLE:
                 return ContentType.DOCUMENT
             else:
@@ -319,13 +375,17 @@ class MarkdownConversionStage(Stage):
 
         # Text files (default)
         text_extensions = {'.txt', '.md', '.rst', '.html', '.xml', '.json', '.csv'}
-        if file_path.suffix.lower() in text_extensions:
+        if file_suffix in text_extensions:
+            logger.debug("Detected text file", file_path=file_str, suffix=file_suffix)
             if SERVICES_AVAILABLE:
                 return ContentType.TEXT
             else:
                 return "TEXT"  # type: ignore
 
         # Default to text for unknown types
+        logger.debug("Using default text type for unknown extension",
+                    file_path=file_str,
+                    suffix=file_suffix)
         if SERVICES_AVAILABLE:
             return ContentType.TEXT
         else:

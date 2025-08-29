@@ -91,16 +91,48 @@ class StageManager:
         
         # Validate inputs
         try:
+            logger.debug("Validating inputs for stage",
+                        stage_type=stage_type.value,
+                        input_files=[str(f) for f in input_files],
+                        input_count=len(input_files))
+
             if not stage.validate_inputs(input_files):
+                # Get more detailed validation info
+                validation_details = []
+                for i, file in enumerate(input_files):
+                    file_info = {
+                        "index": i,
+                        "path": str(file),
+                        "exists": file.exists() if hasattr(file, 'exists') else "unknown",
+                        "is_url": str(file).startswith(('http://', 'https://'))
+                    }
+                    if hasattr(file, 'exists') and file.exists():
+                        try:
+                            file_info["size"] = file.stat().st_size
+                            file_info["suffix"] = file.suffix
+                        except:
+                            pass
+                    validation_details.append(file_info)
+
+                logger.error("Input validation failed - detailed info",
+                           stage_type=stage_type.value,
+                           validation_details=validation_details)
+
                 raise StageValidationError(
-                    f"Input validation failed for stage {stage_type.value}",
+                    f"Input validation failed for stage {stage_type.value}. Expected: 1 file, got: {len(input_files)}. Files: {[str(f) for f in input_files]}",
                     stage_type=stage_type.value,
                     invalid_files=[str(f) for f in input_files]
                 )
+        except StageValidationError:
+            raise
         except Exception as e:
-            logger.error("Input validation failed", stage_type=stage_type.value, error=str(e))
+            logger.error("Input validation failed with exception",
+                        stage_type=stage_type.value,
+                        error=str(e),
+                        error_type=e.__class__.__name__,
+                        input_files=[str(f) for f in input_files])
             raise StageValidationError(
-                f"Input validation error: {e}",
+                f"Input validation error for {stage_type.value}: {e}",
                 stage_type=stage_type.value,
                 invalid_files=[str(f) for f in input_files]
             )
