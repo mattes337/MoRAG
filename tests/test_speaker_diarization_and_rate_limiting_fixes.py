@@ -34,7 +34,7 @@ async def test_speaker_diarization_fix():
     
     try:
         from morag_audio.processor import AudioProcessor
-        from morag_audio.config import AudioConfig
+        from morag_audio.models import AudioConfig
         from morag_audio.services.speaker_diarization import DiarizationResult, SpeakerInfo, SpeakerSegment
         
         # Create a mock audio processor with diarization enabled

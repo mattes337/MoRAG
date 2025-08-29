@@ -591,9 +591,9 @@ class MoRAGWebDAVProcessor:
                 
                 # Create audio configuration
                 config = AudioConfig(
-                    enable_speaker_diarization=True,
+                    enable_diarization=True,
                     enable_topic_segmentation=True,
-                    audio_model_size="base",
+                    model_size="base",
                     language=None  # Auto-detect language (None for auto-detection)
                 )
                 
