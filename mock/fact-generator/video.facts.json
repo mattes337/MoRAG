@@ -1,0 +1,320 @@
+{
+  "document_id": "video_sample_001",
+  "source_file": "video.chunks.json",
+  "content_type": "video",
+  "processing_timestamp": "2024-01-15T14:40:00Z",
+  "extraction_summary": {
+    "total_entities": 24,
+    "total_relations": 18,
+    "total_keywords": 12,
+    "confidence_threshold": 0.7,
+    "processing_time_seconds": 19.6,
+    "domain": "product_demonstration"
+  },
+  "entities": [
+    {
+      "id": "entity_001",
+      "name": "Sarah Chen",
+      "type": "PERSON",
+      "description": "Host of the product demonstration session",
+      "confidence": 0.97,
+      "mentions": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "Sarah Chen hosts with Mike Rodriguez",
+          "start_position": 45,
+          "end_position": 81
+        }
+      ],
+      "properties": {
+        "category": "presenter",
+        "role": "host",
+        "speaker_id": "SPEAKER_00"
+      }
+    },
+    {
+      "id": "entity_002",
+      "name": "Mike Rodriguez",
+      "type": "PERSON",
+      "description": "Product Manager presenting platform features",
+      "confidence": 0.96,
+      "mentions": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "Mike Rodriguez, Product Manager",
+          "start_position": 62,
+          "end_position": 93
+        }
+      ],
+      "properties": {
+        "category": "presenter",
+        "role": "product_manager",
+        "speaker_id": "SPEAKER_01"
+      }
+    },
+    {
+      "id": "entity_003",
+      "name": "Dashboard Redesign",
+      "type": "FEATURE",
+      "description": "New dashboard with customizable layout and improved user experience",
+      "confidence": 0.94,
+      "mentions": [
+        {
+          "chunk_id": "chunk_002",
+          "text": "redesigned dashboard and streamlined workflows reducing clicks by 40%",
+          "start_position": 89,
+          "end_position": 158
+        }
+      ],
+      "properties": {
+        "category": "user_interface",
+        "improvement_metric": "40% click reduction",
+        "feature_type": "dashboard"
+      }
+    },
+    {
+      "id": "entity_004",
+      "name": "Performance Optimization",
+      "type": "IMPROVEMENT",
+      "description": "60% faster page load times and improved database efficiency",
+      "confidence": 0.93,
+      "mentions": [
+        {
+          "chunk_id": "chunk_002",
+          "text": "60% faster page load times and improved database efficiency",
+          "start_position": 189,
+          "end_position": 248
+        }
+      ],
+      "properties": {
+        "category": "performance_metric",
+        "improvement_percentage": "60%",
+        "metric_type": "page_load_time"
+      }
+    },
+    {
+      "id": "entity_005",
+      "name": "Real-time Collaboration Tools",
+      "type": "FEATURE",
+      "description": "Multi-user editing with live cursor tracking and conflict resolution",
+      "confidence": 0.91,
+      "mentions": [
+        {
+          "chunk_id": "chunk_005",
+          "text": "real-time editing with multiple users, live cursor tracking",
+          "start_position": 34,
+          "end_position": 93
+        }
+      ],
+      "properties": {
+        "category": "collaboration_feature",
+        "capability": "multi_user_editing",
+        "feature_type": "real_time"
+      }
+    },
+    {
+      "id": "entity_006",
+      "name": "User Satisfaction Score",
+      "type": "METRIC",
+      "description": "4.7 out of 5.0 user satisfaction rating",
+      "confidence": 0.89,
+      "mentions": [
+        {
+          "chunk_id": "chunk_006",
+          "text": "4.7/5.0 user satisfaction score",
+          "start_position": 89,
+          "end_position": 120
+        }
+      ],
+      "properties": {
+        "category": "satisfaction_metric",
+        "value": "4.7",
+        "scale": "5.0",
+        "metric_type": "user_satisfaction"
+      }
+    },
+    {
+      "id": "entity_007",
+      "name": "Analytics Enhancement",
+      "type": "FEATURE",
+      "description": "Real-time data processing with sub-second latency and AI-powered insights",
+      "confidence": 0.88,
+      "mentions": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "real-time data processing with sub-second latency",
+          "start_position": 45,
+          "end_position": 95
+        }
+      ],
+      "properties": {
+        "category": "analytics_feature",
+        "latency": "sub_second",
+        "ai_powered": true
+      }
+    },
+    {
+      "id": "entity_008",
+      "name": "Query Response Time Improvement",
+      "type": "METRIC",
+      "description": "Response time reduced from 3.2 to 0.8 seconds",
+      "confidence": 0.95,
+      "mentions": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "query response time reduced from 3.2 to 0.8 seconds",
+          "start_position": 298,
+          "end_position": 350
+        }
+      ],
+      "properties": {
+        "category": "performance_metric",
+        "before_value": "3.2 seconds",
+        "after_value": "0.8 seconds",
+        "improvement_factor": "4x"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "relation_001",
+      "source_entity": "entity_002",
+      "target_entity": "entity_003",
+      "relation_type": "PRESENTS",
+      "description": "Mike Rodriguez presents Dashboard Redesign",
+      "confidence": 0.94,
+      "evidence": [
+        {
+          "chunk_id": "chunk_003",
+          "text": "Mike Rodriguez presenting dashboard with customizable layout",
+          "start_position": 0,
+          "end_position": 60
+        }
+      ]
+    },
+    {
+      "id": "relation_002",
+      "source_entity": "entity_003",
+      "target_entity": "entity_006",
+      "relation_type": "IMPROVES",
+      "description": "Dashboard Redesign improves User Satisfaction Score",
+      "confidence": 0.91,
+      "evidence": [
+        {
+          "chunk_id": "chunk_003",
+          "text": "95% found interface more intuitive, 87% reported improved productivity",
+          "start_position": 156,
+          "end_position": 226
+        }
+      ]
+    },
+    {
+      "id": "relation_003",
+      "source_entity": "entity_004",
+      "target_entity": "entity_008",
+      "relation_type": "INCLUDES",
+      "description": "Performance Optimization includes Query Response Time Improvement",
+      "confidence": 0.93,
+      "evidence": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "Performance improvements show query response time reduced from 3.2 to 0.8 seconds",
+          "start_position": 267,
+          "end_position": 350
+        }
+      ]
+    },
+    {
+      "id": "relation_004",
+      "source_entity": "entity_005",
+      "target_entity": "entity_002",
+      "relation_type": "DEMONSTRATED_BY",
+      "description": "Real-time Collaboration Tools demonstrated by Mike Rodriguez",
+      "confidence": 0.89,
+      "evidence": [
+        {
+          "chunk_id": "chunk_005",
+          "text": "Live demonstration shows simultaneous editing capabilities",
+          "start_position": 189,
+          "end_position": 247
+        }
+      ]
+    },
+    {
+      "id": "relation_005",
+      "source_entity": "entity_007",
+      "target_entity": "entity_008",
+      "relation_type": "ACHIEVES",
+      "description": "Analytics Enhancement achieves Query Response Time Improvement",
+      "confidence": 0.87,
+      "evidence": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "Enhanced analytics with improved query response times",
+          "start_position": 0,
+          "end_position": 53
+        }
+      ]
+    }
+  ],
+  "keywords": [
+    {
+      "keyword": "platform enhancement",
+      "frequency": 8,
+      "importance": 0.94,
+      "context": "product improvement and feature development",
+      "related_entities": ["entity_003", "entity_004", "entity_007"]
+    },
+    {
+      "keyword": "user experience",
+      "frequency": 7,
+      "importance": 0.91,
+      "context": "interface design and usability improvements",
+      "related_entities": ["entity_003", "entity_006"]
+    },
+    {
+      "keyword": "real-time collaboration",
+      "frequency": 6,
+      "importance": 0.88,
+      "context": "multi-user functionality and teamwork features",
+      "related_entities": ["entity_005"]
+    },
+    {
+      "keyword": "performance optimization",
+      "frequency": 9,
+      "importance": 0.92,
+      "context": "system speed and efficiency improvements",
+      "related_entities": ["entity_004", "entity_008"]
+    },
+    {
+      "keyword": "analytics capabilities",
+      "frequency": 5,
+      "importance": 0.86,
+      "context": "data processing and insights generation",
+      "related_entities": ["entity_007"]
+    },
+    {
+      "keyword": "user feedback",
+      "frequency": 4,
+      "importance": 0.83,
+      "context": "customer satisfaction and product validation",
+      "related_entities": ["entity_006"]
+    }
+  ],
+  "processing_metadata": {
+    "model_used": "gemini-1.5-flash",
+    "temperature": 0.1,
+    "max_tokens": 4000,
+    "extraction_strategy": "hybrid_video",
+    "domain": "product_demonstration",
+    "language": "en",
+    "content_type_specific": {
+      "video_duration": 1247.5,
+      "speaker_count": 2,
+      "demonstration_type": "product_demo",
+      "has_live_demo": true,
+      "has_performance_metrics": true,
+      "has_user_feedback": true
+    }
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "document_id": "audio_sample_001",
+  "source_file": "audio.md",
+  "content_type": "audio",
+  "processing_timestamp": "2024-01-15T16:50:00Z",
+  "summary": {
+    "title": "Podcast Interview: AI in Healthcare",
+    "overview": "In-depth discussion about artificial intelligence applications in healthcare, covering current implementations, challenges, and future prospects with industry experts.",
+    "key_topics": [
+      "Current state of AI in healthcare",
+      "Diagnostic imaging breakthroughs",
+      "Implementation challenges and solutions",
+      "Patient outcomes and case studies",
+      "Drug discovery and development",
+      "Personalized medicine applications",
+      "Ethical considerations and regulatory landscape"
+    ],
+    "content_type": "podcast_interview",
+    "duration": 2847.3,
+    "speaker_count": 3,
+    "word_count": 6234,
+    "estimated_reading_time": "22-25 minutes"
+  },
+  "chunks": [
+    {
+      "chunk_id": "chunk_001",
+      "sequence_number": 1,
+      "title": "Introduction and Current State of AI in Healthcare",
+      "content": "Welcome to Future of Medicine podcast with Jennifer Walsh. Guests Dr. Sarah Kim (Chief Medical Officer at MedTech Innovations) and Dr. Michael Chen (Director of Digital Health at University Medical Center) discuss AI's transformation from experimental research to practical clinical applications. Current implementations include diagnostic imaging, drug discovery, clinical decision support, and administrative automation.",
+      "word_count": 62,
+      "start_position": 0,
+      "end_position": 445,
+      "timestamp_start": "00:00:00",
+      "timestamp_end": "00:05:15",
+      "metadata": {
+        "section_type": "introduction",
+        "importance_score": 0.94,
+        "topics": ["AI healthcare overview", "guest introductions", "current applications"],
+        "speakers": ["SPEAKER_00", "SPEAKER_01", "SPEAKER_02"],
+        "location_reference": "Introduction segment",
+        "location_type": "audio_segment",
+        "topic_segment": 1
+      }
+    },
+    {
+      "chunk_id": "chunk_002",
+      "sequence_number": 2,
+      "title": "Diagnostic Imaging AI Breakthroughs",
+      "content": "AI systems in diagnostic imaging achieve remarkable results: mammography screening reduces false positives by 35% and increases cancer detection by 12%, CT scans detect pulmonary embolisms with 94% accuracy, and pathology analysis identifies cancer markers. Implementation includes 24/7 analysis capability and 60% reduction in radiologist reading time while maintaining high accuracy standards.",
+      "word_count": 58,
+      "start_position": 446,
+      "end_position": 823,
+      "timestamp_start": "00:05:15",
+      "timestamp_end": "00:12:20",
+      "metadata": {
+        "section_type": "technical_discussion",
+        "importance_score": 0.96,
+        "topics": ["diagnostic imaging", "AI accuracy", "clinical implementation"],
+        "speakers": ["SPEAKER_01", "SPEAKER_02"],
+        "location_reference": "Diagnostic imaging segment",
+        "location_type": "audio_segment",
+        "topic_segment": 2
+      }
+    },
+    {
+      "chunk_id": "chunk_003",
+      "sequence_number": 3,
+      "title": "Implementation Challenges and Patient Outcomes",
+      "content": "Implementation challenges include technical integration with legacy systems, physician skepticism, training requirements, and workflow integration. Success requires gradual rollout, comprehensive training, clear value demonstration, and physician champions. Patient outcomes show significant improvements: 40-minute faster cardiac diagnosis, 23% more early-stage cancer detection, and 18% improved five-year survival rates.",
+      "word_count": 56,
+      "start_position": 824,
+      "end_position": 1189,
+      "timestamp_start": "00:12:20",
+      "timestamp_end": "00:20:35",
+      "metadata": {
+        "section_type": "implementation_analysis",
+        "importance_score": 0.91,
+        "topics": ["implementation challenges", "patient outcomes", "success factors"],
+        "speakers": ["SPEAKER_02", "SPEAKER_01"],
+        "location_reference": "Implementation discussion",
+        "location_type": "audio_segment",
+        "topic_segment": 3
+      }
+    },
+    {
+      "chunk_id": "chunk_004",
+      "sequence_number": 4,
+      "title": "Drug Discovery and Personalized Medicine",
+      "content": "AI revolutionizes drug development through target identification, compound screening, and clinical trial optimization. Traditional 10-15 year development cycles could be reduced by 30-50% with 40-60% cost decrease. Personalized medicine applications include genomic analysis for drug metabolism prediction, lifestyle integration with wearable devices, and treatment optimization based on individual patient characteristics.",
+      "word_count": 54,
+      "start_position": 1190,
+      "end_position": 1534,
+      "timestamp_start": "00:20:35",
+      "timestamp_end": "00:29:40",
+      "metadata": {
+        "section_type": "future_applications",
+        "importance_score": 0.89,
+        "topics": ["drug discovery", "personalized medicine", "development efficiency"],
+        "speakers": ["SPEAKER_01", "SPEAKER_02"],
+        "location_reference": "Drug discovery segment",
+        "location_type": "audio_segment",
+        "topic_segment": 4
+      }
+    },
+    {
+      "chunk_id": "chunk_005",
+      "sequence_number": 5,
+      "title": "Ethical Considerations and Regulatory Framework",
+      "content": "Ethical challenges include data bias, algorithmic fairness, transparency requirements, and accountability frameworks. FDA has approved 300+ AI medical devices with streamlined pathways for AI/ML software. Mitigation strategies involve diverse training datasets, regular bias testing, ethics review boards, and continuous monitoring. Future developments focus on democratizing healthcare access and AI-powered health coaching.",
+      "word_count": 57,
+      "start_position": 1535,
+      "end_position": 1923,
+      "timestamp_start": "00:29:40",
+      "timestamp_end": "00:42:10",
+      "metadata": {
+        "section_type": "ethics_regulation",
+        "importance_score": 0.87,
+        "topics": ["ethical considerations", "regulatory approval", "bias mitigation"],
+        "speakers": ["SPEAKER_01", "SPEAKER_02"],
+        "location_reference": "Ethics discussion",
+        "location_type": "audio_segment",
+        "topic_segment": 5
+      }
+    },
+    {
+      "chunk_id": "chunk_006",
+      "sequence_number": 6,
+      "title": "Future Predictions and Professional Advice",
+      "content": "Future trends include large language models for medical documentation, computer vision for surgical guidance, and AI-powered robotic surgery. Advice for healthcare professionals: stay informed about AI developments, embrace change as enhancement tool, develop digital literacy, focus on human skills like empathy and communication, and participate in institutional AI adoption while advocating for patient interests.",
+      "word_count": 59,
+      "start_position": 1924,
+      "end_position": 2347,
+      "timestamp_start": "00:42:10",
+      "timestamp_end": "00:47:27",
+      "metadata": {
+        "section_type": "future_outlook",
+        "importance_score": 0.85,
+        "topics": ["future trends", "professional development", "human-AI collaboration"],
+        "speakers": ["SPEAKER_01", "SPEAKER_02", "SPEAKER_00"],
+        "location_reference": "Conclusion segment",
+        "location_type": "audio_segment",
+        "topic_segment": 6
+      }
+    }
+  ],
+  "processing_metadata": {
+    "chunking_strategy": "speaker_temporal_semantic",
+    "chunk_size": 4000,
+    "overlap": 200,
+    "total_chunks": 6,
+    "processing_time_seconds": 26.8,
+    "model_used": "text-embedding-004",
+    "embedding_dimension": 768,
+    "content_type_specific": {
+      "audio_duration": 2847.3,
+      "speaker_count": 3,
+      "topic_segments": 6,
+      "has_timestamps": true,
+      "has_speaker_diarization": true,
+      "average_segment_duration": 474.6,
+      "transcription_confidence": 0.92
+    }
+  },
+  "embeddings": {
+    "chunk_001": [0.1892, 0.4567, -0.3124, 0.7891, 0.2345, -0.1678, 0.8234, 0.3567],
+    "chunk_002": [0.2903, 0.5678, -0.4235, 0.8902, 0.3456, -0.2789, 0.9345, 0.4678],
+    "chunk_003": [0.3014, 0.6789, -0.5346, 0.9013, 0.4567, -0.3890, 0.0456, 0.5789],
+    "chunk_004": [0.4125, 0.7890, -0.6457, 0.0124, 0.5678, -0.4901, 0.1567, 0.6890],
+    "chunk_005": [0.5236, 0.8901, -0.7568, 0.1235, 0.6789, -0.5012, 0.2678, 0.7901],
+    "chunk_006": [0.6347, 0.9012, -0.8679, 0.2346, 0.7890, -0.6123, 0.3789, 0.8012]
+  }
+}

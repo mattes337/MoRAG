@@ -1,0 +1,288 @@
+{
+  "document_id": "document_sample_001",
+  "source_file": "document.chunks.json",
+  "content_type": "document",
+  "processing_timestamp": "2024-01-15T10:50:00Z",
+  "extraction_summary": {
+    "total_entities": 28,
+    "total_relations": 22,
+    "total_keywords": 15,
+    "confidence_threshold": 0.7,
+    "processing_time_seconds": 24.8,
+    "domain": "business_analysis"
+  },
+  "entities": [
+    {
+      "id": "entity_001",
+      "name": "Market Growth Rate",
+      "type": "METRIC",
+      "description": "Annual market growth projection of 15%",
+      "confidence": 0.96,
+      "mentions": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "15% projected market growth",
+          "start_position": 156,
+          "end_position": 183
+        }
+      ],
+      "properties": {
+        "category": "financial_metric",
+        "value": "15%",
+        "time_period": "annual",
+        "metric_type": "growth_rate"
+      }
+    },
+    {
+      "id": "entity_002",
+      "name": "Customer Satisfaction Improvement",
+      "type": "METRIC",
+      "description": "23% improvement in customer satisfaction scores",
+      "confidence": 0.94,
+      "mentions": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "23% improvement in customer satisfaction",
+          "start_position": 184,
+          "end_position": 224
+        }
+      ],
+      "properties": {
+        "category": "performance_metric",
+        "value": "23%",
+        "metric_type": "satisfaction_score",
+        "trend": "improvement"
+      }
+    },
+    {
+      "id": "entity_003",
+      "name": "North America Region",
+      "type": "LOCATION",
+      "description": "Geographic market region with $2.4M revenue",
+      "confidence": 0.92,
+      "mentions": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "North America achieved $2.4M revenue",
+          "start_position": 0,
+          "end_position": 37
+        }
+      ],
+      "properties": {
+        "category": "geographic_region",
+        "revenue": "$2.4M",
+        "growth_rate": "15%",
+        "market_share": "23%"
+      }
+    },
+    {
+      "id": "entity_004",
+      "name": "Asia-Pacific Region",
+      "type": "LOCATION",
+      "description": "Highest growth region with 28% year-over-year growth",
+      "confidence": 0.91,
+      "mentions": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "Asia-Pacific showed exceptional growth with $1.2M revenue (+28% YoY)",
+          "start_position": 156,
+          "end_position": 225
+        }
+      ],
+      "properties": {
+        "category": "geographic_region",
+        "revenue": "$1.2M",
+        "growth_rate": "28%",
+        "market_share": "14%",
+        "performance": "exceptional"
+      }
+    },
+    {
+      "id": "entity_005",
+      "name": "Technology Investment Program",
+      "type": "INITIATIVE",
+      "description": "Strategic investment program requiring $1.2M funding",
+      "confidence": 0.89,
+      "mentions": [
+        {
+          "chunk_id": "chunk_007",
+          "text": "$1.2M for technology infrastructure (35% ROI)",
+          "start_position": 134,
+          "end_position": 175
+        }
+      ],
+      "properties": {
+        "category": "strategic_initiative",
+        "investment_amount": "$1.2M",
+        "expected_roi": "35%",
+        "focus_area": "technology_infrastructure"
+      }
+    },
+    {
+      "id": "entity_006",
+      "name": "AI-Powered Analytics Platform",
+      "type": "TECHNOLOGY",
+      "description": "Advanced analytics platform using artificial intelligence",
+      "confidence": 0.87,
+      "mentions": [
+        {
+          "chunk_id": "chunk_006",
+          "text": "AI-powered analytics platform development",
+          "start_position": 89,
+          "end_position": 130
+        }
+      ],
+      "properties": {
+        "category": "technology_solution",
+        "technology_type": "AI_platform",
+        "application": "analytics",
+        "development_phase": "planned"
+      }
+    },
+    {
+      "id": "entity_007",
+      "name": "Risk Assessment Framework",
+      "type": "PROCESS",
+      "description": "Comprehensive framework for identifying and mitigating business risks",
+      "confidence": 0.85,
+      "mentions": [
+        {
+          "chunk_id": "chunk_008",
+          "text": "Risk Assessment and Mitigation Framework",
+          "start_position": 0,
+          "end_position": 40
+        }
+      ],
+      "properties": {
+        "category": "business_process",
+        "process_type": "risk_management",
+        "scope": "enterprise_wide"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "relation_001",
+      "source_entity": "entity_003",
+      "target_entity": "entity_001",
+      "relation_type": "ACHIEVES",
+      "description": "North America Region achieves Market Growth Rate",
+      "confidence": 0.93,
+      "evidence": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "North America achieved $2.4M revenue (+15% YoY)",
+          "start_position": 0,
+          "end_position": 48
+        }
+      ]
+    },
+    {
+      "id": "relation_002",
+      "source_entity": "entity_004",
+      "target_entity": "entity_001",
+      "relation_type": "EXCEEDS",
+      "description": "Asia-Pacific Region exceeds Market Growth Rate",
+      "confidence": 0.91,
+      "evidence": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "Asia-Pacific showed exceptional growth with $1.2M revenue (+28% YoY)",
+          "start_position": 156,
+          "end_position": 225
+        }
+      ]
+    },
+    {
+      "id": "relation_003",
+      "source_entity": "entity_005",
+      "target_entity": "entity_006",
+      "relation_type": "FUNDS",
+      "description": "Technology Investment Program funds AI-Powered Analytics Platform",
+      "confidence": 0.88,
+      "evidence": [
+        {
+          "chunk_id": "chunk_006",
+          "text": "technology investment including AI-powered analytics platform development",
+          "start_position": 56,
+          "end_position": 130
+        }
+      ]
+    },
+    {
+      "id": "relation_004",
+      "source_entity": "entity_002",
+      "target_entity": "entity_001",
+      "relation_type": "SUPPORTS",
+      "description": "Customer Satisfaction Improvement supports Market Growth Rate",
+      "confidence": 0.86,
+      "evidence": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "23% improvement in customer satisfaction scores, 18% operational efficiency gains",
+          "start_position": 184,
+          "end_position": 265
+        }
+      ]
+    }
+  ],
+  "keywords": [
+    {
+      "keyword": "market growth",
+      "frequency": 12,
+      "importance": 0.96,
+      "context": "business performance and expansion metrics",
+      "related_entities": ["entity_001", "entity_003", "entity_004"]
+    },
+    {
+      "keyword": "strategic investment",
+      "frequency": 8,
+      "importance": 0.91,
+      "context": "financial planning and resource allocation",
+      "related_entities": ["entity_005", "entity_006"]
+    },
+    {
+      "keyword": "operational efficiency",
+      "frequency": 7,
+      "importance": 0.87,
+      "context": "process optimization and performance improvement",
+      "related_entities": ["entity_002"]
+    },
+    {
+      "keyword": "regional performance",
+      "frequency": 9,
+      "importance": 0.89,
+      "context": "geographic market analysis and comparison",
+      "related_entities": ["entity_003", "entity_004"]
+    },
+    {
+      "keyword": "technology platform",
+      "frequency": 6,
+      "importance": 0.84,
+      "context": "digital transformation and innovation initiatives",
+      "related_entities": ["entity_006"]
+    },
+    {
+      "keyword": "risk management",
+      "frequency": 5,
+      "importance": 0.82,
+      "context": "business continuity and threat mitigation",
+      "related_entities": ["entity_007"]
+    }
+  ],
+  "processing_metadata": {
+    "model_used": "gemini-1.5-flash",
+    "temperature": 0.1,
+    "max_tokens": 4000,
+    "extraction_strategy": "hybrid_business",
+    "domain": "business_analysis",
+    "language": "en",
+    "content_type_specific": {
+      "document_type": "business_report",
+      "analysis_focus": "strategic_planning",
+      "financial_data_present": true,
+      "regional_analysis_present": true,
+      "risk_assessment_present": true
+    }
+  }
+}

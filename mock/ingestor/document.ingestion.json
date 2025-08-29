@@ -1,0 +1,241 @@
+{
+  "document_id": "document_sample_001",
+  "source_files": ["document.chunks.json", "document.facts.json"],
+  "content_type": "document",
+  "processing_timestamp": "2024-01-15T10:55:00Z",
+  "ingestion_summary": {
+    "total_chunks_ingested": 9,
+    "total_entities_ingested": 28,
+    "total_relations_ingested": 22,
+    "total_keywords_ingested": 15,
+    "processing_time_seconds": 31.4,
+    "databases_updated": ["qdrant", "neo4j"]
+  },
+  "database_results": {
+    "qdrant": {
+      "status": "success",
+      "collection_name": "morag_documents",
+      "operations": {
+        "chunks_inserted": 9,
+        "embeddings_stored": 9,
+        "metadata_records": 9
+      },
+      "performance": {
+        "insertion_time_seconds": 18.7,
+        "batch_size": 9,
+        "average_embedding_dimension": 768
+      },
+      "point_ids": [
+        "chunk_001_document_sample_001",
+        "chunk_002_document_sample_001",
+        "chunk_003_document_sample_001",
+        "chunk_004_document_sample_001",
+        "chunk_005_document_sample_001",
+        "chunk_006_document_sample_001",
+        "chunk_007_document_sample_001",
+        "chunk_008_document_sample_001",
+        "chunk_009_document_sample_001"
+      ]
+    },
+    "neo4j": {
+      "status": "success",
+      "database_name": "morag_knowledge_graph",
+      "operations": {
+        "entities_created": 25,
+        "entities_updated": 3,
+        "relations_created": 20,
+        "relations_updated": 2,
+        "properties_set": 156
+      },
+      "performance": {
+        "insertion_time_seconds": 12.7,
+        "transaction_count": 8,
+        "nodes_created": 25,
+        "relationships_created": 20
+      }
+    }
+  },
+  "chunk_ingestion_details": [
+    {
+      "chunk_id": "chunk_001",
+      "status": "success",
+      "qdrant_point_id": "chunk_001_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Executive Summary and Key Findings",
+        "word_count": 58,
+        "importance_score": 0.98,
+        "topics": ["market growth", "customer satisfaction", "operational efficiency", "revenue performance"],
+        "section_type": "executive_summary",
+        "page_number": 1
+      }
+    },
+    {
+      "chunk_id": "chunk_002",
+      "status": "success",
+      "qdrant_point_id": "chunk_002_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Research Methodology and Scope",
+        "word_count": 52,
+        "importance_score": 0.82,
+        "topics": ["research methodology", "data analysis", "market research", "internal assessment"],
+        "section_type": "methodology",
+        "page_number": 2
+      }
+    },
+    {
+      "chunk_id": "chunk_003",
+      "status": "success",
+      "qdrant_point_id": "chunk_003_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Current Market Environment Analysis",
+        "word_count": 54,
+        "importance_score": 0.94,
+        "topics": ["market resilience", "growth patterns", "competitive landscape", "customer metrics"],
+        "section_type": "market_analysis",
+        "page_number": 3
+      }
+    },
+    {
+      "chunk_id": "chunk_004",
+      "status": "success",
+      "qdrant_point_id": "chunk_004_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Regional Performance Breakdown",
+        "word_count": 56,
+        "importance_score": 0.91,
+        "topics": ["regional performance", "revenue metrics", "market share", "customer base"],
+        "section_type": "performance_data",
+        "page_number": 4
+      }
+    },
+    {
+      "chunk_id": "chunk_005",
+      "status": "success",
+      "qdrant_point_id": "chunk_005_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Short-term Strategic Initiatives",
+        "word_count": 42,
+        "importance_score": 0.89,
+        "topics": ["product enhancement", "market expansion", "operational optimization", "automation"],
+        "section_type": "strategic_recommendations",
+        "page_number": 5
+      }
+    },
+    {
+      "chunk_id": "chunk_006",
+      "status": "success",
+      "qdrant_point_id": "chunk_006_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Long-term Technology and Talent Strategy",
+        "word_count": 45,
+        "importance_score": 0.87,
+        "topics": ["technology investment", "AI platform", "talent development", "innovation labs"],
+        "section_type": "strategic_recommendations",
+        "page_number": 6
+      }
+    },
+    {
+      "chunk_id": "chunk_007",
+      "status": "success",
+      "qdrant_point_id": "chunk_007_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Financial Projections and Investment Requirements",
+        "word_count": 51,
+        "importance_score": 0.93,
+        "topics": ["revenue projections", "investment requirements", "ROI expectations", "financial planning"],
+        "section_type": "financial_projections",
+        "page_number": 7
+      }
+    },
+    {
+      "chunk_id": "chunk_008",
+      "status": "success",
+      "qdrant_point_id": "chunk_008_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Risk Assessment and Mitigation Framework",
+        "word_count": 58,
+        "importance_score": 0.85,
+        "topics": ["risk assessment", "market volatility", "competitive pressure", "mitigation strategies"],
+        "section_type": "risk_analysis",
+        "page_number": 8
+      }
+    },
+    {
+      "chunk_id": "chunk_009",
+      "status": "success",
+      "qdrant_point_id": "chunk_009_document_sample_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Implementation Roadmap and Next Steps",
+        "word_count": 59,
+        "importance_score": 0.88,
+        "topics": ["implementation roadmap", "project phases", "success factors", "performance monitoring"],
+        "section_type": "implementation_plan",
+        "page_number": 9
+      }
+    }
+  ],
+  "entity_ingestion_summary": {
+    "entities_processed": 28,
+    "entities_deduplicated": 3,
+    "entities_stored": 25,
+    "new_entities": 22,
+    "updated_entities": 3,
+    "entity_types": {
+      "METRIC": 8,
+      "LOCATION": 3,
+      "INITIATIVE": 6,
+      "TECHNOLOGY": 4,
+      "PROCESS": 4
+    }
+  },
+  "relation_ingestion_summary": {
+    "relations_processed": 22,
+    "relations_deduplicated": 2,
+    "relations_stored": 20,
+    "new_relations": 18,
+    "updated_relations": 2,
+    "relation_types": {
+      "ACHIEVES": 6,
+      "EXCEEDS": 2,
+      "FUNDS": 4,
+      "SUPPORTS": 5,
+      "IMPLEMENTS": 3
+    }
+  },
+  "validation_results": {
+    "data_integrity_check": "passed",
+    "embedding_validation": "passed",
+    "metadata_validation": "passed",
+    "duplicate_detection": "completed",
+    "knowledge_graph_consistency": "validated",
+    "issues_found": 0,
+    "warnings": [
+      "Entity 'Market Growth Rate' has multiple similar references - consolidated",
+      "Relation confidence below 0.8 for 2 relationships - flagged for review"
+    ]
+  },
+  "processing_metadata": {
+    "batch_size": 50,
+    "embedding_model": "text-embedding-004",
+    "deduplication_enabled": true,
+    "validation_enabled": true,
+    "target_databases": ["qdrant", "neo4j"],
+    "processing_mode": "mock",
+    "content_type_specific": {
+      "document_type": "business_analysis",
+      "has_financial_data": true,
+      "has_regional_data": true,
+      "has_strategic_recommendations": true,
+      "analysis_depth": "comprehensive"
+    }
+  }
+}

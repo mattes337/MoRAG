@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import shutil
 import uuid
 from datetime import datetime
@@ -639,6 +640,10 @@ async def get_stage_status(
 ):
     """Get status of stage execution and available files."""
     try:
+        # Check if mock mode is enabled
+        mock_mode = os.getenv('MORAG_MOCK_MODE', 'false').lower() == 'true'
+        if mock_mode:
+            logger.info("Status check in mock mode", output_dir=output_dir, job_id=job_id)
         # If job_id is provided, try to find the job-specific output directory
         if job_id:
             # Look for job-specific temp directories
@@ -671,13 +676,16 @@ async def get_stage_status(
         if output_path.exists():
             # Check for stage output files
             md_files = list(output_path.glob("*.md"))
-            opt_files = list(output_path.glob("*.opt.md"))
+            # Handle both .opt.md and .optimized.md patterns for optimizer output
+            opt_files = list(output_path.glob("*.opt.md")) + list(output_path.glob("*.optimized.md"))
             chunk_files = list(output_path.glob("*.chunks.json"))
             fact_files = list(output_path.glob("*.facts.json"))
             ingestion_files = list(output_path.glob("*.ingestion.json"))
 
             # Determine completed stages
-            if md_files:
+            # For markdown conversion, exclude optimized files to avoid double counting
+            conversion_files = [f for f in md_files if not f.name.endswith('.optimized.md') and not f.name.endswith('.opt.md')]
+            if conversion_files:
                 stages_completed.append(StageTypeEnum.MARKDOWN_CONVERSION)
             if opt_files:
                 stages_completed.append(StageTypeEnum.MARKDOWN_OPTIMIZER)

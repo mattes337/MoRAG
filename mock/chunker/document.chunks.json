@@ -1,0 +1,204 @@
+{
+  "document_id": "document_sample_001",
+  "source_file": "document.optimized.md",
+  "content_type": "document",
+  "processing_timestamp": "2024-01-15T10:45:00Z",
+  "summary": {
+    "title": "Sample PDF Document Analysis - Optimized",
+    "overview": "Comprehensive market analysis and strategic recommendations for fiscal year planning, including performance metrics, regional analysis, and investment requirements.",
+    "key_topics": [
+      "Market growth and performance analysis",
+      "Regional market performance evaluation",
+      "Strategic recommendations and initiatives",
+      "Financial projections and investment planning",
+      "Risk assessment and mitigation strategies"
+    ],
+    "document_type": "business_analysis",
+    "word_count": 3247,
+    "page_count": 12,
+    "estimated_reading_time": "12-15 minutes"
+  },
+  "chunks": [
+    {
+      "chunk_id": "chunk_001",
+      "sequence_number": 1,
+      "title": "Executive Summary and Key Findings",
+      "content": "This document presents a comprehensive analysis of market trends and strategic recommendations for the upcoming fiscal year. Key findings include 15% projected market growth, 23% improvement in customer satisfaction scores, 18% operational efficiency gains, and 12% revenue target exceedance. The analysis is based on extensive research and data collection from multiple sources.",
+      "word_count": 58,
+      "start_position": 0,
+      "end_position": 412,
+      "metadata": {
+        "section_type": "executive_summary",
+        "importance_score": 0.98,
+        "topics": ["market growth", "customer satisfaction", "operational efficiency", "revenue performance"],
+        "location_reference": "Executive Summary",
+        "location_type": "document_section",
+        "page_number": 1
+      }
+    },
+    {
+      "chunk_id": "chunk_002",
+      "sequence_number": 2,
+      "title": "Research Methodology and Scope",
+      "content": "The research approach incorporated quantitative analysis including statistical analysis of sales data and customer metrics, qualitative research through customer interviews and focus groups, market research covering competitive analysis and industry trends, and internal assessment of operational capabilities. The analysis covers January 2023 to December 2023.",
+      "word_count": 52,
+      "start_position": 413,
+      "end_position": 789,
+      "metadata": {
+        "section_type": "methodology",
+        "importance_score": 0.82,
+        "topics": ["research methodology", "data analysis", "market research", "internal assessment"],
+        "location_reference": "Introduction - Research Scope",
+        "location_type": "document_section",
+        "page_number": 2
+      }
+    },
+    {
+      "chunk_id": "chunk_003",
+      "sequence_number": 3,
+      "title": "Current Market Environment Analysis",
+      "content": "The market demonstrates remarkable resilience with consistent quarterly growth of 8-12%, minimal price fluctuation in core products, increased competitive pressure in premium segments, and accelerated technology adoption. Key indicators include 89% customer retention, 34% increase in new customer acquisition, and maintained competitive advantage in key segments.",
+      "word_count": 54,
+      "start_position": 790,
+      "end_position": 1156,
+      "metadata": {
+        "section_type": "market_analysis",
+        "importance_score": 0.94,
+        "topics": ["market resilience", "growth patterns", "competitive landscape", "customer metrics"],
+        "location_reference": "Market Analysis - Current Environment",
+        "location_type": "document_section",
+        "page_number": 3
+      }
+    },
+    {
+      "chunk_id": "chunk_004",
+      "sequence_number": 4,
+      "title": "Regional Performance Breakdown",
+      "content": "North America achieved $2.4M revenue (+15% YoY) with 23% market share and 1,247 active clients. Europe generated $1.8M revenue (+12% YoY) with 18% market share and 892 clients. Asia-Pacific showed exceptional growth with $1.2M revenue (+28% YoY), 14% market share, and 634 clients, representing the highest growth region.",
+      "word_count": 56,
+      "start_position": 1157,
+      "end_position": 1523,
+      "metadata": {
+        "section_type": "performance_data",
+        "importance_score": 0.91,
+        "topics": ["regional performance", "revenue metrics", "market share", "customer base"],
+        "location_reference": "Regional Performance Analysis",
+        "location_type": "document_section",
+        "page_number": 4
+      }
+    },
+    {
+      "chunk_id": "chunk_005",
+      "sequence_number": 5,
+      "title": "Short-term Strategic Initiatives",
+      "content": "Short-term initiatives (0-6 months) include product enhancement with customer-requested features and improved UI design, market expansion targeting Southeast Asia with local partnerships, and operational optimization through supply chain streamlining and automation implementation targeting 15% efficiency improvement.",
+      "word_count": 42,
+      "start_position": 1524,
+      "end_position": 1832,
+      "metadata": {
+        "section_type": "strategic_recommendations",
+        "importance_score": 0.89,
+        "topics": ["product enhancement", "market expansion", "operational optimization", "automation"],
+        "location_reference": "Strategic Recommendations - Short-term",
+        "location_type": "document_section",
+        "page_number": 5
+      }
+    },
+    {
+      "chunk_id": "chunk_006",
+      "sequence_number": 6,
+      "title": "Long-term Technology and Talent Strategy",
+      "content": "Long-term strategy (6-24 months) focuses on technology investment including AI-powered analytics platform development, predictive maintenance systems, and enhanced cybersecurity infrastructure. Talent development involves expanding technical team by 40%, implementing comprehensive training programs, and establishing innovation labs.",
+      "word_count": 45,
+      "start_position": 1833,
+      "end_position": 2156,
+      "metadata": {
+        "section_type": "strategic_recommendations",
+        "importance_score": 0.87,
+        "topics": ["technology investment", "AI platform", "talent development", "innovation labs"],
+        "location_reference": "Strategic Recommendations - Long-term",
+        "location_type": "document_section",
+        "page_number": 6
+      }
+    },
+    {
+      "chunk_id": "chunk_007",
+      "sequence_number": 7,
+      "title": "Financial Projections and Investment Requirements",
+      "content": "Revenue projections show growth from $6.2M (2024, 18% growth) to $9.5M (2026, 22% growth). Total investment requirements are $2.6M: $1.2M for technology infrastructure (35% ROI), $800K for market expansion (28% ROI), and $600K for talent acquisition (42% ROI through productivity gains).",
+      "word_count": 51,
+      "start_position": 2157,
+      "end_position": 2489,
+      "metadata": {
+        "section_type": "financial_projections",
+        "importance_score": 0.93,
+        "topics": ["revenue projections", "investment requirements", "ROI expectations", "financial planning"],
+        "location_reference": "Financial Projections",
+        "location_type": "document_section",
+        "page_number": 7
+      }
+    },
+    {
+      "chunk_id": "chunk_008",
+      "sequence_number": 8,
+      "title": "Risk Assessment and Mitigation Framework",
+      "content": "High-priority risks include market volatility (35% probability, high impact), competitive pressure from new entrants (65% probability, medium-high impact), regulatory changes (40% probability, medium impact), and supply chain disruption (55% probability, high impact). Mitigation strategies include revenue diversification, financial reserves, operational flexibility, and redundant partnerships.",
+      "word_count": 58,
+      "start_position": 2490,
+      "end_position": 2834,
+      "metadata": {
+        "section_type": "risk_analysis",
+        "importance_score": 0.85,
+        "topics": ["risk assessment", "market volatility", "competitive pressure", "mitigation strategies"],
+        "location_reference": "Risk Assessment Framework",
+        "location_type": "document_section",
+        "page_number": 8
+      }
+    },
+    {
+      "chunk_id": "chunk_009",
+      "sequence_number": 9,
+      "title": "Implementation Roadmap and Next Steps",
+      "content": "Implementation follows three phases: Foundation (months 1-3) with board approval and resource allocation, Implementation (months 4-12) launching product enhancement and market expansion programs, and Optimization (months 13-24) monitoring performance and adjusting strategies. Critical success factors include leadership commitment, adequate resources, timeline adherence, and continuous performance monitoring.",
+      "word_count": 59,
+      "start_position": 2835,
+      "end_position": 3247,
+      "metadata": {
+        "section_type": "implementation_plan",
+        "importance_score": 0.88,
+        "topics": ["implementation roadmap", "project phases", "success factors", "performance monitoring"],
+        "location_reference": "Implementation Roadmap",
+        "location_type": "document_section",
+        "page_number": 9
+      }
+    }
+  ],
+  "processing_metadata": {
+    "chunking_strategy": "semantic_document",
+    "chunk_size": 4000,
+    "overlap": 200,
+    "total_chunks": 9,
+    "processing_time_seconds": 18.7,
+    "model_used": "text-embedding-004",
+    "embedding_dimension": 768,
+    "content_type_specific": {
+      "document_structure": "business_report",
+      "has_sections": true,
+      "has_tables": true,
+      "has_financial_data": true,
+      "section_count": 9,
+      "table_count": 2
+    }
+  },
+  "embeddings": {
+    "chunk_001": [0.1234, 0.5678, -0.2345, 0.7890, 0.3456, -0.1234, 0.8901, 0.2345],
+    "chunk_002": [0.2345, 0.6789, -0.3456, 0.8901, 0.4567, -0.2345, 0.9012, 0.3456],
+    "chunk_003": [0.3456, 0.7890, -0.4567, 0.9012, 0.5678, -0.3456, 0.0123, 0.4567],
+    "chunk_004": [0.4567, 0.8901, -0.5678, 0.0123, 0.6789, -0.4567, 0.1234, 0.5678],
+    "chunk_005": [0.5678, 0.9012, -0.6789, 0.1234, 0.7890, -0.5678, 0.2345, 0.6789],
+    "chunk_006": [0.6789, 0.0123, -0.7890, 0.2345, 0.8901, -0.6789, 0.3456, 0.7890],
+    "chunk_007": [0.7890, 0.1234, -0.8901, 0.3456, 0.9012, -0.7890, 0.4567, 0.8901],
+    "chunk_008": [0.8901, 0.2345, -0.9012, 0.4567, 0.0123, -0.8901, 0.5678, 0.9012],
+    "chunk_009": [0.9012, 0.3456, -0.0123, 0.5678, 0.1234, -0.9012, 0.6789, 0.0123]
+  }
+}

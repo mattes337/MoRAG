@@ -1,0 +1,115 @@
+{
+  "document_id": "sample_document_001",
+  "source_files": ["sample.chunks.json", "sample.facts.json"],
+  "processing_timestamp": "2024-01-15T10:45:00Z",
+  "ingestion_summary": {
+    "total_chunks_ingested": 4,
+    "total_entities_ingested": 15,
+    "total_relations_ingested": 12,
+    "total_keywords_ingested": 8,
+    "processing_time_seconds": 25.7,
+    "databases_updated": ["qdrant"]
+  },
+  "database_results": {
+    "qdrant": {
+      "status": "success",
+      "collection_name": "morag_documents",
+      "operations": {
+        "chunks_inserted": 4,
+        "embeddings_stored": 4,
+        "metadata_records": 4
+      },
+      "performance": {
+        "insertion_time_seconds": 12.3,
+        "batch_size": 4,
+        "average_embedding_dimension": 768
+      },
+      "point_ids": [
+        "chunk_001_sample_document_001",
+        "chunk_002_sample_document_001", 
+        "chunk_003_sample_document_001",
+        "chunk_004_sample_document_001"
+      ]
+    }
+  },
+  "chunk_ingestion_details": [
+    {
+      "chunk_id": "chunk_001",
+      "status": "success",
+      "qdrant_point_id": "chunk_001_sample_document_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Executive Summary and Introduction",
+        "word_count": 52,
+        "importance_score": 0.95,
+        "topics": ["optimization", "structure", "readability"]
+      }
+    },
+    {
+      "chunk_id": "chunk_002",
+      "status": "success", 
+      "qdrant_point_id": "chunk_002_sample_document_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Key Insights and Technical Implementation",
+        "word_count": 45,
+        "importance_score": 0.88,
+        "topics": ["concept extraction", "data organization", "enhancement strategies"]
+      }
+    },
+    {
+      "chunk_id": "chunk_003",
+      "status": "success",
+      "qdrant_point_id": "chunk_003_sample_document_001", 
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Content Structure and Error Correction",
+        "word_count": 48,
+        "importance_score": 0.82,
+        "topics": ["standardization", "error correction", "grammar enhancement"]
+      }
+    },
+    {
+      "chunk_id": "chunk_004",
+      "status": "success",
+      "qdrant_point_id": "chunk_004_sample_document_001",
+      "embedding_stored": true,
+      "metadata": {
+        "title": "Enhanced Analysis and Quality Metrics", 
+        "word_count": 51,
+        "importance_score": 0.91,
+        "topics": ["quality metrics", "readability", "structure improvement"]
+      }
+    }
+  ],
+  "entity_ingestion_summary": {
+    "entities_processed": 15,
+    "entities_deduplicated": 2,
+    "entities_stored": 13,
+    "new_entities": 11,
+    "updated_entities": 2
+  },
+  "relation_ingestion_summary": {
+    "relations_processed": 12,
+    "relations_deduplicated": 1,
+    "relations_stored": 11,
+    "new_relations": 9,
+    "updated_relations": 2
+  },
+  "validation_results": {
+    "data_integrity_check": "passed",
+    "embedding_validation": "passed",
+    "metadata_validation": "passed",
+    "duplicate_detection": "completed",
+    "issues_found": 0,
+    "warnings": []
+  },
+  "processing_metadata": {
+    "batch_size": 50,
+    "embedding_model": "text-embedding-004",
+    "deduplication_enabled": true,
+    "validation_enabled": true,
+    "target_databases": ["qdrant"],
+    "processing_mode": "mock"
+  }
+}

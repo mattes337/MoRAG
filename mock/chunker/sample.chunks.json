@@ -1,0 +1,90 @@
+{
+  "document_id": "sample_document_001",
+  "source_file": "sample.optimized.md",
+  "processing_timestamp": "2024-01-15T10:35:00Z",
+  "summary": {
+    "title": "Sample Document - Optimized",
+    "overview": "This document demonstrates the enhanced structure and content optimization capabilities of the MoRAG system, showcasing improved readability, error correction, and standardized formatting.",
+    "key_topics": [
+      "Content structure improvement",
+      "Error correction and optimization",
+      "Technical implementation strategies",
+      "Quality metrics and processing details"
+    ],
+    "word_count": 847,
+    "estimated_reading_time": "3-4 minutes"
+  },
+  "chunks": [
+    {
+      "chunk_id": "chunk_001",
+      "sequence_number": 1,
+      "title": "Executive Summary and Introduction",
+      "content": "This document has been optimized for clarity, structure, and readability. The optimization process corrected transcription errors, improved formatting, and enhanced the overall document structure while preserving the original meaning and intent. This document demonstrates the enhanced structure of a markdown optimization result from the MoRAG system.",
+      "word_count": 52,
+      "start_position": 0,
+      "end_position": 347,
+      "metadata": {
+        "section_type": "introduction",
+        "importance_score": 0.95,
+        "topics": ["optimization", "structure", "readability"]
+      }
+    },
+    {
+      "chunk_id": "chunk_002", 
+      "sequence_number": 2,
+      "title": "Key Insights and Technical Implementation",
+      "content": "Primary Insight: Advanced concept extraction and relationship mapping enable better understanding. Secondary Insight: Structured data organization facilitates improved information retrieval. The optimization process encompasses multiple enhancement strategies including content structure improvement, error correction, and metadata enhancement.",
+      "word_count": 45,
+      "start_position": 348,
+      "end_position": 695,
+      "metadata": {
+        "section_type": "analysis",
+        "importance_score": 0.88,
+        "topics": ["concept extraction", "data organization", "enhancement strategies"]
+      }
+    },
+    {
+      "chunk_id": "chunk_003",
+      "sequence_number": 3, 
+      "title": "Content Structure and Error Correction",
+      "content": "Header Standardization: Consistent heading hierarchy and formatting. List Organization: Improved bullet point and numbered list structure. Transcription Fixes: Corrected OCR and speech-to-text errors. Grammar Enhancement: Improved sentence structure and clarity. Terminology Standardization: Consistent use of technical terms.",
+      "word_count": 48,
+      "start_position": 696,
+      "end_position": 1043,
+      "metadata": {
+        "section_type": "technical_details",
+        "importance_score": 0.82,
+        "topics": ["standardization", "error correction", "grammar enhancement"]
+      }
+    },
+    {
+      "chunk_id": "chunk_004",
+      "sequence_number": 4,
+      "title": "Enhanced Analysis and Quality Metrics",
+      "content": "The primary analysis section has been enhanced with structured data presentation, improved clarity, and enhanced flow. Quality improvements include readability score improved from 6.2 to 8.7, structure quality enhanced from 72% to 94%, and 23 corrections applied with consistency score improved from 81% to 97%.",
+      "word_count": 51,
+      "start_position": 1044,
+      "end_position": 1391,
+      "metadata": {
+        "section_type": "results",
+        "importance_score": 0.91,
+        "topics": ["quality metrics", "readability", "structure improvement"]
+      }
+    }
+  ],
+  "processing_metadata": {
+    "chunking_strategy": "semantic",
+    "chunk_size": 4000,
+    "overlap": 200,
+    "total_chunks": 4,
+    "processing_time_seconds": 12.5,
+    "model_used": "text-embedding-004",
+    "embedding_dimension": 768
+  },
+  "embeddings": {
+    "chunk_001": [0.1234, 0.5678, -0.2345, 0.7890],
+    "chunk_002": [0.2345, 0.6789, -0.3456, 0.8901],
+    "chunk_003": [0.3456, 0.7890, -0.4567, 0.9012],
+    "chunk_004": [0.4567, 0.8901, -0.5678, 0.0123]
+  }
+}

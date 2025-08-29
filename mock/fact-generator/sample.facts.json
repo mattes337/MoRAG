@@ -1,0 +1,174 @@
+{
+  "document_id": "sample_document_001",
+  "source_file": "sample.chunks.json",
+  "processing_timestamp": "2024-01-15T10:40:00Z",
+  "extraction_summary": {
+    "total_entities": 15,
+    "total_relations": 12,
+    "total_keywords": 8,
+    "confidence_threshold": 0.7,
+    "processing_time_seconds": 18.3
+  },
+  "entities": [
+    {
+      "id": "entity_001",
+      "name": "MoRAG System",
+      "type": "SYSTEM",
+      "description": "Advanced document processing and optimization system",
+      "confidence": 0.95,
+      "mentions": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "MoRAG system",
+          "start_position": 245,
+          "end_position": 257
+        }
+      ],
+      "properties": {
+        "category": "software_system",
+        "domain": "document_processing"
+      }
+    },
+    {
+      "id": "entity_002",
+      "name": "Markdown Optimization",
+      "type": "PROCESS",
+      "description": "Process of improving markdown document structure and quality",
+      "confidence": 0.92,
+      "mentions": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "optimization process",
+          "start_position": 89,
+          "end_position": 109
+        }
+      ],
+      "properties": {
+        "category": "processing_method",
+        "domain": "content_optimization"
+      }
+    },
+    {
+      "id": "entity_003",
+      "name": "Readability Score",
+      "type": "METRIC",
+      "description": "Flesch-Kincaid readability measurement",
+      "confidence": 0.88,
+      "mentions": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "readability score improved from 6.2 to 8.7",
+          "start_position": 156,
+          "end_position": 199
+        }
+      ],
+      "properties": {
+        "category": "quality_metric",
+        "measurement_scale": "flesch_kincaid"
+      }
+    },
+    {
+      "id": "entity_004",
+      "name": "Concept Extraction",
+      "type": "TECHNIQUE",
+      "description": "Method for identifying and extracting key concepts from text",
+      "confidence": 0.85,
+      "mentions": [
+        {
+          "chunk_id": "chunk_002",
+          "text": "concept extraction and relationship mapping",
+          "start_position": 25,
+          "end_position": 68
+        }
+      ],
+      "properties": {
+        "category": "nlp_technique",
+        "domain": "information_extraction"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "relation_001",
+      "source_entity": "entity_001",
+      "target_entity": "entity_002",
+      "relation_type": "PERFORMS",
+      "description": "MoRAG System performs Markdown Optimization",
+      "confidence": 0.93,
+      "evidence": [
+        {
+          "chunk_id": "chunk_001",
+          "text": "MoRAG system optimization process",
+          "start_position": 245,
+          "end_position": 278
+        }
+      ]
+    },
+    {
+      "id": "relation_002",
+      "source_entity": "entity_002",
+      "target_entity": "entity_003",
+      "relation_type": "IMPROVES",
+      "description": "Markdown Optimization improves Readability Score",
+      "confidence": 0.89,
+      "evidence": [
+        {
+          "chunk_id": "chunk_004",
+          "text": "optimization improved readability score",
+          "start_position": 140,
+          "end_position": 179
+        }
+      ]
+    },
+    {
+      "id": "relation_003",
+      "source_entity": "entity_001",
+      "target_entity": "entity_004",
+      "relation_type": "USES",
+      "description": "MoRAG System uses Concept Extraction",
+      "confidence": 0.87,
+      "evidence": [
+        {
+          "chunk_id": "chunk_002",
+          "text": "Advanced concept extraction and relationship mapping",
+          "start_position": 17,
+          "end_position": 69
+        }
+      ]
+    }
+  ],
+  "keywords": [
+    {
+      "keyword": "optimization",
+      "frequency": 8,
+      "importance": 0.94,
+      "context": "document processing and improvement"
+    },
+    {
+      "keyword": "structure",
+      "frequency": 6,
+      "importance": 0.87,
+      "context": "document organization and formatting"
+    },
+    {
+      "keyword": "readability",
+      "frequency": 4,
+      "importance": 0.82,
+      "context": "content clarity and comprehension"
+    },
+    {
+      "keyword": "enhancement",
+      "frequency": 5,
+      "importance": 0.79,
+      "context": "quality improvement processes"
+    }
+  ],
+  "processing_metadata": {
+    "model_used": "gemini-1.5-flash",
+    "temperature": 0.1,
+    "max_tokens": 4000,
+    "extraction_strategy": "hybrid",
+    "domain": "general",
+    "language": "en"
+  }
+}

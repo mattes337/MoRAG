@@ -1,0 +1,190 @@
+{
+  "document_id": "video_sample_001",
+  "source_file": "video.md",
+  "content_type": "video",
+  "processing_timestamp": "2024-01-15T14:35:00Z",
+  "summary": {
+    "title": "Product Demo Video Transcript",
+    "overview": "Comprehensive product demonstration showcasing new platform features, performance improvements, and collaboration tools with live demonstrations and user feedback.",
+    "key_topics": [
+      "Platform overview and new features",
+      "Dashboard demonstration and user interface",
+      "Analytics and reporting capabilities",
+      "Real-time collaboration tools",
+      "Performance metrics and business impact"
+    ],
+    "content_type": "product_demo",
+    "duration": 1247.5,
+    "speaker_count": 2,
+    "word_count": 4156,
+    "estimated_reading_time": "15-18 minutes"
+  },
+  "chunks": [
+    {
+      "chunk_id": "chunk_001",
+      "sequence_number": 1,
+      "title": "Introduction and Platform Overview",
+      "content": "Welcome to today's product demonstration. Sarah Chen hosts with Mike Rodriguez, Product Manager, presenting comprehensive overview of latest platform features. Agenda includes platform overview, live demonstration, performance improvements, Q&A session, and roadmap preview. Platform has undergone significant enhancements focusing on user experience improvements, performance optimizations, and new feature additions.",
+      "word_count": 58,
+      "start_position": 0,
+      "end_position": 412,
+      "timestamp_start": "00:00:00",
+      "timestamp_end": "00:02:15",
+      "metadata": {
+        "section_type": "introduction",
+        "importance_score": 0.92,
+        "topics": ["product demo", "platform overview", "feature enhancements", "agenda"],
+        "speakers": ["SPEAKER_00", "SPEAKER_01"],
+        "location_reference": "Introduction segment",
+        "location_type": "video_segment",
+        "topic_segment": 1
+      }
+    },
+    {
+      "chunk_id": "chunk_002",
+      "sequence_number": 2,
+      "title": "Platform Enhancements and Improvements",
+      "content": "Platform enhancements focus on three main areas: User Experience Improvements with redesigned dashboard and streamlined workflows reducing clicks by 40%, Performance Optimizations achieving 60% faster page load times and improved database efficiency, and New Feature Additions including advanced analytics dashboard, real-time collaboration tools, and automated reporting capabilities.",
+      "word_count": 52,
+      "start_position": 413,
+      "end_position": 789,
+      "timestamp_start": "00:02:15",
+      "timestamp_end": "00:05:30",
+      "metadata": {
+        "section_type": "feature_overview",
+        "importance_score": 0.95,
+        "topics": ["user experience", "performance optimization", "new features", "analytics"],
+        "speakers": ["SPEAKER_01"],
+        "location_reference": "Platform overview segment",
+        "location_type": "video_segment",
+        "topic_segment": 2
+      }
+    },
+    {
+      "chunk_id": "chunk_003",
+      "sequence_number": 3,
+      "title": "Dashboard Demonstration and User Feedback",
+      "content": "New dashboard provides clean, organized view of key metrics with completely customizable layout. Users can drag and drop widgets, resize components, create multiple dashboard views for different roles, and set up automated alerts. User testing with 200+ participants showed 95% found interface more intuitive, 87% reported improved productivity, and 92% appreciated customization options.",
+      "word_count": 56,
+      "start_position": 790,
+      "end_position": 1156,
+      "timestamp_start": "00:05:30",
+      "timestamp_end": "00:08:45",
+      "metadata": {
+        "section_type": "live_demonstration",
+        "importance_score": 0.89,
+        "topics": ["dashboard design", "customization", "user feedback", "productivity"],
+        "speakers": ["SPEAKER_01", "SPEAKER_00"],
+        "location_reference": "Dashboard demo segment",
+        "location_type": "video_segment",
+        "topic_segment": 3
+      }
+    },
+    {
+      "chunk_id": "chunk_004",
+      "sequence_number": 4,
+      "title": "Analytics and Performance Improvements",
+      "content": "Enhanced analytics capabilities include real-time data processing with sub-second latency, interactive charts with drill-down capabilities, advanced filtering with multi-dimensional options and saved presets, and AI-powered automated insights with trend detection and predictive analytics. Performance improvements show query response time reduced from 3.2 to 0.8 seconds, 150% increase in data processing throughput.",
+      "word_count": 59,
+      "start_position": 1157,
+      "end_position": 1523,
+      "timestamp_start": "00:08:45",
+      "timestamp_end": "00:12:20",
+      "metadata": {
+        "section_type": "feature_demonstration",
+        "importance_score": 0.93,
+        "topics": ["analytics capabilities", "real-time processing", "performance metrics", "AI insights"],
+        "speakers": ["SPEAKER_01"],
+        "location_reference": "Analytics demo segment",
+        "location_type": "video_segment",
+        "topic_segment": 4
+      }
+    },
+    {
+      "chunk_id": "chunk_005",
+      "sequence_number": 5,
+      "title": "Real-time Collaboration Features",
+      "content": "Collaboration tools include real-time editing with multiple users, live cursor tracking and conflict resolution, communication integration with in-app messaging and @mentions, and workflow management with task assignment and approval workflows. Live demonstration shows simultaneous editing capabilities with instant synchronization and complete audit trail of modifications.",
+      "word_count": 48,
+      "start_position": 1524,
+      "end_position": 1832,
+      "timestamp_start": "00:12:20",
+      "timestamp_end": "00:17:30",
+      "metadata": {
+        "section_type": "collaboration_demo",
+        "importance_score": 0.87,
+        "topics": ["real-time editing", "collaboration tools", "workflow management", "live demo"],
+        "speakers": ["SPEAKER_01", "SPEAKER_00"],
+        "location_reference": "Collaboration demo segment",
+        "location_type": "video_segment",
+        "topic_segment": 5
+      }
+    },
+    {
+      "chunk_id": "chunk_006",
+      "sequence_number": 6,
+      "title": "Performance Metrics and Business Impact",
+      "content": "Key performance metrics since launch include 78% user adoption of new interface, 45% increase in average session time, 4.7/5.0 user satisfaction score, 99.9% uptime over 90 days, and zero critical security incidents. Business impact shows 23% improvement in customer retention, 35% reduction in support tickets, and 18% increase in revenue per user.",
+      "word_count": 54,
+      "start_position": 1833,
+      "end_position": 2156,
+      "timestamp_start": "00:17:30",
+      "timestamp_end": "00:19:15",
+      "metadata": {
+        "section_type": "performance_metrics",
+        "importance_score": 0.91,
+        "topics": ["user adoption", "performance metrics", "business impact", "customer retention"],
+        "speakers": ["SPEAKER_01"],
+        "location_reference": "Metrics presentation segment",
+        "location_type": "video_segment",
+        "topic_segment": 6
+      }
+    },
+    {
+      "chunk_id": "chunk_007",
+      "sequence_number": 7,
+      "title": "Future Roadmap and Development Plans",
+      "content": "Upcoming roadmap includes Q2 2024 features with AI-powered recommendations and enhanced mobile app, Q3 2024 features with machine learning automation and advanced security, and Q4 2024 features with voice-activated commands and augmented reality visualization tools. Development focuses on user feedback integration and continuous innovation.",
+      "word_count": 47,
+      "start_position": 2157,
+      "end_position": 2489,
+      "timestamp_start": "00:19:15",
+      "timestamp_end": "00:20:30",
+      "metadata": {
+        "section_type": "roadmap_preview",
+        "importance_score": 0.84,
+        "topics": ["future features", "development roadmap", "AI integration", "innovation"],
+        "speakers": ["SPEAKER_01"],
+        "location_reference": "Roadmap segment",
+        "location_type": "video_segment",
+        "topic_segment": 7
+      }
+    }
+  ],
+  "processing_metadata": {
+    "chunking_strategy": "temporal_semantic",
+    "chunk_size": 4000,
+    "overlap": 200,
+    "total_chunks": 7,
+    "processing_time_seconds": 22.3,
+    "model_used": "text-embedding-004",
+    "embedding_dimension": 768,
+    "content_type_specific": {
+      "video_duration": 1247.5,
+      "speaker_count": 2,
+      "topic_segments": 7,
+      "has_timestamps": true,
+      "has_speaker_diarization": true,
+      "average_segment_duration": 178.2
+    }
+  },
+  "embeddings": {
+    "chunk_001": [0.1567, 0.4321, -0.2890, 0.7654, 0.3210, -0.1567, 0.8765, 0.2109],
+    "chunk_002": [0.2678, 0.5432, -0.3901, 0.8765, 0.4321, -0.2678, 0.9876, 0.3210],
+    "chunk_003": [0.3789, 0.6543, -0.4012, 0.9876, 0.5432, -0.3789, 0.0987, 0.4321],
+    "chunk_004": [0.4890, 0.7654, -0.5123, 0.0987, 0.6543, -0.4890, 0.1098, 0.5432],
+    "chunk_005": [0.5901, 0.8765, -0.6234, 0.1098, 0.7654, -0.5901, 0.2109, 0.6543],
+    "chunk_006": [0.6012, 0.9876, -0.7345, 0.2109, 0.8765, -0.6012, 0.3210, 0.7654],
+    "chunk_007": [0.7123, 0.0987, -0.8456, 0.3210, 0.9876, -0.7123, 0.4321, 0.8765]
+  }
+}

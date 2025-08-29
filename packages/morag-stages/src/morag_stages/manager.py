@@ -2,18 +2,21 @@
 
 import asyncio
 import time
+import os
+import json
+import shutil
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 import structlog
 
 from .models import (
-    Stage, StageType, StageStatus, StageResult, StageContext, 
+    Stage, StageType, StageStatus, StageResult, StageContext,
     StageMetadata, PipelineConfig
 )
 from .registry import StageRegistry, get_global_registry
 from .exceptions import (
-    StageError, StageExecutionError, StageValidationError, 
+    StageError, StageExecutionError, StageValidationError,
     StageDependencyError, StageTimeoutError
 )
 from .webhook import WebhookNotifier
@@ -23,37 +26,211 @@ logger = structlog.get_logger(__name__)
 
 class StageManager:
     """Manages execution of processing stages."""
-    
-    def __init__(self, 
+
+    def __init__(self,
                  registry: Optional[StageRegistry] = None,
                  webhook_notifier: Optional[WebhookNotifier] = None):
         """Initialize stage manager.
-        
+
         Args:
             registry: Stage registry to use (defaults to global registry)
             webhook_notifier: Webhook notifier for stage completion events
         """
         self.registry = registry or get_global_registry()
         self.webhook_notifier = webhook_notifier or WebhookNotifier()
-        
-    async def execute_stage(self, 
-                           stage_type: StageType,
-                           input_files: List[Path],
-                           context: StageContext) -> StageResult:
-        """Execute a single stage.
-        
+
+        # Mock mode configuration
+        self.mock_mode = os.getenv('MORAG_MOCK_MODE', 'false').lower() == 'true'
+        self.mock_data_dir = Path(os.getenv('MORAG_MOCK_DATA_DIR', './mock'))
+
+        if self.mock_mode:
+            logger.info("Mock mode enabled", mock_data_dir=str(self.mock_data_dir))
+
+    def _get_mock_output_file(self, stage_type: StageType, input_files: List[Path], context: StageContext) -> Optional[Path]:
+        """Get the mock output file for a given stage type.
+
+        Args:
+            stage_type: Type of stage
+            input_files: Input files (used to determine base filename)
+            context: Stage execution context
+
+        Returns:
+            Path to mock output file if it exists, None otherwise
+        """
+        stage_dir = self.mock_data_dir / stage_type.value
+
+        # Determine content type from context or input files
+        content_type = self._detect_content_type(input_files, context)
+
+        # Define expected output file patterns for each stage and content type
+        if stage_type == StageType.MARKDOWN_CONVERSION:
+            mock_file = stage_dir / f"{content_type}.md"
+        elif stage_type == StageType.MARKDOWN_OPTIMIZER:
+            mock_file = stage_dir / f"{content_type}.optimized.md"
+        elif stage_type == StageType.CHUNKER:
+            mock_file = stage_dir / f"{content_type}.chunks.json"
+        elif stage_type == StageType.FACT_GENERATOR:
+            mock_file = stage_dir / f"{content_type}.facts.json"
+        elif stage_type == StageType.INGESTOR:
+            mock_file = stage_dir / f"{content_type}.ingestion.json"
+        else:
+            return None
+
+        # Fallback to sample files if content-type specific file doesn't exist
+        if not mock_file.exists():
+            if stage_type == StageType.MARKDOWN_CONVERSION:
+                mock_file = stage_dir / "sample.md"
+            elif stage_type == StageType.MARKDOWN_OPTIMIZER:
+                mock_file = stage_dir / "sample.optimized.md"
+            elif stage_type == StageType.CHUNKER:
+                mock_file = stage_dir / "sample.chunks.json"
+            elif stage_type == StageType.FACT_GENERATOR:
+                mock_file = stage_dir / "sample.facts.json"
+            elif stage_type == StageType.INGESTOR:
+                mock_file = stage_dir / "sample.ingestion.json"
+
+        return mock_file if mock_file.exists() else None
+
+    def _detect_content_type(self, input_files: List[Path], context: StageContext) -> str:
+        """Detect content type from input files or context.
+
+        Args:
+            input_files: Input files to analyze
+            context: Stage execution context
+
+        Returns:
+            Content type string (document, video, audio, web, youtube)
+        """
+        # Check context config for explicit content type
+        if context.config.get('content_type'):
+            return context.config['content_type']
+
+        # Detect from file extensions
+        if input_files:
+            file_ext = input_files[0].suffix.lower()
+            if file_ext in ['.pdf', '.doc', '.docx', '.txt']:
+                return 'document'
+            elif file_ext in ['.mp4', '.avi', '.mov', '.mkv']:
+                return 'video'
+            elif file_ext in ['.mp3', '.wav', '.m4a', '.flac']:
+                return 'audio'
+            elif file_ext in ['.html', '.htm']:
+                return 'web'
+
+        # Check for YouTube URLs in context
+        source_path = getattr(context, 'source_path', None)
+        if source_path and 'youtube.com' in str(source_path):
+            return 'youtube'
+        elif source_path and any(domain in str(source_path) for domain in ['http://', 'https://']):
+            return 'web'
+
+        # Default fallback
+        return 'document'
+
+    async def _execute_mock_stage(self,
+                                 stage_type: StageType,
+                                 input_files: List[Path],
+                                 context: StageContext) -> StageResult:
+        """Execute a stage in mock mode by copying pre-generated outputs.
+
         Args:
             stage_type: Type of stage to execute
             input_files: Input files for the stage
             context: Execution context
-            
+
+        Returns:
+            Stage execution result with mock data
+        """
+        logger.info("Executing stage in mock mode", stage_type=stage_type.value)
+
+        # Get mock output file
+        mock_file = self._get_mock_output_file(stage_type, input_files, context)
+        if not mock_file:
+            raise StageExecutionError(
+                f"Mock data not found for stage {stage_type.value}",
+                stage_type=stage_type.value
+            )
+
+        # Generate output filename based on input
+        if input_files:
+            base_name = input_files[0].stem
+        else:
+            base_name = "sample"
+
+        # Determine output file extension based on stage type
+        if stage_type == StageType.MARKDOWN_CONVERSION:
+            output_file = context.output_dir / f"{base_name}.md"
+        elif stage_type == StageType.MARKDOWN_OPTIMIZER:
+            output_file = context.output_dir / f"{base_name}.optimized.md"
+        elif stage_type == StageType.CHUNKER:
+            output_file = context.output_dir / f"{base_name}.chunks.json"
+        elif stage_type == StageType.FACT_GENERATOR:
+            output_file = context.output_dir / f"{base_name}.facts.json"
+        elif stage_type == StageType.INGESTOR:
+            output_file = context.output_dir / f"{base_name}.ingestion.json"
+        else:
+            output_file = context.output_dir / f"{base_name}.output"
+
+        # Ensure output directory exists
+        context.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy mock file to output location
+        shutil.copy2(mock_file, output_file)
+
+        # Load mock data for result
+        mock_data = {}
+        if mock_file.suffix == '.json':
+            try:
+                with open(mock_file, 'r', encoding='utf-8') as f:
+                    mock_data = json.load(f)
+            except Exception as e:
+                logger.warning("Failed to load mock JSON data", error=str(e))
+
+        # Create metadata
+        metadata = StageMetadata(
+            execution_time=0.5,  # Simulate quick execution
+            start_time=datetime.now(),
+            end_time=datetime.now(),
+            input_files=[str(f) for f in input_files],
+            output_files=[str(output_file)],
+            config_used=context.get_stage_config(stage_type),
+            metrics={
+                "mock_mode": True,
+                "mock_source": str(mock_file),
+                "stage_type": stage_type.value
+            }
+        )
+
+        return StageResult(
+            stage_type=stage_type,
+            status=StageStatus.COMPLETED,
+            output_files=[output_file],
+            metadata=metadata,
+            data=mock_data
+        )
+
+    async def execute_stage(self,
+                           stage_type: StageType,
+                           input_files: List[Path],
+                           context: StageContext) -> StageResult:
+        """Execute a single stage.
+
+        Args:
+            stage_type: Type of stage to execute
+            input_files: Input files for the stage
+            context: Execution context
+
         Returns:
             Stage execution result
-            
+
         Raises:
             StageError: If stage execution fails
         """
-        logger.info("Starting stage execution", stage_type=stage_type.value)
+        logger.info("Starting stage execution", stage_type=stage_type.value, mock_mode=self.mock_mode)
+
+        # Check if mock mode is enabled
+        if self.mock_mode:
+            return await self._execute_mock_stage(stage_type, input_files, context)
         
         # Get stage instance
         try:
