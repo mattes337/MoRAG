@@ -137,6 +137,7 @@ COPY agents/ ./agents/
 COPY scripts/ ./scripts/
 COPY examples/ ./examples/
 COPY docs/ ./docs/
+COPY mock/ ./mock/
 COPY *.md ./
 COPY *.txt ./
 
@@ -162,6 +163,7 @@ COPY agents/ ./agents/
 COPY scripts/ ./scripts/
 COPY examples/ ./examples/
 COPY docs/ ./docs/
+COPY mock/ ./mock/
 COPY *.md ./
 COPY *.txt ./
 

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from .models import ProcessingResult
+from .services import ProcessingResult
 
 logger = logging.getLogger(__name__)
 

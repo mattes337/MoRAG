@@ -7,6 +7,7 @@ making it easy to work with multiple content types through a single interface.
 from .services import MoRAGServices, ServiceConfig, ProcessingResult, ContentType
 from .pipeline import Pipeline, PipelineStep, PipelineContext, PipelineStepType
 from .storage import QdrantVectorStorage, QdrantService
+from .data_file_writer import DataFileWriter
 from .embedding import (
     GeminiEmbeddingService,
     EmbeddingServiceFactory,
@@ -35,4 +36,5 @@ __all__ = [
     "SummaryResult",
     "GeminiService",
     "ContextualRetrievalService",
+    "DataFileWriter",
 ]
