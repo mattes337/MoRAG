@@ -760,57 +760,53 @@ class MoRAGServices:
             )
     
     async def process_youtube(self, url: str, options: Optional[Dict[str, Any]] = None) -> ProcessingResult:
-        """Process a YouTube URL.
+        """Process a YouTube URL using Apify service.
 
         Args:
             url: YouTube URL to process
-            options: Processing options
+            options: Processing options including pre-transcribed data
 
         Returns:
             ProcessingResult with extracted content and metadata
         """
         try:
-            # Convert options to YouTubeConfig
-            youtube_config = None
-            if options:
-                # Import YouTubeConfig here to avoid circular imports
-                from morag_youtube.processor import YouTubeConfig
+            # Import YouTubeConfig here to avoid circular imports
+            from morag_youtube.processor import YouTubeConfig
 
-                # Create YouTubeConfig from options
-                youtube_config = YouTubeConfig(
-                    quality=options.get('quality', 'best'),
-                    format_preference=options.get('format_preference', 'mp4'),
-                    extract_audio=options.get('extract_audio', True),
-                    download_subtitles=options.get('download_subtitles', True),
-                    subtitle_languages=options.get('subtitle_languages', ['en']),
-                    max_filesize=options.get('max_filesize', None),
-                    download_thumbnails=options.get('download_thumbnails', True),
-                    extract_metadata_only=options.get('extract_metadata_only', False),
-                    extract_transcript=options.get('extract_transcript', True),
-                    transcript_language=options.get('transcript_language', None),
-                    transcript_format=options.get('transcript_format', 'text'),
-                    prefer_audio_transcription=options.get('prefer_audio_transcription', True),
-                    cookies_file=options.get('cookies_file', None),
-                    transcript_only=options.get('transcript_only', False)
-                )
+            # Create YouTubeConfig from options
+            youtube_config = YouTubeConfig()
+
+            if options:
+                # Handle pre-transcribed videos
+                if options.get('pre_transcribed', False):
+                    youtube_config.pre_transcribed = True
+                    youtube_config.provided_metadata = options.get('metadata')
+                    youtube_config.provided_transcript = options.get('transcript')
+                    youtube_config.provided_transcript_segments = options.get('transcript_segments')
+                else:
+                    # Configure Apify options
+                    youtube_config.extract_metadata = options.get('extract_metadata', True)
+                    youtube_config.extract_transcript = options.get('extract_transcript', True)
+                    youtube_config.use_proxy = options.get('use_proxy', True)
+                    youtube_config.apify_timeout = options.get('apify_timeout', 600)
             elif self.config.youtube_config:
                 # Use default config if available
                 youtube_config = self.config.youtube_config
 
-            result = await self.youtube_service.process_video(
-                url,
-                config=youtube_config
+            # Use the new transcribe_video method with pre-transcribed support
+            result = await self.youtube_service.transcribe_video(
+                url=url,
+                config=youtube_config,
+                metadata=options.get('metadata') if options else None,
+                transcript=options.get('transcript') if options else None,
+                transcript_segments=options.get('transcript_segments') if options else None
             )
-            
+
             # Convert YouTube-specific result to unified format
             extracted_files = []
             if result.video_path:
                 extracted_files.append(str(result.video_path))
-            if result.audio_path:
-                extracted_files.append(str(result.audio_path))
-            extracted_files.extend([str(p) for p in result.subtitle_paths])
-            extracted_files.extend([str(p) for p in result.thumbnail_paths])
-            
+
             # Convert metadata to dictionary with required document fields
             metadata = self._create_youtube_comprehensive_metadata(url, result)
             if result.metadata:
@@ -832,11 +828,21 @@ class MoRAGServices:
                     'channel_id': result.metadata.channel_id,
                     'channel_url': result.metadata.channel_url,
                 })
-            
+
+            # Use transcript from result (handles both regular and pre-transcribed)
+            transcript_text = ""
+            if result.transcript:
+                if isinstance(result.transcript, dict):
+                    transcript_text = result.transcript.get("text", "")
+                elif isinstance(result.transcript, str):
+                    transcript_text = result.transcript
+                else:
+                    transcript_text = str(result.transcript)
+
             return ProcessingResult(
                 content_type=ContentType.YOUTUBE,
                 content_url=url,
-                text_content=result.transcript_text,  # Include transcript text if available
+                text_content=transcript_text,
                 metadata=metadata,
                 extracted_files=extracted_files,
                 processing_time=result.processing_time,
@@ -1130,9 +1136,10 @@ class MoRAGServices:
             "video_id": video_id,
             "platform": "youtube",
             "url": url,
-            "extracted_files_count": len([f for f in [result.video_path, result.audio_path] if f]) +
-                                   len(result.subtitle_paths or []) +
-                                   len(result.thumbnail_paths or []),
+            "extracted_files_count": len([f for f in [result.video_path] if f]),
+            "transcript_segments_count": len(result.transcript.get("segments", []) if isinstance(result.transcript, dict) else []),
+            "has_transcript": bool(result.transcript),
+            "processing_method": "apify" if not getattr(result, 'pre_transcribed', False) else "pre_transcribed",
         }
 
         return metadata

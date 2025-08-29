@@ -11,6 +11,30 @@ class ProcessURLRequest(BaseModel):
     options: Optional[Dict[str, Any]] = None
 
 
+class YouTubeProcessRequest(BaseModel):
+    """Request model for YouTube video processing."""
+    url: str = Field(description="YouTube video URL")
+    pre_transcribed: bool = Field(default=False, description="Whether the video is already transcribed")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Pre-provided metadata for pre-transcribed videos")
+    transcript: Optional[str] = Field(default=None, description="Pre-provided transcript text for pre-transcribed videos")
+    transcript_segments: Optional[List[Dict[str, Any]]] = Field(default=None, description="Pre-provided transcript segments with timestamps")
+    extract_metadata: bool = Field(default=True, description="Whether to extract video metadata (ignored for pre-transcribed)")
+    extract_transcript: bool = Field(default=True, description="Whether to extract video transcript (ignored for pre-transcribed)")
+    use_proxy: bool = Field(default=True, description="Whether to use Apify proxy (ignored for pre-transcribed)")
+
+
+class YouTubeProcessResponse(BaseModel):
+    """Response model for YouTube video processing."""
+    success: bool
+    url: str
+    metadata: Optional[Dict[str, Any]] = None
+    transcript: Optional[str] = None
+    transcript_segments: Optional[List[Dict[str, Any]]] = None
+    processing_time: float
+    error_message: Optional[str] = None
+    pre_transcribed: bool = False
+
+
 class ProcessBatchRequest(BaseModel):
     """Request model for batch processing."""
     items: List[Dict[str, Any]]

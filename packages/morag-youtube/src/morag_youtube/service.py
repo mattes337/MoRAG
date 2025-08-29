@@ -9,26 +9,21 @@ from morag_core.interfaces.service import BaseService
 from morag_core.exceptions import ProcessingError
 
 from .processor import YouTubeProcessor, YouTubeConfig, YouTubeDownloadResult
-from .external_service import YouTubeExternalService
+from .apify_service import ApifyYouTubeService, ApifyYouTubeServiceError
 
 logger = structlog.get_logger(__name__)
 
 class YouTubeService(BaseService):
-    """Service for processing YouTube videos using external transcription API.
+    """Service for processing YouTube videos using Apify transcription API.
 
     This service provides high-level methods for transcribing videos and
-    optionally downloading video files using an external service.
+    extracting metadata using Apify's cloud infrastructure.
     """
 
-    def __init__(self, service_url: Optional[str] = None, service_timeout: int = 300):
-        """Initialize YouTube service.
-
-        Args:
-            service_url: URL of external YouTube service
-            service_timeout: Timeout for external service requests in seconds
-        """
+    def __init__(self):
+        """Initialize YouTube service."""
         self.processor = YouTubeProcessor()
-        self.external_service = YouTubeExternalService(service_url, service_timeout)
+        self.apify_service = None  # Initialize on demand
 
     async def initialize(self) -> bool:
         """Initialize the service.
@@ -315,108 +310,109 @@ class YouTubeService(BaseService):
         
         return thumbnail_path
 
-    async def extract_transcript(
+
+
+    async def transcribe_video(
         self,
         url: str,
-        language: Optional[str] = None,
-        output_dir: Optional[Path] = None,
-        format_type: str = "text",
-        cookies_file: Optional[str] = None,
-        transcript_only: bool = False
-    ) -> Dict[str, Any]:
-        """Extract transcript from a YouTube video using intelligent fallback strategy.
+        config: Optional[YouTubeConfig] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        transcript: Optional[str] = None,
+        transcript_segments: Optional[List[Dict[str, Any]]] = None
+    ) -> YouTubeDownloadResult:
+        """Transcribe a YouTube video using Apify service or process pre-transcribed content.
 
         Args:
             url: YouTube video URL
-            language: Preferred language code (if None, uses original language)
-            output_dir: Directory to save transcript file (uses temp dir if None)
-            format_type: Format type ("text", "srt", "vtt")
-            cookies_file: Path to cookies file for YouTube access
-            transcript_only: If True, skip video download and use only transcript API
+            config: Optional configuration for transcription
+            metadata: Pre-provided metadata (for pre-transcribed videos)
+            transcript: Pre-provided transcript text (for pre-transcribed videos)
+            transcript_segments: Pre-provided transcript segments (for pre-transcribed videos)
 
         Returns:
-            Dictionary containing transcript information and file path
+            YouTubeDownloadResult containing transcription and metadata
+
+        Raises:
+            ProcessingError: If transcription fails or Apify is not configured
         """
         try:
-            # Create config for transcript extraction
-            config = YouTubeConfig(
-                extract_transcript=True,
-                transcript_language=language,
-                transcript_format=format_type,
-                cookies_file=cookies_file,
-                transcript_only=transcript_only,
-                extract_metadata_only=False,  # Need full processing for transcript fallback
-                extract_audio=True,  # Enable audio extraction for fallback transcription
-                download_subtitles=False,  # Don't need subtitle files
-                download_thumbnails=False,  # Don't need thumbnails
-                quality="worst"  # Use lowest quality for faster download if needed
-            )
+            logger.info("Starting video transcription", url=url, pre_transcribed=bool(transcript))
 
-            # Use processor's intelligent fallback logic
+            # Create config with pre-transcribed data if provided
+            if metadata or transcript or transcript_segments:
+                config = config or YouTubeConfig()
+                config.pre_transcribed = True
+                config.provided_metadata = metadata
+                config.provided_transcript = transcript
+                config.provided_transcript_segments = transcript_segments
+
+            # Use the processor's process_url method
             result = await self.processor.process_url(url, config)
 
-            # If processor failed and we're NOT in transcript-only mode, the processor already tried fallback
-            if not result.success or not result.transcript_text:
-                if transcript_only:
-                    # In transcript-only mode, if it failed, don't try again - transcript is not available
-                    logger.error("Transcript-only mode failed - transcript not available for this video",
-                               url=url)
-                    raise ProcessingError("Transcript not available for this video in transcript-only mode")
-                else:
-                    # In full processing mode, the processor already tried fallback, so this is a real failure
-                    logger.error("All transcript extraction methods failed in processor",
-                               url=url)
-                    raise ProcessingError("All transcript extraction methods failed")
+            if not result.success:
+                raise ProcessingError(f"YouTube transcription failed: {result.error_message}")
 
-            # If output_dir is specified, move the transcript file there
-            if output_dir and result.transcript_path:
-                output_dir = Path(output_dir)
-                output_dir.mkdir(exist_ok=True, parents=True)
+            logger.info("Video transcription completed", url=url, success=result.success)
+            return result
 
-                new_transcript_path = output_dir / result.transcript_path.name
-                # Use copy instead of rename to handle cross-drive moves
-                import shutil
-                shutil.copy2(result.transcript_path, new_transcript_path)
-                transcript_path = new_transcript_path
-            else:
-                transcript_path = result.transcript_path
-
-            # Extract video ID for response
-            video_id = self.transcript_service.extract_video_id(url)
-
-            return {
-                'video_id': video_id,
-                'language': result.transcript_language,
-                'transcript_path': transcript_path,
-                'transcript_text': result.transcript_text,
-                'segments_count': 0,  # Will be updated if we have segment info
-                'duration': 0.0,  # Will be updated if we have duration info
-                'is_auto_generated': False,  # Will be updated based on method used
-                'format': format_type,
-                'method': 'fallback_strategy'
-            }
-
+        except ProcessingError:
+            raise
         except Exception as e:
-            error_msg = f"Failed to extract transcript: {str(e)}"
-            logger.error("Transcript extraction failed", url=url, error=str(e))
+            error_msg = f"Video transcription failed for {url}: {str(e)}"
+            logger.error("Video transcription failed", url=url, error=str(e))
             raise ProcessingError(error_msg)
 
-    async def get_available_transcript_languages(self, url: str) -> Dict[str, Dict[str, Any]]:
-        """Get available transcript languages for a YouTube video.
+
+    async def transcribe_videos(
+        self,
+        urls: List[str],
+        config: Optional[YouTubeConfig] = None
+    ) -> List[YouTubeDownloadResult]:
+        """Transcribe multiple YouTube videos.
 
         Args:
-            url: YouTube video URL
+            urls: List of YouTube video URLs
+            config: Optional configuration for transcription
 
         Returns:
-            Dictionary mapping language codes to transcript metadata
+            List of YouTubeDownloadResult objects
+
+        Raises:
+            ProcessingError: If transcription fails
         """
-        try:
-            video_id = self.transcript_service.extract_video_id(url)
-            return await self.transcript_service.get_available_transcripts(video_id)
-        except Exception as e:
-            error_msg = f"Failed to get available transcripts: {str(e)}"
-            logger.error("Failed to get transcript languages", url=url, error=str(e))
-            raise ProcessingError(error_msg)
+        results = []
+        config = config or YouTubeConfig()
+
+        logger.info("Starting batch transcription", video_count=len(urls))
+
+        for url in urls:
+            try:
+                result = await self.transcribe_video(url, config)
+                results.append(result)
+            except Exception as e:
+                logger.error("Failed to transcribe video in batch", url=url, error=str(e))
+                # Create a failed result
+                failed_result = YouTubeDownloadResult(
+                    metadata=None,
+                    transcript=None,
+                    transcript_segments=[],
+                    transcript_languages=[],
+                    formats=[],
+                    total_formats=0,
+                    video_path=None,
+                    output_file=None,
+                    video_download=None,
+                    processing_time=0.0,
+                    success=False,
+                    error_message=str(e)
+                )
+                results.append(failed_result)
+
+        logger.info("Batch transcription completed",
+                   video_count=len(urls),
+                   successful_count=sum(1 for r in results if r.success))
+
+        return results
 
     def cleanup(self, result: Union[YouTubeDownloadResult, List[YouTubeDownloadResult]]) -> None:
         """Clean up temporary files.

@@ -688,7 +688,117 @@ MoRAG automatically detects content types based on file extensions and patterns:
 - **Video**: `.mp4`, `.avi`, `.mov`, `.mkv`, `.webm`, `.flv`
 - **Images**: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.tiff`
 - **Web**: URLs starting with `http://` or `https://`
-- **YouTube**: URLs containing `youtube.com` or `youtu.be`
+- **YouTube**: URLs containing `youtube.com` or `youtu.be` (requires Apify configuration)
+
+## 📺 YouTube Video Processing
+
+**⚠️ Important**: YouTube processing requires Apify configuration. The service will fail if `APIFY_API_TOKEN` is not configured.
+
+### Basic YouTube Video Processing
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/youtube-transcription/execute" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "extract_metadata": true,
+    "extract_transcript": true,
+    "use_proxy": true
+  }'
+```
+
+### Pre-Transcribed YouTube Videos
+
+For videos where you already have metadata and transcripts, you can skip the Apify transcription:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/youtube-transcription/execute" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "pre_transcribed": true,
+    "metadata": {
+      "title": "Rick Astley - Never Gonna Give You Up",
+      "channel": "RickAstleyVEVO",
+      "duration": "213",
+      "viewCount": "1000000000",
+      "uploadDate": "2009-10-25",
+      "description": "The official video for Rick Astley..."
+    },
+    "transcript": "We'\''re no strangers to love. You know the rules and so do I...",
+    "transcript_segments": [
+      {
+        "text": "We'\''re no strangers to love",
+        "start": 0.0,
+        "duration": 2.5
+      },
+      {
+        "text": "You know the rules and so do I",
+        "start": 2.5,
+        "duration": 3.0
+      }
+    ]
+  }'
+```
+
+### YouTube Processing Error Handling
+
+If Apify is not configured, you'll receive an error:
+
+```json
+{
+  "success": false,
+  "error_message": "Failed to initialize Apify service: Apify API token is required. Set APIFY_API_TOKEN environment variable.",
+  "processing_time": 0.1
+}
+```
+
+### YouTube Configuration Requirements
+
+1. **Set Environment Variables**:
+   ```bash
+   APIFY_API_TOKEN=your_apify_api_token_here
+   APIFY_YOUTUBE_ACTOR_ID=SWvgAAm9FpfWHRrUm
+   ```
+
+2. **Get Apify API Token**:
+   - Sign up at [Apify.com](https://apify.com/)
+   - Go to Settings → Integrations → API tokens
+   - Create or copy your API token
+
+3. **Test Configuration**:
+   ```bash
+   # Test if Apify is configured correctly
+   python test_apify_youtube.py
+   ```
+
+### YouTube Response Format
+
+```json
+{
+  "success": true,
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "metadata": {
+    "title": "Rick Astley - Never Gonna Give You Up",
+    "channel": "RickAstleyVEVO",
+    "duration": "213",
+    "viewCount": "1000000000",
+    "uploadDate": "2009-10-25",
+    "description": "The official video for Rick Astley...",
+    "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"
+  },
+  "transcript": "We're no strangers to love. You know the rules and so do I...",
+  "transcript_segments": [
+    {
+      "text": "We're no strangers to love",
+      "start": 0.0,
+      "duration": 2.5
+    }
+  ],
+  "processing_time": 45.2,
+  "pre_transcribed": false
+}
+```
 
 ## 🔄 Migration from Legacy API
 
