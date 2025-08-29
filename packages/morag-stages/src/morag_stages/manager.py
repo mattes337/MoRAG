@@ -118,8 +118,11 @@ class StageManager:
                            stage_type=stage_type.value,
                            validation_details=validation_details)
 
+                # Create more descriptive error message based on stage type
+                error_message = self._create_validation_error_message(stage_type, input_files, validation_details)
+
                 raise StageValidationError(
-                    f"Input validation failed for stage {stage_type.value}. Expected: 1 file, got: {len(input_files)}. Files: {[str(f) for f in input_files]}",
+                    error_message,
                     stage_type=stage_type.value,
                     invalid_files=[str(f) for f in input_files]
                 )
@@ -301,3 +304,76 @@ class StageManager:
                    successful_stages=len([r for r in results if r.success]))
         
         return results
+
+    def _create_validation_error_message(self, stage_type: StageType, input_files: List[Path], validation_details: List[dict]) -> str:
+        """Create a descriptive validation error message based on stage type and input files.
+
+        Args:
+            stage_type: The stage type that failed validation
+            input_files: The input files that failed validation
+            validation_details: Detailed validation information
+
+        Returns:
+            Descriptive error message
+        """
+        file_count = len(input_files)
+
+        # Stage-specific validation messages
+        if stage_type == StageType.FACT_GENERATOR:
+            if file_count != 1:
+                return f"Fact generator stage requires exactly 1 input file, got {file_count}. Files: {[str(f) for f in input_files]}"
+
+            file = input_files[0]
+            if not file.exists():
+                return f"Fact generator stage input file does not exist: {file}"
+
+            if not str(file).endswith('.chunks.json'):
+                return f"Fact generator stage requires a .chunks.json file (output from chunker stage), but got: {file}. Make sure to run the chunker stage first."
+
+            return f"Fact generator stage input file {file} exists but does not contain valid chunk data."
+
+        elif stage_type == StageType.CHUNKER:
+            if file_count != 1:
+                return f"Chunker stage requires exactly 1 input file, got {file_count}. Files: {[str(f) for f in input_files]}"
+
+            file = input_files[0]
+            if not file.exists():
+                return f"Chunker stage input file does not exist: {file}"
+
+            if not file.suffix.lower() in ['.md', '.markdown']:
+                return f"Chunker stage requires a markdown file (.md or .markdown), but got: {file}. Make sure to run the markdown-conversion stage first."
+
+            return f"Chunker stage input file {file} exists but is not valid markdown."
+
+        elif stage_type == StageType.MARKDOWN_CONVERSION:
+            if file_count != 1:
+                return f"Markdown conversion stage requires exactly 1 input file, got {file_count}. Files: {[str(f) for f in input_files]}"
+
+            file = input_files[0]
+            if not file.exists():
+                return f"Markdown conversion stage input file does not exist: {file}"
+
+            supported_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.mp3', '.wav', '.flac', '.m4a', '.pdf', '.docx', '.txt', '.md'}
+            if file.suffix.lower() not in supported_extensions and not str(file).startswith(('http://', 'https://')):
+                return f"Markdown conversion stage requires a supported file type {supported_extensions} or URL, but got: {file}"
+
+            return f"Markdown conversion stage input file {file} exists but could not be processed."
+
+        elif stage_type == StageType.INGESTOR:
+            if file_count < 1:
+                return f"Ingestor stage requires at least 1 input file, got {file_count}."
+
+            invalid_files = []
+            for file in input_files:
+                if not file.exists():
+                    invalid_files.append(f"{file} (does not exist)")
+                elif not str(file).endswith('.json'):
+                    invalid_files.append(f"{file} (not a .json file)")
+
+            if invalid_files:
+                return f"Ingestor stage requires .json files, but found invalid files: {invalid_files}"
+
+            return f"Ingestor stage input files exist but contain invalid JSON data."
+
+        # Default fallback message
+        return f"Input validation failed for stage {stage_type.value}. Expected: 1 file, got: {file_count}. Files: {[str(f) for f in input_files]}"
