@@ -163,26 +163,29 @@ class MarkdownConversionStage(Stage):
                 result_data = await self._process_youtube(input_file, output_file, config)
             else:
                 result_data = await self._process_text(input_file, output_file, config)
-            
+
+            # Check if the output file was renamed (e.g., for YouTube videos with titles)
+            final_output_file = result_data.get("final_output_file", output_file)
+
             # Create metadata
             metadata = StageMetadata(
                 execution_time=0.0,  # Will be set by manager
                 start_time=datetime.now(),
                 input_files=[str(input_file)],
-                output_files=[str(output_file)],
+                output_files=[str(final_output_file)],
                 config_used=config,
                 metrics={
                     "content_type": str(content_type) if content_type else "unknown",
                     "input_size_bytes": input_file.stat().st_size if input_file.exists() else 0,
-                    "output_size_bytes": output_file.stat().st_size if output_file.exists() else 0,
+                    "output_size_bytes": final_output_file.stat().st_size if final_output_file.exists() else 0,
                     **result_data.get("metrics", {})
                 }
             )
-            
+
             return StageResult(
                 stage_type=self.stage_type,
                 status=StageStatus.COMPLETED,
-                output_files=[output_file],
+                output_files=[final_output_file],
                 metadata=metadata,
                 data=result_data
             )
@@ -406,20 +409,27 @@ class MarkdownConversionStage(Stage):
         else:
             return str(content_type).upper() == expected_type.upper()
 
-    def _generate_output_filename(self, input_file: Path, content_type) -> str:
+    def _generate_output_filename(self, input_file: Path, content_type, metadata: Dict[str, Any] = None) -> str:
         """Generate appropriate output filename based on input type.
 
         Args:
             input_file: Input file path or URL
             content_type: Detected content type
+            metadata: Optional metadata containing title information
 
         Returns:
             Output filename with .md extension
         """
 
-
         if self._is_content_type(content_type, "YOUTUBE"):
-            # Extract video ID from YouTube URL
+            # Try to use video title from metadata first
+            if metadata and metadata.get('title'):
+                title = metadata['title']
+                # Sanitize title for filename
+                sanitized_title = sanitize_filename(title, max_length=100)
+                return f"{sanitized_title}.md"
+
+            # Try to extract metadata to get title for filename
             try:
                 # Fix URL mangling from Windows path conversion
                 url_str = str(input_file)
@@ -431,7 +441,12 @@ class MarkdownConversionStage(Stage):
                 elif url_str.startswith('http:') and not url_str.startswith('http://'):
                     url_str = url_str.replace('http:/', 'http://')
 
+                # Try to get title from YouTube service if available
+                # Note: We skip async metadata extraction here to avoid event loop issues
+                # The filename will be updated later during processing if needed
+
                 if YOUTUBE_AVAILABLE and self.youtube_service:
+                    # Fallback to video ID if metadata extraction fails
                     video_id = self.youtube_service.transcript_service.extract_video_id(url_str)
                     return f"{video_id}.md"
                 else:
@@ -456,8 +471,45 @@ class MarkdownConversionStage(Stage):
                 # If video ID extraction fails, fall back to sanitized stem
                 sanitized_name = sanitize_filename(input_file.stem)
                 return f"{sanitized_name}.md"
+        elif self._is_content_type(content_type, "WEB"):
+            # Try to use website title from metadata first
+            if metadata and metadata.get('title'):
+                title = metadata['title']
+                # Sanitize title for filename
+                sanitized_title = sanitize_filename(title, max_length=100)
+                return f"{sanitized_title}.md"
+
+            # Fallback to domain name from URL
+            try:
+                # Fix URL mangling from Windows path conversion
+                url_str = str(input_file)
+                # Convert backslashes to forward slashes
+                url_str = url_str.replace('\\', '/')
+                # Fix common URL mangling patterns
+                if url_str.startswith('https:') and not url_str.startswith('https://'):
+                    url_str = url_str.replace('https:/', 'https://')
+                elif url_str.startswith('http:') and not url_str.startswith('http://'):
+                    url_str = url_str.replace('http:/', 'http://')
+
+                # Extract domain name for fallback filename
+                from urllib.parse import urlparse
+                parsed = urlparse(url_str)
+                domain = parsed.netloc or parsed.path.split('/')[0]
+                if domain:
+                    # Remove www. prefix and sanitize
+                    domain = domain.replace('www.', '')
+                    sanitized_domain = sanitize_filename(domain, max_length=50)
+                    return f"{sanitized_domain}.md"
+                else:
+                    # If domain extraction fails, fall back to sanitized stem
+                    sanitized_name = sanitize_filename(input_file.stem)
+                    return f"{sanitized_name}.md"
+            except Exception:
+                # If URL parsing fails, fall back to sanitized stem
+                sanitized_name = sanitize_filename(input_file.stem)
+                return f"{sanitized_name}.md"
         else:
-            # For non-YouTube content, use sanitized stem
+            # For other content types, use sanitized stem
             sanitized_name = sanitize_filename(input_file.stem)
             return f"{sanitized_name}.md"
 
@@ -957,10 +1009,33 @@ class MarkdownConversionStage(Stage):
         # Write to file
         output_file.write_text(markdown_content, encoding='utf-8')
 
+        # Try to rename the output file to use the website title if available
+        final_output_file = output_file
+        if result.metadata.get('title') and result.metadata.get('title') != "Web Content":
+            try:
+                title = result.metadata['title']
+                sanitized_title = sanitize_filename(title, max_length=100)
+                new_filename = f"{sanitized_title}.md"
+                new_output_file = output_file.parent / new_filename
+
+                # Only rename if the new filename is different and doesn't already exist
+                if new_output_file != output_file and not new_output_file.exists():
+                    output_file.rename(new_output_file)
+                    final_output_file = new_output_file
+                    logger.info("Renamed output file to use website title",
+                               old_name=output_file.name,
+                               new_name=new_output_file.name)
+            except Exception as e:
+                logger.warning("Failed to rename output file with website title",
+                              error=str(e),
+                              title=result.metadata.get('title'))
+                # Continue with original filename
+
         return {
             "content_type": "web",
             "title": result.metadata.get('title', "Web Content"),
             "metadata": result.metadata,
+            "final_output_file": final_output_file,  # Include the final file path
             "metrics": {
                 "url": url,
                 "content_length": len(result.text_content or ""),
@@ -1068,10 +1143,33 @@ class MarkdownConversionStage(Stage):
         # Write to file
         output_file.write_text(markdown_content, encoding='utf-8')
 
+        # Try to rename the output file to use the video title if available
+        final_output_file = output_file
+        if result.metadata.get('title'):
+            try:
+                title = result.metadata['title']
+                sanitized_title = sanitize_filename(title, max_length=100)
+                new_filename = f"{sanitized_title}.md"
+                new_output_file = output_file.parent / new_filename
+
+                # Only rename if the new filename is different and doesn't already exist
+                if new_output_file != output_file and not new_output_file.exists():
+                    output_file.rename(new_output_file)
+                    final_output_file = new_output_file
+                    logger.info("Renamed output file to use video title",
+                               old_name=output_file.name,
+                               new_name=new_output_file.name)
+            except Exception as e:
+                logger.warning("Failed to rename output file with video title",
+                              error=str(e),
+                              title=result.metadata.get('title'))
+                # Continue with original filename
+
         return {
             "content_type": "youtube",
             "title": result.metadata.get('title', "YouTube Video"),
             "metadata": result.metadata,
+            "final_output_file": final_output_file,  # Include the final file path
             "metrics": {
                 "url": url,
                 "video_id": result.metadata.get('video_id'),
