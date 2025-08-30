@@ -720,6 +720,36 @@ class MarkdownConversionStage(Stage):
             }
 
         except Exception as e:
+            error_msg = str(e).lower()
+
+            # Check for specific corruption indicators
+            if any(indicator in error_msg for indicator in [
+                "data-loss while decompressing corrupted data",
+                "corrupted data",
+                "decompression failed",
+                "invalid pdf",
+                "pdf parsing error"
+            ]):
+                logger.warning("PDF appears corrupted, attempting fallback processing",
+                             input_file=str(input_file), error=str(e))
+
+                # Try fallback to document service if available
+                if self.services:
+                    try:
+                        logger.info("Attempting fallback to document service", input_file=str(input_file))
+                        return await self._process_with_document_service(input_file, output_file, config)
+                    except Exception as fallback_error:
+                        logger.error("Fallback processing also failed",
+                                   input_file=str(input_file),
+                                   fallback_error=str(fallback_error))
+
+                # If no fallback available or fallback failed, provide helpful error
+                raise ProcessingError(
+                    f"PDF file appears to be corrupted or damaged: {input_file}. "
+                    f"Please try with a different PDF file or check if the file is valid. "
+                    f"Original error: {e}"
+                )
+
             logger.error(f"MarkItDown processing failed: {e}", input_file=str(input_file))
             raise ProcessingError(f"MarkItDown processing failed for {input_file}: {e}")
     
@@ -883,6 +913,22 @@ class MarkdownConversionStage(Stage):
                 "has_tables": config.get('extract_tables', True)
             }
         }
+
+    async def _process_with_document_service(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Fallback processing using document service when MarkItDown fails.
+
+        Args:
+            input_file: Input file path
+            output_file: Output file path
+            config: Processing configuration
+
+        Returns:
+            Processing result data
+        """
+        logger.info("Processing with document service fallback", input_file=str(input_file))
+
+        # Use the existing document processing method
+        return await self._process_document(input_file, output_file, config)
 
     async def _process_web(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process web URL to markdown.

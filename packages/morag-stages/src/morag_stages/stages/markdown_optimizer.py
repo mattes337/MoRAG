@@ -140,25 +140,40 @@ class MarkdownOptimizerStage(Stage):
     
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for markdown optimization.
-        
+
         Args:
             input_files: List of input file paths
-            
+
         Returns:
             True if inputs are valid
         """
+        logger.debug("Validating markdown optimizer inputs",
+                    input_count=len(input_files),
+                    input_files=[str(f) for f in input_files])
+
         if len(input_files) != 1:
+            logger.error("Invalid input count for markdown optimizer",
+                        expected=1,
+                        actual=len(input_files),
+                        files=[str(f) for f in input_files])
             return False
-        
+
         input_file = input_files[0]
-        
+
         # Check if file exists and is markdown
         if not input_file.exists():
+            logger.error("Input file does not exist for markdown optimizer",
+                        file_path=str(input_file))
             return False
-        
+
         if input_file.suffix.lower() not in ['.md', '.markdown']:
+            logger.error("Input file is not markdown for markdown optimizer",
+                        file_path=str(input_file),
+                        suffix=input_file.suffix)
             return False
-        
+
+        logger.debug("Input validation successful for markdown optimizer",
+                    file_path=str(input_file))
         return True
     
     def get_dependencies(self) -> List[StageType]:

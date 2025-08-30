@@ -552,5 +552,14 @@ class StageManager:
 
             return f"Ingestor stage input files exist but contain invalid JSON data."
 
-        # Default fallback message
-        return f"Input validation failed for stage {stage_type.value}. Expected: 1 file, got: {file_count}. Files: {[str(f) for f in input_files]}"
+        # Default fallback message with more detailed validation info
+        if file_count == 1:
+            file = input_files[0]
+            if not file.exists():
+                return f"Input validation failed for stage {stage_type.value}. File does not exist: {file}"
+            elif hasattr(file, 'suffix'):
+                return f"Input validation failed for stage {stage_type.value}. File format may not be supported: {file} (extension: {file.suffix})"
+            else:
+                return f"Input validation failed for stage {stage_type.value}. File validation failed: {file}"
+        else:
+            return f"Input validation failed for stage {stage_type.value}. Expected: 1 file, got: {file_count}. Files: {[str(f) for f in input_files]}"
