@@ -27,12 +27,12 @@ def sanitize_filename(filename: str, max_length: int = 100) -> str:
     if not filename:
         return "unnamed"
 
-    # Remove or replace invalid characters for Windows/Unix
-    invalid_chars = r'[<>:"/\\|?*\x00-\x1f%]'
+    # Remove or replace invalid characters for Windows/Unix (including spaces)
+    invalid_chars = r'[<>:"/\\|?*\x00-\x1f% ]'
     sanitized = re.sub(invalid_chars, '_', filename)
 
-    # Remove leading/trailing dots and spaces
-    sanitized = sanitized.strip('. ')
+    # Remove leading/trailing dots and underscores
+    sanitized = sanitized.strip('._')
 
     # Replace multiple consecutive underscores with single underscore
     sanitized = re.sub(r'_+', '_', sanitized)

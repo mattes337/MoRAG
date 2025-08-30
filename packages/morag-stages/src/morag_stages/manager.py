@@ -153,7 +153,8 @@ class StageManager:
 
         # Generate output filename based on input
         if input_files:
-            base_name = input_files[0].stem
+            from .file_manager import sanitize_filename
+            base_name = sanitize_filename(input_files[0].stem)
         else:
             base_name = "sample"
 

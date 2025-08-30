@@ -220,19 +220,21 @@ class ChunkerStage(Stage):
     
     def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output file paths.
-        
+
         Args:
             input_files: List of input file paths
             context: Stage execution context
-            
+
         Returns:
             List of expected output file paths
         """
         if len(input_files) != 1:
             return []
-        
+
         input_file = input_files[0]
-        output_file = context.output_dir / f"{input_file.stem}.chunks.json"
+        from ..file_manager import sanitize_filename
+        sanitized_name = sanitize_filename(input_file.stem)
+        output_file = context.output_dir / f"{sanitized_name}.chunks.json"
         return [output_file]
     
     def _extract_metadata_and_content(self, markdown: str) -> tuple[Dict[str, Any], str]:

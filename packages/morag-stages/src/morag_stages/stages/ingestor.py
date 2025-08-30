@@ -250,7 +250,9 @@ class IngestorStage(Stage):
             chunks_file = next(file for file in input_files if file.name.endswith('.chunks.json'))
 
         base_name = chunks_file.stem.replace('.chunks', '')
-        output_file = context.output_dir / f"{base_name}.ingestion.json"
+        from ..file_manager import sanitize_filename
+        sanitized_name = sanitize_filename(base_name)
+        output_file = context.output_dir / f"{sanitized_name}.ingestion.json"
         return [output_file]
     
     def _load_json_file(self, file_path: Path) -> Dict[str, Any]:
