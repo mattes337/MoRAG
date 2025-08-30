@@ -774,11 +774,20 @@ class MarkdownConversionStage(Stage):
             'extract_thumbnails': config.get('extract_thumbnails', False)
         }
 
-        # Use video service
+        # Use video service with output disabled to avoid subdirectory creation
         if not self.services:
             raise ProcessingError("MoRAG services not available")
-        result = await self.services.process_video(str(input_file), options)
-        
+
+        # Temporarily disable output saving to prevent subdirectory creation
+        original_output_dir = self.services.video_service.output_dir
+        self.services.video_service.output_dir = None
+
+        try:
+            result = await self.services.process_video(str(input_file), options)
+        finally:
+            # Restore original output directory
+            self.services.video_service.output_dir = original_output_dir
+
         # Create markdown with metadata header
         markdown_content = self._create_markdown_with_metadata(
             content=result.text_content or "",
@@ -827,10 +836,19 @@ class MarkdownConversionStage(Stage):
             'topic_segmentation': config.get('topic_segmentation', True)
         }
 
-        # Use audio service
+        # Use audio service with output disabled to avoid subdirectory creation
         if not self.services:
             raise ProcessingError("MoRAG services not available")
-        result = await self.services.process_audio(str(input_file), options)
+
+        # Temporarily disable output saving to prevent subdirectory creation
+        original_output_dir = self.services.audio_service.output_dir
+        self.services.audio_service.output_dir = None
+
+        try:
+            result = await self.services.process_audio(str(input_file), options)
+        finally:
+            # Restore original output directory
+            self.services.audio_service.output_dir = original_output_dir
 
         # Create markdown with metadata header
         markdown_content = self._create_markdown_with_metadata(
@@ -881,10 +899,19 @@ class MarkdownConversionStage(Stage):
             'ocr_enabled': config.get('ocr_enabled', True)
         }
 
-        # Use document service
+        # Use document service with output disabled to avoid subdirectory creation
         if not self.services:
             raise ProcessingError("MoRAG services not available")
-        result = await self.services.process_document(str(input_file), options)
+
+        # Temporarily disable output saving to prevent subdirectory creation
+        original_output_dir = self.services.document_service.output_dir
+        self.services.document_service.output_dir = None
+
+        try:
+            result = await self.services.process_document(str(input_file), options)
+        finally:
+            # Restore original output directory
+            self.services.document_service.output_dir = original_output_dir
 
         # Create markdown with metadata header
         markdown_content = self._create_markdown_with_metadata(
@@ -1080,7 +1107,17 @@ class MarkdownConversionStage(Stage):
                 'quality': 'worst'  # Use lowest quality for faster download if needed
             }
 
-            result = await self.services.process_youtube(url, youtube_options)
+            # Temporarily disable output saving to prevent subdirectory creation
+            original_output_dir = getattr(self.services.youtube_service, 'output_dir', None)
+            if hasattr(self.services.youtube_service, 'output_dir'):
+                self.services.youtube_service.output_dir = None
+
+            try:
+                result = await self.services.process_youtube(url, youtube_options)
+            finally:
+                # Restore original output directory
+                if hasattr(self.services.youtube_service, 'output_dir'):
+                    self.services.youtube_service.output_dir = original_output_dir
         elif self.youtube_service:
             # Fallback to direct YouTube service
             logger.info("Using fallback YouTube service for transcript extraction")
