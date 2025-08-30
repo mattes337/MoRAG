@@ -56,13 +56,36 @@ class WebStageProcessor(StageProcessor):
         config: Dict[str, Any]
     ) -> ProcessorResult:
         """Process web URL to markdown."""
-        # Convert Path back to URL string
+        # Convert Path back to URL string and fix Windows path conversion issues
         url = str(input_file)
-        if url.startswith(('C:', 'D:', '/', '\\')):
-            # Handle Windows path conversion issues
+
+        # Handle Windows path conversion issue - Path() mangles URLs
+        if not url.startswith(('http://', 'https://')):
+            # Convert backslashes to forward slashes
             url = url.replace('\\', '/')
-            if not url.startswith(('http://', 'https://')):
-                raise ProcessingError(f"Invalid web URL: {url}")
+
+            # Fix common URL mangling patterns
+            if url.startswith('https:') and not url.startswith('https://'):
+                # Pattern: https:/www.example.com -> https://www.example.com
+                if url.startswith('https://'):
+                    pass  # Already correct
+                elif url.startswith('https:/'):
+                    url = url.replace('https:/', 'https://', 1)
+                else:
+                    url = url.replace('https:', 'https://', 1)
+            elif url.startswith('http:') and not url.startswith('http://'):
+                # Pattern: http:/www.example.com -> http://www.example.com
+                if url.startswith('http://'):
+                    pass  # Already correct
+                elif url.startswith('http:/'):
+                    url = url.replace('http:/', 'http://', 1)
+                else:
+                    url = url.replace('http:', 'http://', 1)
+
+            # Additional fix for URLs that lost protocol entirely
+            if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+                # Default to https for security
+                url = 'https://' + url
         
         logger.info("Processing web URL", url=url)
         

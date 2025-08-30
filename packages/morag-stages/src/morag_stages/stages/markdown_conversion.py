@@ -979,10 +979,21 @@ class MarkdownConversionStage(Stage):
             # Fix common URL mangling patterns
             if url.startswith('https:') and not url.startswith('https://'):
                 # Pattern: https:/www.example.com -> https://www.example.com
-                url = url.replace('https:/', 'https://')
+                # Handle both https:/ and https:// cases
+                if url.startswith('https://'):
+                    pass  # Already correct
+                elif url.startswith('https:/'):
+                    url = url.replace('https:/', 'https://', 1)
+                else:
+                    url = url.replace('https:', 'https://', 1)
             elif url.startswith('http:') and not url.startswith('http://'):
                 # Pattern: http:/www.example.com -> http://www.example.com
-                url = url.replace('http:/', 'http://')
+                if url.startswith('http://'):
+                    pass  # Already correct
+                elif url.startswith('http:/'):
+                    url = url.replace('http:/', 'http://', 1)
+                else:
+                    url = url.replace('http:', 'http://', 1)
 
             # Handle case where the URL got completely mangled
             if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
@@ -1078,10 +1089,21 @@ class MarkdownConversionStage(Stage):
             # Fix common URL mangling patterns
             if url.startswith('https:') and not url.startswith('https://'):
                 # Pattern: https:/www.youtube.com -> https://www.youtube.com
-                url = url.replace('https:/', 'https://')
+                # Handle both https:/ and https:// cases
+                if url.startswith('https://'):
+                    pass  # Already correct
+                elif url.startswith('https:/'):
+                    url = url.replace('https:/', 'https://', 1)
+                else:
+                    url = url.replace('https:', 'https://', 1)
             elif url.startswith('http:') and not url.startswith('http://'):
                 # Pattern: http:/www.youtube.com -> http://www.youtube.com
-                url = url.replace('http:/', 'http://')
+                if url.startswith('http://'):
+                    pass  # Already correct
+                elif url.startswith('http:/'):
+                    url = url.replace('http:/', 'http://', 1)
+                else:
+                    url = url.replace('http:', 'http://', 1)
 
             # Handle case where the URL got completely mangled
             if 'youtube.com' in url and not url.startswith(('http://', 'https://')):
@@ -1090,6 +1112,11 @@ class MarkdownConversionStage(Stage):
                     url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
                 else:
                     url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+
+            # Additional fix for URLs that lost protocol entirely
+            elif ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+                # Default to https for security
+                url = 'https://' + url
 
         logger.info("Processing YouTube URL", url=url)
 

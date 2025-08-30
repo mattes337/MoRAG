@@ -35,18 +35,38 @@ This guide provides comprehensive API usage examples for all MoRAG content types
 
 ## 📚 API Usage Examples
 
+### 🔄 Input Methods: Files vs URLs
+
+**File Uploads**: Use `-F "file=@filename"` for local files (PDF, images, audio, video, etc.)
+**URLs**: Use `-F 'input_files=["URL"]'` for web pages, YouTube videos, or any URL-based content
+
+**Examples:**
+- File: `-F "file=@document.pdf"`
+- URL: `-F 'input_files=["https://example.com"]'`
+- YouTube: `-F 'input_files=["https://youtube.com/watch?v=ID"]'`
+
 ### 1. Single Stage Execution - Markdown Conversion
 
 ```bash
-# Convert PDF to markdown
+# Convert PDF to markdown (file upload)
 curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
   -F "file=@document.pdf" \
   -F 'config={"include_timestamps": true, "preserve_formatting": true}'
 
-# Convert image with text extraction
+# Convert image with text extraction (file upload)
 curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
   -F "file=@image.png" \
   -F 'config={"extract_text": true, "generate_descriptions": false}'
+
+# Process web URL (URL via input_files)
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://example.com/article"]' \
+  -F 'config={"extract_metadata": true, "follow_links": false}'
+
+# Process YouTube URL (URL via input_files)
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={"extract_metadata": true, "extract_transcript": true}'
 ```
 
 ### 2. Stage Chain Execution - Multiple Stages
@@ -499,6 +519,20 @@ async def main():
             )
         conversion_result = response.json()
 
+        # Process YouTube URL - markdown conversion
+        response = await client.post(
+            f"{base_url}/api/v1/stages/markdown-conversion/execute",
+            data={
+                "input_files": json.dumps(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]),
+                "config": json.dumps({
+                    "extract_metadata": True,
+                    "extract_transcript": True,
+                    "use_proxy": True
+                })
+            }
+        )
+        youtube_result = response.json()
+
         # Execute stage chain - conversion + chunking
         with open("audio.mp3", "rb") as f:
             response = await client.post(
@@ -551,6 +585,7 @@ async def main():
         full_pipeline_result = response.json()
 
         print(f"Conversion: {conversion_result['success']}")
+        print(f"YouTube: {youtube_result['success']}")
         print(f"Chain: {chain_result['success']}")
         print(f"Full Pipeline: {full_pipeline_result['success']}")
 
@@ -694,13 +729,19 @@ MoRAG automatically detects content types based on file extensions and patterns:
 
 **⚠️ Important**: YouTube processing requires Apify configuration. The service will fail if `APIFY_API_TOKEN` is not configured.
 
+**Note**: YouTube URLs are processed through the `markdown-conversion` stage, not a separate YouTube stage.
+
+**Important**: URLs must be passed via the `input_files` parameter (as JSON array), not as file uploads. Use `-F 'input_files=["URL"]'` for form data or `"input_files": ["URL"]` for JSON requests.
+
+**Note**: On Windows, URLs may get mangled when converted to Path objects, but the system automatically reconstructs them. The processing will work correctly even if you see temporary URL mangling in logs.
+
 ### Basic YouTube Video Processing
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/stages/youtube-transcription/execute" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+# Process YouTube URL through markdown-conversion stage
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
     "extract_metadata": true,
     "extract_transcript": true,
     "use_proxy": true
@@ -712,10 +753,9 @@ curl -X POST "http://localhost:8000/api/v1/stages/youtube-transcription/execute"
 For videos where you already have metadata and transcripts, you can skip the Apify transcription:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/stages/youtube-transcription/execute" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
+  -F 'input_files=["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]' \
+  -F 'config={
     "pre_transcribed": true,
     "metadata": {
       "title": "Rick Astley - Never Gonna Give You Up",
@@ -739,6 +779,54 @@ curl -X POST "http://localhost:8000/api/v1/stages/youtube-transcription/execute"
       }
     ]
   }'
+```
+
+### YouTube Processing in Stage Chains
+
+You can also process YouTube videos through multiple stages:
+
+```bash
+# Process YouTube video through conversion and chunking
+curl -X POST "http://localhost:8000/api/v1/stages/chain" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_files": ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
+    "stages": ["markdown-conversion", "chunker"],
+    "stage_configs": {
+      "markdown-conversion": {
+        "extract_metadata": true,
+        "extract_transcript": true,
+        "use_proxy": true
+      },
+      "chunker": {
+        "chunk_strategy": "topic",
+        "chunk_size": 4000,
+        "generate_summary": true
+      }
+    }
+  }'
+```
+
+### YouTube Processing with Python
+
+```python
+import requests
+import json
+
+# Process YouTube URL
+url = "http://localhost:8000/api/v1/stages/markdown-conversion/execute"
+data = {
+    'input_files': json.dumps(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]),
+    'config': json.dumps({
+        "extract_metadata": True,
+        "extract_transcript": True,
+        "use_proxy": True
+    })
+}
+
+response = requests.post(url, data=data)
+result = response.json()
+print(f"Success: {result['success']}")
 ```
 
 ### YouTube Processing Error Handling
@@ -1026,7 +1114,7 @@ This section provides comprehensive metadata examples for all supported file typ
 
 ### 📺 YouTube Processing Metadata
 
-**YouTube URLs (youtube.com, youtu.be)**
+**YouTube URLs (youtube.com, youtu.be) - Processed via markdown-conversion stage**
 
 ```json
 {
@@ -1034,7 +1122,7 @@ This section provides comprehensive metadata examples for all supported file typ
   "file_path": "/path/to/youtube_dQw4w9WgXcQ.md",
   "file_size": 65536,
   "created_at": "2024-01-15T10:30:00Z",
-  "stage_type": "youtube-transcription",
+  "stage_type": "markdown-conversion",
   "content_type": "text/markdown",
   "checksum": "sha256:pqr678...",
   "source": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
