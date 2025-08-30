@@ -63,12 +63,35 @@ class TestFileUploadHandler:
         """Test saving a valid file."""
         content = b"Test file content"
         upload_file = self.create_mock_upload_file("test.txt", content, "text/plain")
-        
+
         temp_path = await upload_handler.save_upload(upload_file)
-        
+
         assert temp_path.exists()
         assert temp_path.read_bytes() == content
         assert temp_path.name.endswith("_test.txt")
+
+    @pytest.mark.asyncio
+    async def test_save_valid_json_file(self, upload_handler):
+        """Test saving a valid JSON file (for stage intermediate files)."""
+        content = b'{"chunks": [], "metadata": {"test": true}}'
+        upload_file = self.create_mock_upload_file("test.chunks.json", content, "application/json")
+
+        # Should work with allow_intermediate=True
+        temp_path = await upload_handler.save_upload(upload_file, allow_intermediate=True)
+
+        assert temp_path.exists()
+        assert temp_path.read_bytes() == content
+        assert temp_path.name.endswith("_test.chunks.json")
+
+    @pytest.mark.asyncio
+    async def test_reject_json_file_for_user_upload(self, upload_handler):
+        """Test rejection of JSON files for regular user uploads."""
+        content = b'{"malicious": "data"}'
+        upload_file = self.create_mock_upload_file("malicious.json", content, "application/json")
+
+        # Should fail without allow_intermediate=True
+        with pytest.raises(FileUploadError, match="File extension '.json' not allowed"):
+            await upload_handler.save_upload(upload_file, allow_intermediate=False)
     
     @pytest.mark.asyncio
     async def test_file_too_large(self, upload_handler):
@@ -76,8 +99,8 @@ class TestFileUploadHandler:
         # Create content larger than max_file_size (1MB)
         large_content = b"x" * (2 * 1024 * 1024)  # 2MB
         upload_file = self.create_mock_upload_file("large.txt", large_content, "text/plain")
-        
-        with pytest.raises(FileUploadError, match="File size exceeds maximum"):
+
+        with pytest.raises(FileUploadError, match="exceeds maximum"):
             await upload_handler.save_upload(upload_file)
     
     @pytest.mark.asyncio

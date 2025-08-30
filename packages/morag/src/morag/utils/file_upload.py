@@ -38,6 +38,8 @@ class FileUploadConfig:
             '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp',
             '.html', '.htm', '.md', '.rtf'
         }
+        # Extensions allowed for inter-stage communication (intermediate files)
+        self.intermediate_extensions = {'.json'}
         self.temp_dir_prefix = temp_dir_prefix
         self.cleanup_timeout = cleanup_timeout
         self.allowed_mime_types = allowed_mime_types or {
@@ -60,6 +62,8 @@ class FileUploadConfig:
             # Web
             'text/html', 'application/rtf'
         }
+        # MIME types allowed for inter-stage communication
+        self.intermediate_mime_types = {'application/json'}
 
 
 class FileUploadHandler:
@@ -136,21 +140,22 @@ class FileUploadHandler:
                         dir_path=str(dir_path), error=str(e))
             return False
     
-    async def save_upload(self, file: UploadFile) -> Path:
+    async def save_upload(self, file: UploadFile, allow_intermediate: bool = False) -> Path:
         """Save uploaded file to temporary location with validation.
-        
+
         Args:
             file: FastAPI UploadFile object
-            
+            allow_intermediate: If True, allows intermediate file types (JSON) for stage communication
+
         Returns:
             Path to saved temporary file
-            
+
         Raises:
             FileUploadError: If file validation fails or save operation fails
         """
         try:
             # Validate file
-            await self._validate_file(file)
+            await self._validate_file(file, allow_intermediate=allow_intermediate)
             
             # Generate unique filename
             unique_filename = self._generate_unique_filename(file.filename)
@@ -205,12 +210,13 @@ class FileUploadHandler:
                 raise
             raise FileUploadError(f"File upload failed: {str(e)}") from e
     
-    async def _validate_file(self, file: UploadFile) -> None:
+    async def _validate_file(self, file: UploadFile, allow_intermediate: bool = False) -> None:
         """Validate uploaded file.
-        
+
         Args:
             file: FastAPI UploadFile object
-            
+            allow_intermediate: If True, allows intermediate file types (JSON) for stage communication
+
         Raises:
             FileUploadError: If validation fails
         """
@@ -225,18 +231,26 @@ class FileUploadHandler:
         
         # Check file extension
         file_ext = Path(sanitized_filename).suffix.lower()
-        if file_ext not in self.config.allowed_extensions:
+        allowed_extensions = self.config.allowed_extensions
+        if allow_intermediate:
+            allowed_extensions = allowed_extensions | self.config.intermediate_extensions
+
+        if file_ext not in allowed_extensions:
             raise FileUploadError(
                 f"File extension '{file_ext}' not allowed. "
-                f"Allowed extensions: {', '.join(sorted(self.config.allowed_extensions))}"
+                f"Allowed extensions: {', '.join(sorted(allowed_extensions))}"
             )
         
         # Check MIME type if provided
         if file.content_type:
-            if file.content_type not in self.config.allowed_mime_types:
+            allowed_mime_types = self.config.allowed_mime_types
+            if allow_intermediate:
+                allowed_mime_types = allowed_mime_types | self.config.intermediate_mime_types
+
+            if file.content_type not in allowed_mime_types:
                 # Try to guess MIME type from filename
                 guessed_type, _ = mimetypes.guess_type(sanitized_filename)
-                if not guessed_type or guessed_type not in self.config.allowed_mime_types:
+                if not guessed_type or guessed_type not in allowed_mime_types:
                     raise FileUploadError(
                         f"MIME type '{file.content_type}' not allowed"
                     )

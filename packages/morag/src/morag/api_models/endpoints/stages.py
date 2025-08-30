@@ -261,7 +261,9 @@ async def execute_stage(
         job_id = None
         if file:
             upload_handler = get_upload_handler()
-            temp_path = await upload_handler.save_upload(file)
+            # Allow intermediate files (JSON) for stage-to-stage communication
+            allow_intermediate = file.filename and file.filename.endswith('.json')
+            temp_path = await upload_handler.save_upload(file, allow_intermediate=allow_intermediate)
             input_file_paths = [temp_path]
 
             # Extract job_id from the uploaded file path (first 8 chars of UUID)
@@ -385,7 +387,9 @@ async def execute_stage_chain(
         job_id = None
         if file:
             upload_handler = get_upload_handler()
-            temp_path = await upload_handler.save_upload(file)
+            # Allow intermediate files (JSON) for stage-to-stage communication
+            allow_intermediate = file.filename and file.filename.endswith('.json')
+            temp_path = await upload_handler.save_upload(file, allow_intermediate=allow_intermediate)
             input_files = [temp_path]
 
             # Extract job_id from the uploaded file path (first 8 chars of UUID)
