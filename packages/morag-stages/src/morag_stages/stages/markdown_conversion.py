@@ -1,7 +1,8 @@
 """Markdown conversion stage implementation."""
 
+import re
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Union
 from pathlib import Path
 import structlog
 
@@ -395,7 +396,6 @@ class MarkdownConversionStage(Stage):
                     return f"{video_id}.md"
                 else:
                     # Fallback: extract video ID using regex
-                    import re
                     patterns = [
                         r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
                         r'youtube\.com/v/([a-zA-Z0-9_-]{11})',
@@ -541,7 +541,6 @@ class MarkdownConversionStage(Stage):
 
     def _validate_document_conversion(self, content: str) -> bool:
         """Validate document file conversion (PDF, DOC, PPT, etc.)."""
-        import re
 
         # Check for markdown structure
         markdown_patterns = [
@@ -578,7 +577,6 @@ class MarkdownConversionStage(Stage):
 
     def _validate_html_conversion(self, content: str) -> bool:
         """Validate HTML conversion."""
-        import re
 
         # HTML should convert to structured markdown
         has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
@@ -592,7 +590,6 @@ class MarkdownConversionStage(Stage):
 
     def _validate_data_conversion(self, content: str) -> bool:
         """Validate data file conversion (CSV, Excel)."""
-        import re
 
         # Data files should convert to tables or structured content
         has_tables = bool(re.search(r'^\|.*\|', content, re.MULTILINE))
@@ -620,7 +617,6 @@ class MarkdownConversionStage(Stage):
 
     def _validate_structured_data_conversion(self, content: str) -> bool:
         """Validate structured data conversion (JSON, XML)."""
-        import re
 
         # Should convert to readable markdown format
         has_headers = bool(re.search(r'^#+ ', content, re.MULTILINE))
