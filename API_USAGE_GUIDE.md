@@ -779,13 +779,28 @@ If Apify is not configured, you'll receive an error:
   "success": true,
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   "metadata": {
-    "title": "Rick Astley - Never Gonna Give You Up",
-    "channel": "RickAstleyVEVO",
-    "duration": "213",
-    "viewCount": "1000000000",
-    "uploadDate": "2009-10-25",
-    "description": "The official video for Rick Astley...",
-    "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"
+    "title": "Rick Astley - Never Gonna Give You Up (Official Music Video)",
+    "source": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "type": "youtube",
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "video_id": "dQw4w9WgXcQ",
+    "uploader": "RickAstleyVEVO",
+    "duration": 213.0,
+    "view_count": 1000000000,
+    "like_count": 50000,
+    "comment_count": 10000,
+    "upload_date": "20091025",
+    "description": "The official video for Rick Astley - Never Gonna Give You Up...",
+    "tags": ["Rick Astley", "Never Gonna Give You Up", "Music"],
+    "categories": ["Music"],
+    "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+    "webpage_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "channel_id": "UCuAXFkgsw1L7xaCfnd5JJOw",
+    "channel_url": "https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw",
+    "playlist_id": null,
+    "playlist_title": null,
+    "playlist_index": null,
+    "created_at": "2024-01-15T10:30:00Z"
   },
   "transcript": "We're no strangers to love. You know the rules and so do I...",
   "transcript_segments": [
@@ -797,6 +812,367 @@ If Apify is not configured, you'll receive an error:
   ],
   "processing_time": 45.2,
   "pre_transcribed": false
+}
+```
+
+## 📋 Complete Metadata Reference
+
+This section provides comprehensive metadata examples for all supported file types and processing stages.
+
+### 📄 Document Processing Metadata
+
+**PDF, DOCX, TXT, HTML, RTF Files**
+
+```json
+{
+  "filename": "document.pdf",
+  "file_path": "/path/to/document.pdf",
+  "file_size": 2048576,
+  "created_at": "2024-01-15T10:30:00Z",
+  "stage_type": "markdown-conversion",
+  "content_type": "application/pdf",
+  "checksum": "sha256:abc123...",
+  "source": "/path/to/document.pdf",
+  "type": "document",
+  "page_count": 25,
+  "word_count": 5000,
+  "character_count": 30000,
+  "language": "en",
+  "processing_time": 12.5,
+  "extraction_method": "pymupdf",
+  "has_images": true,
+  "has_tables": true,
+  "metadata": {
+    "title": "Document Title",
+    "author": "John Doe",
+    "subject": "Document Subject",
+    "creator": "Microsoft Word",
+    "producer": "PDF Producer",
+    "creation_date": "2024-01-10T09:00:00Z",
+    "modification_date": "2024-01-12T14:30:00Z"
+  }
+}
+```
+
+### 🎵 Audio Processing Metadata
+
+**MP3, WAV, FLAC, M4A, OGG, AAC Files**
+
+```json
+{
+  "filename": "audio.mp3",
+  "file_path": "/path/to/audio.mp3",
+  "file_size": 8388608,
+  "created_at": "2024-01-15T10:30:00Z",
+  "stage_type": "markdown-conversion",
+  "content_type": "audio/mpeg",
+  "checksum": "sha256:def456...",
+  "source": "/path/to/audio.mp3",
+  "type": "audio",
+  "duration": 600.0,
+  "sample_rate": 44100,
+  "channels": 2,
+  "bitrate": 128000,
+  "codec": "mp3",
+  "language": "en",
+  "processing_time": 85.3,
+  "transcription_service": "whisper",
+  "has_speaker_info": true,
+  "has_topic_info": true,
+  "transcript": {
+    "text": "Full transcript content...",
+    "segments": [
+      {
+        "text": "Hello and welcome to this podcast",
+        "start": 0.0,
+        "duration": 3.2,
+        "speaker": "SPEAKER_00"
+      }
+    ],
+    "metadata": {
+      "word_count": 2500,
+      "segment_count": 45,
+      "num_speakers": 2,
+      "speakers": ["SPEAKER_00", "SPEAKER_01"],
+      "num_topics": 8,
+      "topics": ["introduction", "technology", "future"]
+    }
+  }
+}
+```
+
+### 🎬 Video Processing Metadata
+
+**MP4, AVI, MOV, MKV, WEBM, FLV Files**
+
+```json
+{
+  "filename": "video.mp4",
+  "file_path": "/path/to/video.mp4",
+  "file_size": 104857600,
+  "created_at": "2024-01-15T10:30:00Z",
+  "stage_type": "markdown-conversion",
+  "content_type": "video/mp4",
+  "checksum": "sha256:ghi789...",
+  "source": "/path/to/video.mp4",
+  "type": "video",
+  "duration": 900.0,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30.0,
+  "video_codec": "h264",
+  "audio_codec": "aac",
+  "bitrate": 5000000,
+  "format": "mp4",
+  "has_audio": true,
+  "processing_time": 120.5,
+  "thumbnails": ["/path/to/thumbnail_001.jpg"],
+  "keyframes": ["/path/to/keyframe_001.jpg"],
+  "audio_processing_result": {
+    "transcript": "Full video transcript...",
+    "segments": [
+      {
+        "text": "Welcome to this video tutorial",
+        "start": 0.0,
+        "duration": 2.8
+      }
+    ],
+    "metadata": {
+      "processing_time": 85.3,
+      "word_count": 2500,
+      "segment_count": 45,
+      "has_speaker_info": true,
+      "num_speakers": 1,
+      "speakers": ["SPEAKER_00"]
+    }
+  }
+}
+```
+
+### 🖼️ Image Processing Metadata
+
+**JPG, PNG, GIF, WEBP, BMP, TIFF Files**
+
+```json
+{
+  "filename": "image.jpg",
+  "file_path": "/path/to/image.jpg",
+  "file_size": 1048576,
+  "created_at": "2024-01-15T10:30:00Z",
+  "stage_type": "markdown-conversion",
+  "content_type": "image/jpeg",
+  "checksum": "sha256:jkl012...",
+  "source": "/path/to/image.jpg",
+  "type": "image",
+  "width": 1920,
+  "height": 1080,
+  "format": "JPEG",
+  "mode": "RGB",
+  "has_transparency": false,
+  "processing_time": 5.2,
+  "ocr_result": {
+    "text": "Extracted text from image...",
+    "confidence": 0.95,
+    "word_count": 150,
+    "language": "en"
+  },
+  "description": "AI-generated description of the image content",
+  "metadata": {
+    "camera_make": "Canon",
+    "camera_model": "EOS R5",
+    "datetime": "2024-01-10T15:30:00Z",
+    "gps_latitude": 40.7128,
+    "gps_longitude": -74.0060
+  }
+}
+```
+
+### 🌐 Web Content Processing Metadata
+
+**HTTP/HTTPS URLs**
+
+```json
+{
+  "filename": "webpage.html",
+  "file_path": "/path/to/webpage.html",
+  "file_size": 524288,
+  "created_at": "2024-01-15T10:30:00Z",
+  "stage_type": "markdown-conversion",
+  "content_type": "text/html",
+  "checksum": "sha256:mno345...",
+  "source": "https://example.com/article",
+  "type": "web",
+  "url": "https://example.com/article",
+  "title": "Article Title",
+  "processing_time": 8.7,
+  "word_count": 1200,
+  "character_count": 7500,
+  "language": "en",
+  "metadata": {
+    "title": "Article Title",
+    "description": "Article meta description",
+    "author": "Jane Smith",
+    "publish_date": "2024-01-10T12:00:00Z",
+    "canonical_url": "https://example.com/article",
+    "og_title": "Open Graph Title",
+    "og_description": "Open Graph Description",
+    "og_image": "https://example.com/image.jpg",
+    "twitter_card": "summary_large_image",
+    "keywords": ["technology", "AI", "machine learning"],
+    "robots": "index,follow"
+  }
+}
+```
+
+### 📺 YouTube Processing Metadata
+
+**YouTube URLs (youtube.com, youtu.be)**
+
+```json
+{
+  "filename": "youtube_dQw4w9WgXcQ.md",
+  "file_path": "/path/to/youtube_dQw4w9WgXcQ.md",
+  "file_size": 65536,
+  "created_at": "2024-01-15T10:30:00Z",
+  "stage_type": "youtube-transcription",
+  "content_type": "text/markdown",
+  "checksum": "sha256:pqr678...",
+  "source": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "type": "youtube",
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "video_id": "dQw4w9WgXcQ",
+  "title": "Rick Astley - Never Gonna Give You Up (Official Music Video)",
+  "uploader": "RickAstleyVEVO",
+  "duration": 213.0,
+  "view_count": 1000000000,
+  "like_count": 50000,
+  "comment_count": 10000,
+  "upload_date": "20091025",
+  "description": "The official video for Rick Astley - Never Gonna Give You Up...",
+  "tags": ["Rick Astley", "Never Gonna Give You Up", "Music", "80s"],
+  "categories": ["Music"],
+  "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+  "webpage_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "channel_id": "UCuAXFkgsw1L7xaCfnd5JJOw",
+  "channel_url": "https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw",
+  "playlist_id": null,
+  "playlist_title": null,
+  "playlist_index": null,
+  "processing_time": 45.2,
+  "processing_method": "apify",
+  "has_transcript": true,
+  "transcript_segments_count": 156,
+  "transcript": {
+    "text": "We're no strangers to love. You know the rules and so do I...",
+    "segments": [
+      {
+        "text": "We're no strangers to love",
+        "start": 0.0,
+        "duration": 2.5
+      },
+      {
+        "text": "You know the rules and so do I",
+        "start": 2.5,
+        "duration": 2.8
+      }
+    ]
+  }
+}
+```
+
+### 📊 Stage Processing Metadata
+
+**Common metadata fields added by each processing stage:**
+
+#### Markdown Conversion Stage
+```json
+{
+  "stage_type": "markdown-conversion",
+  "processing_time": 12.5,
+  "input_format": "pdf",
+  "output_format": "markdown",
+  "conversion_method": "pymupdf",
+  "success": true
+}
+```
+
+#### Markdown Optimizer Stage
+```json
+{
+  "stage_type": "markdown-optimizer",
+  "processing_time": 3.2,
+  "optimizations_applied": ["fix_transcription_errors", "normalize_whitespace", "fix_headers"],
+  "original_length": 15000,
+  "optimized_length": 14500,
+  "improvement_ratio": 0.97
+}
+```
+
+#### Chunker Stage
+```json
+{
+  "stage_type": "chunker",
+  "processing_time": 5.8,
+  "chunk_strategy": "semantic",
+  "chunk_size": 4000,
+  "overlap_size": 200,
+  "total_chunks": 12,
+  "chunks": [
+    {
+      "id": "chunk_001",
+      "content": "First chunk content...",
+      "start_char": 0,
+      "end_char": 3800,
+      "word_count": 650,
+      "summary": "Introduction and overview"
+    }
+  ]
+}
+```
+
+#### Fact Generator Stage
+```json
+{
+  "stage_type": "fact-generator",
+  "processing_time": 18.7,
+  "total_facts": 45,
+  "total_entities": 23,
+  "total_relations": 67,
+  "facts": [
+    {
+      "id": "fact_001",
+      "text": "The company was founded in 2020",
+      "confidence": 0.95,
+      "source_chunk": "chunk_003",
+      "entities": ["company", "2020"],
+      "relations": ["founded_in"]
+    }
+  ],
+  "entities": [
+    {
+      "id": "entity_001",
+      "text": "OpenAI",
+      "type": "ORGANIZATION",
+      "confidence": 0.98,
+      "mentions": 12
+    }
+  ]
+}
+```
+
+#### Ingestor Stage
+```json
+{
+  "stage_type": "ingestor",
+  "processing_time": 25.3,
+  "databases": ["qdrant", "neo4j"],
+  "collection_name": "documents",
+  "vector_count": 12,
+  "graph_nodes": 23,
+  "graph_relationships": 67,
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "vector_dimensions": 384,
+  "success": true
 }
 ```
 

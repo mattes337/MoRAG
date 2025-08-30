@@ -87,16 +87,28 @@ class YouTubeStageProcessor(StageProcessor):
             
             # Create markdown content
             metadata = {
-                "title": result.metadata.get('title', "YouTube Video"),
+                "title": result.metadata.title if result.metadata else "YouTube Video",
                 "source": url,
                 "type": "youtube",
                 "url": url,
-                "video_id": result.metadata.get('video_id'),
-                "uploader": result.metadata.get('uploader'),
-                "duration": result.metadata.get('duration'),
-                "language": result.metadata.get('language'),
-                "created_at": datetime.now().isoformat(),
-                **result.metadata
+                "video_id": result.metadata.id if result.metadata else None,
+                "uploader": result.metadata.uploader if result.metadata else None,
+                "duration": result.metadata.duration if result.metadata else None,
+                "view_count": result.metadata.view_count if result.metadata else None,
+                "like_count": result.metadata.like_count if result.metadata else None,
+                "comment_count": result.metadata.comment_count if result.metadata else None,
+                "upload_date": result.metadata.upload_date if result.metadata else None,
+                "description": result.metadata.description if result.metadata else None,
+                "tags": result.metadata.tags if result.metadata else [],
+                "categories": result.metadata.categories if result.metadata else [],
+                "thumbnail_url": result.metadata.thumbnail_url if result.metadata else None,
+                "webpage_url": result.metadata.webpage_url if result.metadata else url,
+                "channel_id": result.metadata.channel_id if result.metadata else None,
+                "channel_url": result.metadata.channel_url if result.metadata else None,
+                "playlist_id": result.metadata.playlist_id if result.metadata else None,
+                "playlist_title": result.metadata.playlist_title if result.metadata else None,
+                "playlist_index": result.metadata.playlist_index if result.metadata else None,
+                "created_at": datetime.now().isoformat()
             }
             
             # Create content with transcript
