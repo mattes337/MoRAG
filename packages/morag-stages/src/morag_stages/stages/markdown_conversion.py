@@ -1,14 +1,14 @@
 """Markdown conversion stage implementation."""
 
-
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
-import re
 import structlog
 
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
+from ..processors import ProcessorRegistry
+from ..utils import detect_content_type, is_content_type
 
 logger = structlog.get_logger(__name__)
 
@@ -19,7 +19,7 @@ except ImportError:
     class ProcessingError(Exception):  # type: ignore
         pass
 
-# Import services - these are required for proper operation
+# Import services - these are optional for fallback processing
 try:
     from morag_services import MoRAGServices, ContentType
     SERVICES_AVAILABLE = True
@@ -93,6 +93,9 @@ class MarkdownConversionStage(Stage):
             self.youtube_service = YouTubeService()
         else:
             self.youtube_service = None
+
+        # Initialize processor registry for delegation
+        self.processor_registry = ProcessorRegistry()
     
     async def execute(self, 
                      input_files: List[Path], 
@@ -116,21 +119,18 @@ class MarkdownConversionStage(Stage):
         input_file = input_files[0]
         config = context.get_stage_config(self.stage_type)
 
-        # Determine content type
-        content_type = self._detect_content_type(input_file)
+        # Determine content type using utility
+        content_type = detect_content_type(input_file)
 
-        # Check if we need MoRAG services (not needed for MarkItDown processing or YouTube fallback)
-        needs_services = not self._should_use_markitdown(input_file, content_type)
-
-        # Allow YouTube processing with fallback service even when MoRAG services are not available
-        if self._is_content_type(content_type, "YOUTUBE") and YOUTUBE_AVAILABLE:
-            needs_services = False
-
-        if needs_services and (not SERVICES_AVAILABLE or self.services is None):
-            raise StageExecutionError(
-                "MoRAG services not available for markdown conversion",
-                stage_type=self.stage_type.value
-            )
+        # Check if we have a processor for this content type
+        content_type_str = str(content_type).upper() if content_type else "TEXT"
+        if not self._should_use_markitdown(input_file, content_type) and not self.processor_registry.supports_content_type(content_type_str):
+            # Fallback to services if no processor available
+            if not SERVICES_AVAILABLE or self.services is None:
+                raise StageExecutionError(
+                    f"No processor available for content type {content_type_str} and MoRAG services not available",
+                    stage_type=self.stage_type.value
+                )
 
         logger.info("Starting markdown conversion",
                    input_file=str(input_file),
@@ -150,19 +150,9 @@ class MarkdownConversionStage(Stage):
                            input_file=str(input_file),
                            content_type=str(content_type))
                 result_data = await self._process_with_markitdown(input_file, output_file, config)
-            # Otherwise use specialized processors
-            elif self._is_content_type(content_type, "VIDEO"):
-                result_data = await self._process_video(input_file, output_file, config)
-            elif self._is_content_type(content_type, "AUDIO"):
-                result_data = await self._process_audio(input_file, output_file, config)
-            elif self._is_content_type(content_type, "DOCUMENT"):
-                result_data = await self._process_document(input_file, output_file, config)
-            elif self._is_content_type(content_type, "WEB"):
-                result_data = await self._process_web(input_file, output_file, config)
-            elif self._is_content_type(content_type, "YOUTUBE"):
-                result_data = await self._process_youtube(input_file, output_file, config)
             else:
-                result_data = await self._process_text(input_file, output_file, config)
+                # Use processor delegation for specialized processing
+                result_data = await self._delegate_processing(input_file, output_file, content_type, config)
 
             # Check if the output file was renamed (e.g., for YouTube videos with titles)
             final_output_file = result_data.get("final_output_file", output_file)
@@ -250,10 +240,10 @@ class MarkdownConversionStage(Stage):
                 return False
 
         # Check if file type is supported
-        content_type = self._detect_content_type(input_file)
+        content_type = detect_content_type(input_file)
         logger.debug("Content type detection result",
                     file_path=file_str,
-                    content_type=content_type.value if content_type else None,
+                    content_type=str(content_type) if content_type else None,
                     is_supported=content_type is not None)
 
         if content_type is None:
@@ -264,7 +254,64 @@ class MarkdownConversionStage(Stage):
                     file_path=file_str,
                     content_type=content_type.value)
         return True
-    
+
+    async def _delegate_processing(
+        self,
+        input_file: Path,
+        output_file: Path,
+        content_type: Union[str, object],
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Delegate processing to appropriate processor.
+
+        Args:
+            input_file: Input file path
+            output_file: Output file path
+            content_type: Content type
+            config: Processing configuration
+
+        Returns:
+            Processing result data
+        """
+        content_type_str = str(content_type).upper() if content_type else "TEXT"
+
+        # Try to get processor from registry
+        processor = self.processor_registry.get_processor(content_type_str)
+
+        if processor:
+            logger.info("Using specialized processor",
+                       content_type=content_type_str,
+                       processor=type(processor).__name__)
+
+            try:
+                result = await processor.process(input_file, output_file, config)
+
+                return {
+                    "content_type": content_type_str.lower(),
+                    "title": result.metadata.get('title', input_file.stem),
+                    "metadata": result.metadata,
+                    "final_output_file": result.final_output_file or output_file,
+                    "metrics": result.metrics
+                }
+
+            except Exception as e:
+                logger.warning("Specialized processor failed, falling back to services",
+                             content_type=content_type_str, error=str(e))
+
+        # Fallback to legacy processing methods
+        if is_content_type(content_type, "VIDEO"):
+            return await self._process_video(input_file, output_file, config)
+        elif is_content_type(content_type, "AUDIO"):
+            return await self._process_audio(input_file, output_file, config)
+        elif is_content_type(content_type, "DOCUMENT"):
+            return await self._process_document(input_file, output_file, config)
+        elif is_content_type(content_type, "WEB"):
+            return await self._process_web(input_file, output_file, config)
+        elif is_content_type(content_type, "YOUTUBE"):
+            return await self._process_youtube(input_file, output_file, config)
+        else:
+            return await self._process_text(input_file, output_file, config)
+
     def get_dependencies(self) -> List[StageType]:
         """Get stage dependencies.
         
@@ -287,112 +334,12 @@ class MarkdownConversionStage(Stage):
             return []
 
         input_file = input_files[0]
-        content_type = self._detect_content_type(input_file)
+        content_type = detect_content_type(input_file)
         output_filename = self._generate_output_filename(input_file, content_type)
         output_file = context.output_dir / output_filename
         return [output_file]
     
-    def _detect_content_type(self, file_path: Path) -> Optional[ContentType]:
-        """Detect content type from file path.
 
-        Args:
-            file_path: File path to analyze
-
-        Returns:
-            Detected content type or None
-        """
-        file_str = str(file_path)
-        logger.debug("Starting content type detection", file_path=file_str)
-
-        # Web URLs - handle Windows path conversion issue
-        # On Windows, Path() converts URLs to backslash format, so we need to check both
-        # Also check for the pattern where the URL scheme gets mangled
-        is_url = (
-            file_str.startswith(('http://', 'https://')) or
-            file_str.replace('\\', '/').startswith(('http://', 'https://')) or
-            ('http:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str)) or
-            ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
-        )
-
-        logger.debug("URL detection in content type",
-                    file_path=file_str,
-                    is_url=is_url)
-
-        if is_url:
-            # Check for YouTube URLs first
-            youtube_domains = ["youtube.com", "youtu.be", "youtube-nocookie.com"]
-            is_youtube = any(domain in file_str for domain in youtube_domains)
-            logger.debug("URL type detection",
-                        file_path=file_str,
-                        is_youtube=is_youtube,
-                        services_available=SERVICES_AVAILABLE)
-
-            if is_youtube:
-                # Create ContentType.YOUTUBE if services available, otherwise use a placeholder
-                if SERVICES_AVAILABLE:
-                    logger.debug("Returning YOUTUBE content type", file_path=file_str)
-                    return ContentType.YOUTUBE
-                else:
-                    # Return a string identifier when services not available
-                    logger.debug("Returning YOUTUBE string (services not available)", file_path=file_str)
-                    return "YOUTUBE"  # type: ignore
-            # Create ContentType.WEB if services available, otherwise use a placeholder
-            if SERVICES_AVAILABLE:
-                logger.debug("Returning WEB content type", file_path=file_str)
-                return ContentType.WEB
-            else:
-                logger.debug("Returning WEB string (services not available)", file_path=file_str)
-                return "WEB"  # type: ignore
-        
-        # Video files
-        file_suffix = file_path.suffix.lower()
-        logger.debug("Checking file extension",
-                    file_path=file_str,
-                    suffix=file_suffix)
-
-        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv'}
-        if file_suffix in video_extensions:
-            logger.debug("Detected video file", file_path=file_str, suffix=file_suffix)
-            if SERVICES_AVAILABLE:
-                return ContentType.VIDEO
-            else:
-                return "VIDEO"  # type: ignore
-
-        # Audio files
-        audio_extensions = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma'}
-        if file_suffix in audio_extensions:
-            logger.debug("Detected audio file", file_path=file_str, suffix=file_suffix)
-            if SERVICES_AVAILABLE:
-                return ContentType.AUDIO
-            else:
-                return "AUDIO"  # type: ignore
-
-        # Document files
-        doc_extensions = {'.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'}
-        if file_suffix in doc_extensions:
-            logger.debug("Detected document file", file_path=file_str, suffix=file_suffix)
-            if SERVICES_AVAILABLE:
-                return ContentType.DOCUMENT
-            else:
-                return "DOCUMENT"  # type: ignore
-
-        # Text files (default)
-        text_extensions = {'.txt', '.md', '.rst', '.html', '.xml', '.json', '.csv'}
-        if file_suffix in text_extensions:
-            logger.debug("Detected text file", file_path=file_str, suffix=file_suffix)
-            if SERVICES_AVAILABLE:
-                return ContentType.TEXT
-            else:
-                return "TEXT"  # type: ignore
-
-        # Default to text for unknown types
-        logger.debug("Using default text type for unknown extension",
-                    file_path=file_str,
-                    suffix=file_suffix)
-        if SERVICES_AVAILABLE:
-            return ContentType.TEXT
-        else:
-            return "TEXT"  # type: ignore
 
     def _is_content_type(self, content_type, expected_type: str) -> bool:
         """Check if content type matches expected type, handling both enum and string types.
@@ -404,10 +351,7 @@ class MarkdownConversionStage(Stage):
         Returns:
             True if content type matches expected type
         """
-        if SERVICES_AVAILABLE and hasattr(ContentType, expected_type):
-            return content_type == getattr(ContentType, expected_type)
-        else:
-            return str(content_type).upper() == expected_type.upper()
+        return is_content_type(content_type, expected_type)
 
     def _generate_output_filename(self, input_file: Path, content_type, metadata: Dict[str, Any] = None) -> str:
         """Generate appropriate output filename based on input type.
