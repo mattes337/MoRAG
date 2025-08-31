@@ -1,17 +1,27 @@
 """Stage context models."""
 
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Union
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .result import StageResult
 from .stage import StageType
 
+# Import URLPath if available
+try:
+    from morag.utils.url_path import URLPath
+    URL_PATH_AVAILABLE = True
+except ImportError:
+    URL_PATH_AVAILABLE = False
+    # Create a dummy URLPath for type hints
+    class URLPath:  # type: ignore
+        pass
+
 
 class StageContext(BaseModel):
     """Context for stage execution containing configuration and state."""
-    
-    source_path: Path = Field(description="Original source file path")
+
+    source_path: Union[Path, URLPath] = Field(description="Original source file path or URL")
     output_dir: Path = Field(description="Output directory for generated files")
     webhook_url: Optional[str] = Field(default=None, description="Webhook URL for notifications")
     config: Dict[str, Any] = Field(default_factory=dict, description="Stage configurations")
@@ -24,9 +34,23 @@ class StageContext(BaseModel):
     
     # Global settings
     resume_from_existing: bool = Field(
-        default=True, 
+        default=True,
         description="Skip stages if output files already exist"
     )
+
+    @field_validator('source_path', mode='before')
+    @classmethod
+    def validate_source_path(cls, v):
+        """Validate source_path to accept both Path and URLPath objects."""
+        if URL_PATH_AVAILABLE and hasattr(v, 'url_str'):
+            # URLPath object - return as is
+            return v
+        elif isinstance(v, (str, Path)):
+            # String or Path - convert to Path
+            return Path(v) if not isinstance(v, Path) else v
+        else:
+            # Unknown type - let Pydantic handle the error
+            return v
     cleanup_intermediate: bool = Field(
         default=False, 
         description="Clean up intermediate files after pipeline completion"
