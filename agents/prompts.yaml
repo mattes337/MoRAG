@@ -61,7 +61,7 @@ fact_extraction:
           "condition": "mild cognitive impairment",
           "remarks": "dosage range: 120-240mg daily",
           "fact_type": "technical",
-          "confidence": 0.9,
+          "confidence": 0.6,
           "keywords": ["Ginkgo biloba", "cognitive function", "elderly patients", "mild cognitive impairment", "dosage"],
           "source_text": "Ginkgo biloba extract (120-240mg daily) has been shown to improve cognitive function"
         }
@@ -107,12 +107,20 @@ fact_extraction:
     Pay special attention to information relevant to this context.
     {% endif %}
 
+    ## Confidence Guidelines
+    Assign confidence scores based on fact specificity and verifiability:
+    - **0.7-1.0**: Highly specific facts with exact measurements, dosages, or technical specifications
+    - **0.5-0.7**: Clear, actionable facts with specific details
+    - **0.3-0.5**: General facts with some specificity (most facts should fall here)
+    - **0.2-0.3**: Broad statements or general principles
+    - **0.1-0.2**: Vague or uncertain information
+
     Return a JSON object with the following structure:
     {
       "facts": [
         {
           "subject": "string",
-          "object": "string", 
+          "object": "string",
           "approach": "string or null",
           "solution": "string or null",
           "condition": "string or null",

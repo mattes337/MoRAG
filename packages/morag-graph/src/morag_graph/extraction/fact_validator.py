@@ -11,9 +11,9 @@ class FactValidator:
     """Validate quality and completeness of extracted facts."""
     
     def __init__(self,
-                 min_confidence: float = 0.7,
-                 allow_vague_language: bool = False,
-                 require_entities: bool = True,
+                 min_confidence: float = 0.3,
+                 allow_vague_language: bool = True,
+                 require_entities: bool = False,
                  min_fact_length: int = 20,
                  strict_validation: bool = True):
         """Initialize validator with configuration.

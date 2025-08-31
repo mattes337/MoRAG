@@ -59,9 +59,9 @@ class FactGeneratorStage(Stage):
                 self.fact_extractor = FactExtractor(
                     model_id=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
                     api_key=api_key,
-                    min_confidence=float(os.getenv('MORAG_FACT_GENERATOR_MIN_CONFIDENCE', '0.5')),
-                    allow_vague_language=os.getenv('MORAG_FACT_GENERATOR_ALLOW_VAGUE_LANGUAGE', 'false').lower() == 'true',
-                    require_entities=os.getenv('MORAG_FACT_GENERATOR_REQUIRE_ENTITIES', 'true').lower() == 'true',
+                    min_confidence=float(os.getenv('MORAG_FACT_GENERATOR_MIN_CONFIDENCE', '0.3')),
+                    allow_vague_language=os.getenv('MORAG_FACT_GENERATOR_ALLOW_VAGUE_LANGUAGE', 'true').lower() == 'true',
+                    require_entities=os.getenv('MORAG_FACT_GENERATOR_REQUIRE_ENTITIES', 'false').lower() == 'true',
                     min_fact_length=int(os.getenv('MORAG_FACT_GENERATOR_MIN_FACT_LENGTH', '20')),
                     strict_validation=os.getenv('MORAG_FACT_GENERATOR_STRICT_VALIDATION', 'true').lower() == 'true'
                 )

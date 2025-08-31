@@ -26,7 +26,7 @@ class FactExtractor:
         self,
         model_id: str = "gemini-2.0-flash",
         api_key: Optional[str] = None,
-        min_confidence: float = 0.7,
+        min_confidence: float = 0.3,
         max_facts_per_chunk: int = 10,
         domain: str = "general",
         language: str = "en",

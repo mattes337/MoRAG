@@ -32,7 +32,7 @@ class DefaultConfigs:
                 output_format="json",
                 strict_json=True,
                 include_confidence=True,
-                min_confidence=0.5
+                min_confidence=0.3
             ),
             agent_config={
                 "max_facts": 20,
