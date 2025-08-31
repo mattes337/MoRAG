@@ -152,7 +152,7 @@ class FactFilterConfigBuilder:
     def create_custom_config(
         required_keywords: list = None,
         excluded_keywords: list = None,
-        confidence_threshold: float = 0.6,
+        confidence_threshold: float = 0.3,
         relevance_threshold: float = 5.0,
         domain_multipliers: Dict[str, float] = None,
         enable_llm_scoring: bool = True

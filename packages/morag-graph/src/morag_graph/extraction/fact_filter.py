@@ -14,7 +14,7 @@ class DomainFilterConfig:
     
     required_keywords: List[str]
     excluded_keywords: List[str]
-    confidence_threshold: float = 0.7
+    confidence_threshold: float = 0.3
     relevance_threshold: float = 6.0
     similarity_threshold: float = 0.4
     enable_llm_scoring: bool = True

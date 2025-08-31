@@ -53,18 +53,18 @@ class PipelineConfig:
     # Entity extraction settings
     entity_max_rounds: int = 3
     entity_target_confidence: float = 0.85
-    entity_confidence_threshold: float = 0.6
+    entity_confidence_threshold: float = 0.4
     enable_entity_gleaning: bool = True
     
     # Relation extraction settings
     relation_max_rounds: int = 2
-    relation_confidence_threshold: float = 0.7
+    relation_confidence_threshold: float = 0.4
     enable_relation_validation: bool = True
     
     # Deduplication settings
     enable_deduplication: bool = True
     similarity_threshold: float = 0.7
-    merge_confidence_threshold: float = 0.8
+    merge_confidence_threshold: float = 0.5
     enable_llm_validation: bool = True
     
     # Performance settings

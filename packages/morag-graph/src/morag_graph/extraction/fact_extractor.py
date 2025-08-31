@@ -398,80 +398,51 @@ class FactExtractor:
         )
 
         try:
-            # Clean the response - remove markdown code blocks if present
-            cleaned_response = response
-            if '```json' in response:
-                # Extract JSON from markdown code block
-                json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
-                if json_match:
-                    cleaned_response = json_match.group(1).strip()
-                    self.logger.debug("Extracted JSON from markdown code block")
-            elif '```' in response:
-                # Extract from generic code block
-                json_match = re.search(r'```\s*(.*?)\s*```', response, re.DOTALL)
-                if json_match:
-                    cleaned_response = json_match.group(1).strip()
-                    self.logger.debug("Extracted JSON from generic code block")
+            # Use the centralized JSON parser from agents framework
+            from agents.base.response_parser import LLMResponseParser
 
-            # Try to parse the cleaned response directly as JSON
-            try:
-                candidates = json.loads(cleaned_response)
-                if isinstance(candidates, list):
-                    # Validate that each candidate is a dictionary
+            parsed_data = LLMResponseParser.parse_json_response(
+                response=response,
+                fallback_value={"facts": []},
+                context="legacy_fact_extraction"
+            )
+
+            # Handle both old format (direct array) and new format (object with facts array)
+            if isinstance(parsed_data, list):
+                # Old format: direct array of facts
+                valid_candidates = []
+                for i, candidate in enumerate(parsed_data):
+                    if isinstance(candidate, dict):
+                        valid_candidates.append(candidate)
+                    else:
+                        self.logger.warning(f"Candidate {i} is not a dictionary: {type(candidate)}")
+                return valid_candidates
+            elif isinstance(parsed_data, dict):
+                # New format: object with facts array
+                if "facts" in parsed_data and isinstance(parsed_data["facts"], list):
                     valid_candidates = []
-                    for i, candidate in enumerate(candidates):
+                    for i, candidate in enumerate(parsed_data["facts"]):
                         if isinstance(candidate, dict):
                             valid_candidates.append(candidate)
                         else:
-                            self.logger.warning(f"Candidate {i} is not a dictionary: {type(candidate)}")
+                            self.logger.warning(f"Fact {i} is not a dictionary: {type(candidate)}")
                     return valid_candidates
-                elif isinstance(candidate, dict):
-                    return [candidates]
-            except json.JSONDecodeError:
-                pass
+                else:
+                    # Single fact object
+                    return [parsed_data]
 
-            # Try to find JSON array in response using greedy matching
-            json_match = re.search(r'\[.*\]', cleaned_response, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                self.logger.debug("Found JSON array in response", json_preview=json_str[:200])
-                candidates = json.loads(json_str)
+            self.logger.warning("Unexpected response format", parsed_data_type=type(parsed_data))
+            return []
 
-                if isinstance(candidates, list):
-                    # Validate that each candidate is a dictionary
-                    valid_candidates = []
-                    for i, candidate in enumerate(candidates):
-                        if isinstance(candidate, dict):
-                            valid_candidates.append(candidate)
-                        else:
-                            self.logger.warning(f"Candidate {i} is not a dictionary: {type(candidate)}")
-                    return valid_candidates
-
-            # Try to find JSON object in response
-            json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                self.logger.debug("Found JSON object in response", json_preview=json_str[:200])
-                candidate = json.loads(json_str)
-                if isinstance(candidate, dict):
-                    return [candidate]
-
-        except json.JSONDecodeError as e:
+        except Exception as e:
             self.logger.error(
-                "Failed to parse LLM response as JSON",
+                "Failed to parse LLM response",
                 error=str(e),
+                error_type=type(e).__name__,
                 response_preview=response[:500],
                 response_length=len(response)
             )
-        except Exception as e:
-            self.logger.error(
-                "Unexpected error parsing LLM response",
-                error=str(e),
-                error_type=type(e).__name__,
-                response_preview=response[:500]
-            )
-
-        return []
+            return []
     
     def _structure_facts(
         self,

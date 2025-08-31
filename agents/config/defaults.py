@@ -59,7 +59,7 @@ class DefaultConfigs:
                 include_examples=True,
                 output_format="json",
                 strict_json=True,
-                min_confidence=0.6
+                min_confidence=0.4
             ),
             agent_config={
                 "entity_types": get_agent_entity_types("entity_extraction"),

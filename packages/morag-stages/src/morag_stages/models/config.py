@@ -61,7 +61,7 @@ class ChunkerConfig(StageConfig):
 class FactGeneratorConfig(StageConfig):
     """Configuration for fact generator stage."""
     max_facts_per_chunk: int = Field(default=10, description="Maximum facts to extract per chunk")
-    confidence_threshold: float = Field(default=0.7, description="Minimum confidence for fact extraction")
+    confidence_threshold: float = Field(default=0.3, description="Minimum confidence for fact extraction")
     
     # Entity extraction
     extract_entities: bool = Field(default=True, description="Extract entities from facts")
@@ -69,7 +69,7 @@ class FactGeneratorConfig(StageConfig):
     
     # Relation extraction
     extract_relations: bool = Field(default=True, description="Extract relations between entities")
-    relation_confidence: float = Field(default=0.6, description="Minimum confidence for relations")
+    relation_confidence: float = Field(default=0.4, description="Minimum confidence for relations")
     
     # LLM settings
     model_name: Optional[str] = Field(default=None, description="LLM model to use")

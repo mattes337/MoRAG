@@ -217,8 +217,8 @@ class ConfigManager:
         
         entity_section.parameters["confidence_threshold"] = ConfigParameter(
             name="confidence_threshold",
-            value=0.7,
-            default_value=0.7,
+            value=0.4,
+            default_value=0.4,
             description="Minimum confidence threshold for entity extraction",
             data_type=float,
             min_value=0.0,
