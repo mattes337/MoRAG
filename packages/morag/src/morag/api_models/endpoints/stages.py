@@ -26,6 +26,7 @@ from morag.api_models.stage_models import (
     ErrorResponse, HealthCheckResponse, StageExecutionMetadata, JobCleanupResponse
 )
 from morag.utils.file_upload import get_upload_handler
+from morag.utils.url_path import create_path_from_string
 
 logger = structlog.get_logger(__name__)
 
@@ -273,7 +274,8 @@ async def execute_stage(
             temp_dir = temp_path.parent
             output_path = temp_dir / "output"
         elif request_input_files:
-            input_file_paths = [Path(f) for f in request_input_files]
+            # Handle URLs properly - don't convert URLs to Path objects as it corrupts them
+            input_file_paths = [create_path_from_string(f) for f in request_input_files]
             output_path = Path(request_output_dir)
         else:
             raise HTTPException(status_code=400, detail="Either file upload or input_files must be provided")
@@ -399,7 +401,8 @@ async def execute_stage_chain(
             temp_dir = temp_path.parent
             output_dir = temp_dir / "output"
         elif parsed_request.input_files:
-            input_files = [Path(f) for f in parsed_request.input_files]
+            # Handle URLs properly - don't convert URLs to Path objects as it corrupts them
+            input_files = [create_path_from_string(f) for f in parsed_request.input_files]
             output_dir = Path(parsed_request.output_dir)
         else:
             raise HTTPException(status_code=400, detail="Either file upload or input_files must be provided")

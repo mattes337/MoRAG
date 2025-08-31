@@ -41,6 +41,18 @@ except ImportError:
     class YouTubeService:  # type: ignore
         pass
 
+# Import URL path utilities
+try:
+    from morag.utils.url_path import URLPath, is_url, get_url_string
+    URL_PATH_AVAILABLE = True
+except ImportError:
+    URL_PATH_AVAILABLE = False
+    # Fallback implementations
+    def is_url(path_like) -> bool:
+        return str(path_like).startswith(('http://', 'https://'))
+    def get_url_string(path_like) -> str:
+        return str(path_like)
+
 
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
     """Sanitize filename for safe filesystem usage.
@@ -98,8 +110,8 @@ class MarkdownConversionStage(Stage):
         # Initialize processor registry for delegation
         self.processor_registry = ProcessorRegistry()
     
-    async def execute(self, 
-                     input_files: List[Path], 
+    async def execute(self,
+                     input_files: List[Union[Path, 'URLPath']],
                      context: StageContext) -> StageResult:
         """Execute markdown conversion on input files.
         
@@ -191,7 +203,7 @@ class MarkdownConversionStage(Stage):
                 original_error=e
             )
     
-    def validate_inputs(self, input_files: List[Path]) -> bool:
+    def validate_inputs(self, input_files: List[Union[Path, 'URLPath']]) -> bool:
         """Validate input files for markdown conversion.
 
         Args:
@@ -219,26 +231,33 @@ class MarkdownConversionStage(Stage):
                     file_type=type(input_file).__name__)
 
         # Check if file exists (for local files)
-        # Handle URLs that may have been converted to Windows paths
-        is_url = (
-            file_str.startswith(('http://', 'https://')) or
-            file_str.replace('\\', '/').startswith(('http://', 'https://')) or
-            ('http:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str)) or
-            ('https:' in file_str and ('www.' in file_str or '.com' in file_str or '.org' in file_str or '.net' in file_str))
-        )
+        # Handle URLPath objects and URLs properly
+        if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+            # URLPath object - this is a URL, no need to check file existence
+            is_url_obj = True
+        else:
+            # Check if it's a URL using our utility function
+            is_url_obj = is_url(input_file)
 
         logger.debug("URL detection result",
                     file_path=file_str,
-                    is_url=is_url)
+                    is_url=is_url_obj,
+                    input_type=type(input_file).__name__)
 
-        if not is_url:
-            file_exists = input_file.exists()
-            logger.debug("Local file existence check",
-                        file_path=file_str,
-                        exists=file_exists)
-            if not file_exists:
-                logger.error("Local file does not exist", file_path=file_str)
-                return False
+        if not is_url_obj:
+            # Only check file existence for local files
+            try:
+                file_exists = input_file.exists()
+                logger.debug("Local file existence check",
+                            file_path=file_str,
+                            exists=file_exists)
+                if not file_exists:
+                    logger.error("Local file does not exist", file_path=file_str)
+                    return False
+            except AttributeError:
+                # If exists() method doesn't exist, assume it's valid
+                logger.debug("Cannot check file existence, assuming valid", file_path=file_str)
+                pass
 
         # Check if file type is supported
         content_type = detect_content_type(input_file)
@@ -258,7 +277,7 @@ class MarkdownConversionStage(Stage):
 
     async def _delegate_processing(
         self,
-        input_file: Path,
+        input_file: Union[Path, 'URLPath'],
         output_file: Path,
         content_type: Union[str, object],
         config: Dict[str, Any]
@@ -321,7 +340,7 @@ class MarkdownConversionStage(Stage):
         """
         return []
     
-    def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
+    def get_expected_outputs(self, input_files: List[Union[Path, 'URLPath']], context: StageContext) -> List[Path]:
         """Get expected output file paths.
 
         Args:
@@ -354,7 +373,7 @@ class MarkdownConversionStage(Stage):
         """
         return is_content_type(content_type, expected_type)
 
-    def _generate_output_filename(self, input_file: Path, content_type, metadata: Dict[str, Any] = None) -> str:
+    def _generate_output_filename(self, input_file: Union[Path, 'URLPath'], content_type, metadata: Dict[str, Any] = None) -> str:
         """Generate appropriate output filename based on input type.
 
         Args:
@@ -425,15 +444,23 @@ class MarkdownConversionStage(Stage):
 
             # Fallback to domain name from URL
             try:
-                # Fix URL mangling from Windows path conversion
-                url_str = str(input_file)
-                # Convert backslashes to forward slashes
-                url_str = url_str.replace('\\', '/')
-                # Fix common URL mangling patterns
-                if url_str.startswith('https:') and not url_str.startswith('https://'):
-                    url_str = url_str.replace('https:/', 'https://')
-                elif url_str.startswith('http:') and not url_str.startswith('http://'):
-                    url_str = url_str.replace('http:/', 'http://')
+                # Handle URLPath objects properly
+                if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+                    # URLPath object - URL is already preserved correctly
+                    url_str = input_file.url_str
+                elif is_url(input_file):
+                    # Check if it's already a proper URL
+                    url_str = get_url_string(input_file) if URL_PATH_AVAILABLE else str(input_file)
+                else:
+                    # Fix URL mangling from Windows path conversion
+                    url_str = str(input_file)
+                    # Convert backslashes to forward slashes
+                    url_str = url_str.replace('\\', '/')
+                    # Fix common URL mangling patterns
+                    if url_str.startswith('https:') and not url_str.startswith('https://'):
+                        url_str = url_str.replace('https:/', 'https://')
+                    elif url_str.startswith('http:') and not url_str.startswith('http://'):
+                        url_str = url_str.replace('http:/', 'http://')
 
                 # Extract domain name for fallback filename
                 from urllib.parse import urlparse
@@ -457,7 +484,7 @@ class MarkdownConversionStage(Stage):
             sanitized_name = sanitize_filename(input_file.stem)
             return f"{sanitized_name}.md"
 
-    def _should_use_markitdown(self, file_path: Path, content_type) -> bool:
+    def _should_use_markitdown(self, file_path: Union[Path, 'URLPath'], content_type) -> bool:
         """Check if MarkItDown should be used for this file type.
 
         Args:
@@ -479,11 +506,17 @@ class MarkdownConversionStage(Stage):
             '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'
         }
 
-        file_ext = file_path.suffix.lower()
+        # Handle URLPath objects which don't have suffix attribute
+        if URL_PATH_AVAILABLE and hasattr(file_path, 'url_str'):
+            # URLPath object - URLs typically don't have file extensions
+            # Don't use MarkItDown for URLs, use specialized processors
+            return False
+        else:
+            file_ext = file_path.suffix.lower()
 
-        # Use MarkItDown for supported file extensions
-        if file_ext in markitdown_extensions:
-            return True
+            # Use MarkItDown for supported file extensions
+            if file_ext in markitdown_extensions:
+                return True
 
         # Handle both ContentType enums and string content types
         content_type_str = str(content_type).upper() if content_type else ""
@@ -506,7 +539,7 @@ class MarkdownConversionStage(Stage):
 
         return False
 
-    def _validate_conversion_quality(self, content: str, file_path: Path) -> bool:
+    def _validate_conversion_quality(self, content: str, file_path: Union[Path, 'URLPath']) -> bool:
         """Validate that conversion produced proper markdown for any supported file type.
 
         Args:
@@ -519,25 +552,34 @@ class MarkdownConversionStage(Stage):
         if not content or len(content.strip()) < 5:
             return False
 
-        file_ext = file_path.suffix.lower()
-
-        # Format-specific validation
-        if file_ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx']:
-            return self._validate_document_conversion(content)
-        elif file_ext in ['.html', '.htm']:
-            return self._validate_html_conversion(content)
-        elif file_ext in ['.csv', '.xlsx', '.xls']:
-            return self._validate_data_conversion(content)
-        elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
-            return self._validate_image_conversion(content)
-        elif file_ext in ['.json', '.xml']:
-            return self._validate_structured_data_conversion(content)
-        elif file_ext in ['.txt', '.md', '.rst']:
-            return self._validate_text_conversion(content)
-        elif file_ext in ['.mp3', '.wav', '.mp4', '.avi', '.mov', '.wmv', '.flv']:
-            return self._validate_media_conversion(content)
+        # Handle URLPath objects which don't have suffix attribute
+        if URL_PATH_AVAILABLE and hasattr(file_path, 'url_str'):
+            # URLPath object - determine validation based on URL content
+            url_str = file_path.url_str.lower()
+            if 'youtube.com' in url_str or 'youtu.be' in url_str:
+                return self._validate_media_conversion(content)
+            else:
+                return self._validate_html_conversion(content)  # Most web content
         else:
-            return self._validate_general_conversion(content)
+            file_ext = file_path.suffix.lower()
+
+            # Format-specific validation
+            if file_ext in ['.pdf', '.doc', '.docx', '.ppt', '.pptx']:
+                return self._validate_document_conversion(content)
+            elif file_ext in ['.html', '.htm']:
+                return self._validate_html_conversion(content)
+            elif file_ext in ['.csv', '.xlsx', '.xls']:
+                return self._validate_data_conversion(content)
+            elif file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+                return self._validate_image_conversion(content)
+            elif file_ext in ['.json', '.xml']:
+                return self._validate_structured_data_conversion(content)
+            elif file_ext in ['.txt', '.md', '.rst']:
+                return self._validate_text_conversion(content)
+            elif file_ext in ['.mp3', '.wav', '.mp4', '.avi', '.mov', '.wmv', '.flv']:
+                return self._validate_media_conversion(content)
+            else:
+                return self._validate_general_conversion(content)
 
     def _validate_document_conversion(self, content: str) -> bool:
         """Validate document file conversion (PDF, DOC, PPT, etc.)."""
@@ -654,7 +696,7 @@ class MarkdownConversionStage(Stage):
 
         return not any(indicator in content_lower for indicator in error_indicators)
 
-    async def _process_with_markitdown(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_with_markitdown(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process file using MarkItDown for high-quality conversion.
 
         Args:
@@ -753,7 +795,7 @@ class MarkdownConversionStage(Stage):
             logger.error(f"MarkItDown processing failed: {e}", input_file=str(input_file))
             raise ProcessingError(f"MarkItDown processing failed for {input_file}: {e}")
     
-    async def _process_video(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_video(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process video file to markdown.
         
         Args:
@@ -816,7 +858,7 @@ class MarkdownConversionStage(Stage):
             }
         }
 
-    async def _process_audio(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_audio(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process audio file to markdown.
 
         Args:
@@ -878,7 +920,7 @@ class MarkdownConversionStage(Stage):
             }
         }
 
-    async def _process_document(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_document(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process document file to markdown.
 
         Args:
@@ -941,7 +983,7 @@ class MarkdownConversionStage(Stage):
             }
         }
 
-    async def _process_with_document_service(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_with_document_service(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Fallback processing using document service when MarkItDown fails.
 
         Args:
@@ -957,51 +999,59 @@ class MarkdownConversionStage(Stage):
         # Use the existing document processing method
         return await self._process_document(input_file, output_file, config)
 
-    async def _process_web(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_web(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process web URL to markdown.
 
         Args:
-            input_file: Input URL (as Path object)
+            input_file: Input URL (as Path or URLPath object)
             output_file: Output markdown file
             config: Stage configuration
 
         Returns:
             Processing result data
         """
-        # Convert Path back to URL string and fix Windows path conversion issues
-        url = str(input_file)
+        # Handle URLPath objects properly
+        if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+            # URLPath object - URL is already preserved correctly
+            url = input_file.url_str
+        elif is_url(input_file):
+            # Check if it's already a proper URL
+            url = get_url_string(input_file) if URL_PATH_AVAILABLE else str(input_file)
+        else:
+            # Convert Path back to URL string and fix Windows path conversion issues
+            url = str(input_file)
 
-        # Handle Windows path conversion issue - Path() mangles URLs
-        if not url.startswith(('http://', 'https://')):
-            # Convert backslashes to forward slashes
-            url = url.replace('\\', '/')
+            # Handle Windows path conversion issue - Path() mangles URLs
+            if not url.startswith(('http://', 'https://')):
+                # Convert backslashes to forward slashes
+                url = url.replace('\\', '/')
 
-            # Fix common URL mangling patterns
-            if url.startswith('https:') and not url.startswith('https://'):
-                # Pattern: https:/www.example.com -> https://www.example.com
-                # Handle both https:/ and https:// cases
-                if url.startswith('https://'):
-                    pass  # Already correct
-                elif url.startswith('https:/'):
-                    url = url.replace('https:/', 'https://', 1)
-                else:
-                    url = url.replace('https:', 'https://', 1)
-            elif url.startswith('http:') and not url.startswith('http://'):
-                # Pattern: http:/www.example.com -> http://www.example.com
-                if url.startswith('http://'):
-                    pass  # Already correct
-                elif url.startswith('http:/'):
-                    url = url.replace('http:/', 'http://', 1)
-                else:
-                    url = url.replace('http:', 'http://', 1)
+                # Fix common URL mangling patterns
+                if url.startswith('https:') and not url.startswith('https://'):
+                    # Pattern: https:/www.example.com -> https://www.example.com
+                    # Handle both https:/ and https:// cases
+                    if url.startswith('https://'):
+                        pass  # Already correct
+                    elif url.startswith('https:/'):
+                        url = url.replace('https:/', 'https://', 1)
+                    else:
+                        url = url.replace('https:', 'https://', 1)
+                elif url.startswith('http:') and not url.startswith('http://'):
+                    # Pattern: http:/www.example.com -> http://www.example.com
+                    if url.startswith('http://'):
+                        pass  # Already correct
+                    elif url.startswith('http:/'):
+                        url = url.replace('http:/', 'http://', 1)
+                    else:
+                        url = url.replace('http:', 'http://', 1)
 
-            # Handle case where the URL got completely mangled
-            if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
-                # Try to reconstruct from fragments - default to https
-                if not url.startswith(('http', 'www')):
-                    url = 'https://' + url
-                elif url.startswith('www'):
-                    url = 'https://' + url
+                # Handle case where the URL got completely mangled
+                if ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+                    # Try to reconstruct from fragments - default to https
+                    if not url.startswith(('http', 'www')):
+                        url = 'https://' + url
+                    elif url.startswith('www'):
+                        url = 'https://' + url
 
         logger.info("Processing web URL", url=url)
 
@@ -1067,56 +1117,64 @@ class MarkdownConversionStage(Stage):
             }
         }
 
-    async def _process_youtube(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_youtube(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process YouTube URL to markdown.
 
         Args:
-            input_file: Input URL (as Path object)
+            input_file: Input URL (as Path or URLPath object)
             output_file: Output markdown file
             config: Stage configuration
 
         Returns:
             Processing result data
         """
-        # Convert Path back to URL string and fix Windows path conversion issues
-        url = str(input_file)
+        # Handle URLPath objects properly
+        if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+            # URLPath object - URL is already preserved correctly
+            url = input_file.url_str
+        elif is_url(input_file):
+            # Check if it's already a proper URL
+            url = get_url_string(input_file) if URL_PATH_AVAILABLE else str(input_file)
+        else:
+            # Convert Path back to URL string and fix Windows path conversion issues
+            url = str(input_file)
 
-        # Handle Windows path conversion issue - Path() mangles URLs
-        if not url.startswith(('http://', 'https://')):
-            # Convert backslashes to forward slashes
-            url = url.replace('\\', '/')
+            # Handle Windows path conversion issue - Path() mangles URLs
+            if not url.startswith(('http://', 'https://')):
+                # Convert backslashes to forward slashes
+                url = url.replace('\\', '/')
 
-            # Fix common URL mangling patterns
-            if url.startswith('https:') and not url.startswith('https://'):
-                # Pattern: https:/www.youtube.com -> https://www.youtube.com
-                # Handle both https:/ and https:// cases
-                if url.startswith('https://'):
-                    pass  # Already correct
-                elif url.startswith('https:/'):
-                    url = url.replace('https:/', 'https://', 1)
-                else:
-                    url = url.replace('https:', 'https://', 1)
-            elif url.startswith('http:') and not url.startswith('http://'):
-                # Pattern: http:/www.youtube.com -> http://www.youtube.com
-                if url.startswith('http://'):
-                    pass  # Already correct
-                elif url.startswith('http:/'):
-                    url = url.replace('http:/', 'http://', 1)
-                else:
-                    url = url.replace('http:', 'http://', 1)
+                # Fix common URL mangling patterns
+                if url.startswith('https:') and not url.startswith('https://'):
+                    # Pattern: https:/www.youtube.com -> https://www.youtube.com
+                    # Handle both https:/ and https:// cases
+                    if url.startswith('https://'):
+                        pass  # Already correct
+                    elif url.startswith('https:/'):
+                        url = url.replace('https:/', 'https://', 1)
+                    else:
+                        url = url.replace('https:', 'https://', 1)
+                elif url.startswith('http:') and not url.startswith('http://'):
+                    # Pattern: http:/www.youtube.com -> http://www.youtube.com
+                    if url.startswith('http://'):
+                        pass  # Already correct
+                    elif url.startswith('http:/'):
+                        url = url.replace('http:/', 'http://', 1)
+                    else:
+                        url = url.replace('http:', 'http://', 1)
 
-            # Handle case where the URL got completely mangled
-            if 'youtube.com' in url and not url.startswith(('http://', 'https://')):
-                # Try to reconstruct from fragments
-                if 'https' in url:
-                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
-                else:
-                    url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+                # Handle case where the URL got completely mangled
+                if 'youtube.com' in url and not url.startswith(('http://', 'https://')):
+                    # Try to reconstruct from fragments
+                    if 'https' in url:
+                        url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
+                    else:
+                        url = 'https://www.youtube.com' + url.split('youtube.com')[-1]
 
-            # Additional fix for URLs that lost protocol entirely
-            elif ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
-                # Default to https for security
-                url = 'https://' + url
+                # Additional fix for URLs that lost protocol entirely
+                elif ('www.' in url or '.com' in url or '.org' in url or '.net' in url) and not url.startswith(('http://', 'https://')):
+                    # Default to https for security
+                    url = 'https://' + url
 
         logger.info("Processing YouTube URL", url=url)
 
@@ -1228,7 +1286,7 @@ class MarkdownConversionStage(Stage):
             }
         }
 
-    async def _process_text(self, input_file: Path, output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_text(self, input_file: Union[Path, 'URLPath'], output_file: Path, config: Dict[str, Any]) -> Dict[str, Any]:
         """Process text file to markdown.
 
         Args:
