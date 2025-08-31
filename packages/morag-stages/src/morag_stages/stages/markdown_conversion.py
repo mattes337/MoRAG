@@ -171,6 +171,15 @@ class MarkdownConversionStage(Stage):
             final_output_file = result_data.get("final_output_file", output_file)
 
             # Create metadata
+            # Handle input size for URLPath objects
+            input_size_bytes = 0
+            if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+                # URLPath object - URLs don't have file size, use 0 or estimate from content
+                input_size_bytes = result_data.get("input_size_bytes", 0)
+            elif hasattr(input_file, 'exists') and input_file.exists():
+                # Regular Path object with file system access
+                input_size_bytes = input_file.stat().st_size
+
             metadata = StageMetadata(
                 execution_time=0.0,  # Will be set by manager
                 start_time=datetime.now(),
@@ -179,7 +188,7 @@ class MarkdownConversionStage(Stage):
                 config_used=config,
                 metrics={
                     "content_type": str(content_type) if content_type else "unknown",
-                    "input_size_bytes": input_file.stat().st_size if input_file.exists() else 0,
+                    "input_size_bytes": input_size_bytes,
                     "output_size_bytes": final_output_file.stat().st_size if final_output_file.exists() else 0,
                     **result_data.get("metrics", {})
                 }
@@ -473,15 +482,27 @@ class MarkdownConversionStage(Stage):
                     return f"{sanitized_domain}.md"
                 else:
                     # If domain extraction fails, fall back to sanitized stem
-                    sanitized_name = sanitize_filename(input_file.stem)
+                    if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+                        # URLPath object - use name property
+                        sanitized_name = sanitize_filename(input_file.name)
+                    else:
+                        sanitized_name = sanitize_filename(input_file.stem)
                     return f"{sanitized_name}.md"
             except Exception:
                 # If URL parsing fails, fall back to sanitized stem
-                sanitized_name = sanitize_filename(input_file.stem)
+                if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+                    # URLPath object - use name property
+                    sanitized_name = sanitize_filename(input_file.name)
+                else:
+                    sanitized_name = sanitize_filename(input_file.stem)
                 return f"{sanitized_name}.md"
         else:
             # For other content types, use sanitized stem
-            sanitized_name = sanitize_filename(input_file.stem)
+            if URL_PATH_AVAILABLE and hasattr(input_file, 'url_str'):
+                # URLPath object - use name property
+                sanitized_name = sanitize_filename(input_file.name)
+            else:
+                sanitized_name = sanitize_filename(input_file.stem)
             return f"{sanitized_name}.md"
 
     def _should_use_markitdown(self, file_path: Union[Path, 'URLPath'], content_type) -> bool:

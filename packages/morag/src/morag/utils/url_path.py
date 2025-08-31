@@ -55,16 +55,45 @@ class URLPath:
     def exists(self) -> bool:
         """URLs are assumed to exist for processing purposes."""
         return True
-    
+
     @property
     def suffix(self) -> str:
         """Return empty suffix for URLs."""
         return ''
-    
+
     @property
     def stem(self) -> str:
         """Return the name without suffix."""
         return self.name
+
+    def stat(self):
+        """Raise AttributeError for stat() calls on URLs."""
+        raise AttributeError(
+            f"'URLPath' object has no attribute 'stat' - URLs don't have file system statistics. "
+            f"URL: {self.url_str}"
+        )
+
+    def is_file(self) -> bool:
+        """URLs are not files."""
+        return False
+
+    def is_dir(self) -> bool:
+        """URLs are not directories."""
+        return False
+
+    def read_text(self, *args, **kwargs):
+        """URLs cannot be read as text files."""
+        raise AttributeError(
+            f"'URLPath' object cannot be read as a text file. "
+            f"Use appropriate URL processing instead. URL: {self.url_str}"
+        )
+
+    def read_bytes(self, *args, **kwargs):
+        """URLs cannot be read as binary files."""
+        raise AttributeError(
+            f"'URLPath' object cannot be read as a binary file. "
+            f"Use appropriate URL processing instead. URL: {self.url_str}"
+        )
 
 
 def create_path_from_string(path_str: str) -> Union[Path, URLPath]:
