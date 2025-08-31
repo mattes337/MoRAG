@@ -151,8 +151,10 @@ class YouTubeStageProcessor(StageProcessor):
             # Create content with transcript
             content_lines = []
             if result.transcript:
-                content_lines.append(f"\n# Transcript\n\n{result.transcript}")
-            
+                # Format transcript with timecodes if segments are available
+                transcript_text = self._format_transcript_with_timecodes(result.transcript)
+                content_lines.append(f"\n# Transcript\n\n{transcript_text}")
+
             content = '\n'.join(content_lines)
             markdown_content = self.create_markdown_with_metadata(content, metadata)
             
@@ -222,7 +224,46 @@ class YouTubeStageProcessor(StageProcessor):
                     )
                 
             except Exception as fallback_error:
-                logger.error("YouTube fallback processing also failed", 
+                logger.error("YouTube fallback processing also failed",
                            url=url, error=str(fallback_error))
-            
+
             raise ProcessingError(f"YouTube processing failed for {url}: {e}")
+
+    def _format_transcript_with_timecodes(self, transcript_data) -> str:
+        """Format transcript data with timecodes in the same format as audio/video files.
+
+        Args:
+            transcript_data: Transcript data from YouTube processor
+
+        Returns:
+            Formatted transcript text with timecodes
+        """
+        if isinstance(transcript_data, str):
+            # If it's already a string, return as-is (might already be formatted)
+            return transcript_data
+
+        if isinstance(transcript_data, dict):
+            # Check if we have segments with timing information
+            segments = transcript_data.get("segments", [])
+            if segments and isinstance(segments, list):
+                # Format segments with timecodes like audio/video files: [timestamp] text
+                formatted_lines = []
+                for segment in segments:
+                    if isinstance(segment, dict):
+                        text = segment.get("text", "").strip()
+                        start_time = segment.get("start", segment.get("startTime", 0))
+                        if text and start_time is not None:
+                            # Format timestamp as [X.Xs] like in audio/video processing
+                            formatted_lines.append(f"[{float(start_time):.1f}s] {text}")
+                        elif text:
+                            # If no timing info, just add the text
+                            formatted_lines.append(text)
+
+                if formatted_lines:
+                    return '\n'.join(formatted_lines)
+
+            # Fallback to text field if segments don't work
+            return transcript_data.get("text", "")
+
+        # Fallback for any other format
+        return str(transcript_data)

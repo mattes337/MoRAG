@@ -129,10 +129,27 @@ class FactGeneratorStage(Stage):
             all_relations = []
             all_facts = []
             all_keywords = set()
-            
-            for chunk in chunks:
+
+            logger.info("Processing chunks for fact extraction",
+                       total_chunks=len(chunks),
+                       fact_extractor_available=bool(self.fact_extractor),
+                       services_available=SERVICES_AVAILABLE)
+
+            for i, chunk in enumerate(chunks):
+                logger.debug("Processing chunk for fact extraction",
+                           chunk_id=chunk.get('id', f'chunk_{i}'),
+                           chunk_size=len(chunk.get('content', '')))
+
                 chunk_results = await self._extract_from_chunk(chunk, config)
-                
+
+                # Log results for debugging
+                logger.debug("Chunk extraction results",
+                           chunk_id=chunk.get('id', f'chunk_{i}'),
+                           entities_found=len(chunk_results.get('entities', [])),
+                           relations_found=len(chunk_results.get('relations', [])),
+                           facts_found=len(chunk_results.get('facts', [])),
+                           keywords_found=len(chunk_results.get('keywords', [])))
+
                 all_entities.extend(chunk_results.get('entities', []))
                 all_relations.extend(chunk_results.get('relations', []))
                 all_facts.extend(chunk_results.get('facts', []))
@@ -295,6 +312,8 @@ class FactGeneratorStage(Stage):
         # Use fact extractor if available
         if self.fact_extractor and SERVICES_AVAILABLE:
             try:
+                logger.debug("Using fact extractor service", chunk_id=chunk_id, content_length=len(content))
+
                 # Use the correct method name: extract_facts
                 facts = await self.fact_extractor.extract_facts(
                     chunk_text=content,
@@ -305,6 +324,11 @@ class FactGeneratorStage(Stage):
                         'language': 'en'
                     }
                 )
+
+                logger.debug("Fact extractor returned results",
+                           chunk_id=chunk_id,
+                           facts_count=len(facts) if facts else 0,
+                           facts_type=type(facts).__name__)
 
                 # Convert facts to the expected format
                 extraction_result = {
@@ -341,10 +365,16 @@ class FactGeneratorStage(Stage):
                 results.update(extraction_result)
                 
             except Exception as e:
-                logger.warning("Fact extractor failed, using LLM fallback", error=str(e))
+                logger.warning("Fact extractor failed, using LLM fallback",
+                             error=str(e),
+                             chunk_id=chunk_id,
+                             error_type=type(e).__name__)
                 results = await self._llm_extraction_fallback(content, chunk_id, config)
         else:
             # Use LLM-based extraction
+            logger.debug("Using LLM fallback for fact extraction",
+                        chunk_id=chunk_id,
+                        reason="fact_extractor_not_available" if not self.fact_extractor else "services_not_available")
             results = await self._llm_extraction_fallback(content, chunk_id, config)
         
         # Extract keywords if enabled
@@ -367,6 +397,11 @@ class FactGeneratorStage(Stage):
         """
         # We can still use LLM fallback even if services are not available
         # Only return empty if we can't import the LLM client
+
+        logger.debug("Starting LLM extraction fallback",
+                    chunk_id=chunk_id,
+                    content_length=len(content),
+                    config_domain=getattr(config, 'domain', 'unknown'))
 
         try:
             # Use direct LLM call instead of agent for better JSON control
@@ -438,12 +473,18 @@ class FactGeneratorStage(Stage):
                 ])
 
             # Parse response (expecting JSON format) using robust parser
+            logger.debug("Parsing LLM response",
+                        chunk_id=chunk_id,
+                        response_length=len(response_text),
+                        response_preview=response_text[:200])
+
             try:
                 # Use centralized parser if available, otherwise fallback to basic parsing
                 fallback_result = {'entities': [], 'relations': [], 'facts': [], 'keywords': []}
 
                 if PARSER_AVAILABLE and LLMResponseParser:
                     # Use the robust parser from agents framework
+                    logger.debug("Using LLMResponseParser", chunk_id=chunk_id)
                     results = LLMResponseParser.parse_json_response(
                         response=response_text,
                         fallback_value=fallback_result,
@@ -451,25 +492,43 @@ class FactGeneratorStage(Stage):
                     )
                 else:
                     # Fallback to basic JSON parsing
+                    logger.debug("Using basic JSON parsing", chunk_id=chunk_id)
                     import re
                     try:
                         results = json.loads(response_text.strip())
+                        logger.debug("Successfully parsed JSON directly", chunk_id=chunk_id)
                     except json.JSONDecodeError:
                         # Try to extract JSON from markdown code blocks
                         json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
                         if json_match:
                             try:
                                 results = json.loads(json_match.group(1))
+                                logger.debug("Successfully parsed JSON from code block", chunk_id=chunk_id)
                             except json.JSONDecodeError:
-                                logger.warning("Failed to parse LLM extraction response as JSON", response_preview=response_text[:500])
+                                logger.warning("Failed to parse LLM extraction response as JSON",
+                                             chunk_id=chunk_id,
+                                             response_preview=response_text[:500])
                                 results = fallback_result
                         else:
-                            logger.warning("No JSON found in LLM response", response_preview=response_text[:500])
+                            logger.warning("No JSON found in LLM response",
+                                         chunk_id=chunk_id,
+                                         response_preview=response_text[:500])
                             results = fallback_result
 
                 # Ensure results has the expected structure
                 if not isinstance(results, dict):
+                    logger.warning("LLM response is not a dict, using fallback",
+                                 chunk_id=chunk_id,
+                                 results_type=type(results).__name__)
                     results = fallback_result
+
+                # Log parsed results for debugging
+                logger.debug("Parsed LLM extraction results",
+                           chunk_id=chunk_id,
+                           entities_count=len(results.get('entities', [])),
+                           relations_count=len(results.get('relations', [])),
+                           facts_count=len(results.get('facts', [])),
+                           keywords_count=len(results.get('keywords', [])))
 
                 # Add source chunk information
                 for entity in results.get('entities', []):

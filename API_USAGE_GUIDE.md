@@ -519,7 +519,7 @@ async def main():
             )
         conversion_result = response.json()
 
-        # Process YouTube URL - markdown conversion
+        # Process YouTube URL - markdown conversion with error handling
         response = await client.post(
             f"{base_url}/api/v1/stages/markdown-conversion/execute",
             data={
@@ -532,6 +532,12 @@ async def main():
             }
         )
         youtube_result = response.json()
+
+        # Check if YouTube processing was successful
+        if youtube_result.get('success', False):
+            print("✅ YouTube processing successful!")
+        else:
+            print(f"❌ YouTube processing failed: {youtube_result.get('error_message', 'Unknown error')}")
 
         # Execute stage chain - conversion + chunking
         with open("audio.mp3", "rb") as f:
@@ -813,7 +819,7 @@ curl -X POST "http://localhost:8000/api/v1/stages/chain" \
 import requests
 import json
 
-# Process YouTube URL
+# Process YouTube URL with proper error handling
 url = "http://localhost:8000/api/v1/stages/markdown-conversion/execute"
 data = {
     'input_files': json.dumps(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]),
@@ -826,10 +832,22 @@ data = {
 
 response = requests.post(url, data=data)
 result = response.json()
-print(f"Success: {result['success']}")
+
+# Always check success field before using result
+if result.get('success', False):
+    print("✅ YouTube processing successful!")
+    print(f"Title: {result.get('metadata', {}).get('title', 'Unknown')}")
+    print(f"Transcript length: {len(result.get('transcript', ''))}")
+else:
+    print("❌ YouTube processing failed!")
+    print(f"Error: {result.get('error_message', 'Unknown error')}")
 ```
 
 ### YouTube Processing Error Handling
+
+YouTube processing can fail for several reasons. The API will return proper error responses with `success: false` for all failure cases:
+
+#### 1. Apify Configuration Missing
 
 If Apify is not configured, you'll receive an error:
 
@@ -839,6 +857,83 @@ If Apify is not configured, you'll receive an error:
   "error_message": "Failed to initialize Apify service: Apify API token is required. Set APIFY_API_TOKEN environment variable.",
   "processing_time": 0.1
 }
+```
+
+#### 2. Invalid YouTube URLs
+
+If you provide an invalid or non-existent YouTube URL:
+
+```json
+{
+  "success": false,
+  "error_message": "YouTube processing failed for https://www.youtube.com/watch?v=invalid123: No metadata or transcript found in Apify result",
+  "processing_time": 15.3
+}
+```
+
+#### 3. Video Processing Failures
+
+If the video exists but cannot be processed (private, restricted, etc.):
+
+```json
+{
+  "success": false,
+  "error_message": "YouTube processing failed for https://www.youtube.com/watch?v=private123: Apify service error: Video is private or unavailable",
+  "processing_time": 8.7
+}
+```
+
+#### 4. Network or Service Errors
+
+If there are connectivity issues with Apify or YouTube:
+
+```json
+{
+  "success": false,
+  "error_message": "YouTube processing failed for https://www.youtube.com/watch?v=example: Apify service timeout",
+  "processing_time": 300.0
+}
+```
+
+**Important**: The API will no longer return `success: true` with empty content when processing fails. All failures now properly return `success: false` with descriptive error messages.
+
+#### Error Handling Best Practices
+
+When processing YouTube URLs, always check the `success` field before using the result:
+
+```python
+import requests
+import json
+
+def process_youtube_url(url):
+    response = requests.post(
+        "http://localhost:8000/api/v1/stages/markdown-conversion/execute",
+        data={
+            'input_files': json.dumps([url]),
+            'config': json.dumps({
+                "extract_metadata": True,
+                "extract_transcript": True
+            })
+        }
+    )
+
+    result = response.json()
+
+    if result.get('success', False):
+        print(f"✅ Successfully processed: {url}")
+        print(f"Title: {result.get('metadata', {}).get('title', 'Unknown')}")
+        return result
+    else:
+        print(f"❌ Failed to process: {url}")
+        print(f"Error: {result.get('error_message', 'Unknown error')}")
+        return None
+
+# Example usage
+result = process_youtube_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+if result:
+    # Process the successful result
+    transcript = result.get('transcript', '')
+    metadata = result.get('metadata', {})
 ```
 
 ### YouTube Configuration Requirements

@@ -440,7 +440,8 @@ class ChunkerStage(Stage):
                     "content": current_chunk.strip(),
                     "metadata": {
                         "chunk_type": "semantic",
-                        "chunk_size": len(current_chunk.strip())
+                        "chunk_size": len(current_chunk.strip()),
+                        "has_context": bool(overlap > 0)
                     }
                 })
                 chunk_id += 1
@@ -452,6 +453,23 @@ class ChunkerStage(Stage):
                     current_chunk = " ".join(overlap_words) + " " + paragraph
                 else:
                     current_chunk = paragraph
+
+                # If the paragraph itself is too large, split it further
+                if len(current_chunk) > chunk_size:
+                    # Split large paragraph into smaller chunks
+                    large_chunks = self._split_large_content(current_chunk, chunk_size, overlap)
+                    for large_chunk in large_chunks:
+                        chunks.append({
+                            "id": f"chunk_{chunk_id:03d}",
+                            "content": large_chunk.strip(),
+                            "metadata": {
+                                "chunk_type": "semantic",
+                                "chunk_size": len(large_chunk.strip()),
+                                "has_context": bool(overlap > 0)
+                            }
+                        })
+                        chunk_id += 1
+                    current_chunk = ""
             else:
                 if current_chunk:
                     current_chunk += "\n\n" + paragraph
@@ -460,14 +478,71 @@ class ChunkerStage(Stage):
 
         # Add final chunk
         if current_chunk.strip():
-            chunks.append({
-                "id": f"chunk_{chunk_id:03d}",
-                "content": current_chunk.strip(),
-                "metadata": {
-                    "chunk_type": "semantic",
-                    "chunk_size": len(current_chunk.strip())
-                }
-            })
+            # Check if final chunk is too large and split if necessary
+            if len(current_chunk.strip()) > chunk_size:
+                large_chunks = self._split_large_content(current_chunk.strip(), chunk_size, overlap)
+                for large_chunk in large_chunks:
+                    chunks.append({
+                        "id": f"chunk_{chunk_id:03d}",
+                        "content": large_chunk.strip(),
+                        "metadata": {
+                            "chunk_type": "semantic",
+                            "chunk_size": len(large_chunk.strip()),
+                            "has_context": bool(overlap > 0)
+                        }
+                    })
+                    chunk_id += 1
+            else:
+                chunks.append({
+                    "id": f"chunk_{chunk_id:03d}",
+                    "content": current_chunk.strip(),
+                    "metadata": {
+                        "chunk_type": "semantic",
+                        "chunk_size": len(current_chunk.strip()),
+                        "has_context": bool(overlap > 0)
+                    }
+                })
+
+        return chunks
+
+    def _split_large_content(self, content: str, chunk_size: int, overlap: int) -> List[str]:
+        """Split large content into smaller chunks respecting the size limit.
+
+        Args:
+            content: Content to split
+            chunk_size: Maximum chunk size
+            overlap: Overlap between chunks
+
+        Returns:
+            List of content chunks
+        """
+        if len(content) <= chunk_size:
+            return [content]
+
+        chunks = []
+        start = 0
+
+        while start < len(content):
+            end = min(start + chunk_size, len(content))
+
+            # Try to break at sentence boundary first
+            if end < len(content):
+                # Look for sentence endings within the last 200 characters
+                sentence_break = content.rfind('.', start, end)
+                if sentence_break > start + chunk_size // 2:  # Only if it's not too early
+                    end = sentence_break + 1
+                else:
+                    # Fall back to word boundary
+                    word_break = content.rfind(' ', start, end)
+                    if word_break > start:
+                        end = word_break
+
+            chunk_content = content[start:end].strip()
+            if chunk_content:
+                chunks.append(chunk_content)
+
+            # Move start position with overlap consideration
+            start = max(start + 1, end - overlap)
 
         return chunks
 

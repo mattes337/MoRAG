@@ -387,11 +387,13 @@ class YouTubeProcessor(BaseProcessor):
                 transcript_segments_data = transcript_data["transcript"]
                 if isinstance(transcript_segments_data, list):
                     transcript_segments = transcript_segments_data
-                    transcript_text = " ".join(segment.get("text", "") for segment in transcript_segments_data)
+                    # Format with timecodes like audio/video files
+                    transcript_text = self._format_transcript_with_timecodes(transcript_segments_data)
             elif isinstance(transcript_data, list):
                 # Handle segment format
                 transcript_segments = transcript_data
-                transcript_text = " ".join(segment.get("text", "") for segment in transcript_data)
+                # Format with timecodes like audio/video files
+                transcript_text = self._format_transcript_with_timecodes(transcript_data)
             elif isinstance(transcript_data, str):
                 # Handle plain text format
                 transcript_text = transcript_data
@@ -448,6 +450,32 @@ class YouTubeProcessor(BaseProcessor):
                 return 0.0
         except (ValueError, IndexError):
             return 0.0
+
+    def _format_transcript_with_timecodes(self, segments: List[Dict[str, Any]]) -> str:
+        """Format transcript segments with timecodes in the same format as audio/video files.
+
+        Args:
+            segments: List of transcript segments with timing information
+
+        Returns:
+            Formatted transcript text with timecodes
+        """
+        if not segments:
+            return ""
+
+        formatted_lines = []
+        for segment in segments:
+            if isinstance(segment, dict):
+                text = segment.get("text", "").strip()
+                start_time = segment.get("start", segment.get("startTime", None))
+                if text and start_time is not None:
+                    # Format timestamp as [X.Xs] like in audio/video processing
+                    formatted_lines.append(f"[{float(start_time):.1f}s] {text}")
+                elif text:
+                    # If no timing info, just add the text
+                    formatted_lines.append(text)
+
+        return '\n'.join(formatted_lines) if formatted_lines else ""
 
     async def process_playlist(
         self,
