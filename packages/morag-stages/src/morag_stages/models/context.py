@@ -21,6 +21,14 @@ except ImportError:
 class StageContext(BaseModel):
     """Context for stage execution containing configuration and state."""
 
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {
+            Path: lambda v: str(v),
+            StageType: lambda v: v.value
+        }
+    }
+
     source_path: Union[Path, URLPath] = Field(description="Original source file path or URL")
     output_dir: Path = Field(description="Output directory for generated files")
     webhook_url: Optional[str] = Field(default=None, description="Webhook URL for notifications")
@@ -66,11 +74,7 @@ class StageContext(BaseModel):
         description="List of intermediate files created during processing"
     )
     
-    class Config:
-        json_encoders = {
-            Path: lambda v: str(v),
-            StageType: lambda v: v.value
-        }
+
     
     def get_stage_config(self, stage_type: StageType) -> Dict[str, Any]:
         """Get configuration for a specific stage.
