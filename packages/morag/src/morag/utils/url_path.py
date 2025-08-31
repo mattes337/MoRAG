@@ -5,6 +5,9 @@ URL path utilities to handle URLs without corrupting them through pathlib.
 from pathlib import Path
 from typing import Union
 import os
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class URLPath:
@@ -67,16 +70,19 @@ class URLPath:
 def create_path_from_string(path_str: str) -> Union[Path, URLPath]:
     """
     Create appropriate path object from string.
-    
+
     Args:
         path_str: File path or URL string
-        
+
     Returns:
         Path object for local files, URLPath for URLs
     """
+    logger.debug("Creating path from string", path_str=path_str)
     if path_str.startswith(('http://', 'https://')):
+        logger.info("Creating URLPath for URL", url=path_str)
         return URLPath(path_str)
     else:
+        logger.debug("Creating Path for local file", path=path_str)
         return Path(path_str)
 
 
