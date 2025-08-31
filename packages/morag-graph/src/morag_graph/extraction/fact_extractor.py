@@ -30,10 +30,14 @@ class FactExtractor:
         max_facts_per_chunk: int = 10,
         domain: str = "general",
         language: str = "en",
-        max_workers: int = 5
+        max_workers: int = 5,
+        allow_vague_language: bool = False,
+        require_entities: bool = True,
+        min_fact_length: int = 20,
+        strict_validation: bool = True
     ):
         """Initialize fact extractor with LLM and configuration.
-        
+
         Args:
             model_id: LLM model to use for extraction
             api_key: API key for LLM service
@@ -42,6 +46,10 @@ class FactExtractor:
             domain: Domain context for extraction
             language: Language of the text
             max_workers: Maximum worker threads for parallel processing
+            allow_vague_language: Allow facts with vague language (mark with lower confidence)
+            require_entities: Require primary entities in structured metadata
+            min_fact_length: Minimum fact text length
+            strict_validation: Enable strict quality validation
         """
         self.model_id = model_id
         self.api_key = api_key
@@ -50,9 +58,15 @@ class FactExtractor:
         self.domain = domain
         self.language = language
         self.max_workers = max_workers
-        
+
         self.logger = structlog.get_logger(__name__)
-        self.validator = FactValidator(min_confidence=min_confidence)
+        self.validator = FactValidator(
+            min_confidence=min_confidence,
+            allow_vague_language=allow_vague_language,
+            require_entities=require_entities,
+            min_fact_length=min_fact_length,
+            strict_validation=strict_validation
+        )
         # Initialize fact filter with domain-specific configurations
         domain_configs = self._create_domain_filter_configs()
         self.fact_filter = FactFilter(domain_configs)

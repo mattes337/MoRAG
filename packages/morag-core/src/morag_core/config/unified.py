@@ -239,12 +239,20 @@ class MarkdownOptimizerConfig(BaseModel, ConfigMixin):
 
 class FactGeneratorConfig(BaseModel, ConfigMixin):
     """Configuration for fact generator stage."""
-    
+
     enabled: bool = Field(default=True, description="Enable fact generation")
-    
+
     # LLM configuration overrides
     model: Optional[str] = Field(default=None, description="LLM model override")
     provider: Optional[str] = Field(default=None, description="LLM provider override")
+
+    # Quality validation settings
+    min_confidence: float = Field(default=0.5, description="Minimum confidence threshold for facts")
+    allow_vague_language: bool = Field(default=False, description="Allow facts with vague language (typically, usually, etc.)")
+    require_entities: bool = Field(default=True, description="Require primary entities in structured metadata")
+    min_fact_length: int = Field(default=20, description="Minimum fact text length")
+    strict_validation: bool = Field(default=True, description="Enable strict quality validation")
+
     temperature: Optional[float] = Field(default=None, description="LLM temperature override")
     max_tokens: Optional[int] = Field(default=None, description="Max tokens override")
     

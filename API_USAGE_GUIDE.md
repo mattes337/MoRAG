@@ -115,6 +115,13 @@ curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
   -F 'stages=["markdown-conversion", "markdown-optimizer", "chunker", "fact-generator", "ingestor"]' \
   -F 'global_config={"language": "en"}' \
   -F 'stage_configs={
+    "fact-generator": {
+      "min_confidence": 0.4,
+      "strict_validation": false,
+      "allow_vague_language": true,
+      "require_entities": true,
+      "min_fact_length": 15
+    },
     "ingestor": {
       "databases": ["qdrant", "neo4j"],
       "collection_name": "documents",
@@ -133,6 +140,40 @@ curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
   -F 'webhook_url=https://your-app.com/webhook' \
   -F 'output_dir=./output' \
   -F 'stop_on_failure=true'
+```
+
+### 3.1. Quality Gate Examples
+
+**High-Quality Production Processing**
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
+  -F "file=@research_paper.pdf" \
+  -F 'stages=["markdown-conversion", "chunker", "fact-generator"]' \
+  -F 'stage_configs={
+    "fact-generator": {
+      "min_confidence": 0.8,
+      "strict_validation": true,
+      "allow_vague_language": false,
+      "require_entities": true,
+      "min_fact_length": 30
+    }
+  }'
+```
+
+**Development/Testing with Lenient Validation**
+```bash
+curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
+  -F "file=@draft_document.txt" \
+  -F 'stages=["markdown-conversion", "chunker", "fact-generator"]' \
+  -F 'stage_configs={
+    "fact-generator": {
+      "min_confidence": 0.3,
+      "strict_validation": false,
+      "allow_vague_language": true,
+      "require_entities": false,
+      "min_fact_length": 10
+    }
+  }'
 ```
 
 ### 4. Ingestor Stage with Explicit Database Configuration
@@ -360,7 +401,114 @@ curl -X POST "http://localhost:8000/api/v1/stages/ingestor/execute" \
     "domain": "general",  // Options: general, medical, legal, technical
     "model": "gemini-pro",
     "temperature": 0.1,
-    "max_tokens": 4096
+    "max_tokens": 4096,
+
+    // Quality Gate Configuration (NEW)
+    "min_confidence": 0.5,           // Minimum confidence threshold (0.0-1.0)
+    "allow_vague_language": false,   // Accept facts with vague language but mark them
+    "require_entities": true,        // Whether to require structured entities
+    "min_fact_length": 20,          // Minimum character length for facts
+    "strict_validation": true       // Overall validation strictness
+  }
+}
+```
+
+#### Quality Gate Configuration
+
+The fact generator now supports configurable quality gates for fine-tuned fact validation:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_confidence` | float | 0.5 | Minimum confidence threshold for accepting facts |
+| `allow_vague_language` | bool | false | Accept facts with vague language but reduce confidence and add warnings |
+| `require_entities` | bool | true | Whether to require primary entities in structured metadata |
+| `min_fact_length` | int | 20 | Minimum character length for fact text |
+| `strict_validation` | bool | true | Enable strict quality validation (converts failures to warnings when false) |
+
+#### Validation Modes
+
+**🔒 Strict Mode (Production)**
+```json
+{
+  "fact-generator": {
+    "min_confidence": 0.7,
+    "strict_validation": true,
+    "allow_vague_language": false,
+    "require_entities": true,
+    "min_fact_length": 25
+  }
+}
+```
+
+**⚖️ Balanced Mode (Recommended)**
+```json
+{
+  "fact-generator": {
+    "min_confidence": 0.4,
+    "strict_validation": false,
+    "allow_vague_language": true,
+    "require_entities": true,
+    "min_fact_length": 15
+  }
+}
+```
+
+**🔓 Lenient Mode (Development)**
+```json
+{
+  "fact-generator": {
+    "min_confidence": 0.3,
+    "strict_validation": false,
+    "allow_vague_language": true,
+    "require_entities": false,
+    "min_fact_length": 10
+  }
+}
+```
+
+#### Environment Variables for Global Defaults
+
+You can also set global defaults using environment variables:
+
+```bash
+# Quality gate defaults
+MORAG_FACT_GENERATOR_MIN_CONFIDENCE=0.5
+MORAG_FACT_GENERATOR_ALLOW_VAGUE_LANGUAGE=false
+MORAG_FACT_GENERATOR_REQUIRE_ENTITIES=true
+MORAG_FACT_GENERATOR_MIN_FACT_LENGTH=20
+MORAG_FACT_GENERATOR_STRICT_VALIDATION=true
+```
+
+#### Fact Output with Quality Gates
+
+When quality gates are configured, facts may include additional metadata:
+
+```json
+{
+  "facts": [
+    {
+      "fact_text": "Machine learning typically improves with more data",
+      "extraction_confidence": 0.5,
+      "remarks": "Contains vague language - confidence reduced",
+      "subject": "Machine learning",
+      "object": "improvement with data",
+      "structured_metadata": {
+        "primary_entities": ["Machine learning"],
+        "secondary_entities": ["data"],
+        "fact_type": "general_statement"
+      }
+    }
+  ],
+  "validation_summary": {
+    "total_facts_extracted": 15,
+    "facts_accepted": 8,
+    "facts_rejected": 7,
+    "rejection_reasons": {
+      "low_confidence": 3,
+      "vague_language": 2,
+      "missing_entities": 1,
+      "too_short": 1
+    }
   }
 }
 ```

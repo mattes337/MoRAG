@@ -58,7 +58,12 @@ class FactGeneratorStage(Stage):
             if api_key:
                 self.fact_extractor = FactExtractor(
                     model_id=os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash'),
-                    api_key=api_key
+                    api_key=api_key,
+                    min_confidence=float(os.getenv('MORAG_FACT_GENERATOR_MIN_CONFIDENCE', '0.5')),
+                    allow_vague_language=os.getenv('MORAG_FACT_GENERATOR_ALLOW_VAGUE_LANGUAGE', 'false').lower() == 'true',
+                    require_entities=os.getenv('MORAG_FACT_GENERATOR_REQUIRE_ENTITIES', 'true').lower() == 'true',
+                    min_fact_length=int(os.getenv('MORAG_FACT_GENERATOR_MIN_FACT_LENGTH', '20')),
+                    strict_validation=os.getenv('MORAG_FACT_GENERATOR_STRICT_VALIDATION', 'true').lower() == 'true'
                 )
             else:
                 logger.warning("GEMINI_API_KEY not found - fact extraction disabled")
@@ -313,6 +318,23 @@ class FactGeneratorStage(Stage):
         if self.fact_extractor and SERVICES_AVAILABLE:
             try:
                 logger.debug("Using fact extractor service", chunk_id=chunk_id, content_length=len(content))
+
+                # Update fact extractor configuration from request config
+                if hasattr(config, 'min_confidence'):
+                    self.fact_extractor.min_confidence = getattr(config, 'min_confidence', 0.5)
+                    self.fact_extractor.validator.min_confidence = getattr(config, 'min_confidence', 0.5)
+
+                if hasattr(config, 'allow_vague_language'):
+                    self.fact_extractor.validator.allow_vague_language = getattr(config, 'allow_vague_language', False)
+
+                if hasattr(config, 'require_entities'):
+                    self.fact_extractor.validator.require_entities = getattr(config, 'require_entities', True)
+
+                if hasattr(config, 'min_fact_length'):
+                    self.fact_extractor.validator.min_fact_length = getattr(config, 'min_fact_length', 20)
+
+                if hasattr(config, 'strict_validation'):
+                    self.fact_extractor.validator.strict_validation = getattr(config, 'strict_validation', True)
 
                 # Use the correct method name: extract_facts
                 facts = await self.fact_extractor.extract_facts(
