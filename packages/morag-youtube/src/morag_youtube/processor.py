@@ -298,6 +298,45 @@ class YouTubeProcessor(BaseProcessor):
         Returns:
             YouTubeDownloadResult object
         """
+        # Check if the result indicates an error
+        error_message = service_result.get("error")
+        if error_message:
+            logger.error("Apify result contains error", error=error_message)
+            return YouTubeDownloadResult(
+                metadata=None,
+                transcript=None,
+                transcript_languages=[],
+                formats=[],
+                total_formats=0,
+                video_path=None,
+                output_file=None,
+                video_download=None,
+                processing_time=time.time() - start_time,
+                success=False,
+                error_message=error_message
+            )
+
+        # Check if we have any meaningful content (metadata or transcript)
+        has_metadata = bool(service_result.get("metadata"))
+        has_transcript = bool(service_result.get("transcript"))
+
+        if not has_metadata and not has_transcript:
+            error_msg = "No metadata or transcript found in Apify result"
+            logger.error("Apify result is empty", result_keys=list(service_result.keys()))
+            return YouTubeDownloadResult(
+                metadata=None,
+                transcript=None,
+                transcript_languages=[],
+                formats=[],
+                total_formats=0,
+                video_path=None,
+                output_file=None,
+                video_download=None,
+                processing_time=time.time() - start_time,
+                success=False,
+                error_message=error_msg
+            )
+
         # Convert metadata if available
         metadata = None
         if service_result.get("metadata"):

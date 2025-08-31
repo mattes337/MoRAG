@@ -115,7 +115,13 @@ class YouTubeStageProcessor(StageProcessor):
             
             # Process the URL
             result = await processor.process_url(url, youtube_config)
-            
+
+            # Check if processing was successful
+            if not result.success:
+                error_msg = result.error_message or "YouTube processing failed"
+                logger.error("YouTube processing failed", url=url, error=error_msg)
+                raise ProcessingError(f"YouTube processing failed for {url}: {error_msg}")
+
             # Create markdown content
             metadata = {
                 "title": result.metadata.title if result.metadata else "YouTube Video",
