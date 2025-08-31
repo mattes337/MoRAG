@@ -492,11 +492,16 @@ class FactExtractor:
                     )
                     continue
 
-                # Extract required fact_text field
+                # Extract or generate fact_text field
                 fact_text = candidate.get('fact_text', '')
+
+                # If fact_text is missing, generate it from structured fields
+                if not fact_text or not fact_text.strip():
+                    fact_text = self._generate_fact_text_from_candidate(candidate)
+
                 if not fact_text or not fact_text.strip():
                     self.logger.debug(
-                        f"Candidate {i} missing fact_text",
+                        f"Candidate {i} missing fact_text and could not generate from fields",
                         candidate=candidate
                     )
                     continue
@@ -564,6 +569,59 @@ class FactExtractor:
                 continue
 
         return facts
+
+    def _generate_fact_text_from_candidate(self, candidate: Dict[str, Any]) -> str:
+        """Generate fact_text from structured candidate fields.
+
+        Args:
+            candidate: Fact candidate dictionary with structured fields
+
+        Returns:
+            Generated fact text string
+        """
+        # Try to use source_text if available
+        if candidate.get('source_text'):
+            return candidate['source_text'].strip()
+
+        # Generate from structured fields
+        subject = candidate.get('subject', '')
+        object_val = candidate.get('object', '')
+        approach = candidate.get('approach', '')
+        solution = candidate.get('solution', '')
+        remarks = candidate.get('remarks', '')
+
+        # Build fact text from available components
+        fact_parts = []
+
+        if subject and object_val:
+            if approach:
+                fact_parts.append(f"{subject} {approach} {object_val}")
+            else:
+                fact_parts.append(f"{subject} involves {object_val}")
+        elif subject:
+            fact_parts.append(subject)
+
+        if solution and solution != object_val:
+            fact_parts.append(f"This results in {solution}")
+
+        if remarks:
+            fact_parts.append(f"({remarks})")
+
+        # Join parts with appropriate punctuation
+        if fact_parts:
+            fact_text = '. '.join(part.strip() for part in fact_parts if part.strip())
+            # Ensure proper sentence ending
+            if fact_text and not fact_text.endswith('.'):
+                fact_text += '.'
+            return fact_text
+
+        # Fallback: try to construct from any available text fields
+        text_fields = ['statement', 'description', 'content', 'text']
+        for field in text_fields:
+            if candidate.get(field):
+                return candidate[field].strip()
+
+        return ""
 
     def _create_domain_filter_configs(self) -> Dict[str, DomainFilterConfig]:
         """Create domain filter configurations based on extraction context.

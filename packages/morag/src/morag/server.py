@@ -241,7 +241,7 @@ def main():
     host = os.getenv("MORAG_HOST", "0.0.0.0")
     port = int(os.getenv("MORAG_PORT", "8000"))
     reload = os.getenv("MORAG_RELOAD", "false").lower() == "true"
-    log_level = os.getenv("MORAG_LOG_LEVEL", "info")
+    log_level = os.getenv("MORAG_LOG_LEVEL", "info").lower()  # Ensure lowercase for uvicorn
 
     # Create app
     app = create_app()
