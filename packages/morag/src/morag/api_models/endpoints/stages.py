@@ -341,13 +341,33 @@ async def execute_stage(
             model_config_dict['agent_models'] = {k: v for k, v in model_config_dict['agent_models'].items() if v is not None}
             merged_config['model_config'] = model_config_dict
 
-        context = StageContext(
-            source_path=input_file_paths[0] if input_file_paths else None,
-            output_dir=output_path,
-            webhook_url=request_webhook_url,
-            config=merged_config
-        )
-        
+        # Validate all required variables are defined before creating context
+        if 'input_file_paths' not in locals():
+            raise HTTPException(status_code=500, detail="input_file_paths not defined")
+        if 'output_path' not in locals():
+            raise HTTPException(status_code=500, detail="output_path not defined")
+        if 'request_webhook_url' not in locals():
+            raise HTTPException(status_code=500, detail="request_webhook_url not defined")
+        if 'merged_config' not in locals():
+            raise HTTPException(status_code=500, detail="merged_config not defined")
+
+        # Create stage context - ensure this is always executed
+        try:
+            context = StageContext(
+                source_path=input_file_paths[0] if input_file_paths else None,
+                output_dir=output_path,
+                webhook_url=request_webhook_url,
+                config=merged_config
+            )
+        except Exception as e:
+            logger.error("Failed to create StageContext",
+                        input_file_paths=input_file_paths,
+                        output_path=str(output_path),
+                        request_webhook_url=request_webhook_url,
+                        merged_config=merged_config,
+                        error=str(e))
+            raise HTTPException(status_code=500, detail=f"Failed to create stage context: {str(e)}")
+
         # Execute stage
         start_time = datetime.now()
         result = await stage_manager.execute_stage(stage_type, input_file_paths, context)
@@ -496,12 +516,29 @@ async def execute_stage_chain(
             model_config_dict['agent_models'] = {k: v for k, v in model_config_dict['agent_models'].items() if v is not None}
             merged_config['model_config'] = model_config_dict
 
-        context = StageContext(
-            source_path=input_files[0] if input_files else None,
-            output_dir=output_dir,
-            webhook_url=parsed_request.webhook_config.url if parsed_request and parsed_request.webhook_config else None,
-            config=merged_config
-        )
+        # Validate all required variables are defined before creating context
+        if 'input_files' not in locals():
+            raise HTTPException(status_code=500, detail="input_files not defined")
+        if 'output_dir' not in locals():
+            raise HTTPException(status_code=500, detail="output_dir not defined")
+        if 'merged_config' not in locals():
+            raise HTTPException(status_code=500, detail="merged_config not defined")
+
+        # Create stage context with error handling
+        try:
+            context = StageContext(
+                source_path=input_files[0] if input_files else None,
+                output_dir=output_dir,
+                webhook_url=parsed_request.webhook_config.url if parsed_request and parsed_request.webhook_config else None,
+                config=merged_config
+            )
+        except Exception as e:
+            logger.error("Failed to create StageContext in stage chain",
+                        input_files=input_files,
+                        output_dir=str(output_dir),
+                        merged_config=merged_config,
+                        error=str(e))
+            raise HTTPException(status_code=500, detail=f"Failed to create stage context: {str(e)}")
 
         # Execute stage chain
         start_time = datetime.now()
