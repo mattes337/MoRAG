@@ -111,7 +111,10 @@ class LLMEntityNormalizer:
         
         # Use entity extraction agent for normalization - ALWAYS
         try:
-            entity_agent = get_agent("entity_extraction")
+            # Pass model override to ensure consistent model usage
+            from agents.base.config import ModelConfig
+            model_config = ModelConfig(model=self.model_name)
+            entity_agent = get_agent("entity_extraction", model=model_config)
 
             # Use the agent to extract and normalize the entity
             extraction_result = await entity_agent.extract_entities(

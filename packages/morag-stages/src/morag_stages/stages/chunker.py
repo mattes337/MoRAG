@@ -96,7 +96,10 @@ class ChunkerStage(Stage):
             # Fallback to dictionary config
             config = context_config
         
-        logger.info("Starting chunking", 
+        # Store model override for agent creation from context config
+        self._model_override = context_config.get('model') if context_config else None
+
+        logger.info("Starting chunking",
                    input_file=str(input_file),
                    config=config)
         
@@ -330,9 +333,23 @@ class ChunkerStage(Stage):
             return ""
 
         try:
-            if not self.summarization_agent:
-                # Use the agents framework to get a summarization agent
-                self.summarization_agent = get_agent("summarization")
+            # Always create a new agent with model override to avoid caching issues
+            model_override = getattr(self, '_model_override', None)
+            if model_override:
+                logger.info(f"Creating summarization agent with model override: {model_override}")
+                # Import agent creation directly to avoid caching
+                from agents.factory.utils import create_agent
+                from agents.base.config import AgentConfig, ModelConfig
+
+                # Create custom config with model override
+                config = AgentConfig(
+                    name="summarization",
+                    model=ModelConfig(model=model_override)
+                )
+                self.summarization_agent = create_agent("summarization", config)
+            else:
+                if not self.summarization_agent:
+                    self.summarization_agent = get_agent("summarization")
             
             # Create summarization using the agents framework
             content_type = metadata.get('type', 'text')

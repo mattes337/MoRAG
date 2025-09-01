@@ -281,7 +281,7 @@ class MarkdownConversionStage(Stage):
 
         logger.debug("Input validation successful",
                     file_path=file_str,
-                    content_type=content_type.value)
+                    content_type=content_type.value if hasattr(content_type, 'value') else str(content_type))
         return True
 
     async def _delegate_processing(

@@ -87,6 +87,45 @@ class FactGeneratorStage(Stage):
             self.entity_normalizer = None
 
         self.extraction_agent = None
+
+    async def _initialize_services_with_config(self, config: FactGeneratorConfig):
+        """Initialize services with runtime configuration.
+
+        Args:
+            config: Runtime configuration with potential CLI overrides
+        """
+        if not SERVICES_AVAILABLE:
+            return
+
+        import os
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            logger.warning("GEMINI_API_KEY not found - fact extraction disabled")
+            self.fact_extractor = None
+            self.entity_normalizer = None
+            return
+
+        # Use model from config (which includes CLI overrides) or fallback to environment
+        model_id = config.model or os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
+
+        # Initialize fact extractor with runtime config
+        if FactExtractor is not None:
+            self.fact_extractor = FactExtractor(
+                model_id=model_id,
+                api_key=api_key,
+                min_confidence=config.min_confidence,
+                allow_vague_language=config.allow_vague_language,
+                require_entities=config.require_entities,
+                min_fact_length=config.min_fact_length,
+                strict_validation=config.strict_validation
+            )
+
+        # Initialize entity normalizer with runtime config
+        if EntityNormalizer is not None:
+            self.entity_normalizer = EntityNormalizer(
+                model_name=model_id,
+                api_key=api_key
+            )
     
     async def execute(self, 
                      input_files: List[Path], 
@@ -113,7 +152,10 @@ class FactGeneratorStage(Stage):
         context_config = context.get_stage_config(self.stage_type)
         config = FactGeneratorConfig.from_env_and_overrides(context_config)
         
-        logger.info("Starting fact generation", 
+        # Reinitialize services with runtime configuration
+        await self._initialize_services_with_config(config)
+
+        logger.info("Starting fact generation",
                    input_file=str(input_file),
                    config=config)
         
@@ -352,27 +394,146 @@ class FactGeneratorStage(Stage):
                            facts_count=len(facts) if facts else 0,
                            facts_type=type(facts).__name__)
 
-                # Convert facts to the expected format
+                # Convert facts to the expected format and extract entities/relations
+                fact_list = []
+                entities_dict = {}
+                relations_list = []
+
+                for fact in facts:
+                    fact_dict = {
+                        'id': fact.id,
+                        'fact_text': fact.fact_text,
+                        'fact_type': fact.fact_type,
+                        'confidence': fact.extraction_confidence,
+                        'keywords': fact.keywords,
+                        'source_chunk': chunk_id,
+                        'source_document_id': fact.source_document_id,
+                        'source_chunk_id': fact.source_chunk_id,
+                        'domain': fact.domain,
+                        'language': fact.language,
+                        'structured_metadata': fact.structured_metadata.model_dump() if hasattr(fact.structured_metadata, 'model_dump') else fact.structured_metadata
+                    }
+                    fact_list.append(fact_dict)
+
+                    # Extract entities from structured metadata
+                    if hasattr(fact, 'structured_metadata') and fact.structured_metadata:
+                        metadata = fact.structured_metadata
+
+                        # Handle both dict and object types for metadata
+                        if isinstance(metadata, dict):
+                            primary_entities = metadata.get('primary_entities', [])
+                            domain_concepts = metadata.get('domain_concepts', [])
+                            relationships = metadata.get('relationships', [])
+                        else:
+                            primary_entities = getattr(metadata, 'primary_entities', [])
+                            domain_concepts = getattr(metadata, 'domain_concepts', [])
+                            relationships = getattr(metadata, 'relationships', [])
+
+                        # Extract primary entities
+                        for entity_name in primary_entities:
+                                entity_id = f"entity_{hash(entity_name.lower()) % 100000:05d}"
+                                if entity_id not in entities_dict:
+                                    entities_dict[entity_id] = {
+                                        'id': entity_id,
+                                        'name': entity_name,
+                                        'type': 'PRIMARY',
+                                        'confidence': fact.extraction_confidence,
+                                        'source_chunks': [chunk_id],
+                                        'source_facts': [fact.id],
+                                        'domain': fact.domain,
+                                        'language': fact.language
+                                    }
+                                else:
+                                    # Update existing entity
+                                    if chunk_id not in entities_dict[entity_id]['source_chunks']:
+                                        entities_dict[entity_id]['source_chunks'].append(chunk_id)
+                                    if fact.id not in entities_dict[entity_id]['source_facts']:
+                                        entities_dict[entity_id]['source_facts'].append(fact.id)
+
+                        # Extract domain concepts as entities
+                        for concept_name in domain_concepts:
+                                entity_id = f"entity_{hash(concept_name.lower()) % 100000:05d}"
+                                if entity_id not in entities_dict:
+                                    entities_dict[entity_id] = {
+                                        'id': entity_id,
+                                        'name': concept_name,
+                                        'type': 'CONCEPT',
+                                        'confidence': fact.extraction_confidence * 0.8,  # Slightly lower confidence for concepts
+                                        'source_chunks': [chunk_id],
+                                        'source_facts': [fact.id],
+                                        'domain': fact.domain,
+                                        'language': fact.language
+                                    }
+                                else:
+                                    # Update existing entity
+                                    if chunk_id not in entities_dict[entity_id]['source_chunks']:
+                                        entities_dict[entity_id]['source_chunks'].append(chunk_id)
+                                    if fact.id not in entities_dict[entity_id]['source_facts']:
+                                        entities_dict[entity_id]['source_facts'].append(fact.id)
+
+                        # Extract relationships
+                        logger.debug(f"Processing relationships for fact {fact.id}: {len(relationships)} relationships found")
+                        for rel in relationships:
+                            logger.debug(f"Processing relationship: {rel} (type: {type(rel)})")
+
+                            # Handle both dict and object types for relationships
+                            if isinstance(rel, dict):
+                                source = rel.get('source')
+                                rel_type = rel.get('type')
+                                target = rel.get('target')
+                            else:
+                                # Handle EntityRelationship objects
+                                source = getattr(rel, 'source', None)
+                                rel_type = getattr(rel, 'type', None)
+                                target = getattr(rel, 'target', None)
+
+                            if source and rel_type and target:
+                                logger.debug(f"Relationship validation passed: {source} --[{rel_type}]--> {target}")
+                                relation_id = f"rel_{hash(f'{source}_{rel_type}_{target}') % 100000:05d}"
+                                # Check if relation already exists
+                                existing_relation = None
+                                for existing in relations_list:
+                                    if (existing['source'] == source and
+                                        existing['type'] == rel_type and
+                                        existing['target'] == target):
+                                        existing_relation = existing
+                                        break
+
+                                if existing_relation:
+                                    # Update existing relation
+                                    if chunk_id not in existing_relation['source_chunks']:
+                                        existing_relation['source_chunks'].append(chunk_id)
+                                    if fact.id not in existing_relation['source_facts']:
+                                        existing_relation['source_facts'].append(fact.id)
+                                else:
+                                    # Create new relation
+                                    relation = {
+                                        'id': relation_id,
+                                        'source': source,
+                                        'type': rel_type,
+                                        'target': target,
+                                        'confidence': fact.extraction_confidence,
+                                        'source_chunks': [chunk_id],
+                                        'source_facts': [fact.id],
+                                        'domain': fact.domain,
+                                        'language': fact.language
+                                    }
+                                    relations_list.append(relation)
+                                    logger.debug(f"Added relation: {source} --[{rel_type}]--> {target}")
+                            else:
+                                logger.debug(f"Relationship validation failed: source={source}, type={rel_type}, target={target}")
+
+                logger.debug(f"Final relations_list before creating extraction_result: {len(relations_list)} relations")
+                for i, rel in enumerate(relations_list):
+                    logger.debug(f"Relation {i}: {rel.get('source', 'N/A')} --[{rel.get('type', 'N/A')}]--> {rel.get('target', 'N/A')}")
+
                 extraction_result = {
-                    'entities': [],
-                    'relations': [],
-                    'facts': [
-                        {
-                            'id': fact.id,
-                            'fact_text': fact.fact_text,
-                            'fact_type': fact.fact_type,
-                            'confidence': fact.extraction_confidence,
-                            'keywords': fact.keywords,
-                            'source_chunk': chunk_id,
-                            'source_document_id': fact.source_document_id,
-                            'source_chunk_id': fact.source_chunk_id,
-                            'domain': fact.domain,
-                            'language': fact.language,
-                            'structured_metadata': fact.structured_metadata.model_dump() if hasattr(fact.structured_metadata, 'model_dump') else fact.structured_metadata
-                        }
-                        for fact in facts
-                    ]
+                    'entities': list(entities_dict.values()),
+                    'relations': relations_list,
+                    'facts': fact_list
                 }
+
+                logger.debug(f"Extraction result relations count: {len(extraction_result.get('relations', []))}")
                 
                 # Add source chunk information
                 for entity in extraction_result.get('entities', []):
@@ -756,7 +917,7 @@ Return valid JSON only."""
         return deduplicated
 
     def _deduplicate_relations(self, relations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Deduplicate relations by subject-predicate-object.
+        """Deduplicate relations by source-type-target.
 
         Args:
             relations: List of relation dictionaries
@@ -768,14 +929,30 @@ Return valid JSON only."""
         deduplicated = []
 
         for relation in relations:
-            subject = relation.get('subject', '').lower()
-            predicate = relation.get('predicate', '').upper()
-            obj = relation.get('object', '').lower()
+            source = relation.get('source', '').lower()
+            rel_type = relation.get('type', '').upper()
+            target = relation.get('target', '').lower()
 
-            relation_key = (subject, predicate, obj)
+            relation_key = (source, rel_type, target)
             if relation_key not in seen_relations:
                 seen_relations.add(relation_key)
                 deduplicated.append(relation)
+            else:
+                # Merge source chunks and facts for duplicate relations
+                for existing in deduplicated:
+                    if (existing.get('source', '').lower() == source and
+                        existing.get('type', '').upper() == rel_type and
+                        existing.get('target', '').lower() == target):
+                        # Merge source chunks
+                        existing_chunks = set(existing.get('source_chunks', []))
+                        new_chunks = set(relation.get('source_chunks', []))
+                        existing['source_chunks'] = list(existing_chunks | new_chunks)
+
+                        # Merge source facts
+                        existing_facts = set(existing.get('source_facts', []))
+                        new_facts = set(relation.get('source_facts', []))
+                        existing['source_facts'] = list(existing_facts | new_facts)
+                        break
 
         return deduplicated
 
@@ -792,7 +969,7 @@ Return valid JSON only."""
         deduplicated = []
 
         for fact in facts:
-            statement = fact.get('statement', '').lower().strip()
+            statement = fact.get('fact_text', '').lower().strip()
             if statement and statement not in seen_statements:
                 seen_statements.add(statement)
                 deduplicated.append(fact)

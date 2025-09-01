@@ -12,16 +12,14 @@ from ..exceptions import StageExecutionError, StageValidationError
 
 # Import LLM services with graceful fallback
 try:
-    from morag_core.ai import create_agent_with_config, SummarizationAgent, AgentConfig
+    from morag_reasoning.llm import LLMClient, LLMConfig as ReasoningLLMConfig
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
-    # Create placeholder functions/classes for runtime
-    def create_agent_with_config(*args, **kwargs):  # type: ignore
-        return None
-    class SummarizationAgent:  # type: ignore
+    # Create placeholder classes for runtime
+    class LLMClient:  # type: ignore
         pass
-    class AgentConfig:  # type: ignore
+    class ReasoningLLMConfig:  # type: ignore
         pass
 
 logger = structlog.get_logger(__name__)
@@ -316,9 +314,6 @@ class MarkdownOptimizerStage(Stage):
             Optimized content
         """
         try:
-            # Import LLM client and config
-            from morag_reasoning.llm import LLMClient, LLMConfig as ReasoningLLMConfig
-
             # Get LLM configuration with stage-specific overrides
             unified_llm_config = config.get_llm_config()
 
@@ -517,38 +512,41 @@ class MarkdownOptimizerStage(Stage):
         Returns:
             System prompt string
         """
-        base_prompt = """You are an expert content optimizer. Your task is to improve the readability and structure of the provided content while preserving all important information.
+        base_prompt = """You are a text correction specialist. Your ONLY task is to fix OCR errors, punctuation, and basic formatting issues while preserving ALL original content exactly as written.
 
-CRITICAL CONTENT REQUIREMENT: You MUST work ONLY with the content provided in the user message. DO NOT add, generate, or hallucinate any new content. DO NOT add examples, conversations, or any content that is not in the original document.
+CRITICAL CONTENT REQUIREMENT: You MUST preserve EVERY SINGLE WORD and ALL MEANING from the original content. DO NOT summarize, condense, rephrase, or change the meaning in any way. DO NOT add, remove, or generate any new content.
 
-CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language, especially English or Spanish. Analyze the content language and keep ALL content in that same language.
+CRITICAL LANGUAGE REQUIREMENT: You MUST preserve the EXACT ORIGINAL LANGUAGE of the content. DO NOT translate or switch to any other language.
 
 CRITICAL OUTPUT FORMAT REQUIREMENTS:
-- Return ONLY the optimized version of the provided content
+- Return ONLY the corrected version of the provided content
 - DO NOT wrap the content in code blocks (```markdown or ```)
 - DO NOT add any explanatory text, metadata, or JSON wrapping
-- DO NOT add prefixes like "Document Analysis:" or "Content:" to titles
-- DO NOT add document information sections or metadata sections
-- DO NOT generate or add any new content, examples, or conversations
 - Return the content exactly as it should appear in the final markdown file
 
-CRITICAL FORMATTING REQUIREMENTS:
-- PRESERVE ALL NEWLINES AND LINE BREAKS exactly as they appear in the original content
-- PRESERVE ALL WHITESPACE FORMATTING including indentation and spacing
-- Return content in valid markdown format
-- DO NOT remove line breaks from transcriptions or structured content
+YOUR ONLY ALLOWED CORRECTIONS:
+1. Fix OCR errors where letters are missing spaces (e.g., "P anzliche" → "Pflanzliche")
+2. Fix obvious character recognition errors (e.g., "fl" → "fl", "fi" → "fi")
+3. Fix punctuation spacing and basic formatting
+4. Fix broken words that are clearly OCR mistakes
+5. Ensure proper markdown formatting structure
 
-REMOVE CLUTTER: Remove non-essential elements such as:
-- Table of contents and indexes
-- Acknowledgements and dedications
-- Navigation elements and boilerplate text
-- Repetitive headers and footers
-- Page numbers and reference markers
-- Copyright notices and disclaimers (unless specifically relevant to content)
-- Advertisement sections and promotional content
-- Redundant metadata and formatting artifacts
+STRICTLY FORBIDDEN:
+- DO NOT summarize or condense any content
+- DO NOT rephrase or rewrite sentences
+- DO NOT change the meaning or structure of paragraphs
+- DO NOT remove any information, facts, or details
+- DO NOT add new content or explanations
+- DO NOT change the order of information
+- DO NOT merge or split paragraphs unless fixing clear OCR line break errors
 
-PRESERVE ESSENTIAL CONTENT: Keep all substantive information, facts, data, and meaningful structural elements."""
+PRESERVE EXACTLY:
+- All facts, data, and information
+- All names, places, and specific details
+- All lists, instructions, and recommendations
+- All paragraph structure and organization
+- All headings and subheadings
+- All tables and structured content"""
 
         if config.fix_transcription_errors:
             base_prompt += " Fix any transcription errors you notice."
