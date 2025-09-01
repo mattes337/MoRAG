@@ -639,7 +639,7 @@ Guidelines:
         """
         max_entities = getattr(config, 'max_entities_per_chunk', 20)
         max_relations = getattr(config, 'max_relations_per_chunk', 15)
-        min_confidence = getattr(config, 'min_confidence', 0.7)
+        min_confidence = getattr(config, 'min_confidence', 0.3)
 
         return f"""Extract structured information from this text. Limit to {max_entities} entities and {max_relations} relations. Only include items with confidence >= {min_confidence}.
 

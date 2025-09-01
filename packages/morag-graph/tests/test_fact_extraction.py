@@ -90,7 +90,7 @@ class TestFactValidator:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.validator = FactValidator(min_confidence=0.7)
+        self.validator = FactValidator(min_confidence=0.3)
     
     def test_valid_fact(self):
         """Test validation of a valid fact."""

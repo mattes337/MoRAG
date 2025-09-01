@@ -70,7 +70,7 @@ class FactValidator:
         if vague_language_detected and self.allow_vague_language:
             # Mark fact with lower confidence but don't reject
             fact.extraction_confidence = max(0.3, fact.extraction_confidence - 0.2)
-            fact.remarks = (fact.remarks or "") + " [Contains vague language - confidence reduced]"
+            # Note: vague language detected but allowed
             warnings.extend(specificity_issues)
         else:
             issues.extend(specificity_issues)
@@ -373,11 +373,13 @@ class FactValidator:
             penalty = min(0.8, len(issues) * 0.2)
             return max(0.0, fact.extraction_confidence - penalty)
         
-        # Bonus for completeness
+        # Bonus for completeness based on new model structure
         completeness_bonus = 0.0
-        if fact.approach and fact.solution:
-            completeness_bonus += 0.1
-        if fact.remarks:
+        if fact.structured_metadata.primary_entities:
+            completeness_bonus += 0.05
+        if fact.structured_metadata.relationships:
+            completeness_bonus += 0.05
+        if fact.structured_metadata.domain_concepts:
             completeness_bonus += 0.05
         if fact.keywords:
             completeness_bonus += 0.05

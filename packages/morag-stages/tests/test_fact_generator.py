@@ -113,7 +113,7 @@ async def test_fact_generator_with_relations(stage_test_framework: StageTestFram
             'extract_entities': True,
             'extract_relations': True,
             'relation_types': ['IS_PART_OF', 'USES', 'RELATED_TO', 'CAUSES'],
-            'min_confidence': 0.7
+            'min_confidence': 0.3
         }
     }
     

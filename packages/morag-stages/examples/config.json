@@ -47,7 +47,7 @@
     "domain": "general",
     "entity_types": null,
     "relation_types": null,
-    "min_confidence": 0.7,
+    "min_confidence": 0.3,
     "max_entities_per_chunk": 20,
     "max_relations_per_chunk": 15,
     "model": "gemini-1.5-flash",

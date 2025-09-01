@@ -247,9 +247,9 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
     provider: Optional[str] = Field(default=None, description="LLM provider override")
 
     # Quality validation settings
-    min_confidence: float = Field(default=0.5, description="Minimum confidence threshold for facts")
-    allow_vague_language: bool = Field(default=False, description="Allow facts with vague language (typically, usually, etc.)")
-    require_entities: bool = Field(default=True, description="Require primary entities in structured metadata")
+    min_confidence: float = Field(default=0.3, description="Minimum confidence threshold for facts")
+    allow_vague_language: bool = Field(default=True, description="Allow facts with vague language (typically, usually, etc.)")
+    require_entities: bool = Field(default=False, description="Require primary entities in structured metadata")
     min_fact_length: int = Field(default=20, description="Minimum fact text length")
     strict_validation: bool = Field(default=True, description="Enable strict quality validation")
 
@@ -263,7 +263,7 @@ class FactGeneratorConfig(BaseModel, ConfigMixin):
     domain: str = Field(default="general", description="Domain for extraction")
     
     # Quality settings
-    min_confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Minimum confidence threshold")
+    # min_confidence already defined above - removed duplicate
     max_entities_per_chunk: int = Field(default=20, ge=1, description="Maximum entities per chunk")
     max_relations_per_chunk: int = Field(default=15, ge=1, description="Maximum relations per chunk")
     

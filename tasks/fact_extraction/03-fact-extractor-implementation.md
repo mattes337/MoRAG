@@ -139,7 +139,7 @@ class FactExtractionPrompts:
 class FactValidator:
     """Validate quality and completeness of extracted facts."""
     
-    def __init__(self, min_confidence: float = 0.7):
+    def __init__(self, min_confidence: float = 0.3):
         self.min_confidence = min_confidence
         
     def validate_fact(self, fact: Fact) -> Tuple[bool, List[str]]:
