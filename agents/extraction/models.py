@@ -73,14 +73,10 @@ class RelationTypeExamples:
 class ExtractedFact(BaseModel):
     """A fact extracted from text."""
     
-    subject: str = Field(..., description="The main entity or concept")
-    object: str = Field(..., description="What the subject relates to or acts upon")
-    approach: Optional[str] = Field(None, description="How something is done or implemented")
-    solution: Optional[str] = Field(None, description="What problem is solved or benefit provided")
-    condition: Optional[str] = Field(None, description="Under what circumstances this applies")
-    remarks: Optional[str] = Field(None, description="Additional context or limitations")
-    fact_type: str = Field(..., description="Type of fact (domain-specific, LLM-generated)")
+    fact_text: str = Field(..., description="Complete, self-contained fact statement")
+    fact_type: str = Field(..., description="Type of fact (statistical, causal, technical, definition, procedural)")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
+    structured_metadata: Dict[str, Any] = Field(default_factory=dict, description="Structured metadata with entities and relationships")
     keywords: List[str] = Field(default_factory=list, description="Relevant technical terms")
     source_text: Optional[str] = Field(None, description="Source text span")
 

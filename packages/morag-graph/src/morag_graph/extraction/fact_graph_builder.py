@@ -91,6 +91,15 @@ class FactGraphBuilder:
                 error=str(e),
                 error_type=type(e).__name__
             )
+            # Add detailed debugging for the string join error
+            if "expected str instance" in str(e):
+                self.logger.error(
+                    "String join error detected - checking relationship types",
+                    relationships_count=len(relationships) if 'relationships' in locals() else 0,
+                    relationships_types=[type(r).__name__ for r in relationships[:3]] if 'relationships' in locals() else []
+                )
+            import traceback
+            self.logger.error("Full traceback:", traceback=traceback.format_exc())
             # Return empty graph on failure
             return Graph(nodes=[], edges=[])
     
@@ -179,9 +188,38 @@ class FactGraphBuilder:
                 # Convert facts to dictionaries for LLM prompt
                 fact_dicts = [self._fact_to_prompt_dict(fact) for fact in facts]
 
+                # Extract direct relationships from structured metadata
+                direct_relationships = []
+                for fact in facts:
+                    if hasattr(fact, 'structured_metadata') and fact.structured_metadata:
+                        fact_relationships = fact.structured_metadata.relationships
+                        for rel in fact_relationships:
+                            # Handle both dict and EntityRelationship objects
+                            if isinstance(rel, dict) and 'source' in rel and 'type' in rel and 'target' in rel:
+                                # Create FactRelation from dict
+                                fact_relation = FactRelation(
+                                    source_fact_id=rel['source'],  # Entity name as source
+                                    target_fact_id=rel['target'],  # Entity name as target
+                                    relation_type=rel['type'].upper(),
+                                    confidence=0.9,
+                                    context=f"Direct relationship from fact: {fact.fact_text[:100]}..."
+                                )
+                                direct_relationships.append(fact_relation)
+                            elif hasattr(rel, 'source') and hasattr(rel, 'type') and hasattr(rel, 'target'):
+                                # Create FactRelation from EntityRelationship object
+                                fact_relation = FactRelation(
+                                    source_fact_id=rel.source,  # Entity name as source
+                                    target_fact_id=rel.target,  # Entity name as target
+                                    relation_type=rel.type.upper(),
+                                    confidence=0.9,
+                                    context=f"Direct relationship from fact: {fact.fact_text[:100]}..."
+                                )
+                                direct_relationships.append(fact_relation)
+
                 self.logger.debug(
                     f"Extracting relationships for {len(facts)} facts (attempt {attempt + 1}/{max_retries})",
-                    fact_ids=[f.id for f in facts]
+                    fact_ids=[f.id for f in facts],
+                    direct_relationships=len(direct_relationships)
                 )
 
                 # Create relationship extraction prompt using agents framework
@@ -249,11 +287,14 @@ class FactGraphBuilder:
                 # Convert to FactRelation objects
                 relationships = self._create_fact_relation_objects(relationship_data, facts)
 
+                # Combine LLM-generated relationships with direct relationships from structured metadata
+                all_relationships = direct_relationships + relationships
+
                 self.logger.info(
-                    f"Successfully created {len(relationships)} fact relationships from {len(relationship_data)} candidates on attempt {attempt + 1}"
+                    f"Successfully created {len(all_relationships)} fact relationships: {len(direct_relationships)} direct + {len(relationships)} LLM-generated on attempt {attempt + 1}"
                 )
 
-                return relationships
+                return all_relationships
 
             except json.JSONDecodeError as e:
                 self.logger.warning(
@@ -312,16 +353,16 @@ class FactGraphBuilder:
                     await asyncio.sleep(retry_delay)
                     continue
                 else:
-                    self.logger.info("Relationship extraction failed after all attempts - returning empty relationships")
-                    return []
+                    self.logger.info(f"LLM relationship extraction failed after all attempts - returning {len(direct_relationships)} direct relationships")
+                    return direct_relationships
 
-        # If we get here, all retries failed
+        # If we get here, all retries failed - but we might still have direct relationships
         self.logger.error(
-            f"Relationship extraction failed after {max_retries} attempts",
+            f"LLM relationship extraction failed after {max_retries} attempts - returning {len(direct_relationships)} direct relationships",
             batch_size=len(facts),
             fact_ids=[f.id for f in facts]
         )
-        return []
+        return direct_relationships
     
     def _fact_to_prompt_dict(self, fact: Fact) -> Dict[str, Any]:
         """Convert fact to dictionary for LLM prompt.
@@ -356,6 +397,16 @@ class FactGraphBuilder:
         try:
             # Clean the response first
             cleaned_response = response.strip()
+
+            # Remove markdown code blocks if present
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]  # Remove ```json
+            if cleaned_response.startswith('```'):
+                cleaned_response = cleaned_response[3:]   # Remove ```
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+
+            cleaned_response = cleaned_response.strip()
 
             # Pre-process to fix malformed keys with newlines
             cleaned_response = self._preprocess_malformed_keys(cleaned_response)
@@ -535,11 +586,11 @@ class FactGraphBuilder:
 
         # Map of expected keys to handle variations
         key_mappings = {
-            'source_fact_id': ['source_fact_id', 'sourcefactid', 'source_id'],
-            'target_fact_id': ['target_fact_id', 'targetfactid', 'target_id'],
-            'relation_type': ['relation_type', 'relationtype', 'type'],
+            'source_fact_id': ['source_fact_id', 'sourcefactid', 'source_id', 'source_entity', 'sourceentity'],
+            'target_fact_id': ['target_fact_id', 'targetfactid', 'target_id', 'target_entity', 'targetentity'],
+            'relation_type': ['relation_type', 'relationtype', 'type', 'relationship_type'],
             'confidence': ['confidence', 'conf'],
-            'context': ['context', 'description', 'desc']
+            'context': ['context', 'description', 'desc', 'explanation']
         }
 
         # Normalize keys by removing whitespace and converting to lowercase
@@ -652,7 +703,8 @@ class FactGraphBuilder:
                     )
                     continue
 
-                # Validate relation type
+                # Validate relation type (normalize to uppercase)
+                relation_type = relation_type.upper()
                 valid_types = FactRelationType.all_types()
                 if relation_type not in valid_types:
                     self.logger.debug(
@@ -739,16 +791,50 @@ class FactGraphBuilder:
         
         # Convert relationships to graph edges
         edges = []
-        for relationship in relationships:
-            edge = GraphEdge(
-                source=relationship.source_fact_id,
-                target=relationship.target_fact_id,
-                type=relationship.relation_type,
-                properties=relationship.get_neo4j_properties()
-            )
-            edges.append(edge)
+        self.logger.debug(f"Converting {len(relationships)} relationships to graph edges")
+        for i, relationship in enumerate(relationships):
+            try:
+                # Handle both FactRelation and EntityRelationship objects
+                if hasattr(relationship, 'get_neo4j_properties'):
+                    # FactRelation object
+                    properties = relationship.get_neo4j_properties()
+                    source = relationship.source_fact_id
+                    target = relationship.target_fact_id
+                    rel_type = relationship.relation_type
+                else:
+                    # EntityRelationship or other object - create basic properties
+                    properties = {
+                        'confidence': getattr(relationship, 'confidence', 0.9),
+                        'context': getattr(relationship, 'context', ''),
+                        'source': 'structured_metadata'
+                    }
+                    source = getattr(relationship, 'source', str(relationship))
+                    target = getattr(relationship, 'target', '')
+                    rel_type = getattr(relationship, 'type', 'RELATED')
+
+                edge = GraphEdge(
+                    source=source,
+                    target=target,
+                    type=rel_type,
+                    properties=properties
+                )
+                edges.append(edge)
+                self.logger.debug(f"Successfully created edge {i+1}: {source} --[{rel_type}]--> {target}")
+            except Exception as e:
+                self.logger.warning(f"Failed to create edge from relationship {i+1}: {e}", relationship=relationship, relationship_type=type(relationship).__name__)
         
-        return Graph(nodes=nodes, edges=edges)
+        # Create a simple object to hold the graph data
+        # Since we need to return edges for the extraction script
+        class GraphResult:
+            def __init__(self, nodes, edges):
+                self.nodes = nodes
+                self.edges = edges
+
+        graph_result = GraphResult(nodes, edges)
+
+        self.logger.debug(f"Created graph with {len(nodes)} nodes and {len(edges)} edges")
+
+        return graph_result
     
     async def _index_facts(self, facts: List[Fact]) -> None:
         """Create keyword and domain indexes for facts.
@@ -892,22 +978,64 @@ class FactGraphBuilder:
             Formatted prompt string
         """
         facts_text = "\n".join([
-            f"Fact {i+1}: {fact.get('subject', '')} {fact.get('predicate', '')} {fact.get('object', '')}"
+            f"Fact {i+1} (ID: {fact.get('id', f'fact_{i+1}')}): {fact.get('fact_text', '')}"
             for i, fact in enumerate(fact_dicts)
         ])
 
-        prompt = f"""Analyze the following facts and identify relationships between them.
+        # Extract entities and relationships from facts
+        entities_text = ""
+        entity_map = {}
+        direct_relationships = []
+
+        for i, fact in enumerate(fact_dicts):
+            fact_id = fact.get('id', f'fact_{i+1}')
+            fact_text = fact.get('fact_text', '')
+
+            # Extract entities from structured metadata
+            structured_metadata = fact.get('structured_metadata', {})
+            primary_entities = structured_metadata.get('primary_entities', [])
+            fact_relationships = structured_metadata.get('relationships', [])
+
+            if primary_entities:
+                entities_text += f"\nFact {i+1} entities: {', '.join(primary_entities)}"
+                for entity in primary_entities:
+                    if entity not in entity_map:
+                        entity_map[entity] = []
+                    entity_map[entity].append(fact_id)
+
+            # Extract direct relationships from structured metadata
+            for rel in fact_relationships:
+                if isinstance(rel, dict) and 'source' in rel and 'type' in rel and 'target' in rel:
+                    direct_relationships.append({
+                        'source_entity': rel['source'],
+                        'target_entity': rel['target'],
+                        'relationship_type': rel['type'],
+                        'confidence': 0.9,  # High confidence for directly extracted relationships
+                        'explanation': f"Direct relationship from fact: {fact_text[:100]}...",
+                        'supporting_facts': [fact_id]
+                    })
+
+        prompt = f"""Analyze the following facts and their entities to identify ENTITY-TO-ENTITY relationships.
 
 Facts to analyze:
 {facts_text}
 
-Please identify semantic relationships between these facts and return them in JSON format.
+Entities extracted:
+{entities_text}
+
+Please identify semantic relationships BETWEEN ENTITIES (not facts) and return them in JSON format.
 Each relationship should have:
-- source_fact_id: ID of the source fact
-- target_fact_id: ID of the target fact
-- relationship_type: Type of relationship (e.g., "supports", "contradicts", "elaborates", "temporal")
+- source_entity: Name of the source entity
+- target_entity: Name of the target entity
+- relationship_type: Type of relationship (e.g., "AFFECTS", "CAUSES", "CONTAINS", "LOCATED_IN", "PART_OF")
 - confidence: Confidence score (0.0 to 1.0)
 - explanation: Brief explanation of the relationship
+- supporting_facts: List of fact IDs that support this relationship
+
+Focus on meaningful entity relationships like:
+- "Toxoplasma gondii" AFFECTS "Brain"
+- "Blood-brain barrier" PROTECTS "Brain"
+- "Cats" HOSTS "Toxoplasma gondii"
 
 Return only valid JSON without any additional text."""
 

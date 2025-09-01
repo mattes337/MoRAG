@@ -3,17 +3,36 @@
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any, ClassVar
+from typing import Optional, List, Dict, Any, ClassVar, Union
 from pydantic import BaseModel, Field
 
 from .types import FactId
+
+
+class EntityRelationship(BaseModel):
+    """Structured entity-to-entity relationship."""
+    source: str = Field(..., description="Source entity name")
+    type: str = Field(..., description="Relationship type (e.g., AFFECTS, CAUSES, CONTAINS)")
+    target: str = Field(..., description="Target entity name")
+
+    def to_dict(self) -> Dict[str, str]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "source": self.source,
+            "type": self.type,
+            "target": self.target
+        }
+
+    def __str__(self) -> str:
+        """String representation for compatibility."""
+        return f"{self.source} {self.type} {self.target}"
 
 
 class StructuredMetadata(BaseModel):
     """Structured metadata extracted from fact text for graph building."""
 
     primary_entities: List[str] = Field(default_factory=list, description="Key entities mentioned in the fact")
-    relationships: List[str] = Field(default_factory=list, description="Important relationships or actions")
+    relationships: List[Union[str, EntityRelationship, Dict[str, Any]]] = Field(default_factory=list, description="Entity relationships (structured or string)")
     domain_concepts: List[str] = Field(default_factory=list, description="Domain-specific concepts and terms")
 
 
@@ -98,7 +117,7 @@ class Fact(BaseModel):
             "id": self.id,
             "fact_text": self.fact_text,
             "primary_entities": ",".join(self.structured_metadata.primary_entities) if self.structured_metadata.primary_entities else "",
-            "relationships": ",".join(self.structured_metadata.relationships) if self.structured_metadata.relationships else "",
+            "relationships": ",".join(str(rel) for rel in self.structured_metadata.relationships) if self.structured_metadata.relationships else "",
             "domain_concepts": ",".join(self.structured_metadata.domain_concepts) if self.structured_metadata.domain_concepts else "",
             "fact_type": self.fact_type,
             "domain": self.domain,

@@ -121,14 +121,9 @@ class ResponseQualityAssessor:
         self.min_accuracy_threshold = self.config.get('min_accuracy_threshold', 0.8)
         self.min_citation_quality_threshold = self.config.get('min_citation_quality_threshold', 0.6)
         
-        # Performance settings
-        self.enable_caching = self.config.get('enable_caching', True)
-        self.cache_size = self.config.get('cache_size', 100)
-        
         # Initialize components
         self._llm_client = None
         self._embedding_model = None
-        self._cache = {} if self.enable_caching else None
         
         logger.info(
             "Response quality assessor initialized",

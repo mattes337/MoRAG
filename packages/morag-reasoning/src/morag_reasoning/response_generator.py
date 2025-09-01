@@ -109,9 +109,7 @@ class ResponseGenerator:
         self.enable_consistency_check = self.config.get('enable_consistency_check', True)
         self.enable_reasoning_explanation = self.config.get('enable_reasoning_explanation', True)
         
-        # Performance settings
-        self.enable_caching = self.config.get('enable_caching', True)
-        self.cache_size = self.config.get('cache_size', 100)
+
         
         # Initialize components
         self._llm_client = None

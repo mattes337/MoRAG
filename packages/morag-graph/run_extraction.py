@@ -15,7 +15,7 @@ Options:
     --model          Specify LLM model (default: gemini-2.0-flash)
     --verbose        Show detailed extraction output
     --output         Specify output file (default: input_file.json)
-    --min-confidence Minimum confidence threshold (default: 0.7)
+    --min-confidence Minimum confidence threshold (default: 0.3)
     --max-facts      Maximum facts per chunk (default: 10)
 """
 
@@ -24,6 +24,7 @@ import asyncio
 import json
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -118,7 +119,7 @@ async def extract_facts_from_file(
     api_key: str,
     model: str = "gemini-2.0-flash",
     domain: str = "general",
-    min_confidence: float = 0.7,
+    min_confidence: float = 0.3,
     max_facts: int = 10,
     verbose: bool = False
 ) -> Dict[str, Any]:
@@ -143,9 +144,24 @@ async def extract_facts_from_file(
         print(f"❌ Error reading file {input_file}: {e}")
         return {}
 
+    # Detect language from content
+    def detect_language(text):
+        """Simple language detection based on common words."""
+        german_indicators = ['der', 'die', 'das', 'und', 'ist', 'ein', 'eine', 'mit', 'von', 'zu', 'auf', 'für', 'über', 'kann', 'sind', 'haben', 'werden']
+        english_indicators = ['the', 'and', 'is', 'a', 'an', 'with', 'of', 'to', 'on', 'for', 'over', 'can', 'are', 'have', 'will']
+
+        text_lower = text.lower()
+        german_count = sum(1 for word in german_indicators if f' {word} ' in text_lower)
+        english_count = sum(1 for word in english_indicators if f' {word} ' in text_lower)
+
+        return "de" if german_count > english_count else "en"
+
+    detected_language = detect_language(content)
+
     if verbose:
         print(f"📄 Processing file: {input_file.name}")
         print(f"📝 Content length: {len(content)} characters")
+        print(f"🌍 Detected language: {detected_language}")
         print(f"🎯 Domain: {domain}")
         print(f"🎚️ Min confidence: {min_confidence}")
         print(f"📊 Max facts per chunk: {max_facts}")
@@ -154,6 +170,7 @@ async def extract_facts_from_file(
         "source_file": str(input_file),
         "model": model,
         "domain": domain,
+        "language": detected_language,
         "facts": [],
         "relationships": [],
         "statistics": {
@@ -168,19 +185,25 @@ async def extract_facts_from_file(
         if verbose:
             print("🔍 Extracting facts...")
 
+        # Initialize variables
+        facts = []
+
         # Initialize fact extractor
         fact_extractor = FactExtractor(
             model_id=model,
             api_key=api_key,
             min_confidence=min_confidence,
             max_facts_per_chunk=max_facts,
-            domain=domain
+            domain=domain,
+            language=detected_language,
+            require_entities=False,  # Allow facts without strict entity requirements
+            strict_validation=False  # Use more lenient validation
         )
 
         # Create a document chunk from the content
         document_id = f"doc_{input_file.stem}"
         chunk = DocumentChunk(
-            id=f"{document_id}_chunk_0",
+            id=f"{document_id}:chunk:0",
             document_id=document_id,
             chunk_index=0,
             text=content,
@@ -197,7 +220,7 @@ async def extract_facts_from_file(
             document_id=document_id,
             context={
                 "domain": domain,
-                "language": "en"
+                "language": detected_language
             }
         )
 
@@ -237,7 +260,11 @@ async def extract_facts_from_file(
             print(f"✅ Extracted {len(facts)} facts:")
             for fact in facts:
                 entities = fact.structured_metadata.primary_entities if fact.structured_metadata and fact.structured_metadata.primary_entities else ["N/A"]
-                entities_str = ", ".join(entities[:2])  # Show first 2 entities
+                # Ensure entities are strings (filter out any EntityRelationship objects that might have been mixed in)
+                string_entities = [str(entity) for entity in entities if isinstance(entity, (str, int, float))]
+                if not string_entities:
+                    string_entities = ["N/A"]
+                entities_str = ", ".join(string_entities[:2])  # Show first 2 entities
                 print(f"  • {fact.fact_text[:50]}... ({fact.fact_type}) - entities: {entities_str} - confidence: {fact.extraction_confidence:.2f}")
 
     except Exception as e:
@@ -260,29 +287,57 @@ async def extract_facts_from_file(
             # Build fact graph to identify relationships
             fact_graph = await fact_graph_builder.build_fact_graph(facts)
 
-            # Extract relationships from the graph
+            # Extract relationships from the graph edges
             relationships = []
-            if hasattr(fact_graph, 'relationships'):
-                relationships = fact_graph.relationships
+            if hasattr(fact_graph, 'edges'):
+                if verbose:
+                    print(f"🔍 Found {len(fact_graph.edges)} edges in graph")
+                # Convert graph edges to FactRelation objects
+                for edge in fact_graph.edges:
+                    try:
+                        # Create a FactRelation from the edge
+                        relationship = FactRelation(
+                            source_fact_id=edge.source,
+                            target_fact_id=edge.target,
+                            relation_type=edge.type,
+                            confidence=edge.properties.get('confidence', 0.7),
+                            context=edge.properties.get('context', '')
+                        )
+                        relationships.append(relationship)
+                        if verbose:
+                            print(f"✅ Created relationship: {edge.source} --[{edge.type}]--> {edge.target}")
+                    except Exception as edge_error:
+                        if verbose:
+                            print(f"❌ Error creating relationship from edge: {edge_error}")
+                            print(f"   Edge: {edge}")
+            else:
+                if verbose:
+                    print("❌ No edges found in fact graph")
 
             # Convert relationships to serializable format
             relationships_data = []
             relationship_types = {}
 
             for relationship in relationships:
-                relationship_dict = {
-                    "id": relationship.id,
-                    "source_fact_id": relationship.source_fact_id,
-                    "target_fact_id": relationship.target_fact_id,
-                    "relationship_type": relationship.relationship_type,
-                    "confidence": relationship.confidence,
-                    "description": relationship.description,
-                    "created_at": relationship.created_at.isoformat()
-                }
-                relationships_data.append(relationship_dict)
+                try:
+                    relationship_dict = {
+                        "id": getattr(relationship, 'id', f"rel_{len(relationships_data)}"),
+                        "source_fact_id": relationship.source_fact_id,
+                        "target_fact_id": relationship.target_fact_id,
+                        "relationship_type": relationship.relation_type,
+                        "confidence": relationship.confidence,
+                        "description": getattr(relationship, 'description', relationship.context),
+                        "created_at": getattr(relationship, 'created_at', datetime.now()).isoformat() if hasattr(getattr(relationship, 'created_at', datetime.now()), 'isoformat') else str(getattr(relationship, 'created_at', datetime.now()))
+                    }
+                    relationships_data.append(relationship_dict)
 
-                # Count relationship types
-                relationship_types[relationship.relationship_type] = relationship_types.get(relationship.relationship_type, 0) + 1
+                    # Count relationship types
+                    relationship_types[relationship.relation_type] = relationship_types.get(relationship.relation_type, 0) + 1
+                except Exception as e:
+                    if verbose:
+                        print(f"❌ Error serializing relationship: {e}")
+                        print(f"   Relationship attributes: {dir(relationship)}")
+                    continue
 
             results["relationships"] = relationships_data
             results["statistics"]["relationships_created"] = len(relationships)
@@ -294,33 +349,55 @@ async def extract_facts_from_file(
                     target_fact = next((f for f in facts if f.id == rel.target_fact_id), None)
 
                     if source_fact and target_fact:
-                        source_entities = source_fact.structured_metadata.primary_entities if source_fact.structured_metadata and source_fact.structured_metadata.primary_entities else ["Unknown"]
-                        target_entities = target_fact.structured_metadata.primary_entities if target_fact.structured_metadata and target_fact.structured_metadata.primary_entities else ["Unknown"]
-                        print(f"  • {source_entities[0]} --[{rel.relationship_type}]--> {target_entities[0]}")
+                        # Show fact text preview instead of entities (since entity extraction may not be enabled)
+                        source_preview = source_fact.fact_text[:50] + "..." if len(source_fact.fact_text) > 50 else source_fact.fact_text
+                        target_preview = target_fact.fact_text[:50] + "..." if len(target_fact.fact_text) > 50 else target_fact.fact_text
+                        print(f"  • \"{source_preview}\" --[{rel.relation_type}]--> \"{target_preview}\"")
 
         except Exception as e:
             print(f"❌ Error during relationship extraction: {e}")
+            print(f"❌ Error type: {type(e).__name__}")
             if verbose:
                 import traceback
                 traceback.print_exc()
+            # Still return results even if relationship extraction fails
+            pass
 
     return results
 
 
 def save_results(results: Dict[str, Any], output_file: Path, verbose: bool = False) -> bool:
     """Save extraction results to JSON file.
-    
+
     Args:
         results: Extraction results dictionary
         output_file: Path to output JSON file
         verbose: Show detailed output
-        
+
     Returns:
         True if saved successfully, False otherwise
     """
+    def json_serializer(obj):
+        """Custom JSON serializer for Pydantic models and other objects."""
+        if hasattr(obj, 'model_dump'):
+            # Pydantic v2 models
+            return obj.model_dump()
+        elif hasattr(obj, 'dict'):
+            # Pydantic v1 models
+            return obj.dict()
+        elif hasattr(obj, 'to_dict'):
+            # Custom to_dict method
+            return obj.to_dict()
+        elif hasattr(obj, '__dict__'):
+            # Generic objects with __dict__
+            return obj.__dict__
+        else:
+            # Fallback to string representation
+            return str(obj)
+
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
+            json.dump(results, f, indent=2, ensure_ascii=False, default=json_serializer)
         
         if verbose:
             print(f"💾 Results saved to: {output_file}")
@@ -345,7 +422,7 @@ async def main():
         epilog="""Examples:
   python run_extraction.py document.md                           # Extract facts with default settings
   python run_extraction.py document.md --domain research        # Extract facts for research domain
-  python run_extraction.py document.md --min-confidence 0.8     # Higher confidence threshold
+  python run_extraction.py document.md --min-confidence 0.5     # Higher confidence threshold
   python run_extraction.py document.md --max-facts 20           # More facts per chunk
   python run_extraction.py document.md --verbose                # Show detailed output
   python run_extraction.py document.md --output result.json     # Custom output file
@@ -374,8 +451,8 @@ async def main():
     parser.add_argument(
         "--min-confidence",
         type=float,
-        default=0.7,
-        help="Minimum confidence threshold (default: 0.7)"
+        default=0.3,
+        help="Minimum confidence threshold (default: 0.3)"
     )
 
     parser.add_argument(

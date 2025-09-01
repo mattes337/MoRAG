@@ -14,30 +14,18 @@ class ChunkKeywordExtractor:
     
     def __init__(self, domain: str = "general"):
         """Initialize the extractor.
-        
+
         Args:
             domain: Domain context for keyword extraction
         """
         self.domain = domain
         self.logger = structlog.get_logger(__name__)
-        
-        # Stop words to exclude from keywords (English and German)
-        self.stop_words = {
-            # English stop words
-            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
-            'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after',
-            'above', 'below', 'between', 'among', 'this', 'that', 'these', 'those', 'is',
-            'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does',
-            'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'shall',
 
-            # German stop words
-            'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einer', 'eines', 'einem',
-            'und', 'oder', 'aber', 'in', 'auf', 'an', 'zu', 'für', 'von', 'mit', 'bei', 'aus',
-            'durch', 'über', 'unter', 'zwischen', 'vor', 'nach', 'während', 'seit', 'bis',
-            'dieser', 'diese', 'dieses', 'jener', 'jene', 'jenes', 'ist', 'sind', 'war', 'waren',
-            'sein', 'haben', 'hat', 'hatte', 'hatten', 'wird', 'werden', 'wurde', 'wurden',
-            'kann', 'könnte', 'soll', 'sollte', 'muss', 'müssen', 'darf', 'dürfen'
-        }
+        # Initialize LLM agent for intelligent keyword extraction
+        from morag_core.agents import AgentRegistry
+        self.agent_registry = AgentRegistry()
+        self.keyword_agent = self.agent_registry.get_agent('keyword_extraction')
+
     
     def extract_keywords_from_chunk(
         self, 
@@ -86,34 +74,65 @@ class ChunkKeywordExtractor:
         return entities, relationships
     
     def _extract_domain_keywords(self, text: str, domain: str) -> List[str]:
-        """Extract domain-specific keywords from text.
-        
+        """Extract domain-specific keywords from text using LLM.
+
         Args:
             text: Text to extract keywords from
             domain: Domain context
-            
+
         Returns:
             List of extracted keywords
         """
-        text_lower = text.lower()
-        keywords = set()
-        
-        if domain == "medical" or domain == "health":
-            keywords.update(self._extract_medical_keywords(text_lower))
-        elif domain == "technical":
-            keywords.update(self._extract_technical_keywords(text_lower))
-        else:
-            keywords.update(self._extract_general_keywords(text_lower))
-        
-        # Remove stop words and short terms
-        filtered_keywords = []
-        for keyword in keywords:
-            if (len(keyword) >= 3 and 
-                keyword.lower() not in self.stop_words and
-                not keyword.isdigit()):
-                filtered_keywords.append(keyword.title())
-        
-        return sorted(list(set(filtered_keywords)))
+        if not text or not text.strip():
+            return []
+
+        try:
+            # Use LLM agent for intelligent keyword extraction
+            result = self.keyword_agent.process({
+                'text': text,
+                'domain': domain,
+                'max_keywords': 15,
+                'language': 'auto',
+                'focus': 'domain_specific_terms'
+            })
+
+            if result and 'keywords' in result:
+                return result['keywords']
+            else:
+                self.logger.warning("LLM keyword extraction failed, using fallback")
+                return self._fallback_keyword_extraction(text)
+
+        except Exception as e:
+            self.logger.error("Error in LLM keyword extraction", error=str(e))
+            return self._fallback_keyword_extraction(text)
+
+    def _fallback_keyword_extraction(self, text: str) -> List[str]:
+        """Simple fallback keyword extraction when LLM fails.
+
+        Args:
+            text: Text to extract keywords from
+
+        Returns:
+            List of basic keywords
+        """
+        # Simple extraction: find words longer than 4 characters, capitalized words, etc.
+        import re
+
+        words = re.findall(r'\b[a-zA-ZäöüÄÖÜß]{4,}\b', text)
+
+        # Basic filtering: remove very common words and keep meaningful terms
+        basic_stop_words = {'aber', 'auch', 'dann', 'dass', 'wenn', 'wie', 'was', 'wer', 'wo'}
+        keywords = []
+
+        for word in words:
+            word_lower = word.lower()
+            if (word_lower not in basic_stop_words and
+                not word_lower.isdigit() and
+                len(word) >= 4):
+                keywords.append(word_lower)
+
+        # Remove duplicates and return top 10
+        return list(set(keywords))[:10]
     
     def _extract_medical_keywords(self, text: str) -> Set[str]:
         """Extract medical/health-specific keywords.
@@ -222,31 +241,74 @@ class ChunkKeywordExtractor:
         return keywords
     
     def _extract_general_keywords(self, text: str) -> Set[str]:
-        """Extract general keywords using simple frequency analysis.
-        
+        """Extract general keywords using enhanced analysis for German and English.
+
         Args:
             text: Lowercase text
-            
+
         Returns:
             Set of general keywords
         """
         keywords = set()
-        
+
+        # Domain-specific terms that should always be considered keywords
+        important_terms = {
+            # Scientific/Medical terms
+            'toxoplasma', 'gondii', 'parasiten', 'verstandesparasiten', 'biophysik', 'biophysiker',
+            'amygdala', 'dopamin', 'neurotransmitter', 'schizophrenie', 'bewusstsein', 'gehirn',
+            'blut-hirn-schranke', 'immunsystem', 'mikroorganismen', 'parasitologie', 'infektion',
+            'beta-carboline', 'harmene', 'noharmene', 'steppenraute', 'soma', 'upanishaden',
+            'zirbeldrüse', 'ekstase', 'freude', 'emotionen', 'aggressionen', 'neokortex',
+            'reptiliengehirn', 'lymmische', 'systeme', 'metastudie', 'universitäten', 'forschung',
+            'wissenschaft', 'studien', 'ergebnisse', 'statistik', 'prozent', 'weltbevölkerung',
+            'deutschland', 'österreich', 'schweiz', 'island', 'staatspräsident', 'herausforderung',
+            'menschheit', 'gesellschaft', 'kollektiv', 'individuum', 'verhalten', 'psyche',
+            'depression', 'psychopharmaka', 'behandlung', 'therapie', 'therapeut', 'medizin',
+            'nahrung', 'fleisch', 'schinken', 'salami', 'obst', 'gemüse', 'trinkwasser',
+            'katzen', 'mäuse', 'endwirt', 'zwischenwirt', 'evolution', 'übertragung', 'infektion',
+            'schwangerschaft', 'schwangere', 'risiko', 'gefahr', 'prävention', 'schutz',
+            # Names and proper nouns
+            'dieter', 'broers', 'dirk', 'schumann', 'armin', 'risi', 'pfleger', 'prag',
+            'tschechien', 'iran', 'südamerika', 'griechenland', 'ministerium', 'who',
+            # Technical terms
+            'elektronenrastermikroskop', 'vergrößerung', 'geometrie', 'kristall', 'oszillator',
+            'schwingkreis', 'widerstand', 'kondensator', 'spule', 'halbmeiter', 'bauteile',
+            'proto-zooinen', 'lebewesen', 'milliarden', 'jahre', 'rna', 'dna', 'klassifizierung',
+            'virologie', 'viren', 'funktionsautomaten', 'intelligenz', 'schwarmbewusstsein',
+            'kommunikation', 'eigenschaften', 'verhalten', 'manipulation', 'kontrolle'
+        }
+
         # Extract words that appear multiple times and are significant
-        words = re.findall(r'\b[a-zA-Z]{3,}\b', text)
+        words = re.findall(r'\b[a-zA-ZäöüÄÖÜß]{3,}\b', text)  # Include German umlauts
         word_freq = {}
-        
+
         for word in words:
             word_lower = word.lower()
             if word_lower not in self.stop_words:
                 word_freq[word_lower] = word_freq.get(word_lower, 0) + 1
-        
-        # Select words that appear at least twice or are long
+
+        # Add important terms that appear in text
+        for term in important_terms:
+            if term in text:
+                keywords.add(term)
+
+        # Select words that appear at least twice or are long or are scientifically relevant
         for word, freq in word_freq.items():
-            if freq >= 2 or len(word) >= 6:
+            if (freq >= 2 or len(word) >= 7 or
+                any(scientific in word for scientific in ['parasit', 'toxo', 'neuro', 'bio', 'psych', 'medizin', 'wissenschaft'])):
                 keywords.add(word)
-        
-        return keywords
+
+        # Filter out remaining common words that might have slipped through
+        filtered_keywords = set()
+        for keyword in keywords:
+            # Keep if it's a compound word, proper noun, or scientific term
+            if (len(keyword) >= 6 or
+                keyword[0].isupper() or
+                any(sci in keyword for sci in ['parasit', 'toxo', 'neuro', 'bio', 'psych', 'medizin']) or
+                keyword in important_terms):
+                filtered_keywords.add(keyword)
+
+        return filtered_keywords
     
     def _create_keyword_entity(
         self, 

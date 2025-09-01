@@ -7,28 +7,33 @@ fact_extraction:
 
     ## Your Role
     Extract facts that are:
+    - **SELF-CONTAINED**: Each fact must be understandable without context (replace pronouns with specific entities)
     - Specific and actionable (not generic advice)
     - Contain measurable parameters or concrete details
     - Include domain-specific knowledge
     - Mention specific techniques, procedures, or substances
 
-    ## Fact Structure
+    ## Simplified Fact Structure
     For each fact, provide:
-    - **subject**: The main entity or concept
-    - **object**: What the subject relates to or acts upon  
-    - **approach**: How something is done or implemented (if applicable)
-    - **solution**: What problem is solved or benefit provided (if applicable)
-    - **condition**: Under what circumstances this applies (if applicable)
-    - **remarks**: Additional context or limitations (if applicable)
-    - **fact_type**: Type of fact (procedural, declarative, regulatory, technical, statistical, causal, temporal, comparative)
+    - **fact_text**: Complete, self-contained fact statement (replace ALL pronouns with specific entities)
+    - **fact_type**: Type of fact (statistical, causal, technical, definition, procedural)
     - **confidence**: 0.0-1.0 confidence score
-    - **keywords**: List of relevant technical terms
-    - **source_text**: Relevant text span (optional)
+    - **structured_metadata**: Object containing:
+      - **primary_entities**: List of main entities mentioned (e.g., ["Toxoplasma gondii", "brain", "blood-brain barrier"])
+      - **domain_concepts**: List of domain-specific concepts (e.g., ["parasitology", "neuroscience", "infection"])
+      - **relationships**: List of structured entity relationships as objects:
+        [{"source": "Toxoplasma gondii", "type": "AFFECTS", "target": "brain"}]
 
     ## Domain Context
     - Target domain: {{ config.domain }}
     - Language: {{ config.language }}
     - Maximum facts to extract: {{ config.agent_config.get('max_facts', 20) }}
+
+    ## CRITICAL: Language Preservation - MANDATORY
+    - **ALWAYS generate facts in the SAME language as the source text**
+    - If source is German, generate German facts: "Toxoplasma gondii ist ein einzelliger Parasit..."
+    - If source is English, generate English facts: "Toxoplasma gondii is a single-celled parasite..."
+    - **NEVER translate or change the language** of the source content
 
     ## Quality Standards
     {% if config.agent_config.get('filter_generic_advice', True) %}
@@ -44,26 +49,35 @@ fact_extraction:
     - Technical specifications or parameters
     - Domain-specific terminology
 
+    ## CRITICAL: Self-Contained Facts - MANDATORY
+    - **NEVER use ANY pronouns**: it, its, they, them, this, that, these, those, he, she, him, her, his, hers
+    - **NEVER use German pronouns**: dieser, diese, dieses, es, sie, er, ihm, ihr, ihnen, das, den, dem
+    - **ALWAYS replace with specific entity names**: "its host" → "the infected host" or "infected organisms"
+    - **Each fact MUST be understandable alone** without context from other facts
+    - **Test each fact**: Can someone understand it without reading anything else?
+    - **FORBIDDEN phrases**: "its host", "their behavior", "this parasite", "these organisms", "it can"
+    - **CORRECT phrases**: "the infected host", "host behavior", "Toxoplasma gondii", "Toxoplasma gondii organisms", "Toxoplasma gondii can"
+
     {% if config.include_examples %}
     ## Examples
     
     ### Example 1
     **Input:** Ginkgo biloba extract (120-240mg daily) has been shown to improve cognitive function in elderly patients with mild cognitive impairment.
-    **Output:** 
+    **Output:**
     ```json
     {
       "facts": [
         {
-          "subject": "Ginkgo biloba extract",
-          "object": "cognitive function improvement",
-          "approach": "daily supplementation",
-          "solution": "improved cognitive function in elderly patients",
-          "condition": "mild cognitive impairment",
-          "remarks": "dosage range: 120-240mg daily",
+          "fact_text": "Ginkgo biloba extract (120-240mg daily) improves cognitive function in elderly patients with mild cognitive impairment",
           "fact_type": "technical",
-          "confidence": 0.6,
-          "keywords": ["Ginkgo biloba", "cognitive function", "elderly patients", "mild cognitive impairment", "dosage"],
-          "source_text": "Ginkgo biloba extract (120-240mg daily) has been shown to improve cognitive function"
+          "confidence": 0.8,
+          "structured_metadata": {
+            "primary_entities": ["Ginkgo biloba extract", "cognitive function", "elderly patients"],
+            "domain_concepts": ["supplementation", "mild cognitive impairment", "dosage"],
+            "relationships": [
+              {"source": "Ginkgo biloba extract", "type": "IMPROVES", "target": "cognitive function"}
+            ]
+          }
         }
       ],
       "total_facts": 1,
@@ -75,7 +89,47 @@ fact_extraction:
     ```
     **Explanation:** This fact contains specific dosage information, target population, and measurable outcomes.
 
-    ### Example 2
+    ### Example 2 (Medical Domain - Self-Contained Facts)
+    **Input:** Dieser Parasit kann das Verhalten beeinflussen. Toxoplasma gondii überwindet die Blut-Hirn-Schranke.
+    **Output:**
+    ```json
+    {
+      "facts": [
+        {
+          "fact_text": "Toxoplasma gondii kann das Verhalten des Wirts beeinflussen",
+          "fact_type": "causal",
+          "confidence": 0.8,
+          "structured_metadata": {
+            "primary_entities": ["Toxoplasma gondii", "host behavior", "parasitic infection"],
+            "domain_concepts": ["behavioral influence", "parasitology"],
+            "relationships": [
+              {"source": "Toxoplasma gondii", "type": "AFFECTS", "target": "host behavior"}
+            ]
+          }
+        },
+        {
+          "fact_text": "Toxoplasma gondii überwindet die Blut-Hirn-Schranke",
+          "fact_type": "technical",
+          "confidence": 0.9,
+          "structured_metadata": {
+            "primary_entities": ["Toxoplasma gondii", "blood-brain barrier", "brain"],
+            "domain_concepts": ["barrier penetration", "neuroscience"],
+            "relationships": [
+              {"source": "Toxoplasma gondii", "type": "CROSSES", "target": "blood-brain barrier"}
+            ]
+          }
+        }
+      ],
+      "total_facts": 2,
+      "confidence": "high",
+      "domain": "medical",
+      "language": "de",
+      "metadata": {"extraction_method": "llm"}
+    }
+    ```
+    **Explanation:** Notice how "Dieser Parasit" was replaced with "Toxoplasma gondii" to make facts self-contained.
+
+    ### Example 3
     **Input:** Make sure to get enough sleep and exercise regularly for better health.
     **Output:**
     ```json
@@ -89,6 +143,57 @@ fact_extraction:
     }
     ```
     **Explanation:** This is rejected because it contains only generic advice without specific parameters or actionable details.
+
+    ### Example 4 (Pronoun Replacement - CRITICAL)
+    **Input:** Toxoplasma gondii can influence its host behavior. It crosses the blood-brain barrier.
+    **WRONG Output:**
+    ```json
+    {
+      "facts": [
+        {
+          "fact_text": "Toxoplasma gondii can influence its host behavior",  // ❌ WRONG: contains "its"
+          "fact_text": "It crosses the blood-brain barrier"  // ❌ WRONG: contains "It"
+        }
+      ]
+    }
+    ```
+    **CORRECT Output:**
+    ```json
+    {
+      "facts": [
+        {
+          "fact_text": "Toxoplasma gondii can influence the behavior of infected hosts",  // ✅ CORRECT: no pronouns
+          "fact_type": "causal",
+          "confidence": 0.8,
+          "structured_metadata": {
+            "primary_entities": ["Toxoplasma gondii", "infected hosts", "host behavior"],
+            "domain_concepts": ["behavioral manipulation", "parasitology"],
+            "relationships": [
+              {"source": "Toxoplasma gondii", "type": "INFLUENCES", "target": "host behavior"}
+            ]
+          }
+        },
+        {
+          "fact_text": "Toxoplasma gondii crosses the blood-brain barrier",  // ✅ CORRECT: no pronouns
+          "fact_type": "technical",
+          "confidence": 0.9,
+          "structured_metadata": {
+            "primary_entities": ["Toxoplasma gondii", "blood-brain barrier"],
+            "domain_concepts": ["barrier penetration", "neuroscience"],
+            "relationships": [
+              {"source": "Toxoplasma gondii", "type": "CROSSES", "target": "blood-brain barrier"}
+            ]
+          }
+        }
+      ],
+      "total_facts": 2,
+      "confidence": "high",
+      "domain": "medical",
+      "language": "en",
+      "metadata": {"extraction_method": "llm"}
+    }
+    ```
+    **Explanation:** Replace ALL pronouns (its, it, they, them, this, that) with specific entity names to ensure facts are self-contained.
     {% endif %}
 
     {{ output_requirements }}

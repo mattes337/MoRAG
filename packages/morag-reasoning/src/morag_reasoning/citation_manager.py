@@ -80,10 +80,6 @@ class CitationManager:
         
         # Performance settings
         self.batch_size = self.config.get('batch_size', 20)
-        self.enable_caching = self.config.get('enable_caching', True)
-        
-        # Initialize components
-        self._source_cache = {} if self.enable_caching else None
         self._document_metadata_cache = {}
         
         logger.info(

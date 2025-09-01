@@ -215,53 +215,114 @@ class SemanticChunker:
     def _validate_chunk_sizes(self, chunks: List[str], config: ChunkingConfig) -> List[str]:
         """Validate and adjust chunk sizes."""
         validated_chunks = []
-        
+
         i = 0
         while i < len(chunks):
-            chunk = chunks[i]
-            
+            chunk = chunks[i].strip()
+
+            # Skip empty chunks
+            if not chunk:
+                i += 1
+                continue
+
             # If chunk is too small, try to merge with next chunk
             if len(chunk) < config.min_chunk_size and i + 1 < len(chunks):
-                next_chunk = chunks[i + 1]
-                if len(chunk) + len(next_chunk) <= config.max_chunk_size:
+                next_chunk = chunks[i + 1].strip()
+                if next_chunk and len(chunk) + len(next_chunk) + 1 <= config.max_chunk_size:
                     merged_chunk = chunk + " " + next_chunk
                     validated_chunks.append(merged_chunk)
                     i += 2  # Skip next chunk as it's been merged
                     continue
-            
-            # If chunk is too large, split it
-            if len(chunk) > config.max_chunk_size:
-                sub_chunks = self._size_based_chunking(chunk, config)
+                else:
+                    # Can't merge, but chunk is too small - only keep if it's substantial
+                    if len(chunk) >= 50:  # Minimum 50 characters to be meaningful
+                        validated_chunks.append(chunk)
+
+            # If chunk is too large, split it carefully
+            elif len(chunk) > config.max_chunk_size:
+                # Avoid recursive splitting that creates tiny chunks
+                sub_chunks = self._safe_split_chunk(chunk, config)
                 validated_chunks.extend(sub_chunks)
             else:
                 validated_chunks.append(chunk)
-            
+
             i += 1
-        
+
         return validated_chunks
+
+    def _safe_split_chunk(self, chunk: str, config: ChunkingConfig) -> List[str]:
+        """Safely split a large chunk without creating tiny fragments."""
+        if len(chunk) <= config.max_chunk_size:
+            return [chunk]
+
+        chunks = []
+        start = 0
+
+        while start < len(chunk):
+            end = min(start + config.max_chunk_size, len(chunk))
+
+            # If this would be the last chunk and it's very small, merge with previous
+            remaining = len(chunk) - end
+            if remaining > 0 and remaining < config.min_chunk_size:
+                end = len(chunk)  # Take the rest
+
+            # Find a good break point (sentence or word boundary)
+            if end < len(chunk):
+                # Look for sentence boundary first
+                for punct in ['. ', '! ', '? ']:
+                    last_punct = chunk.rfind(punct, start, end)
+                    if last_punct > start + config.min_chunk_size:
+                        end = last_punct + 2
+                        break
+                else:
+                    # Look for word boundary
+                    last_space = chunk.rfind(' ', start + config.min_chunk_size, end)
+                    if last_space > start:
+                        end = last_space
+
+            chunk_text = chunk[start:end].strip()
+            if chunk_text and len(chunk_text) >= 50:  # Only keep substantial chunks
+                chunks.append(chunk_text)
+
+            start = end
+            if start >= len(chunk):
+                break
+
+        return chunks
     
     def _apply_overlap(self, chunks: List[str], overlap_size: int) -> List[str]:
         """Apply overlap between chunks."""
         if len(chunks) <= 1 or overlap_size <= 0:
             return chunks
-        
+
         overlapped_chunks = []
-        
+
         for i, chunk in enumerate(chunks):
             if i == 0:
                 # First chunk - no prefix overlap
                 overlapped_chunks.append(chunk)
             else:
-                # Add overlap from previous chunk
+                # Add overlap from previous chunk - but limit to prevent exponential growth
                 prev_chunk = chunks[i - 1]
                 if len(prev_chunk) > overlap_size:
+                    # Find word boundary for clean overlap
                     overlap_text = prev_chunk[-overlap_size:]
-                    overlapped_chunk = overlap_text + " " + chunk
+                    # Find the start of the first complete word in overlap
+                    first_space = overlap_text.find(' ')
+                    if first_space > 0:
+                        overlap_text = overlap_text[first_space + 1:]
+
+                    # Only add overlap if it doesn't make chunk too large
+                    potential_chunk = overlap_text + " " + chunk
+                    if len(potential_chunk) <= self.config.max_chunk_size * 1.2:  # Allow 20% over
+                        overlapped_chunks.append(potential_chunk)
+                    else:
+                        # Skip overlap if it would make chunk too large
+                        overlapped_chunks.append(chunk)
                 else:
-                    overlapped_chunk = prev_chunk + " " + chunk
-                
-                overlapped_chunks.append(overlapped_chunk)
-        
+                    # Previous chunk is small, just add current chunk without overlap
+                    overlapped_chunks.append(chunk)
+
         return overlapped_chunks
     
     def _merge_config_with_kwargs(self, **kwargs) -> ChunkingConfig:

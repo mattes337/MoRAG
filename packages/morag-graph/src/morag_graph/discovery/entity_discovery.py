@@ -104,14 +104,11 @@ class QueryEntityDiscovery:
         )
         
         # Performance settings
-        self.enable_caching = self.config.get('enable_caching', True)
-        self.cache_size = self.config.get('cache_size', 1000)
         self.batch_size = self.config.get('batch_size', 20)
-        
+
         # Initialize components
         self._llm_client = None
         self._embedding_model = None
-        self._cache = {} if self.enable_caching else None
         
         logger.info(
             "Entity discovery initialized",

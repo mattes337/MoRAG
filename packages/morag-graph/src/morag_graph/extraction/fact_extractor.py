@@ -74,8 +74,11 @@ class FactExtractor:
 
         # Initialize fact extraction agent
         self.fact_agent = get_agent("fact_extraction")
-        # Configure agent for this domain
+        # Configure agent for this domain and model
         self.fact_agent.update_config(
+            model={
+                "model": model_id  # Override the default model
+            },
             agent_config={
                 "max_facts": max_facts_per_chunk,
                 "domain": domain,
@@ -334,25 +337,23 @@ class FactExtractor:
         
         try:
             # Use the agents framework - ALWAYS
-            result = await self.fact_agent.extract_facts(
-                text=text,
+            # Pass language as execution parameter to ensure it affects cache key
+            result = await self.fact_agent.execute(
+                text,
                 domain=domain,
+                language=self.language,  # Critical: Include language in execution parameters
                 query_context=query_context,
                 max_facts=self.max_facts_per_chunk
             )
 
-            # Convert agent result to legacy format
+            # Convert agent result to simplified format
             fact_candidates = []
             for fact in result.facts:
                 fact_candidates.append({
-                    'subject': fact.subject,
-                    'object': fact.object,
-                    'approach': fact.approach,
-                    'solution': fact.solution,
-                    'condition': fact.condition,
-                    'remarks': fact.remarks,
+                    'fact_text': fact.fact_text,
                     'fact_type': fact.fact_type,
                     'confidence': fact.confidence,
+                    'structured_metadata': fact.structured_metadata,
                     'keywords': fact.keywords,
                     'source_text': fact.source_text
                 })
@@ -564,11 +565,15 @@ class FactExtractor:
         Returns:
             Generated fact text string
         """
-        # Try to use source_text if available
+        # Priority 1: Use fact_text from simplified structure
+        if candidate.get('fact_text'):
+            return candidate['fact_text'].strip()
+
+        # Priority 2: Try to use source_text if available
         if candidate.get('source_text'):
             return candidate['source_text'].strip()
 
-        # Generate from structured fields
+        # Priority 3: Generate from structured fields (legacy support)
         subject = candidate.get('subject', '')
         object_val = candidate.get('object', '')
         approach = candidate.get('approach', '')

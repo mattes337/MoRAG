@@ -107,8 +107,6 @@ class AgentConfig(BaseModel):
     
     # Execution configuration
     timeout: int = Field(default=30, ge=1, description="Request timeout in seconds")
-    enable_caching: bool = Field(default=True, description="Enable response caching")
-    cache_ttl: int = Field(default=3600, ge=0, description="Cache TTL in seconds")
     
     # Logging and monitoring
     log_level: str = Field(default="INFO", description="Logging level")
