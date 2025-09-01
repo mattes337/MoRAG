@@ -88,11 +88,12 @@ class FactGeneratorStage(Stage):
 
         self.extraction_agent = None
 
-    async def _initialize_services_with_config(self, config: FactGeneratorConfig):
+    async def _initialize_services_with_config(self, config: FactGeneratorConfig, context: 'StageContext'):
         """Initialize services with runtime configuration.
 
         Args:
             config: Runtime configuration with potential CLI overrides
+            context: Stage execution context for model overrides
         """
         if not SERVICES_AVAILABLE:
             return
@@ -167,7 +168,7 @@ class FactGeneratorStage(Stage):
         config = FactGeneratorConfig.from_env_and_overrides(context_config)
         
         # Reinitialize services with runtime configuration
-        await self._initialize_services_with_config(config)
+        await self._initialize_services_with_config(config, context)
 
         logger.info("Starting fact generation",
                    input_file=str(input_file),
