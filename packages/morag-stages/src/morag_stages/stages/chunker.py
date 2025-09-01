@@ -320,7 +320,40 @@ class ChunkerStage(Stage):
                 content_lines = lines[content_section_start + 2:]  # Skip section header and empty line
                 content = '\n'.join(content_lines)
             else:
-                content = markdown  # Fallback to full content
+                # Fallback: exclude metadata sections and only include actual content
+                content_lines = []
+                skip_metadata = False
+
+                for i, line in enumerate(lines):
+                    # Skip title line
+                    if i == 0 and line.startswith('# '):
+                        continue
+
+                    # Check if this is a metadata section (Information, File Information, Video Information, etc.)
+                    if line.startswith('## ') and any(keyword in line.lower() for keyword in ['information', 'metadata', 'properties', 'details']):
+                        skip_metadata = True
+                        continue
+
+                    # Check if this is a content section
+                    if line.startswith('## ') and any(keyword in line.lower() for keyword in ['content', 'transcript', 'text', 'body']):
+                        skip_metadata = False
+                        continue
+
+                    # Skip other metadata sections
+                    if line.startswith('## ') and skip_metadata:
+                        continue
+
+                    # Include content lines (not in metadata sections)
+                    if not skip_metadata:
+                        content_lines.append(line)
+
+                content = '\n'.join(content_lines).strip()
+
+                # If no content found, use original markdown but log warning
+                if not content:
+                    content = markdown
+                    logger.warning("No content section found, using full markdown",
+                                 title=metadata.get('title', 'unknown'))
 
             return metadata, content
 

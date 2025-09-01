@@ -363,7 +363,10 @@ class FactGeneratorStage(Stage):
         """
         content = chunk.get('content', '')
         chunk_id = chunk.get('id', 'unknown')
-        
+
+        # Filter out metadata-like content before fact extraction
+        content = self._filter_metadata_content(content)
+
         results: Dict[str, Any] = {
             'entities': [],
             'relations': [],
@@ -581,6 +584,72 @@ class FactGeneratorStage(Stage):
             results['keywords'] = keywords
         
         return results
+
+    def _filter_metadata_content(self, content: str) -> str:
+        """Filter out metadata-like content that shouldn't be used for fact extraction.
+
+        Args:
+            content: Raw content that may contain metadata
+
+        Returns:
+            Filtered content with metadata removed
+        """
+        import re
+
+        lines = content.split('\n')
+        filtered_lines = []
+        skip_section = False
+
+        for line in lines:
+            line_lower = line.lower().strip()
+
+            # Skip obvious metadata patterns
+            if any(pattern in line_lower for pattern in [
+                'duration:', 'resolution:', 'frame rate:', 'codec:', 'audio codec:',
+                'file size:', 'format:', 'created:', 'modified:', 'author:',
+                'video information', 'file information', 'metadata:',
+                'available in formats:', 'uses codec:', 'has duration:',
+                'has resolution:', 'has frame rate:', 'has audio codec:'
+            ]):
+                continue
+
+            # Skip sections that are clearly metadata
+            if line.startswith('## ') and any(keyword in line_lower for keyword in [
+                'information', 'metadata', 'properties', 'details', 'file info'
+            ]):
+                skip_section = True
+                continue
+
+            # Resume including content when we hit a content section
+            if line.startswith('## ') and any(keyword in line_lower for keyword in [
+                'content', 'transcript', 'text', 'body', 'summary'
+            ]):
+                skip_section = False
+                continue
+
+            # Skip lines in metadata sections
+            if skip_section:
+                continue
+
+            # Skip lines that look like metadata key-value pairs
+            if re.match(r'^\s*[-*]\s*\*\*[^:]+\*\*:\s*', line):
+                continue
+
+            # Include the line if it passes all filters
+            filtered_lines.append(line)
+
+        filtered_content = '\n'.join(filtered_lines).strip()
+
+        # Log if significant content was filtered out
+        original_length = len(content)
+        filtered_length = len(filtered_content)
+        if original_length > 0 and (original_length - filtered_length) / original_length > 0.1:
+            logger.debug("Filtered metadata from content",
+                        original_length=original_length,
+                        filtered_length=filtered_length,
+                        reduction_percent=round((original_length - filtered_length) / original_length * 100, 1))
+
+        return filtered_content
 
     async def _llm_extraction_fallback(self, content: str, chunk_id: str, config: FactGeneratorConfig) -> Dict[str, Any]:
         """Extract facts using LLM as fallback.
