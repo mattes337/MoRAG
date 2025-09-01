@@ -27,6 +27,19 @@ class StageStatusEnum(str, Enum):
     SKIPPED = "skipped"
 
 
+class ModelConfig(BaseModel):
+    """Configuration for LLM models used by agents."""
+    default_model: Optional[str] = Field(default=None, description="Default LLM model for all agents")
+    fact_extraction_agent_model: Optional[str] = Field(default=None, description="LLM model for fact extraction agent")
+    entity_extraction_agent_model: Optional[str] = Field(default=None, description="LLM model for entity extraction agent")
+    relation_extraction_agent_model: Optional[str] = Field(default=None, description="LLM model for relation extraction agent")
+    keyword_extraction_agent_model: Optional[str] = Field(default=None, description="LLM model for keyword extraction agent")
+    summarization_agent_model: Optional[str] = Field(default=None, description="LLM model for summarization agent")
+    content_analysis_agent_model: Optional[str] = Field(default=None, description="LLM model for content analysis agent")
+    markdown_optimizer_agent_model: Optional[str] = Field(default=None, description="LLM model for markdown optimizer agent")
+    chunking_agent_model: Optional[str] = Field(default=None, description="LLM model for chunking agent")
+
+
 class WebhookConfig(BaseModel):
     """Configuration for webhook notifications."""
     url: str = Field(..., description="Webhook URL to send notifications")
@@ -38,11 +51,12 @@ class WebhookConfig(BaseModel):
 
 class StageExecutionRequest(BaseModel):
     """Request model for executing a single stage."""
-    input_files: Optional[List[str]] = Field(None, description="List of input file paths (for non-initial stages)")
-    config: Optional[Dict[str, Any]] = Field(None, description="Stage-specific configuration")
-    output_dir: str = Field("./output", description="Output directory for stage results")
-    webhook_config: Optional[WebhookConfig] = Field(None, description="Webhook notification configuration")
-    skip_if_exists: bool = Field(True, description="Skip execution if output files already exist")
+    input_files: Optional[List[str]] = Field(default=None, description="List of input file paths (for non-initial stages)")
+    config: Optional[Dict[str, Any]] = Field(default=None, description="Stage-specific configuration")
+    llm_model_config: Optional[ModelConfig] = Field(default=None, description="LLM model configuration for agents")
+    output_dir: str = Field(default="./output", description="Output directory for stage results")
+    webhook_config: Optional[WebhookConfig] = Field(default=None, description="Webhook notification configuration")
+    skip_if_exists: bool = Field(default=True, description="Skip execution if output files already exist")
 
 
 class StageFileMetadata(BaseModel):
@@ -81,14 +95,15 @@ class StageExecutionResponse(BaseModel):
 class StageChainRequest(BaseModel):
     """Request model for executing a chain of stages."""
     stages: List[StageTypeEnum] = Field(..., description="List of stages to execute in order")
-    input_files: Optional[List[str]] = Field(None, description="Initial input files (for first stage)")
-    global_config: Optional[Dict[str, Any]] = Field(None, description="Global configuration for all stages")
-    stage_configs: Optional[Dict[StageTypeEnum, Dict[str, Any]]] = Field(None, description="Stage-specific configurations")
-    output_dir: str = Field("./output", description="Base output directory")
-    webhook_config: Optional[WebhookConfig] = Field(None, description="Webhook notification configuration")
-    stop_on_failure: bool = Field(True, description="Stop chain execution if any stage fails")
-    skip_existing: bool = Field(True, description="Skip stages if their outputs already exist")
-    return_content: bool = Field(False, description="Include file contents in response")
+    input_files: Optional[List[str]] = Field(default=None, description="Initial input files (for first stage)")
+    global_config: Optional[Dict[str, Any]] = Field(default=None, description="Global configuration for all stages")
+    stage_configs: Optional[Dict[StageTypeEnum, Dict[str, Any]]] = Field(default=None, description="Stage-specific configurations")
+    llm_model_config: Optional[ModelConfig] = Field(default=None, description="LLM model configuration for agents")
+    output_dir: str = Field(default="./output", description="Base output directory")
+    webhook_config: Optional[WebhookConfig] = Field(default=None, description="Webhook notification configuration")
+    stop_on_failure: bool = Field(default=True, description="Stop chain execution if any stage fails")
+    skip_existing: bool = Field(default=True, description="Skip stages if their outputs already exist")
+    return_content: bool = Field(default=False, description="Include file contents in response")
 
 
 

@@ -44,6 +44,25 @@ async def execute_stage(args):
     if hasattr(args, 'llm_max_tokens') and args.llm_max_tokens:
         cli_overrides['max_tokens'] = args.llm_max_tokens
 
+    # Agent-specific model overrides
+    agent_model_overrides = {}
+    if hasattr(args, 'fact_extraction_agent_model') and args.fact_extraction_agent_model:
+        agent_model_overrides['fact_extraction'] = args.fact_extraction_agent_model
+    if hasattr(args, 'entity_extraction_agent_model') and args.entity_extraction_agent_model:
+        agent_model_overrides['entity_extraction'] = args.entity_extraction_agent_model
+    if hasattr(args, 'relation_extraction_agent_model') and args.relation_extraction_agent_model:
+        agent_model_overrides['relation_extraction'] = args.relation_extraction_agent_model
+    if hasattr(args, 'keyword_extraction_agent_model') and args.keyword_extraction_agent_model:
+        agent_model_overrides['keyword_extraction'] = args.keyword_extraction_agent_model
+    if hasattr(args, 'summarization_agent_model') and args.summarization_agent_model:
+        agent_model_overrides['summarization'] = args.summarization_agent_model
+    if hasattr(args, 'content_analysis_agent_model') and args.content_analysis_agent_model:
+        agent_model_overrides['content_analysis'] = args.content_analysis_agent_model
+    if hasattr(args, 'markdown_optimizer_agent_model') and args.markdown_optimizer_agent_model:
+        agent_model_overrides['markdown_optimizer'] = args.markdown_optimizer_agent_model
+    if hasattr(args, 'chunking_agent_model') and args.chunking_agent_model:
+        agent_model_overrides['chunking'] = args.chunking_agent_model
+
     # Stage-specific overrides
     stage_overrides = {}
     if hasattr(args, 'chunk_size') and args.chunk_size:
@@ -60,7 +79,16 @@ async def execute_stage(args):
         stage_overrides['transcript_language'] = args.transcript_language
 
     # Combine overrides
-    config_overrides = {args.stage: {**cli_overrides, **stage_overrides}} if cli_overrides or stage_overrides else {}
+    config_overrides = {}
+    if cli_overrides or stage_overrides:
+        config_overrides[args.stage] = {**cli_overrides, **stage_overrides}
+
+    # Add model configuration for agents
+    if args.llm_model or agent_model_overrides:
+        config_overrides['model_config'] = {
+            'default_model': args.llm_model,
+            'agent_models': agent_model_overrides
+        }
 
     # Create stage context - configuration loaded from environment variables with CLI overrides
     context = StageContext(
@@ -128,6 +156,25 @@ async def execute_stage_chain(args):
     if hasattr(args, 'llm_max_tokens') and args.llm_max_tokens:
         cli_overrides['max_tokens'] = args.llm_max_tokens
 
+    # Agent-specific model overrides
+    agent_model_overrides = {}
+    if hasattr(args, 'fact_extraction_agent_model') and args.fact_extraction_agent_model:
+        agent_model_overrides['fact_extraction'] = args.fact_extraction_agent_model
+    if hasattr(args, 'entity_extraction_agent_model') and args.entity_extraction_agent_model:
+        agent_model_overrides['entity_extraction'] = args.entity_extraction_agent_model
+    if hasattr(args, 'relation_extraction_agent_model') and args.relation_extraction_agent_model:
+        agent_model_overrides['relation_extraction'] = args.relation_extraction_agent_model
+    if hasattr(args, 'keyword_extraction_agent_model') and args.keyword_extraction_agent_model:
+        agent_model_overrides['keyword_extraction'] = args.keyword_extraction_agent_model
+    if hasattr(args, 'summarization_agent_model') and args.summarization_agent_model:
+        agent_model_overrides['summarization'] = args.summarization_agent_model
+    if hasattr(args, 'content_analysis_agent_model') and args.content_analysis_agent_model:
+        agent_model_overrides['content_analysis'] = args.content_analysis_agent_model
+    if hasattr(args, 'markdown_optimizer_agent_model') and args.markdown_optimizer_agent_model:
+        agent_model_overrides['markdown_optimizer'] = args.markdown_optimizer_agent_model
+    if hasattr(args, 'chunking_agent_model') and args.chunking_agent_model:
+        agent_model_overrides['chunking'] = args.chunking_agent_model
+
     # YouTube-specific overrides
     if hasattr(args, 'transcript_only') and args.transcript_only:
         cli_overrides['transcript_only'] = args.transcript_only
@@ -141,6 +188,13 @@ async def execute_stage_chain(args):
     if cli_overrides:
         for stage_name in stage_names:
             config_overrides[stage_name] = cli_overrides.copy()
+
+    # Add model configuration for agents
+    if args.llm_model or agent_model_overrides:
+        config_overrides['model_config'] = {
+            'default_model': args.llm_model,
+            'agent_models': agent_model_overrides
+        }
 
     # Create context - configuration loaded from environment variables with CLI overrides
     context = StageContext(
@@ -240,7 +294,15 @@ def setup_parser():
     stage_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
 
     # LLM configuration overrides
-    stage_parser.add_argument("--llm-model", help="Override LLM model (e.g., gemini-1.5-flash)")
+    stage_parser.add_argument("--llm-model", help="Default LLM model for all agents (e.g., gemini-1.5-flash)")
+    stage_parser.add_argument("--fact-extraction-agent-model", help="LLM model for fact extraction agent")
+    stage_parser.add_argument("--entity-extraction-agent-model", help="LLM model for entity extraction agent")
+    stage_parser.add_argument("--relation-extraction-agent-model", help="LLM model for relation extraction agent")
+    stage_parser.add_argument("--keyword-extraction-agent-model", help="LLM model for keyword extraction agent")
+    stage_parser.add_argument("--summarization-agent-model", help="LLM model for summarization agent")
+    stage_parser.add_argument("--content-analysis-agent-model", help="LLM model for content analysis agent")
+    stage_parser.add_argument("--markdown-optimizer-agent-model", help="LLM model for markdown optimizer agent")
+    stage_parser.add_argument("--chunking-agent-model", help="LLM model for chunking agent")
     stage_parser.add_argument("--llm-provider", help="Override LLM provider (e.g., gemini)")
     stage_parser.add_argument("--llm-temperature", type=float, help="Override LLM temperature")
     stage_parser.add_argument("--llm-max-tokens", type=int, help="Override LLM max tokens")
@@ -262,7 +324,15 @@ def setup_parser():
     chain_parser.add_argument("--webhook-url", help="Webhook URL for notifications")
 
     # LLM configuration overrides for chain
-    chain_parser.add_argument("--llm-model", help="Override LLM model for all stages")
+    chain_parser.add_argument("--llm-model", help="Default LLM model for all agents")
+    chain_parser.add_argument("--fact-extraction-agent-model", help="LLM model for fact extraction agent")
+    chain_parser.add_argument("--entity-extraction-agent-model", help="LLM model for entity extraction agent")
+    chain_parser.add_argument("--relation-extraction-agent-model", help="LLM model for relation extraction agent")
+    chain_parser.add_argument("--keyword-extraction-agent-model", help="LLM model for keyword extraction agent")
+    chain_parser.add_argument("--summarization-agent-model", help="LLM model for summarization agent")
+    chain_parser.add_argument("--content-analysis-agent-model", help="LLM model for content analysis agent")
+    chain_parser.add_argument("--markdown-optimizer-agent-model", help="LLM model for markdown optimizer agent")
+    chain_parser.add_argument("--chunking-agent-model", help="LLM model for chunking agent")
     chain_parser.add_argument("--llm-provider", help="Override LLM provider for all stages")
     chain_parser.add_argument("--llm-temperature", type=float, help="Override LLM temperature for all stages")
     chain_parser.add_argument("--llm-max-tokens", type=int, help="Override LLM max tokens for all stages")

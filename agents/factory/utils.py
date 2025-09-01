@@ -26,39 +26,43 @@ def get_registry() -> AgentRegistry:
 def create_agent(
     agent_name: str,
     config: Optional[AgentConfig] = None,
+    model_override: Optional[str] = None,
     **config_overrides
 ) -> BaseAgent:
     """Create an agent instance.
-    
+
     Args:
         agent_name: Name of the agent to create
         config: Optional configuration
+        model_override: Optional model override for this specific agent
         **config_overrides: Configuration overrides
-        
+
     Returns:
         Agent instance
     """
     registry = get_registry()
-    return registry.create_agent(agent_name, config, **config_overrides)
+    return registry.create_agent(agent_name, config, model_override=model_override, **config_overrides)
 
 
 def get_agent(
     agent_name: str,
     config: Optional[AgentConfig] = None,
+    model_override: Optional[str] = None,
     **config_overrides
 ) -> BaseAgent:
     """Get an agent instance (cached if available).
-    
+
     Args:
         agent_name: Name of the agent
         config: Optional configuration
+        model_override: Optional model override for this specific agent
         **config_overrides: Configuration overrides
-        
+
     Returns:
         Agent instance
     """
     registry = get_registry()
-    return registry.get_agent(agent_name, config, **config_overrides)
+    return registry.get_agent(agent_name, config, model_override=model_override, **config_overrides)
 
 
 def register_agent(agent_name: str, agent_class: Type[BaseAgent]) -> None:

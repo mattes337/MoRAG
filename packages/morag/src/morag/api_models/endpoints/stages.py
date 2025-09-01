@@ -218,6 +218,16 @@ async def execute_stage(
     input_files: Optional[str] = Form(None),
     webhook_url: Optional[str] = Form(None),
     return_content: bool = Form(False),
+    # Model configuration form parameters
+    default_model: Optional[str] = Form(None),
+    fact_extraction_agent_model: Optional[str] = Form(None),
+    entity_extraction_agent_model: Optional[str] = Form(None),
+    relation_extraction_agent_model: Optional[str] = Form(None),
+    keyword_extraction_agent_model: Optional[str] = Form(None),
+    summarization_agent_model: Optional[str] = Form(None),
+    content_analysis_agent_model: Optional[str] = Form(None),
+    markdown_optimizer_agent_model: Optional[str] = Form(None),
+    chunking_agent_model: Optional[str] = Form(None),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """Execute a single stage using canonical stage names."""
@@ -250,12 +260,30 @@ async def execute_stage(
             request_config = parsed_request.config or {}
             request_input_files = parsed_request.input_files or []
             request_webhook_url = parsed_request.webhook_config.url if parsed_request.webhook_config else None
+            request_model_config = parsed_request.llm_model_config
         else:
             # Form data request
             request_output_dir = output_dir or "./output"
             request_config = json.loads(config) if config else {}
             request_input_files = json.loads(input_files) if input_files else []
             request_webhook_url = webhook_url
+
+            # Build model configuration from form parameters
+            from ..stage_models import ModelConfig
+            request_model_config = ModelConfig(
+                default_model=default_model,
+                fact_extraction_agent_model=fact_extraction_agent_model,
+                entity_extraction_agent_model=entity_extraction_agent_model,
+                relation_extraction_agent_model=relation_extraction_agent_model,
+                keyword_extraction_agent_model=keyword_extraction_agent_model,
+                summarization_agent_model=summarization_agent_model,
+                content_analysis_agent_model=content_analysis_agent_model,
+                markdown_optimizer_agent_model=markdown_optimizer_agent_model,
+                chunking_agent_model=chunking_agent_model
+            ) if any([default_model, fact_extraction_agent_model, entity_extraction_agent_model,
+                     relation_extraction_agent_model, keyword_extraction_agent_model,
+                     summarization_agent_model, content_analysis_agent_model,
+                     markdown_optimizer_agent_model, chunking_agent_model]) else None
 
         # Handle file upload if provided
         input_file_paths = []
@@ -292,11 +320,32 @@ async def execute_stage(
                 "start_time": datetime.now().isoformat()
             }
 
+        # Merge model configuration into the config
+        merged_config = request_config.copy()
+        if request_model_config:
+            # Convert ModelConfig to dict format expected by stages
+            model_config_dict = {
+                'default_model': request_model_config.default_model,
+                'agent_models': {
+                    'fact_extraction': request_model_config.fact_extraction_agent_model,
+                    'entity_extraction': request_model_config.entity_extraction_agent_model,
+                    'relation_extraction': request_model_config.relation_extraction_agent_model,
+                    'keyword_extraction': request_model_config.keyword_extraction_agent_model,
+                    'summarization': request_model_config.summarization_agent_model,
+                    'content_analysis': request_model_config.content_analysis_agent_model,
+                    'markdown_optimizer': request_model_config.markdown_optimizer_agent_model,
+                    'chunking': request_model_config.chunking_agent_model,
+                }
+            }
+            # Remove None values
+            model_config_dict['agent_models'] = {k: v for k, v in model_config_dict['agent_models'].items() if v is not None}
+            merged_config['model_config'] = model_config_dict
+
         context = StageContext(
             source_path=input_file_paths[0] if input_file_paths else None,
             output_dir=output_path,
             webhook_url=request_webhook_url,
-            config=request_config
+            config=merged_config
         )
         
         # Execute stage
@@ -427,6 +476,26 @@ async def execute_stage_chain(
                 stage_key = stage_enum.value
                 merged_config[stage_key] = {**(merged_config.get(stage_key, {})), **stage_config}
 
+        # Add model configuration if provided
+        if parsed_request.llm_model_config:
+            # Convert ModelConfig to dict format expected by stages
+            model_config_dict = {
+                'default_model': parsed_request.llm_model_config.default_model,
+                'agent_models': {
+                    'fact_extraction': parsed_request.llm_model_config.fact_extraction_agent_model,
+                    'entity_extraction': parsed_request.llm_model_config.entity_extraction_agent_model,
+                    'relation_extraction': parsed_request.llm_model_config.relation_extraction_agent_model,
+                    'keyword_extraction': parsed_request.llm_model_config.keyword_extraction_agent_model,
+                    'summarization': parsed_request.llm_model_config.summarization_agent_model,
+                    'content_analysis': parsed_request.llm_model_config.content_analysis_agent_model,
+                    'markdown_optimizer': parsed_request.llm_model_config.markdown_optimizer_agent_model,
+                    'chunking': parsed_request.llm_model_config.chunking_agent_model,
+                }
+            }
+            # Remove None values
+            model_config_dict['agent_models'] = {k: v for k, v in model_config_dict['agent_models'].items() if v is not None}
+            merged_config['model_config'] = model_config_dict
+
         context = StageContext(
             source_path=input_files[0] if input_files else None,
             output_dir=output_dir,
@@ -548,6 +617,16 @@ async def execute_all_stages(
     stop_on_failure: bool = Form(True),
     skip_existing: bool = Form(True),
     return_content: bool = Form(False),
+    # Model configuration form parameters
+    default_model: Optional[str] = Form(None),
+    fact_extraction_agent_model: Optional[str] = Form(None),
+    entity_extraction_agent_model: Optional[str] = Form(None),
+    relation_extraction_agent_model: Optional[str] = Form(None),
+    keyword_extraction_agent_model: Optional[str] = Form(None),
+    summarization_agent_model: Optional[str] = Form(None),
+    content_analysis_agent_model: Optional[str] = Form(None),
+    markdown_optimizer_agent_model: Optional[str] = Form(None),
+    chunking_agent_model: Optional[str] = Form(None),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """Execute all stages using form data (for easier API consumption)."""
@@ -572,11 +651,29 @@ async def execute_all_stages(
         if webhook_url:
             webhook_config = WebhookConfig(url=webhook_url)
 
+        # Build model configuration from form parameters
+        from ..stage_models import ModelConfig
+        model_config = ModelConfig(
+            default_model=default_model,
+            fact_extraction_agent_model=fact_extraction_agent_model,
+            entity_extraction_agent_model=entity_extraction_agent_model,
+            relation_extraction_agent_model=relation_extraction_agent_model,
+            keyword_extraction_agent_model=keyword_extraction_agent_model,
+            summarization_agent_model=summarization_agent_model,
+            content_analysis_agent_model=content_analysis_agent_model,
+            markdown_optimizer_agent_model=markdown_optimizer_agent_model,
+            chunking_agent_model=chunking_agent_model
+        ) if any([default_model, fact_extraction_agent_model, entity_extraction_agent_model,
+                 relation_extraction_agent_model, keyword_extraction_agent_model,
+                 summarization_agent_model, content_analysis_agent_model,
+                 markdown_optimizer_agent_model, chunking_agent_model]) else None
+
         # Create request object
         request = StageChainRequest(
             stages=stage_enums,
             global_config=parsed_global_config,
             stage_configs=parsed_stage_configs,
+            llm_model_config=model_config,
             output_dir=output_dir,
             webhook_config=webhook_config,
             stop_on_failure=stop_on_failure,

@@ -49,8 +49,21 @@ def load_config(config_path: Optional[str]) -> Dict[str, Any]:
 @click.group()
 @click.option('--config', '-c', type=click.Path(exists=True), help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
+@click.option('--llm-model', help='Default LLM model for all agents (e.g., gemini-1.5-flash, gpt-4)')
+@click.option('--fact-extraction-agent-model', help='LLM model for fact extraction agent')
+@click.option('--entity-extraction-agent-model', help='LLM model for entity extraction agent')
+@click.option('--relation-extraction-agent-model', help='LLM model for relation extraction agent')
+@click.option('--keyword-extraction-agent-model', help='LLM model for keyword extraction agent')
+@click.option('--summarization-agent-model', help='LLM model for summarization agent')
+@click.option('--content-analysis-agent-model', help='LLM model for content analysis agent')
+@click.option('--markdown-optimizer-agent-model', help='LLM model for markdown optimizer agent')
+@click.option('--chunking-agent-model', help='LLM model for chunking agent')
 @click.pass_context
-def cli(ctx: click.Context, config: Optional[str], verbose: bool):
+def cli(ctx: click.Context, config: Optional[str], verbose: bool, llm_model: Optional[str],
+        fact_extraction_agent_model: Optional[str], entity_extraction_agent_model: Optional[str],
+        relation_extraction_agent_model: Optional[str], keyword_extraction_agent_model: Optional[str],
+        summarization_agent_model: Optional[str], content_analysis_agent_model: Optional[str],
+        markdown_optimizer_agent_model: Optional[str], chunking_agent_model: Optional[str]):
     """MoRAG - Stage-based processing system using canonical stage names."""
     # Check if stages are available
     if not STAGES_AVAILABLE:
@@ -68,6 +81,21 @@ def cli(ctx: click.Context, config: Optional[str], verbose: bool):
     ctx.obj['config'] = load_config(config)
     ctx.obj['verbose'] = verbose
 
+    # Store model configurations
+    ctx.obj['model_config'] = {
+        'default_model': llm_model,
+        'agent_models': {
+            'fact_extraction': fact_extraction_agent_model,
+            'entity_extraction': entity_extraction_agent_model,
+            'relation_extraction': relation_extraction_agent_model,
+            'keyword_extraction': keyword_extraction_agent_model,
+            'summarization': summarization_agent_model,
+            'content_analysis': content_analysis_agent_model,
+            'markdown_optimizer': markdown_optimizer_agent_model,
+            'chunking': chunking_agent_model,
+        }
+    }
+
 
 @cli.command()
 @click.argument('stage_name', type=click.Choice(['markdown-conversion', 'markdown-optimizer', 'chunker', 'fact-generator', 'ingestor']))
@@ -80,12 +108,17 @@ def stage(ctx: click.Context, stage_name: str, input_file: str, output_dir: str,
     async def _execute_stage():
         stage_manager = StageManager()
 
+        # Merge model configuration with stage config
+        merged_config = ctx.obj['config'].copy()
+        if 'model_config' in ctx.obj:
+            merged_config['model_config'] = ctx.obj['model_config']
+
         # Create stage context
         context = StageContext(
             source_path=Path(input_file),
             output_dir=Path(output_dir),
             webhook_url=webhook_url,
-            config=ctx.obj['config']
+            config=merged_config
         )
 
         # Execute stage
@@ -146,12 +179,17 @@ def stages(ctx: click.Context, stages: str, input_file: str, output_dir: str, we
                 click.echo(f"Valid stages: {[s.value for s in StageType]}")
                 sys.exit(1)
 
+        # Merge model configuration with stage config
+        merged_config = ctx.obj['config'].copy()
+        if 'model_config' in ctx.obj:
+            merged_config['model_config'] = ctx.obj['model_config']
+
         # Create context
         context = StageContext(
             source_path=Path(input_file),
             output_dir=Path(output_dir),
             webhook_url=webhook_url,
-            config=ctx.obj['config']
+            config=merged_config
         )
 
         try:

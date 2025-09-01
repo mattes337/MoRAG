@@ -99,6 +99,21 @@ class ChunkerStage(Stage):
         # Store model override for agent creation from context config
         self._model_override = context_config.get('model') if context_config else None
 
+        # Check for agent-specific model overrides from context
+        self._summarization_model_override = None
+        if context_config:
+            model_config = context_config.get('model_config', {})
+            if model_config:
+                # Check for summarization specific model
+                summarization_model = model_config.get('agent_models', {}).get('summarization')
+                if summarization_model:
+                    self._summarization_model_override = summarization_model
+                    logger.info(f"Using summarization agent model override: {summarization_model}")
+                # Check for default model override
+                elif model_config.get('default_model'):
+                    self._summarization_model_override = model_config['default_model']
+                    logger.info(f"Using default model override for summarization: {model_config['default_model']}")
+
         logger.info("Starting chunking",
                    input_file=str(input_file),
                    config=config)
@@ -333,8 +348,8 @@ class ChunkerStage(Stage):
             return ""
 
         try:
-            # Always create a new agent with model override to avoid caching issues
-            model_override = getattr(self, '_model_override', None)
+            # Use summarization-specific model override if available, otherwise fall back to general model override
+            model_override = getattr(self, '_summarization_model_override', None) or getattr(self, '_model_override', None)
             if model_override:
                 logger.info(f"Creating summarization agent with model override: {model_override}")
                 # Import agent creation directly to avoid caching

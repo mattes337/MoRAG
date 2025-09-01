@@ -40,31 +40,39 @@ class AgentFactory:
         self,
         agent_name: str,
         config: Optional[AgentConfig] = None,
+        model_override: Optional[str] = None,
         **config_overrides
     ) -> BaseAgent:
         """Create an agent instance.
-        
+
         Args:
             agent_name: Name of the agent to create
             config: Optional configuration to use
+            model_override: Optional model override for this specific agent
             **config_overrides: Configuration overrides
-            
+
         Returns:
             Agent instance
-            
+
         Raises:
             ConfigurationError: If agent class not found or creation fails
         """
         if agent_name not in self.agent_classes:
             raise ConfigurationError(f"Unknown agent: {agent_name}")
-        
+
         agent_class = self.agent_classes[agent_name]
-        
+
         # Get configuration
         if config is None:
             config = self.config_manager.get_config(agent_name)
-        
-        # Apply overrides
+
+        # Apply model override if provided
+        if model_override:
+            config = config.copy(deep=True)
+            config.model.model = model_override
+            self.logger.info(f"Applied model override for {agent_name}: {model_override}")
+
+        # Apply other overrides
         if config_overrides:
             config = config.copy(deep=True)
             for key, value in config_overrides.items():

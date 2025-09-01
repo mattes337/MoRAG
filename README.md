@@ -53,6 +53,22 @@ MoRAG uses a unified environment variable configuration system with CLI override
 - **Fallback Chain**: Stage-specific → Global LLM → Legacy → Defaults
 - **LLM Model Fallback**: Always falls back to `MORAG_GEMINI_MODEL` for compatibility
 
+#### LLM Model Configuration
+
+Configure different LLM models for different agents:
+
+- **General Model**: `--llm-model` sets default model for all agents
+- **Agent-Specific Models**: Individual flags for each agent type:
+  - `--fact-extraction-agent-model` - Fact extraction agent
+  - `--entity-extraction-agent-model` - Entity extraction agent
+  - `--relation-extraction-agent-model` - Relation extraction agent
+  - `--summarization-agent-model` - Summarization agent
+  - `--markdown-optimizer-agent-model` - Markdown optimizer agent
+  - `--chunking-agent-model` - Chunking agent
+  - And more...
+
+**Priority**: Agent-specific > Default > Stage config > Environment > Built-in default
+
 #### Stage Flow
 
 ```
@@ -143,12 +159,15 @@ python cli/morag-stages.py process input.pdf --optimize --output-dir ./output
 # Override LLM configuration via CLI
 python cli/morag-stages.py stage markdown-optimizer input.md --llm-model gemini-1.5-pro --llm-temperature 0.2
 
+# Configure different models for different agents
+python cli/morag-stages.py stage fact-generator input.md --llm-model gemini-1.5-flash --fact-extraction-agent-model gemini-2.0-flash
+
 # Override stage-specific parameters
 python cli/morag-stages.py stage chunker input.md --chunk-size 2000
 python cli/morag-stages.py stage fact-generator input.md --domain medical
 
-# Chain with LLM overrides
-python cli/morag-stages.py stages "markdown-optimizer,chunker" input.pdf --llm-model gemini-1.5-flash
+# Chain with LLM overrides and agent-specific models
+python cli/morag-stages.py stages "markdown-optimizer,chunker" input.pdf --llm-model gemini-1.5-flash --summarization-agent-model gemini-1.5-pro
 ```
 
 #### REST API Usage

@@ -11,6 +11,39 @@ This guide provides comprehensive API usage examples for all MoRAG content types
 - `POST /api/v1/stages/execute-all` - Execute all stages with form data
 - `GET /api/v1/stages/list` - List available stages and their configurations
 
+### 🤖 LLM Model Configuration
+
+Configure different LLM models for different agents in your API requests:
+
+- **General Model**: Set `llm_model_config.default_model` for all agents
+- **Agent-Specific Models**: Override specific agents with individual model settings
+- **Priority**: Agent-specific > Default > Stage config > Environment > Built-in default
+
+#### Available Agent Model Fields
+
+- `default_model` - Default model for all agents
+- `fact_extraction_agent_model` - Fact extraction agent
+- `entity_extraction_agent_model` - Entity extraction agent
+- `relation_extraction_agent_model` - Relation extraction agent
+- `keyword_extraction_agent_model` - Keyword extraction agent
+- `summarization_agent_model` - Summarization agent
+- `content_analysis_agent_model` - Content analysis agent
+- `markdown_optimizer_agent_model` - Markdown optimizer agent
+- `chunking_agent_model` - Chunking agent
+
+#### Example Model Configuration
+
+```json
+{
+  "llm_model_config": {
+    "default_model": "gemini-1.5-flash",
+    "fact_extraction_agent_model": "gemini-2.0-flash",
+    "summarization_agent_model": "gemini-1.5-pro",
+    "markdown_optimizer_agent_model": "gemini-1.5-pro"
+  }
+}
+```
+
 **Available Stages:**
 - **markdown-conversion** - Convert content to markdown format
 - **markdown-optimizer** - Optimize and clean markdown content
@@ -58,6 +91,13 @@ curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
   -F "file=@image.png" \
   -F 'config={"extract_text": true, "generate_descriptions": false}'
 
+# Fact extraction with custom model configuration
+curl -X POST "http://localhost:8000/api/v1/stages/fact-generator/execute" \
+  -F 'input_files=["./output/document.chunks.json"]' \
+  -F 'default_model=gemini-1.5-flash' \
+  -F 'fact_extraction_agent_model=gemini-2.0-flash' \
+  -F 'entity_extraction_agent_model=gemini-1.5-pro'
+
 # Process web URL (URL via input_files)
 curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
   -F 'input_files=["https://example.com/article"]' \
@@ -104,6 +144,26 @@ curl -X POST "http://localhost:8000/api/v1/stages/chain" \
       }
     }
   }'
+
+# Complete fact extraction pipeline with model configuration
+curl -X POST "http://localhost:8000/api/v1/stages/chain" \
+  -F "file=@research_paper.pdf" \
+  -F 'request={
+    "stages": ["markdown-conversion", "chunker", "fact-generator"],
+    "llm_model_config": {
+      "default_model": "gemini-1.5-flash",
+      "fact_extraction_agent_model": "gemini-2.0-flash",
+      "entity_extraction_agent_model": "gemini-1.5-pro",
+      "summarization_agent_model": "gemini-1.5-pro"
+    },
+    "stage_configs": {
+      "fact-generator": {
+        "extract_entities": true,
+        "extract_relations": true,
+        "domain": "research"
+      }
+    }
+  }'
 ```
 
 ### 3. Full Pipeline - Complete Processing with Storage
@@ -140,6 +200,23 @@ curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
   -F 'webhook_url=https://your-app.com/webhook' \
   -F 'output_dir=./output' \
   -F 'stop_on_failure=true'
+
+# Full pipeline with model configuration using form data
+curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
+  -F "file=@document.pdf" \
+  -F 'stages=["markdown-conversion", "markdown-optimizer", "chunker", "fact-generator"]' \
+  -F 'default_model=gemini-1.5-flash' \
+  -F 'fact_extraction_agent_model=gemini-2.0-flash' \
+  -F 'entity_extraction_agent_model=gemini-1.5-pro' \
+  -F 'summarization_agent_model=gemini-1.5-pro' \
+  -F 'markdown_optimizer_agent_model=gemini-1.5-pro' \
+  -F 'stage_configs={
+    "fact-generator": {
+      "extract_entities": true,
+      "extract_relations": true,
+      "domain": "general"
+    }
+  }'
 ```
 
 ### 3.1. Quality Gate Examples

@@ -4,12 +4,19 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 
 
+class AgentModelConfig(BaseModel):
+    """Configuration for agent-specific LLM models."""
+    default_model: Optional[str] = Field(default=None, description="Default LLM model for all agents")
+    agent_models: Dict[str, str] = Field(default_factory=dict, description="Agent-specific model overrides")
+
+
 class StageConfig(BaseModel):
     """Base configuration for all stages."""
     enabled: bool = Field(default=True, description="Whether this stage is enabled")
     timeout_seconds: Optional[int] = Field(default=None, description="Timeout for stage execution")
     retry_count: int = Field(default=0, description="Number of retries on failure")
     config: Dict[str, Any] = Field(default_factory=dict, description="Stage-specific configuration")
+    agent_model_config: Optional[AgentModelConfig] = Field(default=None, description="Agent model configuration")
 
 
 class MarkdownConversionConfig(StageConfig):

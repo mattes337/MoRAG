@@ -81,7 +81,7 @@ class MarkdownOptimizerStage(Stage):
             api_key_available = self._check_api_key_available()
             if LLM_AVAILABLE and config.enabled and api_key_available:
                 try:
-                    optimized_content = await self._optimize_with_llm(content, metadata, config)
+                    optimized_content = await self._optimize_with_llm(content, metadata, config, context)
                     optimization_applied = True
                 except Exception as e:
                     logger.warning("LLM optimization failed, using basic cleanup", error=str(e))
@@ -302,13 +302,14 @@ class MarkdownOptimizerStage(Stage):
 
 
     
-    async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig) -> str:
+    async def _optimize_with_llm(self, content: str, metadata: Dict[str, Any], config: MarkdownOptimizerConfig, context: StageContext = None) -> str:
         """Optimize content using LLM with text splitting for large files.
 
         Args:
             content: Content to optimize
             metadata: Document metadata
             config: Stage configuration
+            context: Stage execution context (for model overrides)
 
         Returns:
             Optimized content
@@ -317,10 +318,25 @@ class MarkdownOptimizerStage(Stage):
             # Get LLM configuration with stage-specific overrides
             unified_llm_config = config.get_llm_config()
 
+            # Check for agent-specific model overrides from context
+            model_override = None
+            if context and hasattr(context, 'config') and context.config:
+                model_config = context.config.get('model_config', {})
+                if model_config:
+                    # Check for markdown optimizer specific model
+                    markdown_optimizer_model = model_config.get('agent_models', {}).get('markdown_optimizer')
+                    if markdown_optimizer_model:
+                        model_override = markdown_optimizer_model
+                        logger.info(f"Using markdown optimizer agent model override: {model_override}")
+                    # Check for default model override
+                    elif model_config.get('default_model'):
+                        model_override = model_config['default_model']
+                        logger.info(f"Using default model override: {model_override}")
+
             # Convert to reasoning LLMConfig format
             reasoning_config = ReasoningLLMConfig(
                 provider=unified_llm_config.provider,
-                model=unified_llm_config.model,
+                model=model_override or unified_llm_config.model,
                 api_key=unified_llm_config.api_key,
                 temperature=unified_llm_config.temperature,
                 max_tokens=unified_llm_config.max_tokens,

@@ -108,6 +108,20 @@ class FactGeneratorStage(Stage):
         # Use model from config (which includes CLI overrides) or fallback to environment
         model_id = config.model or os.getenv('MORAG_GEMINI_MODEL', 'gemini-2.0-flash')
 
+        # Check for agent-specific model overrides from context
+        if hasattr(context, 'config') and context.config:
+            model_config = context.config.get('model_config', {})
+            if model_config:
+                # Check for fact extraction specific model
+                fact_extraction_model = model_config.get('agent_models', {}).get('fact_extraction')
+                if fact_extraction_model:
+                    model_id = fact_extraction_model
+                    logger.info(f"Using fact extraction agent model override: {model_id}")
+                # Check for default model override
+                elif model_config.get('default_model'):
+                    model_id = model_config['default_model']
+                    logger.info(f"Using default model override: {model_id}")
+
         # Initialize fact extractor with runtime config
         if FactExtractor is not None:
             self.fact_extractor = FactExtractor(

@@ -132,33 +132,32 @@ class AgentRegistry:
         self,
         agent_name: str,
         config: Optional[AgentConfig] = None,
+        model_override: Optional[str] = None,
         **config_overrides
     ) -> BaseAgent:
         """Get an agent instance, creating it if necessary.
-        
+
         Args:
             agent_name: Name of the agent
             config: Optional configuration
+            model_override: Optional model override for this specific agent
             **config_overrides: Configuration overrides
-            
+
         Returns:
             Agent instance
         """
-        # Check if we have a cached instance
-        if agent_name in self.instances:
+        # Check if we have a cached instance and no overrides
+        if agent_name in self.instances and not model_override and not config_overrides:
             agent_ref = self.instances[agent_name]
             agent = agent_ref()
             if agent is not None:
-                # Update config if overrides provided
-                if config_overrides:
-                    agent.update_config(**config_overrides)
                 return agent
             else:
                 # Clean up dead reference
                 del self.instances[agent_name]
-        
-        # Create new instance
-        agent = self.factory.create_agent(agent_name, config, **config_overrides)
+
+        # Create new instance with overrides
+        agent = self.factory.create_agent(agent_name, config, model_override=model_override, **config_overrides)
         
         # Store weak reference
         self.instances[agent_name] = weakref.ref(agent)
@@ -171,19 +170,21 @@ class AgentRegistry:
         self,
         agent_name: str,
         config: Optional[AgentConfig] = None,
+        model_override: Optional[str] = None,
         **config_overrides
     ) -> BaseAgent:
         """Create a new agent instance (not cached).
-        
+
         Args:
             agent_name: Name of the agent
             config: Optional configuration
+            model_override: Optional model override for this specific agent
             **config_overrides: Configuration overrides
-            
+
         Returns:
             New agent instance
         """
-        return self.factory.create_agent(agent_name, config, **config_overrides)
+        return self.factory.create_agent(agent_name, config, model_override=model_override, **config_overrides)
     
     def register_agent_class(self, agent_name: str, agent_class: Type[BaseAgent]) -> None:
         """Register an agent class.

@@ -4,6 +4,7 @@ from .stage import Stage, StageType, StageStatus
 from .result import StageResult, StageMetadata
 from .context import StageContext
 from .config import (
+    AgentModelConfig,
     PipelineConfig,
     StageConfig,
     MarkdownConversionConfig,
@@ -20,6 +21,7 @@ __all__ = [
     "StageResult",
     "StageMetadata",
     "StageContext",
+    "AgentModelConfig",
     "PipelineConfig",
     "StageConfig",
     "MarkdownConversionConfig",
