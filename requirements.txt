@@ -28,6 +28,7 @@ qdrant-client==1.12.1
 # LLM and AI Services
 google-genai>=1.15.0,<1.18.0
 google-generativeai>=0.3.2,<1.0.0
+outlines>=1.0.0,<2.0.0
 
 # gRPC and Protocol Buffers (version compatibility fixes)
 grpcio>=1.73.0,<2.0.0

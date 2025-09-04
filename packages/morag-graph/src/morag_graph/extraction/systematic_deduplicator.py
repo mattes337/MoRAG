@@ -5,6 +5,7 @@ import asyncio
 import time
 from typing import List, Dict, Set, Tuple, Optional, Any
 from dataclasses import dataclass
+from pydantic import BaseModel, Field
 from collections import defaultdict
 import hashlib
 
@@ -20,6 +21,13 @@ from .entity_normalizer import LLMEntityNormalizer
 from ..utils.retry_utils import retry_with_exponential_backoff
 
 logger = structlog.get_logger(__name__)
+
+
+class MergeDecision(BaseModel):
+    """Structured merge decision from LLM."""
+    should_merge: bool = Field(description="Whether entities should be merged")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the decision")
+    reasoning: str = Field(description="Explanation for the decision")
 
 
 @dataclass
@@ -256,27 +264,27 @@ class LLMMergeValidator:
     
     def _parse_merge_response(self, response: str) -> Tuple[bool, float, str]:
         """Parse LLM response for merge decision."""
+        # This method is now deprecated - structured generation should be used instead
+        # Keeping minimal fallback for compatibility
         try:
+            # Try to parse as JSON for backwards compatibility
             import json
-            
-            # Try to extract JSON from response
             response_clean = response.strip()
             if response_clean.startswith("```json"):
                 response_clean = response_clean[7:]
             if response_clean.endswith("```"):
                 response_clean = response_clean[:-3]
-            
+
             data = json.loads(response_clean)
-            
             should_merge = data.get("should_merge", False)
             confidence = float(data.get("confidence", 0.5))
             reasoning = data.get("reasoning", "LLM decision")
-            
+
             return should_merge, confidence, reasoning
-            
+
         except Exception as e:
-            self.logger.warning(f"Failed to parse LLM response: {e}")
-            # Fallback to conservative decision
+            self.logger.warning(f"Legacy JSON parsing failed: {e}")
+            # Conservative fallback
             return False, 0.3, f"parse_error: {str(e)}"
     
     def _rule_based_confirmation(

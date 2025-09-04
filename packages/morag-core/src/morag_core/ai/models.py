@@ -113,9 +113,31 @@ class TranscriptAnalysisResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
+class ExtractedFact(BaseModel):
+    """A fact extracted from text."""
+
+    fact_text: str = Field(description="Complete, self-contained fact statement")
+    fact_type: str = Field(description="Type of fact (statistical, causal, technical, definition, procedural)")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")
+    structured_metadata: Dict[str, Any] = Field(default_factory=dict, description="Structured metadata with entities and relationships")
+    keywords: List[str] = Field(default_factory=list, description="Relevant technical terms")
+    source_text: Optional[str] = Field(default=None, description="Source text span")
+
+
+class FactExtractionResult(BaseModel):
+    """Result from fact extraction."""
+
+    facts: List[ExtractedFact] = Field(description="Extracted facts")
+    total_facts: int = Field(description="Total number of facts extracted")
+    confidence: ConfidenceLevel = Field(description="Overall confidence")
+    domain: str = Field(default="general", description="Domain context")
+    language: str = Field(default="en", description="Language of text")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
 class BaseAgentResult(BaseModel):
     """Base class for all agent results."""
-    
+
     success: bool = Field(description="Whether the operation was successful")
     timestamp: datetime = Field(default_factory=datetime.now, description="When the result was generated")
     agent_version: Optional[str] = Field(default=None, description="Version of the agent that generated this result")
