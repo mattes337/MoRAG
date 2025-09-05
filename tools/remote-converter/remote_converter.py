@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 import structlog
-import requests
+import httpx
 from dotenv import load_dotenv
 
 # Add MoRAG packages to path
@@ -48,7 +48,13 @@ except ImportError as e:
     print("pip install -e packages/morag-video")
     sys.exit(1)
 
-logger = structlog.get_logger(__name__)
+try:
+    from morag_core.utils.logging import get_logger
+    logger = get_logger(__name__)
+except ImportError:
+    # Fallback for environments without morag-core
+    import structlog
+    logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -284,7 +290,7 @@ class RemoteConverter:
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
             
-            response = requests.get(url, params=params, headers=headers, timeout=30)
+            response = httpx.get(url, params=params, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -358,28 +364,27 @@ class RemoteConverter:
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
 
-            response = requests.get(url, headers=headers, timeout=300, stream=True)
+            with httpx.stream("GET", url, headers=headers, timeout=300) as response:
+                if response.status_code == 200:
+                    # Create temporary file
+                    temp_file = tempfile.NamedTemporaryFile(
+                        dir=self.temp_dir,
+                        delete=False,
+                        suffix=f"_{job_id}"
+                    )
 
-            if response.status_code == 200:
-                # Create temporary file
-                temp_file = tempfile.NamedTemporaryFile(
-                    dir=self.temp_dir,
-                    delete=False,
-                    suffix=f"_{job_id}"
-                )
+                    # Download file in chunks
+                    for chunk in response.iter_bytes(chunk_size=8192):
+                        if chunk:
+                            temp_file.write(chunk)
 
-                # Download file in chunks
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        temp_file.write(chunk)
-
-                temp_file.close()
-                return temp_file.name
-            else:
-                logger.error("Failed to download source file",
-                           job_id=job_id,
-                           status_code=response.status_code)
-                return None
+                    temp_file.close()
+                    return temp_file.name
+                else:
+                    logger.error("Failed to download source file",
+                               job_id=job_id,
+                               status_code=response.status_code)
+                    return None
 
         except Exception as e:
             logger.error("Exception downloading source file",
@@ -471,7 +476,7 @@ class RemoteConverter:
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
 
-            response = requests.put(url, json=payload, headers=headers, timeout=60)
+            response = httpx.put(url, json=payload, headers=headers, timeout=60)
 
             if response.status_code != 200:
                 logger.error("Failed to submit result",
@@ -496,7 +501,7 @@ class RemoteConverter:
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
 
-            response = requests.put(url, json=payload, headers=headers, timeout=60)
+            response = httpx.put(url, json=payload, headers=headers, timeout=60)
 
             if response.status_code != 200:
                 logger.error("Failed to submit error result",
@@ -514,7 +519,7 @@ class RemoteConverter:
             if self.api_key:
                 headers['Authorization'] = f'Bearer {self.api_key}'
 
-            response = requests.get(url, headers=headers, timeout=10)
+            response = httpx.get(url, headers=headers, timeout=10)
 
             if response.status_code == 200:
                 logger.info("API connection test successful", api_url=self.api_base_url)

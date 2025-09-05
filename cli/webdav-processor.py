@@ -518,29 +518,27 @@ class MoRAGWebDAVProcessor:
             print(f"  ⬇️  Downloading {webdav_remote_path}...")
             
             # Use direct HTTP request to bypass webdavclient3 path issues
-            import requests
-            from requests.auth import HTTPBasicAuth
+            import httpx
             
             # Construct the direct URL
             file_url = f"{self.webdav_url}/{webdav_remote_path}"
             
             # Make direct HTTP request
-            response = requests.get(
+            with httpx.stream(
+                "GET",
                 file_url,
-                auth=HTTPBasicAuth(self.username, self.password),
+                auth=(self.username, self.password),
                 verify=False,
-                stream=True,
                 timeout=30
-            )
-            
-            if response.status_code == 200:
-                with open(local_temp_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                print(f"  ✓ Downloaded to {local_temp_path}")
-            else:
-                raise Exception(f"HTTP download failed with status code: {response.status_code}")
+            ) as response:
+                if response.status_code == 200:
+                    with open(local_temp_path, 'wb') as f:
+                        for chunk in response.iter_bytes(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                    print(f"  ✓ Downloaded to {local_temp_path}")
+                else:
+                    raise Exception(f"HTTP download failed with status code: {response.status_code}")
             
             # Process the file using MoRAG Services
             print(f"  🔄 Processing {remote_file_path} with MoRAG...")

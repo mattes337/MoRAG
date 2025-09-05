@@ -14,10 +14,10 @@ from .service_coordinator import MoRAGServiceCoordinator, ServiceConfig, Content
 from .content_processors import ContentProcessors
 from .service_utilities import ServiceUtilities
 
-import structlog
 from typing import Dict, List, Any, Optional, Union
+from morag_core.utils.logging import get_logger
 
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 class MoRAGServices(MoRAGServiceCoordinator):
