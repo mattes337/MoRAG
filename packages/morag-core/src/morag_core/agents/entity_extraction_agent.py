@@ -1,12 +1,12 @@
 """Entity extraction agent using Outlines for guaranteed structured output."""
 
 from typing import Type, List, Optional, Dict, Any
-import structlog
 
 from ..ai.base_agent import MoRAGBaseAgent, AgentConfig
 from ..ai.models import EntityExtractionResult, Entity, ConfidenceLevel
+from ..utils.logging import get_logger
 
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 class EntityExtractionAgent(MoRAGBaseAgent[EntityExtractionResult]):

@@ -6,7 +6,7 @@ import os
 import tempfile
 import shutil
 from pathlib import Path
-import requests
+import httpx
 import time
 
 # Add the packages to the path
@@ -19,7 +19,7 @@ def test_api_startup_validation():
     
     try:
         # Try to connect to the API server
-        response = requests.get("http://localhost:8000/health", timeout=5)
+        response = httpx.get("http://localhost:8000/health", timeout=5)
         
         if response.status_code == 200:
             print("[OK] API server is running and healthy")
@@ -30,7 +30,7 @@ def test_api_startup_validation():
             print(f"[FAIL] API server health check failed (status: {response.status_code})")
             return False
             
-    except requests.exceptions.ConnectionError:
+    except httpx.ConnectError:
         print("[FAIL] Cannot connect to API server (not running or startup failed)")
         print("   This could indicate temp directory validation failed during startup")
         return False
@@ -54,7 +54,7 @@ def test_file_upload_endpoint():
             # Upload the file
             with open(test_file_path, 'rb') as f:
                 files = {'file': ('test.txt', f, 'text/plain')}
-                response = requests.post(
+                response = httpx.post(
                     "http://localhost:8000/process/file",
                     files=files,
                     timeout=30
@@ -131,7 +131,7 @@ def test_worker_file_access():
             with open(test_file_path, 'rb') as f:
                 files = {'file': ('worker_test.txt', f, 'text/plain')}
                 data = {'source_type': 'document'}
-                response = requests.post(
+                response = httpx.post(
                     "http://localhost:8000/api/v1/ingest/file",
                     files=files,
                     data=data,
@@ -145,7 +145,7 @@ def test_worker_file_access():
                 
                 # Check task status after a short delay
                 time.sleep(2)
-                status_response = requests.get(
+                status_response = httpx.get(
                     f"http://localhost:8000/api/v1/status/{task_id}",
                     timeout=10
                 )

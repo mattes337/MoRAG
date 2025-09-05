@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import structlog
-import requests
+import httpx
 from urllib.parse import urlparse
 
 from morag.api_models.models import WebhookProgressNotification
@@ -123,7 +123,7 @@ class EnhancedWebhookService:
                 loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(
                     None,
-                    lambda: requests.post(
+                    lambda: httpx.post(
                         webhook_url,
                         json=notification.dict(),
                         headers=headers,
@@ -144,12 +144,12 @@ class EnhancedWebhookService:
                                   status_code=response.status_code,
                                   response_text=response.text[:200])
                     
-            except requests.exceptions.Timeout:
+            except httpx.TimeoutException:
                 logger.warning("Webhook notification timeout",
                               webhook_url=webhook_url,
                               task_id=task_id,
                               attempt=attempt + 1)
-            except requests.exceptions.ConnectionError:
+            except httpx.ConnectError:
                 logger.warning("Webhook notification connection error",
                               webhook_url=webhook_url,
                               task_id=task_id,

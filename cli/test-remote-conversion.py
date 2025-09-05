@@ -109,24 +109,24 @@ def test_remote_job_lifecycle():
         return False
 
 def test_api_endpoints():
-    """Test the API endpoints using requests."""
+    """Test the API endpoints using httpx."""
     print("\n🌐 Testing API Endpoints")
     print("=" * 40)
     
     try:
-        import requests
+        import httpx
         
         # Test server health (assuming server is running on localhost:8000)
         base_url = "http://localhost:8000"
         
         print("1️⃣ Testing server health...")
         try:
-            response = requests.get(f"{base_url}/health", timeout=5)
+            response = httpx.get(f"{base_url}/health", timeout=5)
             if response.status_code == 200:
                 print("[OK] Server is running")
             else:
                 print(f"[WARN] Server responded with status {response.status_code}")
-        except requests.exceptions.RequestException:
+        except httpx.RequestError:
             print("[FAIL] Server is not running. Start the server with: python -m morag.server")
             return False
         
@@ -139,7 +139,7 @@ def test_api_endpoints():
             "ingestion_task_id": "test-api-123"
         }
         
-        response = requests.post(f"{base_url}/api/v1/remote-jobs/", json=job_data)
+        response = httpx.post(f"{base_url}/api/v1/remote-jobs/", json=job_data)
         if response.status_code == 200:
             job_response = response.json()
             job_id = job_response["job_id"]
@@ -147,7 +147,7 @@ def test_api_endpoints():
             
             # Test job status
             print("\n3️⃣ Testing job status...")
-            status_response = requests.get(f"{base_url}/api/v1/remote-jobs/{job_id}/status")
+            status_response = httpx.get(f"{base_url}/api/v1/remote-jobs/{job_id}/status")
             if status_response.status_code == 200:
                 status_data = status_response.json()
                 print(f"[OK] Job status: {status_data['status']}")

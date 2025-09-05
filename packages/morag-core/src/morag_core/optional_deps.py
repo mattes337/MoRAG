@@ -3,9 +3,10 @@
 import importlib
 import warnings
 from typing import Dict, List, Optional, Any
-import structlog
 
-logger = structlog.get_logger(__name__)
+from .utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class OptionalDependency:
@@ -174,6 +175,42 @@ class OptionalDependencyManager:
             import_path="langdetect",
             feature_name="Language detection",
             install_command="pip install langdetect"
+        )
+        
+        # ML/Scientific computing dependencies (heavy - should be optional)
+        self.dependencies["torch"] = OptionalDependency(
+            name="torch",
+            import_path="torch",
+            feature_name="PyTorch tensor operations",
+            install_command="pip install torch>=2.1.0,<2.7.0"
+        )
+        
+        self.dependencies["torchaudio"] = OptionalDependency(
+            name="torchaudio",
+            import_path="torchaudio", 
+            feature_name="PyTorch audio processing",
+            install_command="pip install torchaudio>=2.1.0,<2.7.0"
+        )
+        
+        self.dependencies["scipy"] = OptionalDependency(
+            name="scipy",
+            import_path="scipy",
+            feature_name="Scientific computing",
+            install_command="pip install scipy>=1.13.0,<1.15.0"
+        )
+        
+        self.dependencies["scikit_learn"] = OptionalDependency(
+            name="scikit-learn",
+            import_path="sklearn",
+            feature_name="Machine learning algorithms",
+            install_command="pip install scikit-learn>=1.5.0,<1.6.0"
+        )
+        
+        self.dependencies["sentence_transformers"] = OptionalDependency(
+            name="sentence-transformers",
+            import_path="sentence_transformers",
+            feature_name="Sentence embeddings",
+            install_command="pip install sentence-transformers>=3.0.0,<5.0.0"
         )
     
     def get_dependency(self, name: str) -> OptionalDependency:

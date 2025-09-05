@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-import requests
+import httpx
 import os
 from typing import Dict, Any, List, Optional
 from pathlib import Path
@@ -130,7 +130,7 @@ def send_webhook_notification(webhook_url: str, task_id: str, status: str, resul
             "completed_at": "2024-01-01T12:05:30"  # Would use actual timestamp
         }
         
-        response = requests.post(
+        response = httpx.post(
             webhook_url,
             json=payload,
             timeout=10,
