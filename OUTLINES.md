@@ -103,21 +103,17 @@ class OutlinesEnabledAgent(MoRAGBaseAgent[T]):
     def __init__(self, config: Optional[AgentConfig] = None):
         super().__init__(config)
         self.outlines_provider = OutlinesProvider(config.provider_config)
-        self.use_outlines = config.use_structured_generation
-    
+
     async def run_structured(self, user_prompt: str, **kwargs) -> T:
-        if self.use_outlines:
-            generator = self.outlines_provider.get_generator(self.get_result_type())
-            result_str = generator(user_prompt, **kwargs)
-            return self.get_result_type().model_validate_json(result_str)
-        else:
-            return await super().run(user_prompt, **kwargs)
+        generator = self.outlines_provider.get_generator(self.get_result_type())
+        result_str = generator(user_prompt, **kwargs)
+        return self.get_result_type().model_validate_json(result_str)
 ```
 
 #### 2.2 Migration Strategy
-- Add `use_structured_generation: bool = True` to AgentConfig
-- Implement backward compatibility with existing parsing logic
-- Gradual migration agent by agent
+- All agents now use Outlines for structured generation
+- Legacy JSON parsing has been completely removed
+- Simplified configuration with guaranteed structured output
 
 ### Phase 3: Specific Agent Implementations (Week 3-4)
 
@@ -358,17 +354,9 @@ MORAG_OUTLINES_TEMPERATURE=0.1
 ```python
 class AgentConfig(BaseModel):
     # Existing fields...
-    use_structured_generation: bool = Field(
-        default=True,
-        description="Use Outlines for guaranteed structured output"
-    )
     outlines_provider: str = Field(
         default="gemini",
         description="Provider for Outlines integration"
-    )
-    fallback_to_parsing: bool = Field(
-        default=True,
-        description="Fallback to traditional parsing if Outlines fails"
     )
 ```
 

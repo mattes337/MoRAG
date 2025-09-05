@@ -44,6 +44,59 @@ Configure different LLM models for different agents in your API requests:
 }
 ```
 
+### 🎯 Agent Prompt Configuration
+
+**Note**: Currently, agent prompts are loaded from the centralized `agents/prompts.yaml` file and cannot be overridden via API parameters. Custom prompts must be configured by:
+
+1. **Modifying the global prompts file**: Edit `agents/prompts.yaml` to customize prompts for specific agents
+2. **Using prompt configuration parameters**: Configure prompt behavior through stage configs:
+
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "medical",
+      "custom_instructions": "Focus on clinical findings and treatment protocols",
+      "include_examples": true,
+      "min_confidence": 0.7
+    }
+  }
+}
+```
+
+#### Available Prompt Configuration Options
+
+These can be passed through `stage_configs` for each stage:
+
+- `domain` - Domain context (e.g., "medical", "legal", "technical", "general")
+- `custom_instructions` - Additional instructions to append to prompts
+- `include_examples` - Whether to include few-shot examples (boolean)
+- `include_context` - Whether to include contextual information (boolean)
+- `output_format` - Expected output format ("json", "text", "markdown")
+- `strict_json` - Enforce strict JSON output (boolean)
+- `language` - Target language for processing
+- `min_confidence` - Minimum confidence threshold (0.0-1.0)
+
+#### Example with Prompt Configuration
+
+```json
+{
+  "stages": ["fact-generator"],
+  "llm_model_config": {
+    "fact_extraction_agent_model": "gemini-2.0-flash"
+  },
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "research",
+      "custom_instructions": "Focus on methodology, findings, and statistical significance",
+      "include_examples": true,
+      "min_confidence": 0.8,
+      "language": "en"
+    }
+  }
+}
+```
+
 **Available Stages:**
 - **markdown-conversion** - Convert content to markdown format
 - **markdown-optimizer** - Optimize and clean markdown content
@@ -97,6 +150,19 @@ curl -X POST "http://localhost:8000/api/v1/stages/fact-generator/execute" \
   -F 'default_model=gemini-1.5-flash' \
   -F 'fact_extraction_agent_model=gemini-2.0-flash' \
   -F 'entity_extraction_agent_model=gemini-1.5-pro'
+
+# Fact extraction with custom prompt configuration
+curl -X POST "http://localhost:8000/api/v1/stages/fact-generator/execute" \
+  -F 'input_files=["./output/document.chunks.json"]' \
+  -F 'config={
+    "domain": "medical",
+    "custom_instructions": "Focus on clinical findings, treatment protocols, and patient outcomes. Include dosage information and contraindications.",
+    "include_examples": true,
+    "min_confidence": 0.8,
+    "language": "en",
+    "extract_entities": true,
+    "extract_relations": true
+  }'
 
 # Process web URL (URL via input_files)
 curl -X POST "http://localhost:8000/api/v1/stages/markdown-conversion/execute" \
@@ -164,6 +230,28 @@ curl -X POST "http://localhost:8000/api/v1/stages/chain" \
       }
     }
   }'
+
+# Pipeline with custom prompt configuration for domain-specific processing
+curl -X POST "http://localhost:8000/api/v1/stages/chain" \
+  -F "file=@legal_document.pdf" \
+  -F 'request={
+    "stages": ["markdown-conversion", "chunker", "fact-generator"],
+    "llm_model_config": {
+      "fact_extraction_agent_model": "gemini-2.0-flash",
+      "entity_extraction_agent_model": "gemini-1.5-pro"
+    },
+    "stage_configs": {
+      "fact-generator": {
+        "domain": "legal",
+        "custom_instructions": "Focus on legal precedents, statutes, case citations, and regulatory requirements. Extract specific legal entities like court names, case numbers, and legal principles.",
+        "include_examples": true,
+        "min_confidence": 0.9,
+        "extract_entities": true,
+        "extract_relations": true,
+        "language": "en"
+      }
+    }
+  }'
 ```
 
 ### 3. Full Pipeline - Complete Processing with Storage
@@ -215,6 +303,29 @@ curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
       "extract_entities": true,
       "extract_relations": true,
       "domain": "general"
+    }
+  }'
+
+# Full pipeline with custom prompt configuration for technical documentation
+curl -X POST "http://localhost:8000/api/v1/stages/execute-all" \
+  -F "file=@technical_manual.pdf" \
+  -F 'stages=["markdown-conversion", "markdown-optimizer", "chunker", "fact-generator"]' \
+  -F 'default_model=gemini-1.5-flash' \
+  -F 'fact_extraction_agent_model=gemini-2.0-flash' \
+  -F 'stage_configs={
+    "markdown-optimizer": {
+      "domain": "technical",
+      "custom_instructions": "Preserve technical terminology, code snippets, and formatting. Maintain accuracy of technical specifications.",
+      "language": "en"
+    },
+    "fact-generator": {
+      "domain": "technical",
+      "custom_instructions": "Extract technical specifications, procedures, requirements, and system configurations. Focus on actionable technical information.",
+      "include_examples": true,
+      "min_confidence": 0.7,
+      "extract_entities": true,
+      "extract_relations": true,
+      "language": "en"
     }
   }'
 ```
@@ -651,6 +762,211 @@ When quality gates are configured, facts may include additional metadata:
 | Stage Chain | `/api/v1/stages/chain` | Execute multiple stages with JSON config |
 | Execute All | `/api/v1/stages/execute-all` | Execute all stages with form data |
 
+## 🎯 Prompt Customization Best Practices
+
+### Domain-Specific Configurations
+
+**Medical/Healthcare Documents**
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "medical",
+      "custom_instructions": "Focus on clinical findings, diagnoses, treatments, medications, dosages, contraindications, and patient outcomes. Include medical terminology and ICD codes when available.",
+      "include_examples": true,
+      "min_confidence": 0.8,
+      "language": "en"
+    }
+  }
+}
+```
+
+**Legal Documents**
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "legal",
+      "custom_instructions": "Extract legal precedents, statutes, case citations, regulatory requirements, court decisions, and legal principles. Include case numbers, court names, and legal entity relationships.",
+      "include_examples": true,
+      "min_confidence": 0.9,
+      "language": "en"
+    }
+  }
+}
+```
+
+**Technical Documentation**
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "technical",
+      "custom_instructions": "Focus on technical specifications, system requirements, procedures, configurations, APIs, and implementation details. Preserve version numbers and technical parameters.",
+      "include_examples": true,
+      "min_confidence": 0.7,
+      "language": "en"
+    }
+  }
+}
+```
+
+**Research Papers**
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "research",
+      "custom_instructions": "Extract methodology, findings, statistical significance, sample sizes, experimental conditions, and conclusions. Include author names, publication details, and citation information.",
+      "include_examples": true,
+      "min_confidence": 0.8,
+      "language": "en"
+    }
+  }
+}
+```
+
+### Multi-Language Processing
+
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "general",
+      "language": "es",
+      "custom_instructions": "Procesar el contenido en español manteniendo la terminología técnica original. Extraer hechos específicos y entidades relevantes.",
+      "include_examples": true,
+      "min_confidence": 0.6
+    }
+  }
+}
+```
+
+### Quality Control Settings
+
+**High-Quality Production Mode**
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "min_confidence": 0.8,
+      "strict_validation": true,
+      "include_examples": true,
+      "custom_instructions": "Only extract high-confidence, verifiable facts with clear source attribution."
+    }
+  }
+}
+```
+
+**Development/Testing Mode**
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "min_confidence": 0.3,
+      "strict_validation": false,
+      "include_examples": true,
+      "custom_instructions": "Extract all potentially relevant facts for analysis and review."
+    }
+  }
+}
+```
+
+### Advanced Prompt Configuration
+
+**Combining Multiple Agents with Custom Prompts**
+```json
+{
+  "stage_configs": {
+    "markdown-optimizer": {
+      "domain": "technical",
+      "custom_instructions": "Preserve code blocks, technical diagrams, and formatting. Fix only conversion errors without changing technical content.",
+      "language": "en"
+    },
+    "fact-generator": {
+      "domain": "technical",
+      "custom_instructions": "Extract API specifications, system requirements, configuration parameters, and implementation steps. Include version numbers and compatibility information.",
+      "include_examples": true,
+      "min_confidence": 0.7,
+      "extract_entities": true,
+      "extract_relations": true
+    }
+  }
+}
+```
+
+**Custom Examples and Context**
+```json
+{
+  "stage_configs": {
+    "fact-generator": {
+      "domain": "financial",
+      "custom_instructions": "Extract financial metrics, market data, regulatory compliance information, and risk factors. Include numerical values with proper units and time periods.",
+      "include_examples": true,
+      "custom_examples": [
+        {
+          "input": "The company reported Q3 revenue of $2.5B, up 15% YoY.",
+          "output": "Company Q3 revenue was $2.5 billion, representing 15% year-over-year growth."
+        }
+      ],
+      "min_confidence": 0.8
+    }
+  }
+}
+```
+
+### Prompt Configuration Reference Table
+
+| Parameter | Type | Default | Description | Example Values |
+|-----------|------|---------|-------------|----------------|
+| `domain` | string | "general" | Domain context for specialized processing | "medical", "legal", "technical", "research", "financial" |
+| `custom_instructions` | string | null | Additional instructions appended to prompts | "Focus on clinical findings and treatment protocols" |
+| `include_examples` | boolean | true | Whether to include few-shot examples | true, false |
+| `include_context` | boolean | true | Whether to include contextual information | true, false |
+| `output_format` | string | "json" | Expected output format | "json", "text", "markdown" |
+| `strict_json` | boolean | true | Enforce strict JSON output validation | true, false |
+| `language` | string | "en" | Target language for processing | "en", "es", "fr", "de", "zh" |
+| `min_confidence` | float | 0.5 | Minimum confidence threshold (0.0-1.0) | 0.3, 0.7, 0.9 |
+| `max_output_length` | integer | null | Maximum output length in characters | 1000, 5000, 10000 |
+| `custom_examples` | array | null | Custom few-shot examples | See example above |
+
+### Current Limitations and Workarounds
+
+**⚠️ Important Notes:**
+
+1. **System/User Prompt Override**: Currently, the core system and user prompts cannot be completely overridden via API. They are loaded from `agents/prompts.yaml`. The `custom_instructions` parameter appends to existing prompts rather than replacing them.
+
+2. **Prompt Template Access**: To completely customize agent prompts, you need to:
+   - Modify the `agents/prompts.yaml` file directly
+   - Restart the service to reload prompts
+   - Use the `custom_instructions` parameter for additional context
+
+3. **Agent-Specific Limitations**: Some agents may not support all prompt configuration options. Check the specific agent documentation for supported parameters.
+
+**Workarounds for Advanced Customization:**
+
+```bash
+# Method 1: Modify global prompts file
+# Edit agents/prompts.yaml and restart service
+
+# Method 2: Use custom_instructions for additional context
+curl -X POST "http://localhost:8000/api/v1/stages/fact-generator/execute" \
+  -F 'input_files=["./output/document.chunks.json"]' \
+  -F 'config={
+    "domain": "specialized",
+    "custom_instructions": "IMPORTANT: Override default behavior. Focus exclusively on X, Y, Z. Ignore generic advice. Use the following format: [specific format instructions]",
+    "min_confidence": 0.8
+  }'
+```
+
+### Future Roadmap
+
+**Planned Enhancements:**
+- Full prompt override capability via API parameters
+- Dynamic prompt template loading
+- Agent-specific prompt customization endpoints
+- Prompt versioning and A/B testing support
+
 ## 🔧 Webhook Configuration
 
 ### Webhook Configuration for Stage Notifications
@@ -796,6 +1112,14 @@ async def main():
                         "chunker", "fact-generator", "ingestor"
                     ]),
                     "stage_configs": json.dumps({
+                        "fact-generator": {
+                            "domain": "research",
+                            "custom_instructions": "Focus on methodology, findings, and statistical significance",
+                            "include_examples": True,
+                            "min_confidence": 0.7,
+                            "extract_entities": True,
+                            "extract_relations": True
+                        },
                         "ingestor": {
                             "databases": ["qdrant", "neo4j"],
                             "collection_name": "documents",
@@ -814,6 +1138,32 @@ async def main():
                 }
             )
         full_pipeline_result = response.json()
+
+        # Execute with domain-specific prompt configuration
+        with open("medical_report.pdf", "rb") as f:
+            response = await client.post(
+                f"{base_url}/api/v1/stages/chain",
+                files={"file": f},
+                json={
+                    "stages": ["markdown-conversion", "chunker", "fact-generator"],
+                    "llm_model_config": {
+                        "fact_extraction_agent_model": "gemini-2.0-flash",
+                        "entity_extraction_agent_model": "gemini-1.5-pro"
+                    },
+                    "stage_configs": {
+                        "fact-generator": {
+                            "domain": "medical",
+                            "custom_instructions": "Extract clinical findings, diagnoses, treatments, medications, and patient outcomes. Include dosage information and contraindications.",
+                            "include_examples": True,
+                            "min_confidence": 0.8,
+                            "extract_entities": True,
+                            "extract_relations": True,
+                            "language": "en"
+                        }
+                    }
+                }
+            )
+        medical_result = response.json()
 
         print(f"Conversion: {conversion_result['success']}")
         print(f"YouTube: {youtube_result['success']}")

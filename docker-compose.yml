@@ -52,8 +52,11 @@ services:
       - PYTORCH_DISABLE_NNPACK=1
       - PYTORCH_DISABLE_AVX=1
       - PYTORCH_DISABLE_AVX2=1
+      # Mock Mode Configuration
+      - MORAG_MOCK_MODE=false
     depends_on:
       - redis
+    user: "0:0"  # Run as root to avoid permission issues with volume mounts
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -69,9 +72,9 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      - HF_HOME=/app/temp/cache/huggingface
+      - TRANSFORMERS_CACHE=/app/temp/cache/huggingface
+      - WHISPER_CACHE_DIR=/app/temp/cache/whisper
       # CPU Compatibility Settings
       - MORAG_FORCE_CPU=true
       - MORAG_DISABLE_DOCLING=false
@@ -86,6 +89,7 @@ services:
       - PYTORCH_DISABLE_AVX2=1
     depends_on:
       - redis
+    user: "0:0"  # Run as root to avoid permission issues with volume mounts
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -100,9 +104,9 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      - HF_HOME=/app/temp/cache/huggingface
+      - TRANSFORMERS_CACHE=/app/temp/cache/huggingface
+      - WHISPER_CACHE_DIR=/app/temp/cache/whisper
       # CPU Compatibility Settings
       - MORAG_FORCE_CPU=true
       - MORAG_DISABLE_DOCLING=false
@@ -117,6 +121,7 @@ services:
       - PYTORCH_DISABLE_AVX2=1
     depends_on:
       - redis
+    user: "0:0"  # Run as root to avoid permission issues with volume mounts
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -132,9 +137,9 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      - HF_HOME=/home/morag/.cache/huggingface
-      - TRANSFORMERS_CACHE=/home/morag/.cache/huggingface
-      - WHISPER_CACHE_DIR=/home/morag/.cache/whisper
+      - HF_HOME=/app/temp/cache/huggingface
+      - TRANSFORMERS_CACHE=/app/temp/cache/huggingface
+      - WHISPER_CACHE_DIR=/app/temp/cache/whisper
       # CPU Compatibility Settings
       - MORAG_FORCE_CPU=true
       - MORAG_DISABLE_DOCLING=false
@@ -149,6 +154,7 @@ services:
       - PYTORCH_DISABLE_AVX2=1
     depends_on:
       - redis
+    user: "0:0"  # Run as root to avoid permission issues with volume mounts
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
