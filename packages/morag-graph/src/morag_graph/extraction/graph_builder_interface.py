@@ -1,6 +1,7 @@
 """Graph builder interface and main coordination logic."""
 
 import asyncio
+import traceback
 from typing import List, Optional
 from morag_core.utils.logging import get_logger
 
@@ -20,7 +21,8 @@ class FactGraphBuilder:
         api_key: Optional[str] = None,
         min_relation_confidence: float = 0.6,
         max_relations_per_fact: int = 5,
-        language: str = "en"
+        language: str = "en",
+        processing_timeout: int = 300
     ):
         """Initialize fact graph builder.
 
@@ -30,12 +32,14 @@ class FactGraphBuilder:
             min_relation_confidence: Minimum confidence for relationships
             max_relations_per_fact: Maximum relationships per fact
             language: Language for relationship extraction
+            processing_timeout: Timeout for graph building operations in seconds
         """
         self.model_id = model_id
         self.api_key = api_key
         self.min_relation_confidence = min_relation_confidence
         self.max_relations_per_fact = max_relations_per_fact
         self.language = language
+        self.processing_timeout = processing_timeout
         
         self.logger = get_logger(__name__)
         
@@ -54,59 +58,41 @@ class FactGraphBuilder:
         self.utilities = GraphUtilities()
     
     async def build_fact_graph(self, facts: List[Fact]) -> Graph:
-        """Build knowledge graph from extracted facts.
-        
-        Args:
-            facts: List of facts to build graph from
-            
-        Returns:
-            Graph object containing facts and their relationships
-        """
+        """Build knowledge graph with proper resource management."""
         if not facts:
             return Graph(nodes=[], edges=[])
-        
-        self.logger.info(
-            "Starting fact graph building",
-            num_facts=len(facts)
-        )
-        
+
+        relationships = []
         try:
-            # Create fact relationships using operations component
-            relationships = await self.operations.create_fact_relationships(
-                facts, 
-                self.min_relation_confidence,
-                self.max_relations_per_fact
-            )
-            
-            # Build graph structure using utilities
-            graph = self.utilities.build_graph_structure(facts, relationships)
-            
-            # Index facts for efficient retrieval
-            await self._index_facts(facts)
-            
-            self.logger.info(
-                "Fact graph building completed",
-                num_facts=len(facts),
-                num_relationships=len(relationships)
-            )
-            
-            return graph
-            
-        except Exception as e:
-            self.logger.error(
-                "Fact graph building failed",
-                error=str(e),
-                error_type=type(e).__name__
-            )
-            # Add detailed debugging for the string join error
-            if "expected str instance" in str(e):
-                self.logger.error(
-                    "String join error detected - checking relationship types"
+            # Create relationships with timeout
+            async with asyncio.timeout(self.processing_timeout):
+                relationships = await self.operations.create_fact_relationships(
+                    facts,
+                    self.min_relation_confidence,
+                    self.max_relations_per_fact
                 )
-            import traceback
-            self.logger.error("Full traceback:", traceback=traceback.format_exc())
-            # Return empty graph on failure
-            return Graph(nodes=[], edges=[])
+
+            # Build graph structure
+            graph = self.utilities.build_graph_structure(facts, relationships)
+
+            # Index with separate error handling
+            try:
+                await self._index_facts(facts)
+            except Exception as index_error:
+                self.logger.warning("Fact indexing failed", error=str(index_error))
+
+            return graph
+
+        except asyncio.TimeoutError:
+            self.logger.error("Graph building timed out", num_facts=len(facts))
+            return self.utilities.build_graph_structure(facts, relationships)
+        except Exception as e:
+            self.logger.error("Graph building failed", error=str(e), traceback=traceback.format_exc())
+            raise  # Let caller handle - don't hide errors
+        finally:
+            # Ensure cleanup happens
+            if hasattr(self.llm_client, 'close'):
+                await self.llm_client.close()
 
     async def _index_facts(self, facts: List[Fact]):
         """Index facts for efficient retrieval (placeholder for now)."""

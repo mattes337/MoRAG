@@ -4,14 +4,54 @@ import asyncio
 import os
 from typing import Dict, Any, List, Optional
 from pathlib import Path
+import concurrent.futures
+import threading
 
 from celery import Celery
 import structlog
+import nest_asyncio
 
 from morag.api import MoRAGAPI
 from morag_services import ServiceConfig
 
 logger = structlog.get_logger(__name__)
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
+
+# Create a shared event loop for all async operations
+_event_loop = None
+_loop_thread = None
+_loop_lock = threading.Lock()
+
+def get_shared_event_loop():
+    """Get or create a shared event loop for async operations."""
+    global _event_loop, _loop_thread
+
+    with _loop_lock:
+        if _event_loop is None or _event_loop.is_closed():
+            # Create new event loop in a separate thread
+            def run_event_loop():
+                global _event_loop
+                _event_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(_event_loop)
+                _event_loop.run_forever()
+
+            _loop_thread = threading.Thread(target=run_event_loop, daemon=True)
+            _loop_thread.start()
+
+            # Wait for loop to be ready
+            import time
+            while _event_loop is None:
+                time.sleep(0.01)
+
+    return _event_loop
+
+def run_async(coroutine):
+    """Run coroutine using the shared event loop."""
+    loop = get_shared_event_loop()
+    future = asyncio.run_coroutine_threadsafe(coroutine, loop)
+    return future.result()
 
 # Create Celery app
 celery_app = Celery('morag_worker')
@@ -47,242 +87,249 @@ def get_morag_api() -> MoRAGAPI:
 @celery_app.task(bind=True)
 def process_url_task(self, url: str, content_type: Optional[str] = None, options: Optional[Dict[str, Any]] = None):
     """Process content from URL as background task."""
-    async def _process():
-        api = get_morag_api()
-        try:
-            self.update_state(state='PROCESSING', meta={'stage': 'starting', 'progress': 0.0, 'message': 'Initializing URL processing'})
+    return run_async(_process_url_async(self, url, content_type, options))
 
-            # Create a progress callback for the API
-            def progress_callback(progress: float, message: str = None):
-                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+async def _process_url_async(task, url: str, content_type: Optional[str], options: Optional[Dict[str, Any]]):
+    """Async implementation for URL processing."""
+    api = get_morag_api()
+    try:
+        task.update_state(state='PROCESSING', meta={'stage': 'starting', 'progress': 0.0, 'message': 'Initializing URL processing'})
 
-            # Pass progress callback to API if supported
-            if options is None:
-                options = {}
-            options['progress_callback'] = progress_callback
+        # Create a progress callback for the API
+        def progress_callback(progress: float, message: str = None):
+            task.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
 
-            result = await api.process_url(url, content_type, options)
+        # Pass progress callback to API if supported
+        if options is None:
+            options = {}
+        options['progress_callback'] = progress_callback
 
-            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing processing'})
+        result = await api.process_url(url, content_type, options)
 
-            return {
-                'success': result.success,
-                'content': result.text_content or "",
-                'metadata': result.metadata,
-                'processing_time': result.processing_time,
-                'error_message': result.error_message
-            }
-        except Exception as e:
-            logger.error("URL processing task failed", url=url, error=str(e))
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+        task.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing processing'})
 
-    return asyncio.run(_process())
+        return {
+            'success': result.success,
+            'content': result.text_content or "",
+            'metadata': result.metadata,
+            'processing_time': result.processing_time,
+            'error_message': result.error_message
+        }
+    except Exception as e:
+        logger.error("URL processing task failed", url=url, error=str(e))
+        task.update_state(state='FAILURE', meta={'error': str(e)})
+        raise
 
 
 @celery_app.task(bind=True)
 def process_file_task(self, file_path: str, content_type: Optional[str] = None, options: Optional[Dict[str, Any]] = None):
     """Process file as background task."""
-    async def _process():
-        api = get_morag_api()
-        try:
-            self.update_state(state='PROCESSING', meta={'stage': 'starting', 'progress': 0.0, 'message': 'Initializing file processing'})
+    return run_async(_process_file_async(self, file_path, content_type, options))
 
-            # Create a progress callback for the API
-            def progress_callback(progress: float, message: str = None):
-                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+async def _process_file_async(task, file_path: str, content_type: Optional[str], options: Optional[Dict[str, Any]]):
+    """Async implementation for file processing."""
+    api = get_morag_api()
+    try:
+        task.update_state(state='PROCESSING', meta={'stage': 'starting', 'progress': 0.0, 'message': 'Initializing file processing'})
 
-            # Pass progress callback to API if supported
-            if options is None:
-                options = {}
-            options['progress_callback'] = progress_callback
+        # Create a progress callback for the API
+        def progress_callback(progress: float, message: str = None):
+            task.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
 
-            result = await api.process_file(file_path, content_type, options)
+        # Pass progress callback to API if supported
+        if options is None:
+            options = {}
+        options['progress_callback'] = progress_callback
 
-            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing processing'})
+        result = await api.process_file(file_path, content_type, options)
 
-            return {
-                'success': result.success,
-                'content': result.text_content or "",
-                'metadata': result.metadata,
-                'processing_time': result.processing_time,
-                'error_message': result.error_message
-            }
-        except Exception as e:
-            logger.error("File processing task failed", file_path=file_path, error=str(e))
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+        task.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing processing'})
 
-    return asyncio.run(_process())
+        return {
+            'success': result.success,
+            'content': result.text_content or "",
+            'metadata': result.metadata,
+            'processing_time': result.processing_time,
+            'error_message': result.error_message
+        }
+    except Exception as e:
+        logger.error("File processing task failed", file_path=file_path, error=str(e))
+        task.update_state(state='FAILURE', meta={'error': str(e)})
+        raise
 
 
 @celery_app.task(bind=True)
 def process_web_page_task(self, url: str, options: Optional[Dict[str, Any]] = None):
     """Process web page as background task."""
-    async def _process():
-        api = get_morag_api()
-        try:
-            self.update_state(state='PROCESSING', meta={'stage': 'web_scraping', 'progress': 0.0, 'message': 'Initializing web page processing'})
+    return run_async(_process_web_page_async(self, url, options))
 
-            # Create a progress callback for the API
-            def progress_callback(progress: float, message: str = None):
-                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+async def _process_web_page_async(task, url: str, options: Optional[Dict[str, Any]]):
+    """Async implementation for web page processing."""
+    api = get_morag_api()
+    try:
+        task.update_state(state='PROCESSING', meta={'stage': 'web_scraping', 'progress': 0.0, 'message': 'Initializing web page processing'})
 
-            # Pass progress callback to API if supported
-            if options is None:
-                options = {}
-            options['progress_callback'] = progress_callback
+        # Create a progress callback for the API
+        def progress_callback(progress: float, message: str = None):
+            task.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
 
-            result = await api.process_web_page(url, options)
+        # Pass progress callback to API if supported
+        if options is None:
+            options = {}
+        options['progress_callback'] = progress_callback
 
-            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing web page processing'})
+        result = await api.process_web_page(url, options)
 
-            return {
-                'success': result.success,
-                'content': result.text_content or "",
-                'metadata': result.metadata,
-                'processing_time': result.processing_time,
-                'error_message': result.error_message
-            }
-        except Exception as e:
-            logger.error("Web page processing task failed", url=url, error=str(e))
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+        task.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing web page processing'})
 
-    return asyncio.run(_process())
+        return {
+            'success': result.success,
+            'content': result.text_content or "",
+            'metadata': result.metadata,
+            'processing_time': result.processing_time,
+            'error_message': result.error_message
+        }
+    except Exception as e:
+        logger.error("Web page processing task failed", url=url, error=str(e))
+        task.update_state(state='FAILURE', meta={'error': str(e)})
+        raise
 
 
 @celery_app.task(bind=True)
 def process_youtube_video_task(self, url: str, options: Optional[Dict[str, Any]] = None):
     """Process YouTube video as background task."""
-    async def _process():
-        api = get_morag_api()
-        try:
-            self.update_state(state='PROCESSING', meta={'stage': 'youtube_download', 'progress': 0.0, 'message': 'Initializing YouTube video processing'})
+    return run_async(_process_youtube_video_async(self, url, options))
 
-            # Create a progress callback for the API
-            def progress_callback(progress: float, message: str = None):
-                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
+async def _process_youtube_video_async(task, url: str, options: Optional[Dict[str, Any]]):
+    """Async implementation for YouTube video processing."""
+    api = get_morag_api()
+    try:
+        task.update_state(state='PROCESSING', meta={'stage': 'youtube_download', 'progress': 0.0, 'message': 'Initializing YouTube video processing'})
 
-            # Pass progress callback to API if supported
-            if options is None:
-                options = {}
-            options['progress_callback'] = progress_callback
+        # Create a progress callback for the API
+        def progress_callback(progress: float, message: str = None):
+            task.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Processing... {int(progress * 100)}%'})
 
-            result = await api.process_youtube_video(url, options)
+        # Pass progress callback to API if supported
+        if options is None:
+            options = {}
+        options['progress_callback'] = progress_callback
 
-            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing YouTube video processing'})
+        result = await api.process_youtube_video(url, options)
 
-            return {
-                'success': result.success,
-                'content': result.text_content or "",
-                'metadata': result.metadata,
-                'processing_time': result.processing_time,
-                'error_message': result.error_message
-            }
-        except Exception as e:
-            logger.error("YouTube processing task failed", url=url, error=str(e))
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+        task.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.95, 'message': 'Finalizing YouTube video processing'})
 
-    return asyncio.run(_process())
+        return {
+            'success': result.success,
+            'content': result.text_content or "",
+            'metadata': result.metadata,
+            'processing_time': result.processing_time,
+            'error_message': result.error_message
+        }
+    except Exception as e:
+        logger.error("YouTube processing task failed", url=url, error=str(e))
+        task.update_state(state='FAILURE', meta={'error': str(e)})
+        raise
 
 
 @celery_app.task(bind=True)
 def process_batch_task(self, items: List[Dict[str, Any]], options: Optional[Dict[str, Any]] = None):
     """Process batch of items as background task."""
-    async def _process():
-        api = get_morag_api()
-        try:
-            total_items = len(items)
-            self.update_state(state='PROCESSING', meta={
-                'stage': 'batch_processing',
+    return run_async(_process_batch_async(self, items, options))
+
+async def _process_batch_async(task, items: List[Dict[str, Any]], options: Optional[Dict[str, Any]]):
+    """Async implementation for batch processing."""
+    api = get_morag_api()
+    try:
+        total_items = len(items)
+        task.update_state(state='PROCESSING', meta={
+            'stage': 'batch_processing',
+            'total_items': total_items,
+            'progress': 0.0,
+            'message': f'Starting batch processing of {total_items} items'
+        })
+
+        # Create a progress callback for batch processing
+        def progress_callback(completed_items: int, message: str = None):
+            progress = completed_items / total_items if total_items > 0 else 0.0
+            task.update_state(state='PROGRESS', meta={
+                'progress': progress,
+                'completed_items': completed_items,
                 'total_items': total_items,
-                'progress': 0.0,
-                'message': f'Starting batch processing of {total_items} items'
+                'message': message or f'Processed {completed_items}/{total_items} items'
             })
 
-            # Create a progress callback for batch processing
-            def progress_callback(completed_items: int, message: str = None):
-                progress = completed_items / total_items if total_items > 0 else 0.0
-                self.update_state(state='PROGRESS', meta={
-                    'progress': progress,
-                    'completed_items': completed_items,
-                    'total_items': total_items,
-                    'message': message or f'Processed {completed_items}/{total_items} items'
-                })
+        # Pass progress callback to API if supported
+        if options is None:
+            options = {}
+        options['batch_progress_callback'] = progress_callback
 
-            # Pass progress callback to API if supported
-            if options is None:
-                options = {}
-            options['batch_progress_callback'] = progress_callback
+        results = await api.process_batch(items, options)
 
-            results = await api.process_batch(items, options)
+        task.update_state(state='PROCESSING', meta={
+            'stage': 'completing',
+            'progress': 0.95,
+            'message': 'Finalizing batch processing'
+        })
 
-            self.update_state(state='PROCESSING', meta={
-                'stage': 'completing',
-                'progress': 0.95,
-                'message': 'Finalizing batch processing'
-            })
-
-            return [
-                {
-                    'success': result.success,
-                    'content': result.text_content or "",
-                    'metadata': result.metadata,
-                    'processing_time': result.processing_time,
-                    'error_message': result.error_message
-                } for result in results
-            ]
-        except Exception as e:
-            logger.error("Batch processing task failed", item_count=len(items), error=str(e))
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
-
-    return asyncio.run(_process())
+        return [
+            {
+                'success': result.success,
+                'content': result.text_content or "",
+                'metadata': result.metadata,
+                'processing_time': result.processing_time,
+                'error_message': result.error_message
+            } for result in results
+        ]
+    except Exception as e:
+        logger.error("Batch processing task failed", item_count=len(items), error=str(e))
+        task.update_state(state='FAILURE', meta={'error': str(e)})
+        raise
 
 
 @celery_app.task(bind=True)
 def search_task(self, query: str, limit: int = 10, filters: Optional[Dict[str, Any]] = None):
     """Search for similar content as background task."""
-    async def _search():
-        api = get_morag_api()
-        try:
-            self.update_state(state='PROCESSING', meta={'stage': 'searching', 'progress': 0.1, 'message': 'Initializing search'})
+    return run_async(_search_async(self, query, limit, filters))
 
-            # Create a progress callback for the API
-            def progress_callback(progress: float, message: str = None):
-                self.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Searching... {int(progress * 100)}%'})
+async def _search_async(task, query: str, limit: int, filters: Optional[Dict[str, Any]]):
+    """Async implementation for search."""
+    api = get_morag_api()
+    try:
+        task.update_state(state='PROCESSING', meta={'stage': 'searching', 'progress': 0.1, 'message': 'Initializing search'})
 
-            # Search doesn't typically need progress callbacks, but we can simulate progress
-            self.update_state(state='PROGRESS', meta={'progress': 0.5, 'message': 'Executing search query'})
+        # Create a progress callback for the API
+        def progress_callback(progress: float, message: str = None):
+            task.update_state(state='PROGRESS', meta={'progress': progress, 'message': message or f'Searching... {int(progress * 100)}%'})
 
-            results = await api.search(query, limit, filters)
+        # Search doesn't typically need progress callbacks, but we can simulate progress
+        task.update_state(state='PROGRESS', meta={'progress': 0.5, 'message': 'Executing search query'})
 
-            self.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.9, 'message': 'Finalizing search results'})
+        results = await api.search(query, limit, filters)
 
-            return {'results': results}
-        except Exception as e:
-            logger.error("Search task failed", query=query, error=str(e))
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            raise
+        task.update_state(state='PROCESSING', meta={'stage': 'completing', 'progress': 0.9, 'message': 'Finalizing search results'})
 
-    return asyncio.run(_search())
+        return {'results': results}
+    except Exception as e:
+        logger.error("Search task failed", query=query, error=str(e))
+        task.update_state(state='FAILURE', meta={'error': str(e)})
+        raise
 
 
 @celery_app.task
 def health_check_task():
     """Health check as background task."""
-    async def _health():
-        api = get_morag_api()
-        try:
-            status = await api.health_check()
-            return status
-        except Exception as e:
-            logger.error("Health check task failed", error=str(e))
-            raise
-    
-    return asyncio.run(_health())
+    return run_async(_health_check_async())
+
+async def _health_check_async():
+    """Async implementation for health check."""
+    api = get_morag_api()
+    try:
+        status = await api.health_check()
+        return status
+    except Exception as e:
+        logger.error("Health check task failed", error=str(e))
+        raise
 
 
 # Worker event handlers
@@ -320,9 +367,16 @@ def worker_ready_handler(sender=None, **kwargs):
 @worker_shutdown.connect
 def worker_shutdown_handler(sender=None, **kwargs):
     """Worker shutdown handler."""
-    global morag_api
+    global morag_api, _event_loop
+
+    # Clean up MoRAG API
     if morag_api:
-        asyncio.run(morag_api.cleanup())
+        run_async(morag_api.cleanup())
+
+    # Clean up event loop
+    if _event_loop and not _event_loop.is_closed():
+        _event_loop.call_soon_threadsafe(_event_loop.stop)
+
     logger.info("MoRAG worker shutdown")
 
 

@@ -5,6 +5,7 @@ Handles database initialization and data writing operations for multiple databas
 
 import os
 import json
+import asyncio
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
@@ -23,12 +24,87 @@ logger = get_logger(__name__)
 
 
 class DatabaseHandler:
-    """Handles database initialization and operations for the ingestion system."""
-    
+    """Handles database operations with connection pooling."""
+
     def __init__(self):
-        """Initialize the database handler."""
-        pass
-    
+        """Initialize the database handler with connection pools."""
+        self._qdrant_pool = {}  # Connection pool for Qdrant
+        self._neo4j_pool = {}  # Connection pool for Neo4j
+        self._pool_lock = asyncio.Lock()
+
+    async def _get_qdrant_connection(self, config_key: str, db_config: DatabaseConfig):
+        """Get or create pooled Qdrant connection."""
+        async with self._pool_lock:
+            if config_key not in self._qdrant_pool:
+                host = db_config.hostname or 'localhost'
+                port = db_config.port or 6333
+
+                # Handle URL-style hostnames
+                if host.startswith(('http://', 'https://')):
+                    from urllib.parse import urlparse
+                    parsed = urlparse(host)
+                    hostname = parsed.hostname or "localhost"
+                    port = parsed.port or (443 if parsed.scheme == 'https' else port)
+                    config_host = host
+                else:
+                    hostname = host
+                    config_host = hostname
+
+                verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+
+                storage = QdrantVectorStorage(
+                    host=config_host,
+                    port=port,
+                    api_key=os.getenv('QDRANT_API_KEY'),
+                    collection_name=db_config.database_name or 'morag_documents',
+                    verify_ssl=verify_ssl
+                )
+                await storage.connect()
+                self._qdrant_pool[config_key] = storage
+            return self._qdrant_pool[config_key]
+
+    async def _get_neo4j_connection(self, config_key: str, db_config: DatabaseConfig):
+        """Get or create pooled Neo4j connection."""
+        async with self._pool_lock:
+            if config_key not in self._neo4j_pool:
+                neo4j_config = Neo4jConfig(
+                    uri=db_config.hostname or 'bolt://localhost:7687',
+                    username=db_config.username or 'neo4j',
+                    password=db_config.password or 'password',
+                    database=db_config.database_name or 'neo4j',
+                    verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
+                    trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
+                )
+
+                storage = Neo4jStorage(neo4j_config)
+                await storage.connect()
+                self._neo4j_pool[config_key] = storage
+            return self._neo4j_pool[config_key]
+
+    def _get_config_key(self, db_config: DatabaseConfig) -> str:
+        """Generate unique key for database configuration."""
+        return f"{db_config.type.value}_{db_config.hostname}_{db_config.port}_{db_config.database_name}"
+
+    async def cleanup_connections(self):
+        """Cleanup all pooled connections."""
+        async with self._pool_lock:
+            # Close Qdrant connections
+            for storage in self._qdrant_pool.values():
+                try:
+                    await storage.disconnect()
+                except Exception as e:
+                    logger.warning(f"Error closing Qdrant connection: {e}")
+
+            # Close Neo4j connections
+            for storage in self._neo4j_pool.values():
+                try:
+                    await storage.disconnect()
+                except Exception as e:
+                    logger.warning(f"Error closing Neo4j connection: {e}")
+
+            self._qdrant_pool.clear()
+            self._neo4j_pool.clear()
+
     async def initialize_databases(
         self,
         database_configs: List[DatabaseConfig],
@@ -53,75 +129,34 @@ class DatabaseHandler:
         db_config: DatabaseConfig,
         embeddings_data: Dict[str, Any]
     ) -> None:
-        """Initialize Qdrant collection."""
-        host = db_config.hostname or 'localhost'
-        port = db_config.port or 6333
-
+        """Initialize Qdrant collection using connection pool."""
         logger.info("Initializing Qdrant with config",
                    hostname=db_config.hostname,
                    port=db_config.port,
                    database_name=db_config.database_name)
 
-        # Check if hostname is a URL and extract components
-        if host.startswith(('http://', 'https://')):
-            from urllib.parse import urlparse
-            parsed = urlparse(host)
-            hostname = parsed.hostname or "localhost"
-            port = parsed.port or (443 if parsed.scheme == 'https' else port)
-            https = parsed.scheme == 'https'
-            # Use the full URL for QdrantStorage
-            config_host = host
-        else:
-            hostname = host
-            https = port == 443  # Auto-detect HTTPS for port 443
-            config_host = hostname
-
-        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
-
-        logger.info("Creating QdrantVectorStorage with",
-                   config_host=config_host,
-                   port=port,
-                   collection_name=db_config.database_name or 'morag_documents',
-                   verify_ssl=verify_ssl)
-
-        # Use QdrantVectorStorage instead of QdrantStorage for better connection handling
-        qdrant_storage = QdrantVectorStorage(
-            host=config_host,
-            port=port,
-            api_key=os.getenv('QDRANT_API_KEY'),
-            collection_name=db_config.database_name or 'morag_documents',
-            verify_ssl=verify_ssl
-        )
-        await qdrant_storage.connect()
+        config_key = self._get_config_key(db_config)
+        qdrant_storage = await self._get_qdrant_connection(config_key, db_config)
 
         logger.info("Qdrant collection initialized",
                    collection=db_config.database_name or 'morag_documents',
                    vector_size=embeddings_data.get('embedding_dimension', 768))
 
-        await qdrant_storage.disconnect()
+        # Connection remains in pool - no disconnect needed
 
     async def _initialize_neo4j(self, db_config: DatabaseConfig) -> None:
-        """Initialize Neo4j database."""
-        neo4j_config = Neo4jConfig(
-            uri=db_config.hostname or 'bolt://localhost:7687',
-            username=db_config.username or 'neo4j',
-            password=db_config.password or 'password',
-            database=db_config.database_name or 'neo4j',
-            verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-            trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
-        )
-
-        neo4j_storage = Neo4jStorage(neo4j_config)
-        await neo4j_storage.connect()
+        """Initialize Neo4j database using connection pool."""
+        config_key = self._get_config_key(db_config)
+        neo4j_storage = await self._get_neo4j_connection(config_key, db_config)
 
         # Test the connection and ensure database exists
         await neo4j_storage.test_connection()
 
         logger.info("Neo4j database initialized",
-                   database=neo4j_config.database,
-                   uri=neo4j_config.uri)
+                   database=db_config.database_name or 'neo4j',
+                   uri=db_config.hostname or 'bolt://localhost:7687')
 
-        await neo4j_storage.disconnect()
+        # Connection remains in pool - no disconnect needed
 
     async def write_to_databases(
         self,
@@ -156,34 +191,11 @@ class DatabaseHandler:
         db_config: DatabaseConfig,
         ingest_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Write chunks and embeddings to Qdrant."""
-        host = db_config.hostname or 'localhost'
-        port = db_config.port or 6333
-
-        # Handle URL-style hostnames
-        if host.startswith(('http://', 'https://')):
-            from urllib.parse import urlparse
-            parsed = urlparse(host)
-            hostname = parsed.hostname or "localhost"
-            port = parsed.port or (443 if parsed.scheme == 'https' else port)
-            config_host = host
-        else:
-            hostname = host
-            config_host = hostname
-
-        verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
-
-        qdrant_storage = QdrantVectorStorage(
-            host=config_host,
-            port=port,
-            api_key=os.getenv('QDRANT_API_KEY'),
-            collection_name=db_config.database_name or 'morag_documents',
-            verify_ssl=verify_ssl
-        )
+        """Write chunks and embeddings to Qdrant using connection pool."""
+        config_key = self._get_config_key(db_config)
+        qdrant_storage = await self._get_qdrant_connection(config_key, db_config)
 
         try:
-            await qdrant_storage.connect()
-
             # Process chunk data
             chunks_data = ingest_data.get('chunks', [])
             point_ids = []
@@ -213,28 +225,18 @@ class DatabaseHandler:
         except Exception as e:
             logger.error("Failed to write to Qdrant", error=str(e))
             raise
-        finally:
-            await qdrant_storage.disconnect()
+        # No finally block - connection remains in pool
 
     async def _write_to_neo4j(
         self,
         db_config: DatabaseConfig,
         ingest_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Write graph data to Neo4j."""
-        neo4j_config = Neo4jConfig(
-            uri=db_config.hostname or 'bolt://localhost:7687',
-            username=db_config.username or 'neo4j',
-            password=db_config.password or 'password',
-            database=db_config.database_name or 'neo4j',
-            verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-            trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
-        )
-
-        neo4j_storage = Neo4jStorage(neo4j_config)
+        """Write graph data to Neo4j using connection pool."""
+        config_key = self._get_config_key(db_config)
+        neo4j_storage = await self._get_neo4j_connection(config_key, db_config)
 
         try:
-            await neo4j_storage.connect()
 
             # Get graph data
             graph_data = ingest_data.get('graph_data', {})
@@ -287,14 +289,14 @@ class DatabaseHandler:
                 facts_stored += 1
 
             logger.info("Successfully wrote to Neo4j",
-                       database=neo4j_config.database,
+                       database=db_config.database_name or 'neo4j',
                        entities_stored=entities_stored,
                        relations_stored=relations_stored,
                        facts_stored=facts_stored)
 
             return {
                 'success': True,
-                'database': neo4j_config.database,
+                'database': db_config.database_name or 'neo4j',
                 'entities_stored': entities_stored,
                 'relations_stored': relations_stored,
                 'facts_stored': facts_stored
@@ -303,5 +305,4 @@ class DatabaseHandler:
         except Exception as e:
             logger.error("Failed to write to Neo4j", error=str(e))
             raise
-        finally:
-            await neo4j_storage.disconnect()
+        # No finally block - connection remains in pool

@@ -10,6 +10,7 @@ import structlog
 from pydantic import BaseModel
 
 from morag_core.interfaces.service import BaseService
+from morag_core.interfaces import IServiceCoordinator
 from morag_core.models import ProcessingConfig
 from morag_core.exceptions import ProcessingError, UnsupportedFormatError
 
@@ -60,7 +61,7 @@ class ProcessingResult(BaseModel):
     graph_data: Optional[GraphProcessingResult] = None
 
 
-class MoRAGServiceCoordinator:
+class MoRAGServiceCoordinator(IServiceCoordinator):
     """Main coordinator for all MoRAG processing services."""
 
     def __init__(self, config: Optional[ServiceConfig] = None, graph_config: Optional[GraphProcessingConfig] = None, data_output_dir: Optional[str] = None):
@@ -94,6 +95,93 @@ class MoRAGServiceCoordinator:
         self._semaphore = asyncio.Semaphore(self.config.max_concurrent_tasks)
         
         logger.info("MoRAG services coordinator initialized", max_concurrent_tasks=self.config.max_concurrent_tasks)
+
+    async def get_service(self, service_type: str) -> Any:
+        """Get a service instance by type.
+
+        Args:
+            service_type: Type of service to retrieve
+
+        Returns:
+            Service instance
+
+        Raises:
+            ProcessingError: If service type is not supported or service is not initialized
+        """
+        service_map = {
+            "fact_extractor": self._get_fact_extractor,
+            "entity_normalizer": self._get_entity_normalizer,
+            "fact_extraction_agent": self._get_fact_extraction_agent,
+            "document": lambda: self.document_service,
+            "audio": lambda: self.audio_service,
+            "video": lambda: self.video_service,
+            "image": lambda: self.image_service,
+            "embedding": lambda: self.embedding_service,
+            "web": lambda: self.web_service,
+            "youtube": lambda: self.youtube_service,
+            "graph": lambda: self.graph_processor
+        }
+
+        if service_type not in service_map:
+            raise ProcessingError(f"Unsupported service type: {service_type}")
+
+        service = service_map[service_type]()
+        if service is None:
+            raise ProcessingError(f"Service {service_type} is not initialized")
+
+        return service
+
+    def _get_fact_extractor(self):
+        """Get or create fact extractor service."""
+        # Try to get from graph processor first
+        if self.graph_processor and hasattr(self.graph_processor, 'fact_extractor'):
+            return self.graph_processor.fact_extractor
+
+        # Fallback: create a basic fact extractor
+        try:
+            from morag_graph.extraction import FactExtractor
+            return FactExtractor()
+        except ImportError:
+            logger.warning("FactExtractor not available")
+            return None
+
+    def _get_entity_normalizer(self):
+        """Get or create entity normalizer service."""
+        # Try to get from graph processor first
+        if self.graph_processor and hasattr(self.graph_processor, 'entity_normalizer'):
+            return self.graph_processor.entity_normalizer
+
+        # Fallback: create a basic entity normalizer
+        try:
+            from morag_graph.extraction import EntityNormalizer
+            return EntityNormalizer()
+        except ImportError:
+            logger.warning("EntityNormalizer not available")
+            return None
+
+    def _get_fact_extraction_agent(self):
+        """Get or create fact extraction agent."""
+        # Try to get from graph processor first
+        if self.graph_processor and hasattr(self.graph_processor, 'agent'):
+            return self.graph_processor.agent
+
+        # Fallback: create using AI services
+        try:
+            from morag_core.ai import create_agent, AgentConfig
+            # This would need proper configuration - for now, return None
+            logger.warning("Fact extraction agent creation requires proper configuration")
+            return None
+        except ImportError:
+            logger.warning("AI services not available for fact extraction agent")
+            return None
+
+    async def initialize_services(self) -> None:
+        """Initialize all required services."""
+        await self.initialize()
+
+    async def cleanup_services(self) -> None:
+        """Cleanup and dispose of services."""
+        await self.shutdown()
 
     async def initialize(self):
         """Initialize all services."""

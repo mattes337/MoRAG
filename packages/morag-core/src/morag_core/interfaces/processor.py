@@ -124,3 +124,46 @@ class BaseProcessor(ABC):
                 raise ProcessingError(
                     f"File too large: {file_size} bytes (max: {config.max_file_size})"
                 )
+
+
+class IContentProcessor(ABC):
+    """Interface for content processors."""
+
+    @abstractmethod
+    async def process(self, content: Any, options: Dict) -> ProcessingResult:
+        """Process content with the given options.
+
+        Args:
+            content: Content to process (file path, text, etc.)
+            options: Processing options
+
+        Returns:
+            ProcessingResult with processed content
+        """
+        pass
+
+
+class IServiceCoordinator(ABC):
+    """Interface for service coordination."""
+
+    @abstractmethod
+    async def get_service(self, service_type: str) -> Any:
+        """Get a service instance by type.
+
+        Args:
+            service_type: Type of service to retrieve
+
+        Returns:
+            Service instance
+        """
+        pass
+
+    @abstractmethod
+    async def initialize_services(self) -> None:
+        """Initialize all required services."""
+        pass
+
+    @abstractmethod
+    async def cleanup_services(self) -> None:
+        """Cleanup and dispose of services."""
+        pass

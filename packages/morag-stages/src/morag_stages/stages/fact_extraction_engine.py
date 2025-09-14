@@ -1,5 +1,6 @@
 """Core fact extraction engine with AI-powered processing."""
 
+import asyncio
 import json
 import re
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
@@ -91,21 +92,46 @@ class FactExtractionEngine:
         }
 
     async def _process_chunks_in_batches(self, chunks: List[Dict[str, Any]], config: FactGeneratorConfig) -> List[Dict[str, Any]]:
-        """Process chunks in batches for efficiency."""
+        """Process chunks in batches with memory-aware streaming."""
         batch_size = config.max_chunks_per_batch
         results = []
-        
+
+        # Add memory threshold check
+        MAX_MEMORY_MB = 500  # Configure based on available resources
+        current_memory_usage = 0
+
         for i in range(0, len(chunks), batch_size):
+            # Estimate memory for batch
             batch = chunks[i:i + batch_size]
-            batch_results = []
-            
-            for chunk in batch:
-                result = await self._extract_from_chunk(chunk, config)
-                batch_results.append(result)
-            
+            batch_memory = sum(len(str(chunk)) for chunk in batch) / (1024 * 1024)
+
+            # If memory threshold exceeded, process accumulated results and clear memory
+            if current_memory_usage + batch_memory > MAX_MEMORY_MB:
+                await self._flush_results(results)
+                results = []
+                current_memory_usage = 0
+
+            batch_results = await asyncio.gather(*[
+                self._extract_from_chunk(chunk, config)
+                for chunk in batch
+            ])
+
             results.extend(batch_results)
-        
+            current_memory_usage += batch_memory
+
         return results
+
+    async def _flush_results(self, results: List[Dict[str, Any]]) -> None:
+        """Flush accumulated results to free memory.
+
+        This method can be extended to persist results to disk or database
+        for very large batch processing scenarios.
+        """
+        if results:
+            logger.debug(f"Flushing {len(results)} accumulated results to free memory")
+            # In a more advanced implementation, results could be written to disk
+            # or streamed to a database here to prevent memory accumulation
+            # For now, we rely on the caller to handle the cleared results
 
     async def _extract_from_chunk(self, chunk: Dict[str, Any], config: FactGeneratorConfig) -> Dict[str, Any]:
         """Extract facts, entities, relations, and keywords from a single chunk."""

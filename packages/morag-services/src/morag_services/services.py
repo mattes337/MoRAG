@@ -22,15 +22,16 @@ logger = get_logger(__name__)
 
 class MoRAGServices(MoRAGServiceCoordinator):
     """Backward compatible main MoRAG services class.
-    
-    This class extends MoRAGServiceCoordinator with the original MoRAGServices interface
-    for backward compatibility while using the refactored components internally.
+
+    This class extends MoRAGServiceCoordinator (which implements IServiceCoordinator)
+    with the original MoRAGServices interface for backward compatibility while using
+    the refactored components internally.
     """
 
     def __init__(self, config=None, graph_config=None, data_output_dir=None):
         """Initialize MoRAG services with backward compatible interface."""
         super().__init__(config, graph_config, data_output_dir)
-        
+
         # Initialize processors
         self.content_processors = ContentProcessors(self)
         self.utilities = ServiceUtilities()

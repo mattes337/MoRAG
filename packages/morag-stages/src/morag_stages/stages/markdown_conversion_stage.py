@@ -2,13 +2,31 @@
 
 import re
 from datetime import datetime
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 from pathlib import Path
 import structlog
 
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 from ..utils import detect_content_type, is_content_type
+
+# Import sanitization function
+try:
+    from morag_core.utils.validation import sanitize_filepath
+except ImportError:
+    def sanitize_filepath(filepath: Union[str, Path]) -> Path:
+        """Fallback sanitization function."""
+        import re
+        from pathlib import Path
+
+        path = Path(filepath)
+
+        # Basic sanitization - prevent dangerous characters
+        safe_name = re.sub(r'[;&|`$()]', '', path.name)
+        if safe_name != path.name:
+            raise ValueError(f"Unsafe characters in filename: {path.name}")
+
+        return path.resolve()
 
 from .converter_factory import ConverterFactory
 from .conversion_processors import ConversionProcessors
@@ -58,21 +76,22 @@ class MarkdownConversionStage(Stage):
         self.processors = ConversionProcessors()
 
     async def execute(self,
-                     input_files: List[Union[Path, 'URLPath']],
-                     output_dir: Path,
-                     context: StageContext = None) -> StageResult:
+                     input_files: List[Path],
+                     context: StageContext,
+                     output_dir: Optional[Path] = None) -> StageResult:
         """Execute markdown conversion for input files.
-        
+
         Args:
             input_files: List of input files or URLs
-            output_dir: Directory for output files
             context: Stage execution context
-            
+            output_dir: Optional output directory override
+
         Returns:
             StageResult with conversion results
         """
-        if context is None:
-            context = StageContext()
+        # Get output directory from context if not provided
+        if output_dir is None:
+            output_dir = context.output_dir or Path.cwd()
 
         stage_metadata = StageMetadata(
             stage_type=self.stage_type,
@@ -108,10 +127,25 @@ class MarkdownConversionStage(Stage):
                     output_filename = self._generate_output_filename(input_file, content_type)
                     output_file = output_dir / output_filename
                     
+                    # Sanitize input file path for security
+                    sanitized_input = input_file
+                    if not is_url(str(input_file)):
+                        # Only sanitize local file paths, not URLs
+                        try:
+                            sanitized_input = sanitize_filepath(input_file)
+                        except (ValueError, Exception) as e:
+                            logger.error("File path sanitization failed",
+                                       file=str(input_file), error=str(e))
+                            errors.append({
+                                'input_file': str(input_file),
+                                'error': f"File path sanitization failed: {str(e)}"
+                            })
+                            continue
+
                     # Process the file
                     result = await self.processors.process_file(
-                        input_file, 
-                        output_file, 
+                        sanitized_input,
+                        output_file,
                         content_type,
                         self.config.copy()
                     )
@@ -180,7 +214,7 @@ class MarkdownConversionStage(Stage):
                 error=str(e)
             )
 
-    def validate_inputs(self, input_files: List[Union[Path, 'URLPath']]) -> bool:
+    def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files/URLs."""
         if not input_files:
             logger.error("No input files provided")
@@ -231,7 +265,7 @@ class MarkdownConversionStage(Stage):
         """Get list of stage dependencies."""
         return []  # Markdown conversion is usually the first stage
 
-    def get_expected_outputs(self, input_files: List[Union[Path, 'URLPath']], context: StageContext) -> List[Path]:
+    def get_expected_outputs(self, input_files: List[Path], context: StageContext) -> List[Path]:
         """Get expected output files."""
         output_dir = context.output_dir if context else Path.cwd()
         outputs = []
@@ -243,7 +277,7 @@ class MarkdownConversionStage(Stage):
         
         return outputs
 
-    def _generate_output_filename(self, input_file: Union[Path, 'URLPath'], content_type, metadata: Dict[str, Any] = None) -> str:
+    def _generate_output_filename(self, input_file: Path, content_type, metadata: Dict[str, Any] = None) -> str:
         """Generate output filename for converted content."""
         if metadata is None:
             metadata = {}

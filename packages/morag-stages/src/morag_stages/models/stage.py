@@ -45,16 +45,18 @@ class Stage(ABC):
     @abstractmethod
     async def execute(self,
                      input_files: List[Path],
-                     context: "StageContext") -> "StageResult":
+                     context: "StageContext",
+                     output_dir: Optional[Path] = None) -> "StageResult":
         """Execute the stage with given input files and context.
-        
+
         Args:
             input_files: List of input file paths
             context: Stage execution context
-            
+            output_dir: Optional output directory override
+
         Returns:
             Stage execution result
-            
+
         Raises:
             StageExecutionError: If stage execution fails
         """

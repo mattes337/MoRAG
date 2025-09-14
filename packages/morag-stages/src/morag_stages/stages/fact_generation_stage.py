@@ -7,6 +7,7 @@ from pathlib import Path
 import structlog
 
 from morag_core.config import FactGeneratorConfig
+from morag_core.interfaces import IServiceCoordinator
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
 
@@ -38,10 +39,16 @@ except ImportError:
 class FactGeneratorStage(Stage):
     """Stage that extracts facts, entities, relations, and keywords from chunks."""
 
-    def __init__(self, stage_type: StageType = StageType.FACT_GENERATOR):
-        """Initialize fact generator stage."""
+    def __init__(self, coordinator: IServiceCoordinator, stage_type: StageType = StageType.FACT_GENERATOR):
+        """Initialize fact generator stage.
+
+        Args:
+            coordinator: Service coordinator implementing IServiceCoordinator
+            stage_type: Type of stage
+        """
         super().__init__(stage_type)
-        
+        self.coordinator = coordinator
+
         # Default configuration
         self.config = {
             'chunk_size_threshold': 100,
@@ -59,51 +66,48 @@ class FactGeneratorStage(Stage):
             'enable_extraction_caching': True,
             'extraction_cache_ttl': 3600,
         }
-        
-        # Initialize services
+
+        # Initialize services (will be dependency-injected)
         self.fact_extractor = None
         self.entity_normalizer = None
         self.agent = None
         self.extraction_engine = FactExtractionEngine()
 
-    async def _initialize_services_with_config(self, config: FactGeneratorConfig, context: 'StageContext'):
-        """Initialize services with provided configuration."""
+    async def _initialize_services(self):
+        """Initialize services using dependency injection."""
         try:
-            if SERVICES_AVAILABLE:
-                # Initialize fact extractor
-                if FactExtractor:
-                    self.fact_extractor = FactExtractor()
-                    await self.fact_extractor.initialize()
-                    logger.info("Fact extractor initialized")
-                
-                # Initialize entity normalizer
-                if EntityNormalizer and config.enable_entity_normalization:
-                    self.entity_normalizer = EntityNormalizer()
-                    await self.entity_normalizer.initialize()
-                    logger.info("Entity normalizer initialized")
-                
-                # Initialize AI agent
-                if create_agent and AgentConfig:
-                    agent_config = AgentConfig(
-                        model=config.fact_extraction_agent_model,
-                        temperature=0.1,
-                        max_tokens=4000,
-                        timeout=config.fact_extraction_timeout
-                    )
-                    self.agent = await create_agent(agent_config)
-                    logger.info("Fact extraction agent initialized", model=config.fact_extraction_agent_model)
-                
-                # Initialize extraction engine
-                await self.extraction_engine.initialize(
-                    fact_extractor=self.fact_extractor,
-                    entity_normalizer=self.entity_normalizer,
-                    agent=self.agent
-                )
-                
-            else:
-                logger.warning("Fact extraction services not available, using fallback methods")
-                await self.extraction_engine.initialize()
-                
+            # Initialize services through coordinator
+            await self.coordinator.initialize_services()
+
+            # Get services from coordinator
+            try:
+                self.fact_extractor = await self.coordinator.get_service("fact_extractor")
+                logger.info("Fact extractor service obtained")
+            except Exception:
+                logger.warning("Fact extractor service not available")
+                self.fact_extractor = None
+
+            try:
+                self.entity_normalizer = await self.coordinator.get_service("entity_normalizer")
+                logger.info("Entity normalizer service obtained")
+            except Exception:
+                logger.warning("Entity normalizer service not available")
+                self.entity_normalizer = None
+
+            try:
+                self.agent = await self.coordinator.get_service("fact_extraction_agent")
+                logger.info("Fact extraction agent service obtained")
+            except Exception:
+                logger.warning("Fact extraction agent service not available")
+                self.agent = None
+
+            # Initialize extraction engine with obtained services
+            await self.extraction_engine.initialize(
+                fact_extractor=self.fact_extractor,
+                entity_normalizer=self.entity_normalizer,
+                agent=self.agent
+            )
+
         except Exception as e:
             logger.error("Failed to initialize fact generation services", error=str(e))
             raise StageExecutionError(f"Service initialization failed: {str(e)}")
@@ -137,8 +141,8 @@ class FactGeneratorStage(Stage):
         )
 
         try:
-            # Initialize services
-            await self._initialize_services_with_config(config, context)
+            # Initialize services using dependency injection
+            await self._initialize_services()
             
             # Validate inputs
             if not self.validate_inputs(input_files):

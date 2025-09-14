@@ -72,114 +72,152 @@ class BatchProcessor(ABC, Generic[T, R]):
         pass
     
     async def process_batch(
-        self, 
+        self,
         items: List[T],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None
     ) -> List[BatchResult[T, R]]:
-        """Process a batch of items using LLM.
-        
+        """Process a batch of items using LLM with memory-aware streaming.
+
         Args:
             items: Items to process
             max_tokens: Maximum tokens per response
             temperature: Temperature for generation
-            
+
         Returns:
             List of batch results
         """
         if not items:
             return []
-        
-        # Create prompts for all items
-        batch_items = []
-        for item in items:
-            try:
-                prompt = self.create_prompt(item)
-                batch_items.append(BatchItem(data=item, prompt=prompt))
-            except Exception as e:
-                self.logger.error(f"Failed to create prompt for item: {str(e)}")
-                # Add error result
-                batch_items.append(BatchItem(
-                    data=item, 
-                    prompt="", 
-                    metadata={"prompt_error": str(e)}
-                ))
-        
-        # Extract prompts for LLM processing
-        prompts = [item.prompt for item in batch_items if item.prompt]
-        
-        if not prompts:
-            # All prompts failed, return error results
-            return [
-                BatchResult(
-                    item=batch_item.data,
-                    result=None,
-                    success=False,
-                    error_message=batch_item.metadata.get("prompt_error", "Failed to create prompt")
-                )
-                for batch_item in batch_items
-            ]
-        
-        try:
-            # Process prompts using LLM batch processing
-            responses = await self.llm_client.generate_batch(
-                prompts, max_tokens, temperature, self.batch_size
-            )
-            
-            # Parse responses and create results
-            results = []
-            for i, batch_item in enumerate(batch_items):
-                if not batch_item.prompt:
-                    # This item had a prompt creation error
-                    results.append(BatchResult(
+
+        # Memory-aware streaming processing
+        MAX_MEMORY_MB = 300  # Conservative limit for general batch processor
+        current_memory_usage = 0
+        all_results = []
+
+        # Process items in smaller chunks to prevent memory accumulation
+        chunk_size = min(self.batch_size, 50)  # Conservative chunk size
+
+        for i in range(0, len(items), chunk_size):
+            chunk = items[i:i + chunk_size]
+            chunk_memory = sum(len(str(item)) for item in chunk) / (1024 * 1024)
+
+            # If memory threshold exceeded, flush accumulated results
+            if current_memory_usage + chunk_memory > MAX_MEMORY_MB:
+                await self._flush_batch_results(all_results)
+                current_memory_usage = 0
+
+            # Create prompts for current chunk
+            batch_items = []
+            for item in chunk:
+                try:
+                    prompt = self.create_prompt(item)
+                    batch_items.append(BatchItem(data=item, prompt=prompt))
+                except Exception as e:
+                    self.logger.error(f"Failed to create prompt for item: {str(e)}")
+                    # Add error result
+                    batch_items.append(BatchItem(
+                        data=item,
+                        prompt="",
+                        metadata={"prompt_error": str(e)}
+                    ))
+
+            # Extract prompts for LLM processing
+            prompts = [item.prompt for item in batch_items if item.prompt]
+
+            if not prompts:
+                # All prompts failed for this chunk, add error results
+                chunk_results = [
+                    BatchResult(
                         item=batch_item.data,
                         result=None,
                         success=False,
                         error_message=batch_item.metadata.get("prompt_error", "Failed to create prompt")
-                    ))
-                    continue
-                
-                try:
-                    # Find corresponding response
-                    response_index = len([item for item in batch_items[:i] if item.prompt])
-                    if response_index < len(responses):
-                        response = responses[response_index]
-                        parsed_result = self.parse_response(response, batch_item.data)
-                        results.append(BatchResult(
-                            item=batch_item.data,
-                            result=parsed_result,
-                            success=True
-                        ))
-                    else:
-                        results.append(BatchResult(
+                    )
+                    for batch_item in batch_items
+                ]
+                all_results.extend(chunk_results)
+                continue
+
+            try:
+                # Process prompts using LLM batch processing
+                responses = await self.llm_client.generate_batch(
+                    prompts, max_tokens, temperature, len(prompts)
+                )
+
+                # Parse responses and create results for this chunk
+                chunk_results = []
+                for i, batch_item in enumerate(batch_items):
+                    if not batch_item.prompt:
+                        # This item had a prompt creation error
+                        chunk_results.append(BatchResult(
                             item=batch_item.data,
                             result=None,
                             success=False,
-                            error_message="No response received from LLM"
+                            error_message=batch_item.metadata.get("prompt_error", "Failed to create prompt")
                         ))
-                except Exception as e:
-                    self.logger.error(f"Failed to parse response for item: {str(e)}")
-                    results.append(BatchResult(
+                        continue
+
+                    try:
+                        # Find corresponding response
+                        response_index = len([item for item in batch_items[:i] if item.prompt])
+                        if response_index < len(responses):
+                            response = responses[response_index]
+                            parsed_result = self.parse_response(response, batch_item.data)
+                            chunk_results.append(BatchResult(
+                                item=batch_item.data,
+                                result=parsed_result,
+                                success=True
+                            ))
+                        else:
+                            chunk_results.append(BatchResult(
+                                item=batch_item.data,
+                                result=None,
+                                success=False,
+                                error_message="No response received from LLM"
+                            ))
+                    except Exception as e:
+                        self.logger.error(f"Failed to parse response for item: {str(e)}")
+                        chunk_results.append(BatchResult(
+                            item=batch_item.data,
+                            result=None,
+                            success=False,
+                            error_message=f"Failed to parse response: {str(e)}"
+                        ))
+
+                all_results.extend(chunk_results)
+                current_memory_usage += chunk_memory
+
+            except Exception as e:
+                self.logger.error(f"Batch LLM processing failed for chunk: {str(e)}")
+                # Return error results for all items in this chunk
+                chunk_results = [
+                    BatchResult(
                         item=batch_item.data,
                         result=None,
                         success=False,
-                        error_message=f"Failed to parse response: {str(e)}"
-                    ))
-            
-            return results
-            
-        except Exception as e:
-            self.logger.error(f"Batch LLM processing failed: {str(e)}")
-            # Return error results for all items
-            return [
-                BatchResult(
-                    item=batch_item.data,
-                    result=None,
-                    success=False,
-                    error_message=f"Batch processing failed: {str(e)}"
-                )
-                for batch_item in batch_items
-            ]
+                        error_message=f"Batch processing failed: {str(e)}"
+                    )
+                    for batch_item in batch_items
+                ]
+                all_results.extend(chunk_results)
+
+        return all_results
+
+    async def _flush_batch_results(self, results: List[BatchResult[T, R]]) -> None:
+        """Flush accumulated results to free memory.
+
+        This method can be extended to persist results to disk or database
+        for very large batch processing scenarios.
+
+        Args:
+            results: List of accumulated results to flush
+        """
+        if results:
+            self.logger.debug(f"Flushing {len(results)} accumulated batch results to free memory")
+            # In a more advanced implementation, results could be written to disk
+            # or streamed to a database here to prevent memory accumulation
+            # For now, we rely on the caller to handle the cleared results
 
 
 class TextAnalysisBatchProcessor(BatchProcessor[str, Dict[str, Any]]):

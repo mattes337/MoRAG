@@ -42,43 +42,60 @@ class EmbeddingProcessor:
         content_type: str = 'document',
         base_metadata: Dict[str, Any] = None
     ) -> Tuple[List[str], List[List[float]], List[Dict[str, Any]]]:
-        """Generate embeddings and metadata for chunks.
-        
+        """Generate embeddings and metadata for chunks with optimized batching.
+
         Args:
             chunks: List of text chunks
             content_type: Type of content being processed
             base_metadata: Base metadata to include with each chunk
-            
+
         Returns:
             Tuple of (chunks, embeddings, metadata_list)
         """
         if not chunks:
             return [], [], []
-            
+
         if base_metadata is None:
             base_metadata = {}
-        
+
         try:
-            # Generate embeddings for all chunks
-            embeddings = await self.embedding_service.generate_batch(chunks)
-            
-            # Generate metadata for each chunk
-            metadata_list = []
-            for i, chunk_text in enumerate(chunks):
-                chunk_metadata = self._add_chunk_metadata(chunk_text, i, content_type, base_metadata)
-                metadata_list.append(chunk_metadata)
-            
-            logger.info("Generated embeddings and metadata", 
+            # Use Gemini's optimal batch size (documented as 100)
+            OPTIMAL_BATCH_SIZE = 100
+
+            # Process in parallel batches
+            embedding_tasks = []
+            for i in range(0, len(chunks), OPTIMAL_BATCH_SIZE):
+                batch = chunks[i:i + OPTIMAL_BATCH_SIZE]
+                embedding_tasks.append(self.embedding_service.generate_batch(batch))
+
+            # Execute all batches concurrently
+            batch_results = await asyncio.gather(*embedding_tasks)
+
+            # Flatten results
+            embeddings = [emb for batch in batch_results for emb in batch]
+
+            # Generate metadata in parallel with embeddings
+            metadata_list = await asyncio.gather(*[
+                self._generate_chunk_metadata_async(chunk, i, content_type, base_metadata)
+                for i, chunk in enumerate(chunks)
+            ])
+
+            logger.info("Generated embeddings and metadata with optimized batching",
                        chunk_count=len(chunks),
-                       content_type=content_type)
-            
+                       content_type=content_type,
+                       batch_count=len(embedding_tasks))
+
             return chunks, embeddings, metadata_list
-            
+
         except Exception as e:
-            logger.error("Failed to generate embeddings and metadata", 
+            logger.error("Failed to generate embeddings and metadata",
                         error=str(e),
                         chunk_count=len(chunks))
             raise
+
+    async def _generate_chunk_metadata_async(self, chunk_text: str, chunk_index: int, content_type: str, base_metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate chunk metadata asynchronously for parallel processing."""
+        return self._add_chunk_metadata(chunk_text, chunk_index, content_type, base_metadata)
 
     def _add_chunk_metadata(self, chunk_text: str, chunk_index: int, content_type: str, base_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Add metadata to a chunk based on content type."""

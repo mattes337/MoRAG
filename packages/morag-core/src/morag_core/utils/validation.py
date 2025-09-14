@@ -211,3 +211,31 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
         sanitized = name[:max_name_length] + ext
 
     return sanitized
+
+
+def sanitize_filepath(filepath: Union[str, Path]) -> Path:
+    """Sanitize file path to prevent traversal and injection attacks.
+
+    Args:
+        filepath: Path to sanitize
+
+    Returns:
+        Sanitized and resolved Path object
+
+    Raises:
+        ValidationError: If path traversal or unsafe characters detected
+    """
+    path = Path(filepath)
+
+    # Prevent path traversal
+    resolved = path.resolve()
+    base_dir = Path.cwd().resolve()
+    if not str(resolved).startswith(str(base_dir)):
+        raise ValidationError(f"Path traversal detected: {filepath}")
+
+    # Sanitize filename - remove dangerous characters
+    safe_name = re.sub(r'[;&|`$()]', '', path.name)
+    if safe_name != path.name:
+        raise ValidationError(f"Unsafe characters in filename: {path.name}")
+
+    return resolved
