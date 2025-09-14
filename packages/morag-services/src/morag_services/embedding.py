@@ -743,6 +743,33 @@ Text to summarize:
 Summary:
 """
 
+    async def generate_batch(
+        self,
+        texts: List[str],
+        task_type: str = "retrieval_document"
+    ) -> List[List[float]]:
+        """Generate batch embeddings and return just the embedding vectors.
+
+        This is an alias for generate_embeddings_batch optimized for the embedding processor.
+        Returns just the embedding vectors for better performance.
+
+        Args:
+            texts: List of texts to embed
+            task_type: Type of embedding task
+
+        Returns:
+            List of embedding vectors
+        """
+        embedding_results = await self.generate_embeddings_batch(
+            texts=texts,
+            task_type=task_type,
+            batch_size=100,  # Use optimal batch size
+            use_native_batch=True
+        )
+
+        # Extract just the embedding vectors for performance
+        return [result.embedding for result in embedding_results]
+
     async def health_check(self) -> Dict[str, Any]:
         """Check if Gemini API is accessible."""
         try:

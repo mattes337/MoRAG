@@ -75,10 +75,18 @@ python tests/cli/test-simple.py
 # Comprehensive system test with detailed report
 python tests/cli/test-all.py
 
-# Test individual components (dual-mode support)
+# Test individual components with stage-based CLI
+python cli/morag-stages.py stage markdown-conversion sample.pdf
+python cli/morag-stages.py stage chunker output/sample.md
+python cli/morag-stages.py stage fact-generator output/sample.chunks.json
+
+# Test complete pipeline
+python cli/morag-stages.py stages "markdown-conversion,chunker,fact-generator" sample.pdf
+
+# Test individual components (legacy dual-mode support)
 python tests/cli/test-audio.py sample.mp3                    # Processing mode
 python tests/cli/test-audio.py sample.mp3 --ingest           # Ingestion mode
-python tests/cli/test-document.py sample.pdf                 # Processing mode  
+python tests/cli/test-document.py sample.pdf                 # Processing mode
 python tests/cli/test-document.py sample.pdf --ingest        # Ingestion mode
 python tests/cli/test-web.py https://example.com --ingest
 

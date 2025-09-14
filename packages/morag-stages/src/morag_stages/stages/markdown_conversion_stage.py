@@ -8,25 +8,71 @@ import structlog
 
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
+from ..error_handling import stage_error_handler, validation_error_handler
 from ..utils import detect_content_type, is_content_type
 
 # Import sanitization function
 try:
     from morag_core.utils.validation import sanitize_filepath
+    from morag_core.exceptions import ValidationError
 except ImportError:
-    def sanitize_filepath(filepath: Union[str, Path]) -> Path:
-        """Fallback sanitization function."""
+    class ValidationError(Exception):
+        """Fallback ValidationError class."""
+        pass
+
+    def sanitize_filepath(filepath: Union[str, Path], base_dir: Path = None) -> Path:
+        """Fallback sanitization function with enhanced security."""
         import re
         from pathlib import Path
 
+        if not filepath:
+            raise ValidationError("Empty file path provided")
+
         path = Path(filepath)
+        path_str = str(path)
 
-        # Basic sanitization - prevent dangerous characters
-        safe_name = re.sub(r'[;&|`$()]', '', path.name)
-        if safe_name != path.name:
-            raise ValueError(f"Unsafe characters in filename: {path.name}")
+        # Check for null bytes
+        if '\x00' in path_str:
+            raise ValidationError(f"Null byte detected in path: {filepath}")
 
-        return path.resolve()
+        # Check for dangerous patterns
+        dangerous_patterns = [
+            r'[;&|`$()]',     # Shell metacharacters
+            r'\$\(',          # Command substitution
+            r'`.*`',          # Backtick command substitution
+            r'\.\./',         # Directory traversal
+            r'\.\.\\'         # Windows directory traversal
+        ]
+
+        for pattern in dangerous_patterns:
+            if re.search(pattern, path_str):
+                raise ValidationError(f"Dangerous characters or patterns detected in path: {filepath}")
+
+        # Resolve and validate path
+        try:
+            resolved = path.resolve()
+        except (OSError, RuntimeError) as e:
+            raise ValidationError(f"Failed to resolve path {filepath}: {str(e)}")
+
+        # Basic path traversal protection
+        if base_dir is None:
+            base_dir = Path.cwd().resolve()
+        else:
+            base_dir = base_dir.resolve()
+
+        try:
+            resolved.relative_to(base_dir)
+        except ValueError:
+            raise ValidationError(f"Path traversal detected - path outside base directory: {filepath}")
+
+        # Additional filename validation
+        filename = resolved.name
+        if filename:
+            # Check for filenames that start with multiple dots
+            if filename.startswith('..'):
+                raise ValidationError(f"Filename cannot start with double dots: {filename}")
+
+        return resolved
 
 from .converter_factory import ConverterFactory
 from .conversion_processors import ConversionProcessors
@@ -75,6 +121,7 @@ class MarkdownConversionStage(Stage):
         self.converter_factory = ConverterFactory()
         self.processors = ConversionProcessors()
 
+    @stage_error_handler("markdown_conversion_execute")
     async def execute(self,
                      input_files: List[Path],
                      context: StageContext,
@@ -132,8 +179,10 @@ class MarkdownConversionStage(Stage):
                     if not is_url(str(input_file)):
                         # Only sanitize local file paths, not URLs
                         try:
-                            sanitized_input = sanitize_filepath(input_file)
-                        except (ValueError, Exception) as e:
+                            # Use a safe base directory for validation (current working directory)
+                            safe_base_dir = Path.cwd()
+                            sanitized_input = sanitize_filepath(input_file, base_dir=safe_base_dir)
+                        except (ValidationError, ValueError, Exception) as e:
                             logger.error("File path sanitization failed",
                                        file=str(input_file), error=str(e))
                             errors.append({
@@ -214,6 +263,7 @@ class MarkdownConversionStage(Stage):
                 error=str(e)
             )
 
+    @validation_error_handler("markdown_conversion_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files/URLs."""
         if not input_files:

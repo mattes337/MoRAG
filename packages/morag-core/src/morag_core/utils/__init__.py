@@ -31,6 +31,9 @@ from .processing import (
     create_processing_metadata,
     get_output_paths,
 )
+from .deduplication import (
+    Deduplicator,
+)
 
 __all__ = [
     # Device utilities
@@ -59,4 +62,6 @@ __all__ = [
     "ProcessingMetadata",
     "create_processing_metadata",
     "get_output_paths",
+    # Deduplication
+    "Deduplicator",
 ]

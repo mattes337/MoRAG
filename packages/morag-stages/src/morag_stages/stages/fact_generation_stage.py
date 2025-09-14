@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import List, Dict, Any, TYPE_CHECKING
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 import structlog
 
@@ -10,44 +10,92 @@ from morag_core.config import FactGeneratorConfig
 from morag_core.interfaces import IServiceCoordinator
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
+from ..error_handling import stage_error_handler, validation_error_handler
+
+# Import sanitization function
+try:
+    from morag_core.utils.validation import sanitize_filepath, ValidationError
+except ImportError:
+    class ValidationError(Exception):
+        """Fallback ValidationError class."""
+        pass
+
+    def sanitize_filepath(filepath, base_dir=None):
+        """Fallback sanitization function with enhanced security."""
+        import re
+        from pathlib import Path
+
+        if not filepath:
+            raise ValidationError("Empty file path provided")
+
+        path = Path(filepath)
+        path_str = str(path)
+
+        # Check for null bytes
+        if '\x00' in path_str:
+            raise ValidationError(f"Null byte detected in path: {filepath}")
+
+        # Check for dangerous patterns
+        dangerous_patterns = [
+            r'[;&|`$()]',     # Shell metacharacters
+            r'\$\(',          # Command substitution
+            r'`.*`',          # Backtick command substitution
+            r'\.\./',         # Directory traversal
+            r'\.\.\\'         # Windows directory traversal
+        ]
+
+        for pattern in dangerous_patterns:
+            if re.search(pattern, path_str):
+                raise ValidationError(f"Dangerous characters or patterns detected in path: {filepath}")
+
+        # Resolve and validate path
+        try:
+            resolved = path.resolve()
+        except (OSError, RuntimeError) as e:
+            raise ValidationError(f"Failed to resolve path {filepath}: {str(e)}")
+
+        # Basic path traversal protection
+        if base_dir is None:
+            base_dir = Path.cwd().resolve()
+        else:
+            base_dir = Path(base_dir).resolve()
+
+        try:
+            resolved.relative_to(base_dir)
+        except ValueError:
+            raise ValidationError(f"Path traversal detected - path outside base directory: {filepath}")
+
+        # Additional filename validation
+        filename = resolved.name
+        if filename and filename.startswith('..'):
+            raise ValidationError(f"Filename cannot start with double dots: {filename}")
+
+        return resolved
 
 from .fact_extraction_engine import FactExtractionEngine
 
 logger = structlog.get_logger(__name__)
 
-# Import services with graceful fallback
-if TYPE_CHECKING:
-    from morag_core.ai import create_agent, AgentConfig
-    from morag_graph.extraction import FactExtractor, EntityNormalizer
-
-try:
-    from morag_core.ai import create_agent as _create_agent, AgentConfig as _AgentConfig
-    from morag_graph.extraction import FactExtractor as _FactExtractor, EntityNormalizer as _EntityNormalizer
-    create_agent = _create_agent
-    AgentConfig = _AgentConfig
-    FactExtractor = _FactExtractor
-    EntityNormalizer = _EntityNormalizer
-    SERVICES_AVAILABLE = True
-except ImportError:
-    SERVICES_AVAILABLE = False
-    create_agent = None  # type: ignore
-    AgentConfig = None  # type: ignore
-    FactExtractor = None  # type: ignore
-    EntityNormalizer = None  # type: ignore
-
 
 class FactGeneratorStage(Stage):
     """Stage that extracts facts, entities, relations, and keywords from chunks."""
 
-    def __init__(self, coordinator: IServiceCoordinator, stage_type: StageType = StageType.FACT_GENERATOR):
+    def __init__(self, coordinator: Optional[IServiceCoordinator] = None, stage_type: StageType = StageType.FACT_GENERATOR):
         """Initialize fact generator stage.
 
         Args:
-            coordinator: Service coordinator implementing IServiceCoordinator
+            coordinator: Service coordinator implementing IServiceCoordinator (None for backward compatibility)
             stage_type: Type of stage
         """
         super().__init__(stage_type)
-        self.coordinator = coordinator
+
+        # Handle backward compatibility
+        if coordinator is None:
+            # Create a basic service coordinator for backward compatibility
+            self.coordinator = None
+            logger.warning("FactGeneratorStage initialized without coordinator - will use fallback services")
+        else:
+            self.coordinator = coordinator
 
         # Default configuration
         self.config = {
@@ -75,6 +123,11 @@ class FactGeneratorStage(Stage):
 
     async def _initialize_services(self):
         """Initialize services using dependency injection."""
+        if self.coordinator is None:
+            logger.warning("No service coordinator available, using fallback initialization")
+            await self.extraction_engine.initialize()
+            return
+
         try:
             # Initialize services through coordinator
             await self.coordinator.initialize_services()
@@ -83,22 +136,22 @@ class FactGeneratorStage(Stage):
             try:
                 self.fact_extractor = await self.coordinator.get_service("fact_extractor")
                 logger.info("Fact extractor service obtained")
-            except Exception:
-                logger.warning("Fact extractor service not available")
+            except Exception as e:
+                logger.warning("Fact extractor service not available", error=str(e))
                 self.fact_extractor = None
 
             try:
                 self.entity_normalizer = await self.coordinator.get_service("entity_normalizer")
                 logger.info("Entity normalizer service obtained")
-            except Exception:
-                logger.warning("Entity normalizer service not available")
+            except Exception as e:
+                logger.warning("Entity normalizer service not available", error=str(e))
                 self.entity_normalizer = None
 
             try:
                 self.agent = await self.coordinator.get_service("fact_extraction_agent")
                 logger.info("Fact extraction agent service obtained")
-            except Exception:
-                logger.warning("Fact extraction agent service not available")
+            except Exception as e:
+                logger.warning("Fact extraction agent service not available", error=str(e))
                 self.agent = None
 
             # Initialize extraction engine with obtained services
@@ -112,22 +165,24 @@ class FactGeneratorStage(Stage):
             logger.error("Failed to initialize fact generation services", error=str(e))
             raise StageExecutionError(f"Service initialization failed: {str(e)}")
 
-    async def execute(self, 
-                     input_files: List[Path], 
-                     output_dir: Path, 
-                     context: StageContext = None) -> StageResult:
+    @stage_error_handler("fact_generation_execute")
+    async def execute(self,
+                     input_files: List[Path],
+                     context: StageContext,
+                     output_dir: Optional[Path] = None) -> StageResult:
         """Execute fact generation on chunk files.
-        
+
         Args:
             input_files: List of chunk.json files to process
-            output_dir: Directory for output files  
             context: Stage execution context
+            output_dir: Optional output directory override
             
         Returns:
             StageResult with fact generation results
         """
-        if context is None:
-            context = StageContext()
+        # Get output directory from context if not provided
+        if output_dir is None:
+            output_dir = context.output_dir or Path.cwd()
 
         # Get configuration
         config = FactGeneratorConfig.from_context(context)
@@ -165,9 +220,22 @@ class FactGeneratorStage(Stage):
             for input_file in input_files:
                 try:
                     logger.info("Processing chunk file", file=str(input_file))
-                    
+
+                    # Sanitize input file path for security
+                    try:
+                        safe_base_dir = Path.cwd()
+                        sanitized_input = sanitize_filepath(input_file, base_dir=safe_base_dir)
+                    except (ValidationError, ValueError, Exception) as e:
+                        logger.error("File path sanitization failed",
+                                   file=str(input_file), error=str(e))
+                        errors.append({
+                            'input_file': str(input_file),
+                            'error': f"File path sanitization failed: {str(e)}"
+                        })
+                        continue
+
                     # Load chunks from JSON file
-                    with open(input_file, 'r', encoding='utf-8') as f:
+                    with open(sanitized_input, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     
                     chunks = data.get('chunks', [])
@@ -264,6 +332,7 @@ class FactGeneratorStage(Stage):
                 error=str(e)
             )
 
+    @validation_error_handler("fact_generation_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input chunk files."""
         if not input_files:
@@ -281,7 +350,16 @@ class FactGeneratorStage(Stage):
                 
             # Validate file contains chunk data
             try:
-                with open(input_file, 'r', encoding='utf-8') as f:
+                # Sanitize input file path for security
+                try:
+                    safe_base_dir = Path.cwd()
+                    sanitized_input = sanitize_filepath(input_file, base_dir=safe_base_dir)
+                except (ValidationError, ValueError, Exception) as e:
+                    logger.error("File path sanitization failed during validation",
+                               file=str(input_file), error=str(e))
+                    return False
+
+                with open(sanitized_input, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 
                 if 'chunks' not in data:

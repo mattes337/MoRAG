@@ -5,6 +5,9 @@ from typing import Dict, Any, Union
 from pathlib import Path
 import structlog
 
+# Import error handling decorators
+from ..error_handling import standalone_validation_handler
+
 logger = structlog.get_logger(__name__)
 
 # Import services - these are optional for fallback processing
@@ -113,6 +116,7 @@ class ConverterFactory:
             logger.warning("Error determining markitdown usage", file=str(file_path), error=str(e))
             return True  # Default to markitdown
 
+    @standalone_validation_handler("converter_factory_validate_conversion_quality")
     def validate_conversion_quality(self, content: str, file_path: Union[Path, 'URLPath']) -> bool:
         """Validate the quality of converted content."""
         try:

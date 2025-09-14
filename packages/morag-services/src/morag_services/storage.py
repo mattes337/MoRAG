@@ -5,16 +5,127 @@ from qdrant_client.models import (
     Distance, VectorParams, CreateCollection, PointStruct,
     Filter, FieldCondition, MatchValue, SearchRequest
 )
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Callable, Awaitable
 import structlog
 import asyncio
 from datetime import datetime, timezone
 import uuid
+import hashlib
 
 from morag_core.interfaces.storage import VectorStorage as BaseVectorStorage
 from morag_core.exceptions import StorageError
 
 logger = structlog.get_logger(__name__)
+
+
+class EmbeddingCache:
+    """LRU cache for embeddings with content hashing."""
+
+    def __init__(self, max_size: int = 10000):
+        """Initialize the embedding cache.
+
+        Args:
+            max_size: Maximum number of embeddings to cache (default: 10000)
+        """
+        self.cache: Dict[str, List[float]] = {}
+        self.access_order: List[str] = []
+        self.max_size = max_size
+        logger.info("Initialized EmbeddingCache", max_size=max_size)
+
+    def get_key(self, text: str) -> str:
+        """Generate cache key from text content using SHA256.
+
+        Args:
+            text: Input text to hash
+
+        Returns:
+            16-character hash key
+        """
+        return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+    async def get_or_compute(
+        self,
+        text: str,
+        compute_func: Callable[[str], Awaitable[List[float]]]
+    ) -> List[float]:
+        """Get embedding from cache or compute and cache it.
+
+        Args:
+            text: Text to get embedding for
+            compute_func: Async function to compute embedding if not cached
+
+        Returns:
+            Embedding vector
+        """
+        key = self.get_key(text)
+
+        # Check if embedding is in cache
+        if key in self.cache:
+            # Move to end (most recently used)
+            self.access_order.remove(key)
+            self.access_order.append(key)
+            logger.debug("Cache hit for embedding", key=key)
+            return self.cache[key]
+
+        # Compute embedding using provided function
+        logger.debug("Cache miss, computing embedding", key=key)
+        embedding = await compute_func(text)
+
+        # Add to cache with LRU eviction
+        if len(self.cache) >= self.max_size:
+            # Remove oldest entry
+            oldest = self.access_order.pop(0)
+            del self.cache[oldest]
+            logger.debug("LRU eviction", evicted_key=oldest)
+
+        # Store in cache
+        self.cache[key] = embedding
+        self.access_order.append(key)
+
+        logger.debug("Cached new embedding", key=key, cache_size=len(self.cache))
+        return embedding
+
+    def clear(self) -> None:
+        """Clear all cached embeddings."""
+        cleared_count = len(self.cache)
+        self.cache.clear()
+        self.access_order.clear()
+        logger.info("Cleared embedding cache", cleared_count=cleared_count)
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics.
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        return {
+            "cache_size": len(self.cache),
+            "max_size": self.max_size,
+            "utilization": len(self.cache) / self.max_size if self.max_size > 0 else 0,
+            "access_order_length": len(self.access_order)
+        }
+
+    def resize(self, new_max_size: int) -> None:
+        """Resize the cache to a new maximum size.
+
+        Args:
+            new_max_size: New maximum cache size
+        """
+        if new_max_size < 0:
+            raise ValueError("max_size must be non-negative")
+
+        old_size = self.max_size
+        self.max_size = new_max_size
+
+        # Evict items if new size is smaller
+        while len(self.cache) > new_max_size:
+            oldest = self.access_order.pop(0)
+            del self.cache[oldest]
+
+        logger.info("Resized embedding cache",
+                   old_size=old_size,
+                   new_size=new_max_size,
+                   current_entries=len(self.cache))
 
 
 class QdrantVectorStorage(BaseVectorStorage):

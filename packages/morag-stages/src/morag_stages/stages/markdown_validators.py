@@ -4,6 +4,9 @@ import re
 from typing import Union
 from pathlib import Path
 
+# Import error handling decorator
+from ..error_handling import standalone_validation_handler
+
 # Import URL utilities if available
 try:
     from morag.utils.url_path import URLPath
@@ -14,6 +17,7 @@ except ImportError:
         pass
 
 
+@standalone_validation_handler("validate_conversion_quality")
 def validate_conversion_quality(content: str, file_path: Union[Path, 'URLPath']) -> bool:
     """Validate that conversion produced proper markdown for any supported file type.
 
@@ -57,6 +61,7 @@ def validate_conversion_quality(content: str, file_path: Union[Path, 'URLPath'])
             return validate_general_conversion(content)
 
 
+@standalone_validation_handler("validate_document_conversion")
 def validate_document_conversion(content: str) -> bool:
     """Validate document file conversion (PDF, DOC, PPT, etc.)."""
 
@@ -94,6 +99,7 @@ def validate_document_conversion(content: str) -> bool:
     return has_structure and has_reasonable_formatting
 
 
+@standalone_validation_handler("validate_html_conversion")
 def validate_html_conversion(content: str) -> bool:
     """Validate HTML conversion."""
 
@@ -154,6 +160,7 @@ def validate_text_conversion(content: str) -> bool:
     return len(content.strip()) > 0
 
 
+@standalone_validation_handler("validate_media_conversion")
 def validate_media_conversion(content: str) -> bool:
     """Validate media file conversion (audio/video transcription)."""
     # Media files should produce transcribed text

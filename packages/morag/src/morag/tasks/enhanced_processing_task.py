@@ -10,7 +10,7 @@ import structlog
 from morag.api import MoRAGAPI
 from morag.services.enhanced_webhook_service import get_webhook_service
 from morag.services.temporary_file_service import get_temp_file_service
-from morag.worker import celery_app
+from morag.worker import celery_app, run_async
 
 logger = structlog.get_logger(__name__)
 
@@ -274,5 +274,5 @@ def enhanced_process_ingest_task(
                 logger.warning("Failed to clean up temporary file",
                              file_path=file_path, error=str(e))
     
-    # Run the async function
-    return asyncio.run(_process())
+    # Run the async function using shared event loop
+    return run_async(_process())

@@ -44,14 +44,14 @@ class FactGraphBuilder:
         self.logger = get_logger(__name__)
         
         # Initialize LLM client
-        llm_config = LLMConfig(
+        self.llm_config = LLMConfig(
             provider="gemini",
             model=model_id,
             api_key=api_key,
             temperature=0.1,
             max_tokens=2000
         )
-        self.llm_client = LLMClient(llm_config)
+        self.llm_client = LLMClient(self.llm_config)
         
         # Initialize helper components
         self.operations = FactGraphOperations(self.llm_client, self.logger)
@@ -64,7 +64,7 @@ class FactGraphBuilder:
 
         relationships = []
         try:
-            # Create relationships with timeout
+            # Create relationships and build graph with timeout
             async with asyncio.timeout(self.processing_timeout):
                 relationships = await self.operations.create_fact_relationships(
                     facts,
@@ -72,10 +72,10 @@ class FactGraphBuilder:
                     self.max_relations_per_fact
                 )
 
-            # Build graph structure
-            graph = self.utilities.build_graph_structure(facts, relationships)
+                # Build graph structure
+                graph = self.utilities.build_graph_structure(facts, relationships)
 
-            # Index with separate error handling
+            # Index with separate error handling (outside timeout)
             try:
                 await self._index_facts(facts)
             except Exception as index_error:
@@ -89,12 +89,24 @@ class FactGraphBuilder:
         except Exception as e:
             self.logger.error("Graph building failed", error=str(e), traceback=traceback.format_exc())
             raise  # Let caller handle - don't hide errors
-        finally:
-            # Ensure cleanup happens
-            if hasattr(self.llm_client, 'close'):
-                await self.llm_client.close()
 
     async def _index_facts(self, facts: List[Fact]):
         """Index facts for efficient retrieval (placeholder for now)."""
         # TODO: Implement fact indexing if needed
         pass
+
+    async def close(self):
+        """Close the graph builder and clean up resources."""
+        try:
+            if hasattr(self.llm_client, 'close'):
+                await self.llm_client.close()
+        except Exception as e:
+            self.logger.warning("Error closing LLM client", error=str(e))
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with cleanup."""
+        await self.close()

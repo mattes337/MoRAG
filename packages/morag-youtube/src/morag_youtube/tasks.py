@@ -1,14 +1,54 @@
 """YouTube processing tasks for MoRAG."""
 
 from typing import Dict, Any, List, Optional
+import asyncio
+import threading
 import structlog
 from pathlib import Path
+import nest_asyncio
 
 from morag_core.interfaces.task import BaseTask
 
 from .processor import YouTubeProcessor, YouTubeConfig, YouTubeDownloadResult
 
 logger = structlog.get_logger(__name__)
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
+
+# Create a shared event loop for all async operations
+_event_loop = None
+_loop_thread = None
+_loop_lock = threading.Lock()
+
+def get_shared_event_loop():
+    """Get or create a shared event loop for async operations."""
+    global _event_loop, _loop_thread
+
+    with _loop_lock:
+        if _event_loop is None or _event_loop.is_closed():
+            # Create new event loop in a separate thread
+            def run_event_loop():
+                global _event_loop
+                _event_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(_event_loop)
+                _event_loop.run_forever()
+
+            _loop_thread = threading.Thread(target=run_event_loop, daemon=True)
+            _loop_thread.start()
+
+            # Wait for loop to be ready
+            import time
+            while _event_loop is None:
+                time.sleep(0.01)
+
+    return _event_loop
+
+def run_async(coroutine):
+    """Run coroutine using the shared event loop."""
+    loop = get_shared_event_loop()
+    future = asyncio.run_coroutine_threadsafe(coroutine, loop)
+    return future.result()
 
 
 class YouTubeProcessingTask(BaseTask):
@@ -301,20 +341,17 @@ def create_celery_tasks(celery_app):
     @celery_app.task(bind=True)
     def process_youtube_video_celery(self, url: str, config: Optional[Dict[str, Any]] = None):
         """Celery wrapper for YouTube video processing."""
-        import asyncio
-        return asyncio.run(process_youtube_video(url, config, self.request.id))
+        return run_async(process_youtube_video(url, config, self.request.id))
     
     @celery_app.task(bind=True)
     def process_youtube_playlist_celery(self, url: str, config: Optional[Dict[str, Any]] = None):
         """Celery wrapper for YouTube playlist processing."""
-        import asyncio
-        return asyncio.run(process_youtube_playlist(url, config, self.request.id))
+        return run_async(process_youtube_playlist(url, config, self.request.id))
     
     @celery_app.task(bind=True)
     def extract_youtube_metadata_celery(self, url: str):
         """Celery wrapper for YouTube metadata extraction."""
-        import asyncio
-        return asyncio.run(extract_youtube_metadata(url, self.request.id))
+        return run_async(extract_youtube_metadata(url, self.request.id))
     
     return {
         'process_youtube_video': process_youtube_video_celery,

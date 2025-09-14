@@ -8,7 +8,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 import structlog
 
-from morag.worker import celery_app, get_morag_api
+from morag.worker import celery_app, get_morag_api, run_async
 from morag_services import QdrantVectorStorage, GeminiEmbeddingService
 from morag_core.models import Document, DocumentChunk
 from morag_core.config import get_settings, validate_chunk_size
@@ -583,7 +583,7 @@ def ingest_file_task(self, file_path: str, content_type: Optional[str] = None, t
                     # Fallback to generic exception if reconstruction fails
                     raise Exception(str(e))
     
-    return asyncio.run(_ingest())
+    return run_async(_ingest())
 
 
 @celery_app.task(bind=True)
@@ -709,7 +709,7 @@ def ingest_url_task(self, url: str, content_type: Optional[str] = None, task_opt
                     # Fallback to generic exception if reconstruction fails
                     raise Exception(str(e))
 
-    return asyncio.run(_ingest())
+    return run_async(_ingest())
 
 
 @celery_app.task(bind=True)
@@ -892,4 +892,4 @@ def ingest_batch_task(self, items: List[Dict[str, Any]], task_options: Optional[
                     # Fallback to generic exception if reconstruction fails
                     raise Exception(str(e))
 
-    return asyncio.run(_ingest())
+    return run_async(_ingest())

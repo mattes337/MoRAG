@@ -9,6 +9,7 @@ import structlog
 
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
+from ..error_handling import stage_error_handler, validation_error_handler
 
 if TYPE_CHECKING:
     from morag_graph.storage import Neo4jStorage
@@ -55,15 +56,18 @@ class IngestorStage(Stage):
         self.neo4j_storage: Optional["Neo4jStorage"] = None
         self.qdrant_storage: Optional["QdrantStorage"] = None
     
-    async def execute(self, 
-                     input_files: List[Path], 
-                     context: StageContext) -> StageResult:
+    @stage_error_handler("ingestor_execute")
+    async def execute(self,
+                     input_files: List[Path],
+                     context: StageContext,
+                     output_dir: Optional[Path] = None) -> StageResult:
         """Execute ingestion on input files.
-        
+
         Args:
             input_files: List of input files (chunks.json and facts.json)
             context: Stage execution context
-            
+            output_dir: Optional output directory override
+
         Returns:
             Stage execution result
         """
@@ -76,11 +80,15 @@ class IngestorStage(Stage):
             )
         
         config = context.get_stage_config(self.stage_type)
-        
-        logger.info("Starting ingestion", 
+
+        # Get effective output directory
+        effective_output_dir = output_dir or context.output_dir
+
+        logger.info("Starting ingestion",
                    input_files=[str(f) for f in input_files],
+                   output_dir=str(effective_output_dir),
                    config=config)
-        
+
         try:
             # Find chunks and facts files from input files first
             chunks_file = None
@@ -94,14 +102,14 @@ class IngestorStage(Stage):
 
             # If chunks file not in input, look in output directory
             if not chunks_file:
-                chunks_files = list(context.output_dir.glob("*.chunks.json"))
+                chunks_files = list(effective_output_dir.glob("*.chunks.json"))
                 if chunks_files:
                     chunks_file = chunks_files[0]
                     logger.info("Found chunks file in output directory", chunks_file=str(chunks_file))
 
             # If facts file not in input, look in output directory
             if not facts_file:
-                facts_files = list(context.output_dir.glob("*.facts.json"))
+                facts_files = list(effective_output_dir.glob("*.facts.json"))
                 if facts_files:
                     facts_file = facts_files[0]
                     logger.info("Found facts file in output directory", facts_file=str(facts_file))
@@ -115,8 +123,8 @@ class IngestorStage(Stage):
             
             # Generate output filename
             base_name = chunks_file.stem.replace('.chunks', '')
-            output_file = context.output_dir / f"{base_name}.ingestion.json"
-            context.output_dir.mkdir(parents=True, exist_ok=True)
+            output_file = effective_output_dir / f"{base_name}.ingestion.json"
+            effective_output_dir.mkdir(parents=True, exist_ok=True)
             
             # Load input data
             chunks_data = self._load_json_file(chunks_file)
@@ -184,6 +192,7 @@ class IngestorStage(Stage):
                 original_error=e
             )
     
+    @validation_error_handler("ingestor_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for ingestion.
 

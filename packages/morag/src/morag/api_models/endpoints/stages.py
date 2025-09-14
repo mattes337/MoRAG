@@ -23,7 +23,8 @@ from morag.api_models.stage_models import (
     StageTypeEnum, StageStatusEnum, StageExecutionRequest, StageExecutionResponse,
     StageChainRequest, StageChainResponse, StageStatusResponse, StageFileMetadata,
     FileDownloadResponse, FileListResponse, StageInfoResponse, StageListResponse,
-    ErrorResponse, HealthCheckResponse, StageExecutionMetadata, JobCleanupResponse
+    ErrorResponse, HealthCheckResponse, StageExecutionMetadata, JobCleanupResponse,
+    WebhookConfig
 )
 from morag.utils.file_upload import get_upload_handler
 from morag.utils.url_path import create_path_from_string
@@ -136,72 +137,86 @@ async def send_webhook_notification(webhook_config, stage_result, job_id: Option
         return False
 
 
+async def _list_stages_impl():
+    """Internal implementation for listing stages."""
+    stages_info = []
+
+    stage_descriptions = {
+        StageTypeEnum.MARKDOWN_CONVERSION: {
+            "description": "Convert input files to unified markdown format",
+            "input_formats": ["pdf", "docx", "txt", "mp3", "mp4", "wav", "m4a", "flac", "avi", "mov", "mkv"],
+            "output_formats": ["md"],
+            "required_config": [],
+            "optional_config": ["include_timestamps", "speaker_diarization", "topic_segmentation"],
+            "dependencies": []
+        },
+        StageTypeEnum.MARKDOWN_OPTIMIZER: {
+            "description": "LLM-based text improvement and transcription error correction",
+            "input_formats": ["md"],
+            "output_formats": ["md"],
+            "required_config": [],
+            "optional_config": ["fix_transcription_errors", "improve_readability", "preserve_timestamps"],
+            "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION]
+        },
+        StageTypeEnum.CHUNKER: {
+            "description": "Create summary, chunks, and contextual embeddings",
+            "input_formats": ["md"],
+            "output_formats": ["json"],
+            "required_config": [],
+            "optional_config": ["chunk_strategy", "chunk_size", "generate_summary"],
+            "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION]
+        },
+        StageTypeEnum.FACT_GENERATOR: {
+            "description": "Extract facts, entities, relations, and keywords",
+            "input_formats": ["json"],
+            "output_formats": ["json"],
+            "required_config": [],
+            "optional_config": ["extract_entities", "extract_relations", "domain"],
+            "dependencies": [StageTypeEnum.CHUNKER]
+        },
+        StageTypeEnum.INGESTOR: {
+            "description": "Database ingestion and storage",
+            "input_formats": ["json"],
+            "output_formats": ["json"],
+            "required_config": [],
+            "optional_config": ["databases", "collection_name"],
+            "dependencies": [StageTypeEnum.CHUNKER, StageTypeEnum.FACT_GENERATOR]
+        }
+    }
+
+    for stage_type in StageTypeEnum:
+        info = stage_descriptions[stage_type]
+        stages_info.append(StageInfoResponse(
+            stage_type=stage_type,
+            description=info["description"],
+            input_formats=info["input_formats"],
+            output_formats=info["output_formats"],
+            required_config=info["required_config"],
+            optional_config=info["optional_config"],
+            dependencies=info["dependencies"]
+        ))
+
+    return StageListResponse(
+        stages=stages_info,
+        total_count=len(stages_info)
+    )
+
+
 @router.get("/", response_model=StageListResponse)
+async def list_stages_root():
+    """List all available stages with their information (root endpoint)."""
+    try:
+        return await _list_stages_impl()
+    except Exception as e:
+        logger.error("Failed to list stages", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/list", response_model=StageListResponse)
 async def list_stages():
     """List all available stages with their information."""
     try:
-        stages_info = []
-        
-        stage_descriptions = {
-            StageTypeEnum.MARKDOWN_CONVERSION: {
-                "description": "Convert input files to unified markdown format",
-                "input_formats": ["pdf", "docx", "txt", "mp3", "mp4", "wav", "m4a", "flac", "avi", "mov", "mkv"],
-                "output_formats": ["md"],
-                "required_config": [],
-                "optional_config": ["include_timestamps", "speaker_diarization", "topic_segmentation"],
-                "dependencies": []
-            },
-            StageTypeEnum.MARKDOWN_OPTIMIZER: {
-                "description": "LLM-based text improvement and transcription error correction",
-                "input_formats": ["md"],
-                "output_formats": ["md"],
-                "required_config": [],
-                "optional_config": ["fix_transcription_errors", "improve_readability", "preserve_timestamps"],
-                "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION]
-            },
-            StageTypeEnum.CHUNKER: {
-                "description": "Create summary, chunks, and contextual embeddings",
-                "input_formats": ["md"],
-                "output_formats": ["json"],
-                "required_config": [],
-                "optional_config": ["chunk_strategy", "chunk_size", "generate_summary"],
-                "dependencies": [StageTypeEnum.MARKDOWN_CONVERSION]
-            },
-            StageTypeEnum.FACT_GENERATOR: {
-                "description": "Extract facts, entities, relations, and keywords",
-                "input_formats": ["json"],
-                "output_formats": ["json"],
-                "required_config": [],
-                "optional_config": ["extract_entities", "extract_relations", "domain"],
-                "dependencies": [StageTypeEnum.CHUNKER]
-            },
-            StageTypeEnum.INGESTOR: {
-                "description": "Database ingestion and storage",
-                "input_formats": ["json"],
-                "output_formats": ["json"],
-                "required_config": [],
-                "optional_config": ["databases", "collection_name"],
-                "dependencies": [StageTypeEnum.CHUNKER, StageTypeEnum.FACT_GENERATOR]
-            }
-        }
-        
-        for stage_type in StageTypeEnum:
-            info = stage_descriptions[stage_type]
-            stages_info.append(StageInfoResponse(
-                stage_type=stage_type,
-                description=info["description"],
-                input_formats=info["input_formats"],
-                output_formats=info["output_formats"],
-                required_config=info["required_config"],
-                optional_config=info["optional_config"],
-                dependencies=info["dependencies"]
-            ))
-        
-        return StageListResponse(
-            stages=stages_info,
-            total_count=len(stages_info)
-        )
-        
+        return await _list_stages_impl()
     except Exception as e:
         logger.error("Failed to list stages", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

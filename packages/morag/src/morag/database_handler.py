@@ -31,79 +31,147 @@ class DatabaseHandler:
         self._qdrant_pool = {}  # Connection pool for Qdrant
         self._neo4j_pool = {}  # Connection pool for Neo4j
         self._pool_lock = asyncio.Lock()
+        self._initialized = False
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with cleanup."""
+        await self.cleanup_connections()
 
     async def _get_qdrant_connection(self, config_key: str, db_config: DatabaseConfig):
-        """Get or create pooled Qdrant connection."""
+        """Get or create pooled Qdrant connection with health checking."""
         async with self._pool_lock:
-            if config_key not in self._qdrant_pool:
-                host = db_config.hostname or 'localhost'
-                port = db_config.port or 6333
+            # Check if connection exists and is healthy
+            if config_key in self._qdrant_pool:
+                storage = self._qdrant_pool[config_key]
+                try:
+                    # Test connection health
+                    await storage.health_check()
+                    return storage
+                except Exception as e:
+                    logger.warning(f"Qdrant connection unhealthy, recreating: {e}")
+                    # Remove unhealthy connection from pool
+                    try:
+                        await storage.disconnect()
+                    except:
+                        pass
+                    del self._qdrant_pool[config_key]
 
-                # Handle URL-style hostnames
-                if host.startswith(('http://', 'https://')):
-                    from urllib.parse import urlparse
-                    parsed = urlparse(host)
-                    hostname = parsed.hostname or "localhost"
-                    port = parsed.port or (443 if parsed.scheme == 'https' else port)
-                    config_host = host
-                else:
-                    hostname = host
-                    config_host = hostname
+            # Create new connection
+            host = db_config.hostname or 'localhost'
+            port = db_config.port or 6333
 
-                verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+            # Handle URL-style hostnames
+            if host.startswith(('http://', 'https://')):
+                from urllib.parse import urlparse
+                parsed = urlparse(host)
+                hostname = parsed.hostname or "localhost"
+                port = parsed.port or (443 if parsed.scheme == 'https' else port)
+                config_host = host
+            else:
+                hostname = host
+                config_host = hostname
 
-                storage = QdrantVectorStorage(
-                    host=config_host,
-                    port=port,
-                    api_key=os.getenv('QDRANT_API_KEY'),
-                    collection_name=db_config.database_name or 'morag_documents',
-                    verify_ssl=verify_ssl
-                )
-                await storage.connect()
-                self._qdrant_pool[config_key] = storage
-            return self._qdrant_pool[config_key]
+            verify_ssl = os.getenv('QDRANT_VERIFY_SSL', 'true').lower() == 'true'
+
+            storage = QdrantVectorStorage(
+                host=config_host,
+                port=port,
+                api_key=os.getenv('QDRANT_API_KEY'),
+                collection_name=db_config.database_name or 'morag_documents',
+                verify_ssl=verify_ssl
+            )
+            await storage.connect()
+            self._qdrant_pool[config_key] = storage
+            logger.info(f"Created new Qdrant connection for config: {config_key}")
+            return storage
 
     async def _get_neo4j_connection(self, config_key: str, db_config: DatabaseConfig):
-        """Get or create pooled Neo4j connection."""
+        """Get or create pooled Neo4j connection with health checking."""
         async with self._pool_lock:
-            if config_key not in self._neo4j_pool:
-                neo4j_config = Neo4jConfig(
-                    uri=db_config.hostname or 'bolt://localhost:7687',
-                    username=db_config.username or 'neo4j',
-                    password=db_config.password or 'password',
-                    database=db_config.database_name or 'neo4j',
-                    verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
-                    trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
-                )
+            # Check if connection exists and is healthy
+            if config_key in self._neo4j_pool:
+                storage = self._neo4j_pool[config_key]
+                try:
+                    # Test connection health
+                    await storage.test_connection()
+                    return storage
+                except Exception as e:
+                    logger.warning(f"Neo4j connection unhealthy, recreating: {e}")
+                    # Remove unhealthy connection from pool
+                    try:
+                        await storage.disconnect()
+                    except:
+                        pass
+                    del self._neo4j_pool[config_key]
 
-                storage = Neo4jStorage(neo4j_config)
-                await storage.connect()
-                self._neo4j_pool[config_key] = storage
-            return self._neo4j_pool[config_key]
+            # Create new connection
+            neo4j_config = Neo4jConfig(
+                uri=db_config.hostname or 'bolt://localhost:7687',
+                username=db_config.username or 'neo4j',
+                password=db_config.password or 'password',
+                database=db_config.database_name or 'neo4j',
+                verify_ssl=os.getenv("NEO4J_VERIFY_SSL", "true").lower() == "true",
+                trust_all_certificates=os.getenv("NEO4J_TRUST_ALL_CERTIFICATES", "false").lower() == "true"
+            )
+
+            storage = Neo4jStorage(neo4j_config)
+            await storage.connect()
+            self._neo4j_pool[config_key] = storage
+            logger.info(f"Created new Neo4j connection for config: {config_key}")
+            return storage
 
     def _get_config_key(self, db_config: DatabaseConfig) -> str:
         """Generate unique key for database configuration."""
         return f"{db_config.type.value}_{db_config.hostname}_{db_config.port}_{db_config.database_name}"
 
+    def get_pool_stats(self) -> Dict[str, Any]:
+        """Get connection pool statistics."""
+        return {
+            'qdrant_connections': len(self._qdrant_pool),
+            'neo4j_connections': len(self._neo4j_pool),
+            'total_connections': len(self._qdrant_pool) + len(self._neo4j_pool),
+            'qdrant_config_keys': list(self._qdrant_pool.keys()),
+            'neo4j_config_keys': list(self._neo4j_pool.keys())
+        }
+
     async def cleanup_connections(self):
         """Cleanup all pooled connections."""
         async with self._pool_lock:
+            cleanup_errors = []
+
             # Close Qdrant connections
-            for storage in self._qdrant_pool.values():
+            qdrant_count = len(self._qdrant_pool)
+            for config_key, storage in list(self._qdrant_pool.items()):
                 try:
                     await storage.disconnect()
                 except Exception as e:
-                    logger.warning(f"Error closing Qdrant connection: {e}")
+                    cleanup_errors.append(f"Qdrant {config_key}: {e}")
+                    logger.warning(f"Error closing Qdrant connection {config_key}: {e}")
 
             # Close Neo4j connections
-            for storage in self._neo4j_pool.values():
+            neo4j_count = len(self._neo4j_pool)
+            for config_key, storage in list(self._neo4j_pool.items()):
                 try:
                     await storage.disconnect()
                 except Exception as e:
-                    logger.warning(f"Error closing Neo4j connection: {e}")
+                    cleanup_errors.append(f"Neo4j {config_key}: {e}")
+                    logger.warning(f"Error closing Neo4j connection {config_key}: {e}")
 
             self._qdrant_pool.clear()
             self._neo4j_pool.clear()
+
+            logger.info(f"Connection cleanup completed",
+                       qdrant_closed=qdrant_count,
+                       neo4j_closed=neo4j_count,
+                       errors=len(cleanup_errors))
+
+            if cleanup_errors:
+                logger.warning(f"Connection cleanup had {len(cleanup_errors)} errors",
+                             errors=cleanup_errors)
 
     async def initialize_databases(
         self,
@@ -176,12 +244,15 @@ class DatabaseHandler:
                     database_results['neo4j'] = result
 
             except Exception as e:
+                pool_stats = self.get_pool_stats()
                 logger.error("Failed to write to database",
                            database_type=db_config.type.value,
-                           error=str(e))
+                           error=str(e),
+                           pool_stats=pool_stats)
                 database_results[db_config.type.value.lower()] = {
                     'success': False,
-                    'error': str(e)
+                    'error': str(e),
+                    'pool_stats': pool_stats
                 }
 
         return database_results

@@ -9,6 +9,7 @@ import structlog
 from morag_core.config.unified import MarkdownOptimizerConfig
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
+from ..error_handling import stage_error_handler, validation_error_handler
 
 # Import LLM services with graceful fallback
 try:
@@ -37,15 +38,18 @@ class MarkdownOptimizerStage(Stage):
         
         self.agent = None
     
-    async def execute(self, 
-                     input_files: List[Path], 
-                     context: StageContext) -> StageResult:
+    @stage_error_handler("markdown_optimizer_execute")
+    async def execute(self,
+                     input_files: List[Path],
+                     context: StageContext,
+                     output_dir: Optional[Path] = None) -> StageResult:
         """Execute markdown optimization on input files.
-        
+
         Args:
             input_files: List of input markdown files
             context: Stage execution context
-            
+            output_dir: Optional output directory override
+
         Returns:
             Stage execution result
         """
@@ -67,9 +71,12 @@ class MarkdownOptimizerStage(Stage):
                    config=config)
         
         try:
+            # Get output directory from parameter or context
+            effective_output_dir = output_dir or context.output_dir
+
             # Generate output filename
-            output_file = context.output_dir / f"{input_file.stem}.opt.md"
-            context.output_dir.mkdir(parents=True, exist_ok=True)
+            output_file = effective_output_dir / f"{input_file.stem}.opt.md"
+            effective_output_dir.mkdir(parents=True, exist_ok=True)
             
             # Read input markdown
             markdown_content = input_file.read_text(encoding='utf-8')
@@ -136,6 +143,7 @@ class MarkdownOptimizerStage(Stage):
                 original_error=e
             )
     
+    @validation_error_handler("markdown_optimizer_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for markdown optimization.
 

@@ -1,7 +1,9 @@
 """Web content processing tasks for MoRAG."""
 
 import asyncio
+import threading
 from typing import Any, Dict, List, Optional
+import nest_asyncio
 
 import structlog
 
@@ -11,6 +13,43 @@ from morag_core.models.document import DocumentChunk
 from .processor import WebProcessor, WebScrapingConfig
 
 logger = structlog.get_logger(__name__)
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
+
+# Create a shared event loop for all async operations
+_event_loop = None
+_loop_thread = None
+_loop_lock = threading.Lock()
+
+def get_shared_event_loop():
+    """Get or create a shared event loop for async operations."""
+    global _event_loop, _loop_thread
+
+    with _loop_lock:
+        if _event_loop is None or _event_loop.is_closed():
+            # Create new event loop in a separate thread
+            def run_event_loop():
+                global _event_loop
+                _event_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(_event_loop)
+                _event_loop.run_forever()
+
+            _loop_thread = threading.Thread(target=run_event_loop, daemon=True)
+            _loop_thread.start()
+
+            # Wait for loop to be ready
+            import time
+            while _event_loop is None:
+                time.sleep(0.01)
+
+    return _event_loop
+
+def run_async(coroutine):
+    """Run coroutine using the shared event loop."""
+    loop = get_shared_event_loop()
+    future = asyncio.run_coroutine_threadsafe(coroutine, loop)
+    return future.result()
 
 
 class WebProcessingTask(BaseTask):
@@ -212,14 +251,12 @@ def create_celery_tasks(celery_app):
     @celery_app.task(bind=True)
     def process_web_url_celery(self, url: str, config: Optional[Dict[str, Any]] = None):
         """Celery wrapper for web URL processing."""
-        import asyncio
-        return asyncio.run(process_web_url(url, config, self.request.id))
+        return run_async(process_web_url(url, config, self.request.id))
     
     @celery_app.task(bind=True)
     def process_web_urls_batch_celery(self, urls: List[str], config: Optional[Dict[str, Any]] = None):
         """Celery wrapper for batch web URL processing."""
-        import asyncio
-        return asyncio.run(process_web_urls_batch(urls, config, self.request.id))
+        return run_async(process_web_urls_batch(urls, config, self.request.id))
     
     return {
         'process_web_url': process_web_url_celery,

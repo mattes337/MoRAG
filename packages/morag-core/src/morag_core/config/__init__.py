@@ -9,6 +9,20 @@ from .unified import (
     IngestorConfig,
 )
 
+from .manager import (
+    ConfigurationManager,
+    ConfigurationSource,
+    EnvironmentSource,
+    FileSource,
+    DefaultsSource,
+    ConfigOverride,
+    get_config_manager,
+    get_package_config,
+    get_config_value,
+    override_config,
+    clear_config_overrides,
+)
+
 # Import settings from the main config module
 try:
     from ..config import settings, Settings, get_settings, validate_configuration_and_log, validate_chunk_size, detect_device, get_safe_device
@@ -77,6 +91,17 @@ __all__ = [
     'FactGeneratorConfig',
     'ChunkerConfig',
     'IngestorConfig',
+    'ConfigurationManager',
+    'ConfigurationSource',
+    'EnvironmentSource',
+    'FileSource',
+    'DefaultsSource',
+    'ConfigOverride',
+    'get_config_manager',
+    'get_package_config',
+    'get_config_value',
+    'override_config',
+    'clear_config_overrides',
     'settings',
     'Settings',
     'get_settings',

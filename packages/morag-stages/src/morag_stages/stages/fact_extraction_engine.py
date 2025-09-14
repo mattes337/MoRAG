@@ -3,7 +3,7 @@
 import asyncio
 import json
 import re
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
+from typing import List, Dict, Any, Optional
 import structlog
 
 from morag_core.config import FactGeneratorConfig
@@ -17,10 +17,6 @@ try:
 except ImportError:
     PARSER_AVAILABLE = False
     LLMResponseParser = None
-
-if TYPE_CHECKING:
-    from morag_core.ai import Agent
-    from morag_graph.extraction import FactExtractor, EntityNormalizer
 
 
 class FactExtractionEngine:

@@ -91,7 +91,7 @@ class BatchProcessor(ABC, Generic[T, R]):
             return []
 
         # Memory-aware streaming processing
-        MAX_MEMORY_MB = 300  # Conservative limit for general batch processor
+        MAX_MEMORY_MB = 500  # Configure based on available resources
         current_memory_usage = 0
         all_results = []
 

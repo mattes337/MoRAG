@@ -3,12 +3,13 @@
 import json
 import re
 from datetime import datetime
-from typing import List, Dict, Any, TYPE_CHECKING
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from pathlib import Path
 import structlog
 
 from ..models import Stage, StageType, StageStatus, StageResult, StageContext, StageMetadata
 from ..exceptions import StageExecutionError, StageValidationError
+from ..error_handling import stage_error_handler, validation_error_handler
 
 # Import services with graceful fallback
 if TYPE_CHECKING:
@@ -67,15 +68,18 @@ class ChunkerStage(Stage):
         else:
             return default
     
-    async def execute(self, 
-                     input_files: List[Path], 
-                     context: StageContext) -> StageResult:
+    @stage_error_handler("chunker_execute")
+    async def execute(self,
+                     input_files: List[Path],
+                     context: StageContext,
+                     output_dir: Optional[Path] = None) -> StageResult:
         """Execute chunking on input markdown files.
-        
+
         Args:
             input_files: List of input markdown files
             context: Stage execution context
-            
+            output_dir: Optional output directory override
+
         Returns:
             Stage execution result
         """
@@ -205,6 +209,7 @@ class ChunkerStage(Stage):
                 original_error=e
             )
     
+    @validation_error_handler("chunker_validate_inputs")
     def validate_inputs(self, input_files: List[Path]) -> bool:
         """Validate input files for chunking.
         

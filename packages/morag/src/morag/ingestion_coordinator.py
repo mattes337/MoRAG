@@ -35,6 +35,21 @@ class IngestionCoordinator:
         self.database_handler = DatabaseHandler()
         self.chunk_processor = ChunkProcessor()
 
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self.initialize()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with cleanup."""
+        if self.database_handler:
+            await self.database_handler.cleanup_connections()
+        if self.embedding_service and hasattr(self.embedding_service, 'cleanup'):
+            try:
+                await self.embedding_service.cleanup()
+            except Exception as e:
+                logger.warning(f"Error cleaning up embedding service: {e}")
+
     async def initialize(self):
         """Initialize all services and components."""
         try:

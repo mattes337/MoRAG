@@ -213,11 +213,12 @@ def sanitize_filename(filename: str, max_length: int = 255) -> str:
     return sanitized
 
 
-def sanitize_filepath(filepath: Union[str, Path]) -> Path:
+def sanitize_filepath(filepath: Union[str, Path], base_dir: Optional[Union[str, Path]] = None) -> Path:
     """Sanitize file path to prevent traversal and injection attacks.
 
     Args:
         filepath: Path to sanitize
+        base_dir: Base directory to validate against (defaults to current working directory)
 
     Returns:
         Sanitized and resolved Path object
@@ -225,17 +226,81 @@ def sanitize_filepath(filepath: Union[str, Path]) -> Path:
     Raises:
         ValidationError: If path traversal or unsafe characters detected
     """
+    if not filepath:
+        raise ValidationError("Empty file path provided")
+
     path = Path(filepath)
 
-    # Prevent path traversal
-    resolved = path.resolve()
-    base_dir = Path.cwd().resolve()
-    if not str(resolved).startswith(str(base_dir)):
-        raise ValidationError(f"Path traversal detected: {filepath}")
+    # Convert to string to check for dangerous patterns
+    path_str = str(path)
 
-    # Sanitize filename - remove dangerous characters
-    safe_name = re.sub(r'[;&|`$()]', '', path.name)
-    if safe_name != path.name:
-        raise ValidationError(f"Unsafe characters in filename: {path.name}")
+    # Check for null bytes (can cause issues in some systems)
+    if '\x00' in path_str:
+        raise ValidationError(f"Null byte detected in path: {filepath}")
+
+    # Check for dangerous command injection patterns
+    dangerous_patterns = [
+        r'[;&|`$()]',  # Shell metacharacters
+        r'\$\(',       # Command substitution
+        r'`.*`',       # Backtick command substitution
+        r'>\s*/',      # Output redirection to system paths
+        r'<\s*/',      # Input redirection from system paths
+        r'\|\s*\w+',   # Pipe to commands
+    ]
+
+    for pattern in dangerous_patterns:
+        if re.search(pattern, path_str):
+            raise ValidationError(f"Dangerous characters or patterns detected in path: {filepath}")
+
+    # Check for path traversal patterns
+    traversal_patterns = [
+        r'\.\./',      # Directory traversal
+        r'\.\.\\'      # Windows directory traversal
+    ]
+
+    for pattern in traversal_patterns:
+        if re.search(pattern, path_str):
+            raise ValidationError(f"Path traversal pattern detected: {filepath}")
+
+    # Resolve the path and validate it stays within base directory
+    try:
+        resolved = path.resolve()
+    except (OSError, RuntimeError) as e:
+        raise ValidationError(f"Failed to resolve path {filepath}: {str(e)}")
+
+    # Set base directory for validation
+    if base_dir is None:
+        base_dir = Path.cwd().resolve()
+    else:
+        base_dir = Path(base_dir).resolve()
+
+    # Ensure the resolved path is within the base directory
+    try:
+        resolved.relative_to(base_dir)
+    except ValueError:
+        raise ValidationError(f"Path traversal detected - path outside base directory: {filepath}")
+
+    # Additional filename validation
+    filename = resolved.name
+    if filename:
+        # Check for reserved Windows filenames
+        reserved_names = {
+            'CON', 'PRN', 'AUX', 'NUL',
+            'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+            'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+        }
+
+        # Check base filename without extension
+        base_filename = filename.split('.')[0].upper()
+        if base_filename in reserved_names:
+            raise ValidationError(f"Reserved filename detected: {filename}")
+
+        # Check for filenames that are only dots or whitespace
+        if filename.strip('. \t\n\r') == '':
+            raise ValidationError(f"Invalid filename (only dots/whitespace): {filename}")
+
+        # Check for filenames that start with multiple dots (potential traversal or hidden files)
+        if filename.startswith('..'):
+            raise ValidationError(f"Filename cannot start with double dots: {filename}")
 
     return resolved
