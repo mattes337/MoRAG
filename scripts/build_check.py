@@ -6,13 +6,14 @@ This script should be run before commits and in CI/CD pipelines.
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
-def run_command(cmd: List[str], cwd: Path = None) -> Dict[str, Any]:
+def run_command(cmd: List[str], cwd: Optional[Path] = None) -> Dict[str, Any]:
     """Run a command and return the result."""
     try:
         result = subprocess.run(
@@ -35,14 +36,14 @@ def run_command(cmd: List[str], cwd: Path = None) -> Dict[str, Any]:
 
 def check_python_syntax(project_root: Path) -> Dict[str, Any]:
     """Check Python syntax using py_compile."""
-    print("🔍 Checking Python syntax...")
+    print("[*] Checking Python syntax...")
 
     python_files = []
-    for root, dirs, files in project_root.rglob("*.py"):
+    for py_file in project_root.rglob("*.py"):
         if not any(
-            exclude in str(root) for exclude in [".git", "__pycache__", ".venv", "venv"]
+            exclude in str(py_file) for exclude in [".git", "__pycache__", ".venv", "venv"]
         ):
-            python_files.append(root)
+            python_files.append(py_file)
 
     errors = []
     for py_file in python_files:
@@ -60,7 +61,7 @@ def check_python_syntax(project_root: Path) -> Dict[str, Any]:
 
 def run_import_check(project_root: Path) -> Dict[str, Any]:
     """Run our custom import checker."""
-    print("📦 Checking imports...")
+    print("[*] Checking imports...")
 
     script_path = project_root / "scripts" / "check_imports.py"
     if not script_path.exists():
@@ -110,7 +111,7 @@ def run_import_check(project_root: Path) -> Dict[str, Any]:
 
 def run_static_analysis(project_root: Path) -> Dict[str, Any]:
     """Run comprehensive static analysis."""
-    print("🔬 Running static analysis...")
+    print("[*] Running static analysis...")
 
     script_path = project_root / "scripts" / "static_analysis.py"
     if not script_path.exists():
@@ -162,7 +163,7 @@ def run_static_analysis(project_root: Path) -> Dict[str, Any]:
 
 def run_tests(project_root: Path) -> Dict[str, Any]:
     """Run tests if available."""
-    print("🧪 Running tests...")
+    print("[*] Running tests...")
 
     # Check if pytest is available and there are tests
     test_dirs = [
@@ -204,7 +205,7 @@ def run_tests(project_root: Path) -> Dict[str, Any]:
 
 def run_build_checks(project_root: Path, skip_tests: bool = False) -> Dict[str, Any]:
     """Run all build checks."""
-    print("🚀 Starting build checks...")
+    print("Starting build checks...")
     print("=" * 50)
 
     checks = [
@@ -225,7 +226,7 @@ def run_build_checks(project_root: Path, skip_tests: bool = False) -> Dict[str, 
             results.append(result)
 
             # Print immediate feedback
-            status = "✅" if result["success"] else "❌"
+            status = "[PASS]" if result["success"] else "[FAIL]"
             print(f"{status} {result['name']}")
 
             if not result["success"]:
@@ -240,7 +241,7 @@ def run_build_checks(project_root: Path, skip_tests: bool = False) -> Dict[str, 
                 print(f"   {len(result['warnings'])} warnings")
 
         except Exception as e:
-            print(f"❌ {check_func.__name__} failed: {e}")
+            print(f"[FAIL] {check_func.__name__} failed: {e}")
             overall_success = False
             results.append(
                 {
@@ -292,9 +293,9 @@ def main():
         print(f"  Total warnings: {results['summary']['total_warnings']}")
 
         if results["overall_success"]:
-            print("\n🎉 All checks passed!")
+            print("\n[SUCCESS] All checks passed!")
         else:
-            print("\n💥 Some checks failed!")
+            print("\n[ERROR] Some checks failed!")
             print("\nFailed checks:")
             for check in results["checks"]:
                 if not check["success"]:

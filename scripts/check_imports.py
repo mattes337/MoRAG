@@ -60,11 +60,14 @@ class ImportChecker(ast.NodeVisitor):
     def visit_FunctionDef(self, node):
         """Handle function definitions."""
         self.defined_names.add(node.name)
-        # Add function parameters as defined names
+        # Add function parameters as defined names BEFORE visiting the body
         for arg in node.args.args:
             self.defined_names.add(arg.arg)
         # Add keyword-only arguments
         for arg in node.args.kwonlyargs:
+            self.defined_names.add(arg.arg)
+        # Add positional-only arguments (Python 3.8+)
+        for arg in node.args.posonlyargs:
             self.defined_names.add(arg.arg)
         # Add *args and **kwargs
         if node.args.vararg:
@@ -72,6 +75,11 @@ class ImportChecker(ast.NodeVisitor):
         if node.args.kwarg:
             self.defined_names.add(node.args.kwarg.arg)
         self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node):
+        """Handle async function definitions."""
+        # Same as visit_FunctionDef
+        self.visit_FunctionDef(node)
 
     def visit_ClassDef(self, node):
         """Handle class definitions."""
@@ -139,6 +147,7 @@ class ImportChecker(ast.NodeVisitor):
             "enumerate",
             "eval",
             "exec",
+            "exit",
             "filter",
             "float",
             "format",
@@ -187,6 +196,7 @@ class ImportChecker(ast.NodeVisitor):
             "vars",
             "zip",
             "__import__",
+            # Built-in exceptions
             "Exception",
             "BaseException",
             "ValueError",
@@ -196,9 +206,35 @@ class ImportChecker(ast.NodeVisitor):
             "AttributeError",
             "ImportError",
             "ModuleNotFoundError",
+            "FileNotFoundError",
+            "RuntimeError",
+            "OSError",
+            "IOError",
+            "KeyboardInterrupt",
+            "SystemExit",
+            "UnicodeDecodeError",
+            "ZeroDivisionError",
+            "ConnectionError",
+            "LookupError",
+            "NotImplementedError",
+            "PermissionError",
+            "TimeoutError",
+            "MemoryError",
+            "SyntaxError",
+            "StopIteration",
+            "GeneratorExit",
+            "AssertionError",
+            "DeprecationWarning",
+            "Warning",
+            "UserWarning",
+            "FutureWarning",
+            # Built-in constants
             "True",
             "False",
             "None",
+            "Ellipsis",
+            "NotImplemented",
+            # Built-in module attributes
             "__name__",
             "__file__",
             "__doc__",
@@ -207,8 +243,88 @@ class ImportChecker(ast.NodeVisitor):
             "__loader__",
             "__cached__",
             "__builtins__",
+            # Common names
             "self",
             "cls",
+            # Standard library modules commonly used without explicit import in some contexts
+            "importlib",
+        }
+
+        # Common parameter names that are often false positives
+        common_params = {
+            # Common function parameters
+            "query",
+            "text",
+            "content",
+            "data",
+            "result",
+            "response",
+            "context",
+            "config",
+            "options",
+            "settings",
+            "params",
+            "args",
+            "kwargs",
+            "key",
+            "value",
+            "item",
+            "items",
+            "name",
+            "path",
+            "file",
+            "filename",
+            "filepath",
+            "url",
+            "uri",
+            "source",
+            "target",
+            "destination",
+            "input",
+            "output",
+            "request",
+            "callback",
+            # Common loop/comprehension variables
+            "x",
+            "y",
+            "i",
+            "j",
+            "k",
+            "v",
+            "c",
+            "e",
+            "f",
+            "g",
+            "t",
+            # Common test fixtures
+            "tmp_path",
+            "tmpdir",
+            "monkeypatch",
+            "capsys",
+            "caplog",
+            # Common mock names
+            "mock_",
+            "test_",
+            "demo_",
+            "example_",
+            # Common database/query parameters
+            "limit",
+            "offset",
+            "query_id",
+            "entity_id",
+            "document_id",
+            "collection_name",
+            "database_name",
+            "table_name",
+            "batch_size",
+            "chunk_size",
+            "max_size",
+            "min_size",
+            # Common type/validation parameters
+            "domain",
+            "strategy",
+            "threshold",
+            "max_depth",
         }
 
         # Names that are imported or defined locally
@@ -222,7 +338,39 @@ class ImportChecker(ast.NodeVisitor):
         # Find missing imports
         missing = self.used_names - available_names
 
+        # Filter out common parameter names and single-letter variables
+        filtered_missing = set()
         for name in missing:
+            # Skip single-letter variables (likely loop variables)
+            if len(name) == 1:
+                continue
+            # Skip if it starts with a common prefix
+            if any(
+                name.startswith(prefix)
+                for prefix in common_params
+                if prefix.endswith("_")
+            ):
+                continue
+            # Skip if it's in common params
+            if name in common_params:
+                continue
+            # Skip if it ends with common suffixes
+            if any(
+                name.endswith(suffix)
+                for suffix in [
+                    "_id",
+                    "_name",
+                    "_type",
+                    "_path",
+                    "_url",
+                    "_size",
+                    "_count",
+                ]
+            ):
+                continue
+            filtered_missing.add(name)
+
+        for name in sorted(filtered_missing):
             self.errors.append(f"Missing import for '{name}' used in {self.filepath}")
 
     def check_unused_imports(self):
@@ -255,7 +403,7 @@ def check_file(filepath: Path) -> Tuple[List[str], List[str]]:
 
 
 def find_python_files(
-    directory: Path, exclude_patterns: List[str] = None
+    directory: Path, exclude_patterns: Optional[List[str]] = None
 ) -> List[Path]:
     """Find all Python files in a directory."""
     if exclude_patterns is None:

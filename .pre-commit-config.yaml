@@ -21,6 +21,7 @@ repos:
         entry: py -3 scripts/build_check.py
         language: system
         files: \.py$
+        pass_filenames: false
         args: [--skip-tests]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
